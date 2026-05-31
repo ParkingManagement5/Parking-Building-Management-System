@@ -1,2 +1,4 @@
-# Parking-Building-Management-System
-Hệ thống Smart Parking giúp quản lý bãi xe thông minh với đặt chỗ, theo dõi slot trống, thanh toán online, nhận diện biển số và AI hỗ trợ phân bổ vị trí đỗ xe hiệu quả.
+1.SRS-Parking Car System Management(Báo cáo):
+
+2.Doc.Ai Code:
+https://docs.google.com/document/d/1HMAsg3iuBezdkCwlWBz7DAs_BKnZ0ZiksKDJj9briPc/edit?usp=sharing
