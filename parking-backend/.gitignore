@@ -37,3 +37,4 @@ application-dev.yml
 application-prod.yml
 application-local.yml
 
+parking-backend/src/main/resources/application-dev.yml
