@@ -3,6 +3,7 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.request.ChangePasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
+import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.AuthResponse;
 import com.swp391.parking.service.impl.AuthService;
@@ -70,5 +71,18 @@ public class AuthController {
             @Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(userDetails.getUsername(), request);
         return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công"));
+    }
+
+    /**
+     * PUT /api/v1/users/profile
+     * Yêu cầu JWT token — cập nhật profile người dùng
+     * Body: { fullName, email, phone, address }
+     */
+    @PutMapping("/users/profile")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        UserProfileResponse response = authService.updateProfile(userDetails.getUsername(), request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật profile thành công", response));
     }
 }
