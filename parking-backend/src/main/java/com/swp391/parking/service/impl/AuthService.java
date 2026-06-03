@@ -1,5 +1,6 @@
 package com.swp391.parking.service.impl;
 
+import com.swp391.parking.dto.request.ChangePasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
 import com.swp391.parking.dto.response.AuthResponse;
@@ -119,5 +120,21 @@ public class AuthService {
                 .roles(roles)
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    // ── Change Password ──────────────────────────────────────────────────────
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest req) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User không tồn tại"));
+
+        // Verify old password
+        if (!passwordEncoder.matches(req.getOldPassword(), user.getPasswordHash())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Mật khẩu cũ không đúng");
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        userRepository.save(user);
     }
 }
