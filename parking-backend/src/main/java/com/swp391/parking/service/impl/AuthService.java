@@ -17,9 +17,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.swp391.parking.dto.response.UserProfileResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -98,13 +98,15 @@ public class AuthService {
                 .roles(roles)
                 .build();
     }
-//
+
+
+    // ── Get Me ───────────────────────────────────────────────────────────────
     public UserProfileResponse getMe(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User không tồn tại"));
 
         Set<String> roles = user.getRoles().stream()
-                .map(role -> role.getRoleName().name())
+                .map(r -> "ROLE_" + r.getRoleName().name())
                 .collect(Collectors.toSet());
 
         return UserProfileResponse.builder()
