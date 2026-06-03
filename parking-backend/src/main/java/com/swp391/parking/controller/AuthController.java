@@ -1,5 +1,6 @@
 package com.swp391.parking.controller;
 
+import com.swp391.parking.dto.request.ChangePasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
 import com.swp391.parking.dto.response.ApiResponse;
@@ -56,5 +57,18 @@ public class AuthController {
             @AuthenticationPrincipal UserDetails userDetails) {
         UserProfileResponse response = authService.getMe(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * PUT /api/v1/auth/change-password
+     * Yêu cầu JWT token — đổi mật khẩu
+     * Body: { oldPassword, newPassword }
+     */
+    @PutMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(userDetails.getUsername(), request);
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công"));
     }
 }
