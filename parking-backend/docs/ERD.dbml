@@ -1,0 +1,408 @@
+# Parking Building Management System - ERD
+
+## parking_building
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| building_id | int | PK, Auto Increment |
+| name | varchar(100) | NOT NULL |
+| address | varchar(255) | NOT NULL |
+| operating_hours | varchar(50) | |
+| total_floors | int | |
+| status | varchar(20) | ACTIVE, INACTIVE, MAINTENANCE |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## floor
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| floor_id | int | PK, Auto Increment |
+| building_id | int | FK → parking_building.building_id |
+| floor_number | int | NOT NULL |
+| floor_name | varchar(50) | |
+| status | varchar(20) | ACTIVE, INACTIVE, MAINTENANCE |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## vehicle_type
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| vehicle_type_id | int | PK, Auto Increment |
+| name | varchar(50) | UNIQUE, NOT NULL |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+Values:
+- MOTORBIKE
+- CAR
+- ELECTRIC_CAR
+
+---
+
+## zone
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| zone_id | int | PK, Auto Increment |
+| floor_id | int | FK → floor.floor_id |
+| vehicle_type_id | int | FK → vehicle_type.vehicle_type_id |
+| zone_name | varchar(50) | NOT NULL |
+| status | varchar(20) | ACTIVE, INACTIVE, MAINTENANCE |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## parking_slot
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| slot_id | int | PK, Auto Increment |
+| zone_id | int | FK → zone.zone_id |
+| slot_code | varchar(20) | UNIQUE, NOT NULL |
+| priority | int | |
+| distance_to_gate | int | |
+| status | varchar(20) | AVAILABLE, RESERVED, OCCUPIED, MAINTENANCE |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## user
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| user_id | int | PK, Auto Increment |
+| username | varchar(50) | UNIQUE, NOT NULL |
+| full_name | varchar(100) | NOT NULL |
+| email | varchar(100) | UNIQUE, NOT NULL |
+| phone | varchar(20) | |
+| password_hash | varchar(255) | NOT NULL |
+| status | varchar(20) | ACTIVE, INACTIVE, LOCKED |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## role
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| role_id | int | PK |
+| role_name | varchar(50) | UNIQUE, NOT NULL |
+
+Roles:
+- ADMIN
+- MANAGER
+- STAFF
+- DRIVER
+
+---
+
+## user_role
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| user_id | int | FK → user.user_id |
+| role_id | int | FK → role.role_id |
+
+Primary Key:
+- (user_id, role_id)
+
+---
+
+## vehicle
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| vehicle_id | int | PK |
+| owner_user_id | int | FK → user.user_id |
+| vehicle_type_id | int | FK → vehicle_type.vehicle_type_id |
+| license_plate | varchar(20) | UNIQUE, NOT NULL |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## booking
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| booking_id | int | PK |
+| user_id | int | FK → user.user_id |
+| vehicle_id | int | FK → vehicle.vehicle_id |
+| slot_id | int | FK → parking_slot.slot_id |
+| booking_start_time | datetime | |
+| booking_end_time | datetime | |
+| reserved_at | datetime | |
+| expired_at | datetime | |
+| status | varchar(30) | PENDING_PAYMENT, CONFIRMED, CHECKED_IN, EXPIRED, CANCELLED, COMPLETED |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## parking_session
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| session_id | int | PK |
+| booking_id | int | FK → booking.booking_id |
+| slot_id | int | FK → parking_slot.slot_id |
+| user_id | int | FK → user.user_id |
+| vehicle_id | int | FK → vehicle.vehicle_id |
+| entry_gate_id | int | FK → gate.gate_id |
+| exit_gate_id | int | FK → gate.gate_id |
+| entry_time | datetime | |
+| exit_time | datetime | |
+| entry_mode | varchar(20) | BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL |
+| status | varchar(30) | ACTIVE, WAITING_PAYMENT, COMPLETED, EXCEPTION |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## ticket
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| ticket_id | int | PK |
+| session_id | int | FK → parking_session.session_id |
+| ticket_code | varchar(50) | UNIQUE, NOT NULL |
+| ticket_type | varchar(20) | BOOKING, WALK_IN |
+| issued_at | datetime | NOT NULL |
+| status | varchar(20) | ACTIVE, LOST, CLOSED |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## pricing_policy
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| policy_id | int | PK |
+| vehicle_type_id | int | FK → vehicle_type.vehicle_type_id |
+| time_type | varchar(20) | HOURLY, DAILY, OVERNIGHT |
+| day_type | varchar(20) | WEEKDAY, WEEKEND, HOLIDAY |
+| start_hour | int | |
+| end_hour | int | |
+| price_per_hour | decimal(10,2) | NOT NULL |
+| is_active | boolean | NOT NULL |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## payment
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| payment_id | int | PK |
+| session_id | int | FK → parking_session.session_id |
+| policy_id | int | FK → pricing_policy.policy_id |
+| applied_rate | decimal(10,2) | |
+| base_fee | decimal(12,2) | |
+| overtime_fee | decimal(12,2) | |
+| penalty_fee | decimal(12,2) | |
+| discount | decimal(12,2) | |
+| total_amount | decimal(12,2) | NOT NULL |
+| transaction_ref | varchar(100) | UNIQUE |
+| payment_method | varchar(20) | CASH, MOCK, VNPAY |
+| payment_status | varchar(20) | PENDING, PAID, FAILED, REFUNDED, CANCELLED |
+| paid_at | datetime | |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## gate
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| gate_id | int | PK |
+| building_id | int | FK → parking_building.building_id |
+| gate_code | varchar(50) | UNIQUE, NOT NULL |
+| gate_type | varchar(20) | ENTRY, EXIT, BOTH |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## gate_log
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| gate_log_id | int | PK |
+| gate_id | int | FK → gate.gate_id |
+| session_id | int | FK → parking_session.session_id |
+| staff_user_id | int | FK → user.user_id |
+| license_plate | varchar(20) | |
+| event_type | varchar(30) | ENTRY, EXIT |
+| result_status | varchar(20) | SUCCESS, FAILED, MANUAL_CHECK |
+| event_time | datetime | NOT NULL |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## ocr_scan
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| scan_id | int | PK |
+| session_id | int | FK → parking_session.session_id |
+| gate_id | int | FK → gate.gate_id |
+| image_path | varchar(500) | |
+| detected_plate | varchar(20) | |
+| plate_confidence_score | float | |
+| corrected_plate | varchar(20) | |
+| staff_vehicle_type_id | int | FK → vehicle_type.vehicle_type_id |
+| is_corrected | boolean | NOT NULL |
+| corrected_by | int | FK → user.user_id |
+| corrected_at | datetime | |
+| correction_reason | varchar(255) | |
+| trigger_type | varchar(20) | ENTRY, EXIT |
+| process_status | varchar(30) | AUTO_APPROVED, MANUAL_REVIEW, STAFF_APPROVED, CORRECTED_AFTER_APPROVAL, FAILED |
+| scanned_at | datetime | |
+
+---
+
+## request
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| request_id | int | PK |
+| user_id | int | FK → user.user_id |
+| assigned_staff_id | int | FK → user.user_id |
+| request_type | varchar(30) | LOST_CARD, WRONG_FEE, CANNOT_FIND_CAR, OTHER |
+| subject | varchar(200) | |
+| description | text | |
+| status | varchar(20) | PENDING, PROCESSING, RESOLVED, REJECTED, CLOSED |
+| resolved_at | datetime | |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## exception_case
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| exception_id | int | PK |
+| session_id | int | FK → parking_session.session_id |
+| request_id | int | FK → request.request_id |
+| exception_type | varchar(30) | |
+| description | varchar(500) | |
+| status | varchar(20) | OPEN, PROCESSING, RESOLVED, CLOSED |
+| resolved_by | int | FK → user.user_id |
+| resolved_at | datetime | |
+| created_at | datetime | |
+| updated_at | datetime | |
+
+---
+
+## notification
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| notification_id | int | PK |
+| user_id | int | FK → user.user_id |
+| title | varchar(200) | NOT NULL |
+| body | text | |
+| type | varchar(50) | |
+| entity_type | varchar(30) | |
+| entity_id | int | |
+| is_read | boolean | NOT NULL |
+| created_at | datetime | |
+
+---
+
+## activity_log
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| log_id | bigint | PK |
+| user_id | int | FK → user.user_id |
+| action_type | varchar(50) | |
+| action | varchar(200) | NOT NULL |
+| ip_address | varchar(50) | |
+| created_at | datetime | |
+
+---
+
+## shift
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| shift_id | int | PK |
+| shift_name | varchar(50) | NOT NULL |
+| start_time | time | NOT NULL |
+| end_time | time | NOT NULL |
+| status | varchar(20) | ACTIVE, INACTIVE |
+
+---
+
+## staff_shift
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| staff_shift_id | int | PK |
+| staff_user_id | int | FK → user.user_id |
+| shift_id | int | FK → shift.shift_id |
+| working_date | date | NOT NULL |
+
+---
+
+## system_config
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| config_id | bigint | PK |
+| config_key | varchar(100) | UNIQUE, NOT NULL |
+| config_value | varchar(255) | |
+| description | varchar(255) | |
+| updated_by | int | FK → user.user_id |
+| updated_at | datetime | |
+
+---
+
+## password_reset_token
+
+| Column | Type | Constraints |
+|----------|----------|----------|
+| token_id | int | PK |
+| user_id | int | FK → user.user_id |
+| token | varchar(255) | UNIQUE, NOT NULL |
+| expires_at | datetime | NOT NULL |
+| used | boolean | NOT NULL |
+| created_at | datetime | |
+
+---
+
+# Main Relationships
+
+- parking_building → floor (1:N)
+- parking_building → gate (1:N)
+- floor → zone (1:N)
+- zone → parking_slot (1:N)
+- vehicle_type → zone (1:N)
+- vehicle_type → vehicle (1:N)
+- vehicle_type → pricing_policy (1:N)
+- user ↔ role (N:N via user_role)
+- user → vehicle (1:N)
+- user → booking (1:N)
+- booking → parking_session (1:0..1)
+- parking_session → payment (1:1)
+- parking_session → ticket (1:1)
+- parking_session → gate_log (1:N)
+- parking_session → ocr_scan (1:N)
+- user → request (1:N)
+- request → exception_case (1:N)
+- shift → staff_shift (1:N)
