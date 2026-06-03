@@ -9,6 +9,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import com.swp391.parking.dto.response.UserProfileResponse;
 
 /**
  * Public endpoints — không cần JWT.
@@ -43,4 +46,15 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
     }
+
+    /**
+     * GET /api/v1/auth/me
+     * Cần JWT — trả về thông tin user đang đăng nhập
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getMe(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UserProfileResponse response = authService.getMe(userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(response));
+
 }

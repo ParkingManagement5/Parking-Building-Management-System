@@ -98,4 +98,24 @@ public class AuthService {
                 .roles(roles)
                 .build();
     }
+//
+    public UserProfileResponse getMe(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        Set<String> roles = user.getRoles().stream()
+                .map(role -> role.getRoleName().name())
+                .collect(Collectors.toSet());
+
+        return UserProfileResponse.builder()
+                .userId(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .status(user.getStatus().name())
+                .roles(roles)
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
 }
