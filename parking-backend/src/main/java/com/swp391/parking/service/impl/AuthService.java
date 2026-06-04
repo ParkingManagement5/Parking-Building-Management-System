@@ -1,7 +1,9 @@
 package com.swp391.parking.service.impl;
 
+import com.swp391.parking.dto.request.ChangePasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
+import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.AuthResponse;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
@@ -17,9 +19,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.swp391.parking.dto.response.UserProfileResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -96,6 +98,79 @@ public class AuthService {
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .roles(roles)
+                .build();
+    }
+
+
+    // ── Get Me ───────────────────────────────────────────────────────────────
+    public UserProfileResponse getMe(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User không tồn tại"));
+
+        Set<String> roles = user.getRoles().stream()
+                .map(r -> "ROLE_" + r.getRoleName().name())
+                .collect(Collectors.toSet());
+
+        return UserProfileResponse.builder()
+                .userId(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .status(user.getStatus().name())
+                .roles(roles)
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    // ── Change Password ──────────────────────────────────────────────────────
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest req) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User không tồn tại"));
+
+        // Verify old password
+        if (!passwordEncoder.matches(req.getOldPassword(), user.getPasswordHash())) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Mật khẩu cũ không đúng");
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    // ── Update Profile ───────────────────────────────────────────────────
+    @Transactional
+    public UserProfileResponse updateProfile(String username, UpdateProfileRequest req) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User không tồn tại"));
+
+        // Check if new email is already in use by another user
+        if (!user.getEmail().equals(req.getEmail()) && userRepository.existsByEmail(req.getEmail())) {
+            throw new AppException(HttpStatus.CONFLICT, "Email đã được sử dụng");
+        }
+
+        // Update fields
+        user.setFullName(req.getFullName());
+        user.setEmail(req.getEmail());
+        user.setPhone(req.getPhone());
+
+        userRepository.save(user);
+
+        // Build response
+        Set<String> roles = user.getRoles().stream()
+                .map(r -> "ROLE_" + r.getRoleName().name())
+                .collect(Collectors.toSet());
+
+        return UserProfileResponse.builder()
+                .userId(user.getUserId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .status(user.getStatus().name())
+                .roles(roles)
+                .createdAt(user.getCreatedAt())
                 .build();
     }
 }
