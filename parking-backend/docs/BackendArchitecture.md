@@ -1,4 +1,7 @@
 # Backend Architecture
+> Version 2.0 — Cập nhật: bỏ Ticket module, thêm QR token, deposit logic
+
+---
 
 ## 1. Project Overview
 
@@ -8,9 +11,9 @@ The backend system is responsible for managing:
 
 * User authentication and authorization
 * Parking building management
-* Vehicle and booking management
-* Parking sessions and ticket processing
-* Payment management
+* Vehicle and booking management (với QR check-in, deposit cho CAR/ELECTRIC_CAR)
+* Parking sessions (BOOKING / WALK_IN_AUTO / WALK_IN_MANUAL)
+* Payment management (DEPOSIT + PARKING_FEE)
 * OCR vehicle plate recognition
 * Request and exception handling
 * Staff scheduling
@@ -18,464 +21,225 @@ The backend system is responsible for managing:
 
 ---
 
-# 2. Technology Stack
+## 2. Technology Stack
 
-## Core Technologies
+### Core Technologies
 
-| Component  | Technology      |
-| ---------- | --------------- |
-| Language   | Java 17         |
-| Framework  | Spring Boot 3.x |
-| Build Tool | Maven           |
-| Database   | MySQL 8         |
-| API Style  | RESTful API     |
+| Component | Technology |
+|-----------|------------|
+| Language | Java 17 |
+| Framework | Spring Boot 3.3.x |
+| Build Tool | Maven |
+| Database | MySQL 8 |
+| API Style | RESTful API |
 
-## Libraries
+### Libraries
 
 * Spring Web
 * Spring Data JPA
 * Spring Security
-* JWT Authentication
+* JWT Authentication (jjwt 0.12.3) — dùng cho cả auth token và QR token
 * Bean Validation
 * Lombok
 * MapStruct
-* Swagger OpenAPI
+* Swagger OpenAPI (springdoc 2.3.0)
 
 ---
 
-# 3. Architecture Pattern
-
-The backend follows a layered architecture.
+## 3. Architecture Pattern
 
 ```text
 Client
    ↓
-Controller Layer
+Controller Layer   ← validate request, trả ApiResponse<T>
    ↓
-Service Layer
+Service Layer      ← business logic, transaction, throw AppException
    ↓
-Repository Layer
+Repository Layer   ← JPA queries
    ↓
 MySQL Database
 ```
 
-## Controller Layer
-
-Responsibilities:
-
-* Receive HTTP requests
-* Validate request data
-* Return API responses
-
-## Service Layer
-
-Responsibilities:
-
-* Implement business logic
-* Handle transactions
-* Process validations
-
-## Repository Layer
-
-Responsibilities:
-
-* Database access
-* CRUD operations
-* Query execution
-
 ---
 
-# 4. Package Structure
+## 4. Package Structure
 
 ```text
 com.swp391.parking
 
-├── config
+├── config          ← SecurityConfig, JpaConfig, OpenApiConfig
 ├── security
-├── controller
+│   ├── jwt         ← JwtUtil, JwtAuthFilter
+│   └── service     ← UserDetailsServiceImpl
+├── controller      ← REST endpoints
 ├── service
-│   └── impl
-├── repository
-├── entity
+│   └── impl        ← Business logic
+├── repository      ← JPA repositories
+├── entity          ← JPA entities (extends BaseEntity)
 ├── dto
-│   ├── request
-│   └── response
-├── mapper
-├── exception
-├── util
-└── scheduler
+│   ├── request     ← *Request.java
+│   └── response    ← *Response.java, ApiResponse.java
+├── mapper          ← MapStruct mappers
+├── exception       ← AppException, GlobalExceptionHandler
+├── util            ← FeeCalculator, QrTokenUtil, DepositCalculator
+└── scheduler       ← BookingExpiryScheduler
 ```
 
 ---
 
-# 5. Environment Configuration
-
-## Application Files
+## 5. Environment Configuration
 
 ```text
 src/main/resources
-
-├── application.yml
-├── application-dev.yml
-└── application-prod.yml
+├── application.yml       ← commit lên git (không có password)
+├── application-dev.yml   ← KHÔNG commit (gitignore)
+└── application-prod.yml  ← KHÔNG commit (gitignore)
 ```
-
-### application.yml
-
-Shared configuration committed to Git.
-
-Contains:
-
-* JPA settings
-* JWT configuration
-* Common application settings
-
-### application-dev.yml
-
-Local development configuration.
-
-Contains:
-
-* Local database URL
-* Username
-* Password
-
-This file must not be committed to Git.
 
 ---
 
-# 6. Security Design
+## 6. Security Design
 
-## Authentication
+### Authentication
+* JWT Token Authentication
+* QR Token: cũng dùng JWT (khác secret key hoặc claim `type=QR`)
 
-JWT Token Authentication
+### Authorization — RBAC
 
-### Features
+| Role | Quyền chính |
+|------|-------------|
+| DRIVER | Tạo booking, xem lịch sử, thanh toán |
+| STAFF | Check-in/out, verify OCR, xử lý request |
+| MANAGER | Quản lý pricing, báo cáo, quản lý staff |
+| ADMIN | Toàn quyền hệ thống |
 
-* Login
-* Register
-* Password Reset
-* Token Validation
-
-## Authorization
-
-Role-Based Access Control (RBAC)
-
-### System Roles
-
-* ADMIN
-* MANAGER
-* STAFF
-* DRIVER
-
-## Password Security
-
+### Password Security
 * BCrypt Password Encoder
 
 ---
 
-# 7. Business Modules
+## 7. Business Modules
 
-## Authentication Module
-
-Entities:
-
-* User
-* Role
-* UserRole
-* PasswordResetToken
-
-Features:
-
-* Login
-* Register
-* JWT Authentication
-* Password Reset
+### Authentication Module
+Entities: User, Role, UserRole, PasswordResetToken
+Features: Login, Register, JWT, Password Reset
 
 ---
 
-## Parking Infrastructure Module
-
-Entities:
-
-* ParkingBuilding
-* Floor
-* Zone
-* ParkingSlot
-* Gate
-
-Features:
-
-* Building Management
-* Floor Management
-* Zone Management
-* Slot Management
-* Gate Management
+### Parking Infrastructure Module
+Entities: ParkingBuilding, Floor, Zone, ParkingSlot, Gate
+Features: CRUD building/floor/zone/slot/gate, quản lý status
 
 ---
 
-## Vehicle & Booking Module
-
-Entities:
-
-* Vehicle
-* VehicleType
-* Booking
+### Vehicle & Booking Module
+Entities: Vehicle, VehicleType, Booking
 
 Features:
+* Vehicle CRUD
+* Booking với deposit (CAR + ELECTRIC_CAR)
+* Sinh QR token sau khi payment PAID
+* Gửi QR qua email (notification)
+* Scheduler tự EXPIRED booking sau `expired_at`
 
-* Vehicle Registration
-* Slot Reservation
-* Booking Management
-* Booking Expiration
+**Deposit logic** (DepositCalculator.java):
+```
+< 30 phút  → 0đ       (MOTORBIKE luôn 0đ)
+30p – 2h   → 10,000đ
+2h – 4h    → 15,000đ
+4h – 6h    → 20,000đ
+> 6h       → 30,000đ
+```
+Áp dụng cho: CAR, ELECTRIC_CAR
+
+**expired_at logic:**
+```
+expired_at = MIN(now + 15 phút, booking_start_time - 5 phút)
+Không cho booking nếu booking_start_time - now < 10 phút
+```
 
 ---
 
-## Parking Session Module
+### Parking Session Module
+Entities: ParkingSession, GateLog, OcrScan
 
-Entities:
-
-* ParkingSession
-* Ticket
-* GateLog
-* OCRScan
+> ⚠️ Không có Ticket entity — đã bỏ hoàn toàn
 
 Features:
+* Check-in: verify QR (booking) hoặc OCR biển số (walk-in)
+* Check-out: OCR biển số hoặc QR, tính phí
+* Ghi GateLog mọi sự kiện ENTRY/EXIT
+* OCR: AUTO_APPROVED / MANUAL_REVIEW / STAFF_APPROVED
 
-* Vehicle Check-In
-* Vehicle Check-Out
-* Ticket Management
-* OCR Verification
+**entry_mode:**
+* `BOOKING` — có QR hợp lệ
+* `WALK_IN_AUTO` — OCR tự động nhận diện
+* `WALK_IN_MANUAL` — staff nhập tay
 
 ---
 
-## Payment Module
+### Payment Module
+Entities: PricingPolicy, Payment
 
-Entities:
+**payment_type:**
+* `DEPOSIT` — thu cọc khi tạo booking (trước khi có session)
+* `PARKING_FEE` — phí đỗ xe khi checkout
 
-* PricingPolicy
-* Payment
-
-Features:
-
-* Fee Calculation
-* Payment Processing
-* Revenue Tracking
-
----
-
-## Request & Exception Module
-
-Entities:
-
-* Request
-* ExceptionCase
-
-Features:
-
-* Lost Ticket Handling
-* Wrong Fee Handling
-* Customer Support Requests
-* Exception Resolution
+**Fee calculation:**
+```
+total = base_fee + overtime_fee + penalty_fee - discount - deposit_deducted
+```
 
 ---
 
-## Staff Management Module
+### Request & Exception Module
+Entities: Request, ExceptionCase
 
-Entities:
-
-* Shift
-* StaffShift
-
-Features:
-
-* Staff Scheduling
-* Shift Assignment
+**request_type:**
+* `LOST_QR` — driver mất QR/điện thoại
+* `WRONG_FEE` — khiếu nại phí
+* `CANNOT_FIND_CAR`
+* `OTHER`
 
 ---
 
-## Audit & Configuration Module
-
-Entities:
-
-* ActivityLog
-* Notification
-* SystemConfig
-
-Features:
-
-* Audit Logging
-* Notifications
-* System Configuration
+### Staff Management Module
+Entities: Shift, StaffShift
+Features: Staff scheduling, shift assignment
 
 ---
 
-# 8. Git Branch Strategy
+### Audit & Configuration Module
+Entities: ActivityLog, Notification, SystemConfig
+Features: Audit logging, notifications (email QR, reminder), system config
 
-## Main Branches
+---
+
+## 8. Git Branch Strategy
 
 ```text
 main
 └── backend
+    ├── feature/parking-infra   ← BE-1
+    ├── feature/booking         ← BE-2
+    ├── feature/session         ← BE-3
+    └── feature/payment         ← BE-4
 ```
 
-## Feature Branches
-
-```text
-backend
-├── feature/auth
-├── feature/parking-infra
-├── feature/booking-session
-├── feature/payment-report
-```
-
-### Development Workflow
-
-```text
-feature branch
-      ↓
-Pull Request
-      ↓
-backend
-      ↓
-main
-```
-
-### Rules
-
-1. Create feature branches from backend.
-2. Open Pull Request before merging.
-3. At least one team member reviews the code.
-4. Do not commit local configuration files.
-5. Keep feature branches focused on a single module.
+**Rules:**
+1. Tạo branch từ `backend`
+2. Pull Request trước khi merge
+3. Ít nhất 1 người review
+4. Không commit `application-dev.yml`
+5. Mỗi branch chỉ làm 1 module
 
 ---
 
-# 9. Team Development Plan
+## 9. Coding Standards
 
-## Sprint 1
-
-Authentication & Security
-
-Entities:
-
-* User
-* Role
-* UserRole
-* PasswordResetToken
-
-Deliverables:
-
-* Login API
-* Register API
-* JWT Authentication
-* Role Authorization
-
----
-
-## Sprint 2
-
-Parking Infrastructure
-
-Entities:
-
-* ParkingBuilding
-* Floor
-* Zone
-* ParkingSlot
-* Gate
-
-Deliverables:
-
-* CRUD APIs
-* Slot Management
-
----
-
-## Sprint 3
-
-Vehicle & Booking
-
-Entities:
-
-* Vehicle
-* VehicleType
-* Booking
-
-Deliverables:
-
-* Vehicle APIs
-* Booking APIs
-* Booking Expiration Scheduler
-
----
-
-## Sprint 4
-
-Parking Session
-
-Entities:
-
-* ParkingSession
-* Ticket
-* GateLog
-* OCRScan
-
-Deliverables:
-
-* Check-In APIs
-* Check-Out APIs
-* OCR Integration
-
----
-
-## Sprint 5
-
-Payment
-
-Entities:
-
-* PricingPolicy
-* Payment
-
-Deliverables:
-
-* Fee Calculation
-* Payment APIs
-* Revenue Statistics
-
----
-
-## Sprint 6
-
-Support & Reporting
-
-Entities:
-
-* Request
-* ExceptionCase
-* Shift
-* StaffShift
-* ActivityLog
-* Notification
-* SystemConfig
-
-Deliverables:
-
-* Request Management
-* Exception Handling
-* Staff Scheduling
-* Reports
-
----
-
-# 10. Coding Standards
-
-* Java 17 syntax
-* RESTful API design
-* DTO pattern for request/response
-* Constructor injection preferred
-* Global exception handling
-* Swagger documentation for all APIs
-* Meaningful commit messages
-* Follow clean code principles
+* Response format: `ApiResponse<T>` cho mọi endpoint
+* Exception: throw `AppException(HttpStatus, message)` từ service
+* Entity: extends `BaseEntity` (auto createdAt/updatedAt)
+* Naming: PascalCase class, snake_case DB, `/api/v1/resource` endpoint
+* Swagger: `@Operation` annotation trên mọi endpoint
+* Commit message: `feat(module): mô tả` / `fix(module): mô tả`
