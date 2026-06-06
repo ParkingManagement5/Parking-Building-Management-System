@@ -1,0 +1,10 @@
+@media (max-width: 900px) {
+  .stats-grid,
+  .dashboard-section {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    width: 220px;
+  }
+}
