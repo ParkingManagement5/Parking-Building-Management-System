@@ -1,0 +1,164 @@
+/* HEADER */
+
+.header {
+  height: 72px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 28px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* USER */
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-text {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.user-text span {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+
+  border-radius: 50%;
+
+  background: #2563eb;
+  color: white;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  font-weight: bold;
+}
+
+/* PAGE TITLE */
+
+.page-title h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.page-title p {
+  margin-top: 8px;
+  color: #6b7280;
+}
+
+/* DASHBOARD CARDS */
+
+.stats-grid {
+  margin-top: 24px;
+
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+
+  gap: 20px;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+
+  padding: 22px;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #6b7280;
+}
+
+.stat-card p {
+  margin: 12px 0 6px;
+
+  font-size: 30px;
+  font-weight: bold;
+}
+
+.stat-card span {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* PANELS */
+
+.dashboard-section {
+  margin-top: 24px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  gap: 22px;
+}
+
+.panel {
+  background: white;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+
+  padding: 22px;
+}
+
+.panel h3 {
+  margin-top: 0;
+}
+
+/* STATUS */
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.progress {
+  height: 10px;
+  background: #e5e7eb;
+
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress div {
+  height: 100%;
+  background: #2563eb;
+}
+
+/* ACTIVITY */
+
+.activity-list {
+  padding-left: 18px;
+  margin-bottom: 0;
+}
+
+.activity-list li {
+  margin-bottom: 12px;
+  color: #374151;
+}
