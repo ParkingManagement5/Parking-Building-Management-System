@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getToken, logout } from "../utils/auth";
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -7,14 +8,29 @@ const axiosClient = axios.create({
   },
 });
 
-axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+axiosClient.interceptors.request.use(
+  (config) => {
+    const token = getToken();
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+axiosClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      logout();
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(error);
   }
-
-  return config;
-});
+);
 
 export default axiosClient;
