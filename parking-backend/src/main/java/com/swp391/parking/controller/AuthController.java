@@ -6,7 +6,6 @@ import com.swp391.parking.dto.request.RegisterRequest;
 import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.AuthResponse;
-import com.swp391.parking.service.impl.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.swp391.parking.dto.response.UserProfileResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import com.swp391.parking.service.impl.AuthService;
 
 /**
  * Public endpoints — không cần JWT.
