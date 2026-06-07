@@ -50,3 +50,31 @@
 .public-section {
   padding: 48px;
 }
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.service-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.service-card h3 {
+  margin-top: 0;
+}
+
+.service-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}

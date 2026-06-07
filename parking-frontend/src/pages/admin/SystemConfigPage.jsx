@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { systemConfigApi } from "../../api/systemConfigApi";
+import { systemConfigApi } from "../../api/admin/systemConfigApi";
 
 export default function SystemConfigPage() {
   const [configs, setConfigs] = useState([]);

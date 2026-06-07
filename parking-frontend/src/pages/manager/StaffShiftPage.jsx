@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { staffShiftApi } from "../../api/staffShiftApi";
+import { staffShiftApi } from "../../api/manager/staffShiftApi";
 
 export default function StaffShiftPage() {
   const [staffShifts, setStaffShifts] = useState([]);

@@ -1,4 +1,4 @@
-import axiosClient from "./axiosClient";
+import axiosClient from "../axiosClient";
 
 export const floorApi = {
   getAll: () => axiosClient.get("/floors"),
