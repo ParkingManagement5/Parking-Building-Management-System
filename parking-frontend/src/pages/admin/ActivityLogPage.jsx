@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { activityLogApi } from "../../api/activityLogApi";
+import { activityLogApi } from "../../api/admin/activityLogApi";
 
 export default function ActivityLogPage() {
   const [logs, setLogs] = useState([]);

@@ -1,11 +1,14 @@
 import { Outlet } from "react-router-dom";
-import PublicNavbar from "../components/public/PublicNavbar";
+import PublicNavbar from "../pages/public/PublicNavbar";
 
 export default function PublicLayout() {
   return (
-    <div>
+    <>
       <PublicNavbar />
-      <Outlet />
-    </div>
+
+      <main>
+        <Outlet />
+      </main>
+    </>
   );
 }

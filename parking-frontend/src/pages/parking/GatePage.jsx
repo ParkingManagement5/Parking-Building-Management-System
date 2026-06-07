@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { gateApi } from "../../api/gateApi";
+import { gateApi } from "../../api/manager/gateApi";
 
 export default function GatePage() {
   const [gates, setGates] = useState([]);

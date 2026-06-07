@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { floorApi } from "../../api/floorApi";
+import { floorApi } from "../../api/manager/floorApi";
 
 export default function FloorPage() {
   const [floors, setFloors] = useState([]);
