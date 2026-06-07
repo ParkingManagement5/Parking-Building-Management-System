@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { userApi } from "../../api/userApi";
+import { userApi } from "../../api/admin/userApi";
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);

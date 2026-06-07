@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { vehicleEntryApi } from "../../api/vehicleEntryApi";
+import { vehicleEntryApi } from "../../api/staff/vehicleEntryApi";
 
 export default function VehicleEntryPage() {
   const [form, setForm] = useState({

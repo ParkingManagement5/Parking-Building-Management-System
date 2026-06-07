@@ -2,7 +2,7 @@ import axios from "axios";
 import { getToken, logout } from "../utils/auth";
 
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080/api",
   headers: {
     "Content-Type": "application/json",
   },
