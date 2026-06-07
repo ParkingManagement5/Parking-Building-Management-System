@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { zoneApi } from "../../api/zoneApi";
+import { zoneApi } from "../../api/manager/zoneApi";
 
 export default function ZonePage() {
   const [zones, setZones] = useState([]);

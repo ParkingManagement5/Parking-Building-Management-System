@@ -1,26 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { saveAuth } from "../../utils/auth";
-import { authApi } from "../../api/authApi";
+import { saveToken, saveRole } from "../../utils/auth";
 
 export default function LoginPage() {
-  const navigate = useNavigate();
-
   const [form, setForm] = useState({
     username: "",
     password: "",
   });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const redirectByRole = (role) => {
-    if (role === "DRIVER") navigate("/driver");
-    else if (role === "STAFF") navigate("/staff");
-    else if (role === "MANAGER") navigate("/manager");
-    else if (role === "ADMIN") navigate("/admin");
-    else navigate("/login");
-  };
 
   const handleChange = (e) => {
     setForm({
@@ -29,48 +14,49 @@ export default function LoginPage() {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
-    try {
-      const res = await authApi.login(form);
+    // TEST ROLE
 
-      const data = res.data.data;
-
-      saveAuth({
-        token: data.token,
-        role: data.role,
-        username: data.username,
-      });
-
-      redirectByRole(data.role);
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Login failed. Please try again."
-      );
-    } finally {
-      setLoading(false);
+    if (form.username === "admin") {
+      saveToken("demo-token");
+      saveRole("ADMIN");
+      window.location.href = "/admin";
+      return;
     }
+
+    if (form.username === "manager") {
+      saveToken("demo-token");
+      saveRole("MANAGER");
+      window.location.href = "/manager";
+      return;
+    }
+
+    if (form.username === "staff") {
+      saveToken("demo-token");
+      saveRole("STAFF");
+      window.location.href = "/staff";
+      return;
+    }
+
+    saveToken("demo-token");
+    saveRole("DRIVER");
+    window.location.href = "/driver";
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
         <h1>Login</h1>
-        <p>Parking Building Management System</p>
 
-        {error && <div className="error-message">{error}</div>}
-
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Username</label>
             <input
               name="username"
               value={form.username}
               onChange={handleChange}
-              placeholder="Enter username"
             />
           </div>
 
@@ -81,12 +67,11 @@ export default function LoginPage() {
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="Enter password"
             />
           </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button type="submit" className="primary-btn">
+            Login
           </button>
         </form>
       </div>

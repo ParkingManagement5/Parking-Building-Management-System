@@ -1,5 +1,4 @@
-import axiosClient from "./axiosClient";
-
+import axiosClient from "../axiosClient";
 export const staffShiftApi = {
   getAll: () => axiosClient.get("/staff-shifts"),
 
