@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { buildingApi } from "../../api/buildingApi";
+import { buildingApi } from "../../api/manager/buildingApi";
 
 export default function BuildingPage() {
   const [buildings, setBuildings] = useState([]);

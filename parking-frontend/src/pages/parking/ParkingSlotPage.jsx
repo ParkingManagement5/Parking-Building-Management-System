@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { parkingSlotApi } from "../../api/parkingSlotApi";
+import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 
 export default function ParkingSlotPage() {
   const [slots, setSlots] = useState([]);

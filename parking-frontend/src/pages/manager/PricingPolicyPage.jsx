@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { pricingPolicyApi } from "../../api/pricingPolicyApi";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 
 export default function PricingPolicyPage() {
   const [policies, setPolicies] = useState([]);
