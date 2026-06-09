@@ -13,4 +13,5 @@ public interface ParkingSlotService {
     ParkingSlot update(Long id, SlotRequest req);
     ParkingSlot updateStatus(Long id, Status newStatus);            // FR-3
     void validateSelectable(Long slotId);                           // BR-11
-}
+
+ 

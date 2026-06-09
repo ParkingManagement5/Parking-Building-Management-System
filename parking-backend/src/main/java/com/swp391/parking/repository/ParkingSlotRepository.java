@@ -27,4 +27,5 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
     List<ParkingSlot> findAvailableByVehicleType(@Param("vehicleTypeId") Long vehicleTypeId);
 
     boolean existsByZoneIdAndSlotCode(Long zoneId, String slotCode);
-}
+
+ 

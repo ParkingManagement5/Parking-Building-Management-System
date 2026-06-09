@@ -81,6 +81,12 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     }
 
     @Override
+    public List<ParkingSlot> searchAvailableSlots(Long buildingId, Long vehicleTypeId, Long floorId) {
+        // Row 13: tìm slot AVAILABLE theo building + vehicleType, lọc thêm floor nếu có
+        return slotRepo.searchAvailableSlots(buildingId, vehicleTypeId, floorId);
+    }
+
+    @Override
     public void validateSelectable(Long slotId) {
         // BR-11: slot MAINTENANCE không được chọn — gọi trước khi assign/đặt slot
         ParkingSlot slot = getById(slotId);
