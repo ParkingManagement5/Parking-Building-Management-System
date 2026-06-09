@@ -18,6 +18,7 @@ public class Floor extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "floor_id")
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
