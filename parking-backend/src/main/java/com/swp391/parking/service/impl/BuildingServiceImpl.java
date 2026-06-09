@@ -32,6 +32,11 @@ public class BuildingServiceImpl implements BuildingService {
     @Override
     @Transactional
     public ParkingBuilding create(BuildingRequest req) {
+        // Kiểm tra tên tòa nhà không trùng
+        if (buildingRepo.existsByName(req.getName())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                "Tòa nhà '" + req.getName() + "' đã tồn tại");
+        }
         // BR-05: giờ đóng phải sau giờ mở
         if (!req.getCloseTime().isAfter(req.getOpenTime())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -56,6 +61,13 @@ public class BuildingServiceImpl implements BuildingService {
     @Transactional
     public ParkingBuilding update(Long id, BuildingRequest req) {
         ParkingBuilding building = getById(id);
+
+        // Nếu đổi tên thì kiểm tra không trùng với tòa nhà khác
+        if (!building.getName().equals(req.getName())
+                && buildingRepo.existsByName(req.getName())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                "Tòa nhà '" + req.getName() + "' đã tồn tại");
+        }
 
         if (!req.getCloseTime().isAfter(req.getOpenTime())) {
             throw new AppException(HttpStatus.BAD_REQUEST,

@@ -42,6 +42,11 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     @Override
     @Transactional
     public ParkingSlot create(SlotRequest req) {
+        // Kiểm tra global unique trước (DB schema: slot_code UNIQUE toàn hệ thống)
+        if (slotRepo.existsBySlotCode(req.getSlotCode())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                "Mã slot '" + req.getSlotCode() + "' đã tồn tại trong hệ thống");
+        }
         if (slotRepo.existsByZoneIdAndSlotCode(req.getZoneId(), req.getSlotCode())) {
             throw new AppException(HttpStatus.CONFLICT,
                 "Slot '" + req.getSlotCode() + "' đã tồn tại trong zone này");
@@ -66,6 +71,12 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     @Transactional
     public ParkingSlot update(Long id, SlotRequest req) {
         ParkingSlot slot = getById(id);
+        // Nếu đổi slotCode thì kiểm tra không trùng với slot khác (global unique)
+        if (!slot.getSlotCode().equals(req.getSlotCode())
+                && slotRepo.existsBySlotCode(req.getSlotCode())) {
+            throw new AppException(HttpStatus.CONFLICT,
+                "Mã slot '" + req.getSlotCode() + "' đã tồn tại trong hệ thống");
+        }
         slot.setSlotCode(req.getSlotCode());
         slot.setSlotSize(req.getSlotSize());
         return slotRepo.save(slot);
