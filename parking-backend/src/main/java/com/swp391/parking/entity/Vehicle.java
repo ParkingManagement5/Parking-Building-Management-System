@@ -14,11 +14,12 @@ public class Vehicle extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "vehicle_id")
     private Long id;
 
     // Trỏ về user trong module Auth — không dùng @ManyToOne để tránh circular dependency
     @Column(name = "owner_user_id", nullable = false)
-    private Integer userId;
+    private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_type_id", nullable = false)
