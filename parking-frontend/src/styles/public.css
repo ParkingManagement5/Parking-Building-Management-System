@@ -1,0 +1,80 @@
+.public-navbar {
+  height: 72px;
+  background: white;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.public-logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.public-menu {
+  display: flex;
+  gap: 28px;
+}
+
+.public-menu a {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.public-menu a.active {
+  color: var(--primary-color);
+}
+
+.public-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.login-link {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.register-btn {
+  background: var(--primary-color);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 10px;
+}
+
+.public-section {
+  padding: 48px;
+}
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.service-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.service-card h3 {
+  margin-top: 0;
+}
+
+.service-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
