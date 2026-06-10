@@ -73,21 +73,38 @@ public class VehicleController {
     /**
      * PUT /api/v1/vehicles/{id}
      * Driver cập nhật thông tin xe (brand, model, color).
+     * Service kiểm tra ownership — chỉ chủ xe mới sửa được.
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('DRIVER')")
     public ResponseEntity<ApiResponse<Vehicle>> update(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody VehicleRequest req) {
+        User user = resolveUser(authentication);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật xe thành công",
-            vehicleService.update(id, req)));
+            vehicleService.update(id, user.getUserId(), req)));
     }
 
-    /** DELETE /api/v1/vehicles/{id} — soft delete */
+    /**
+     * DELETE /api/v1/vehicles/{id} — soft delete
+     * DRIVER: chỉ xóa được xe của mình.
+     * ADMIN: được xóa xe của bất kỳ ai (bypass ownership bằng cách dùng userId của xe).
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
-        vehicleService.deactivate(id);
+    public ResponseEntity<ApiResponse<Void>> deactivate(
+            Authentication authentication,
+            @PathVariable Long id) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isAdmin) {
+            // ADMIN bypass: dùng chính userId của xe để pass ownership check
+            vehicleService.deactivate(id, vehicleService.getById(id).getUserId());
+        } else {
+            User user = resolveUser(authentication);
+            vehicleService.deactivate(id, user.getUserId());
+        }
         return ResponseEntity.ok(ApiResponse.success("Đã vô hiệu hóa xe"));
     }
 

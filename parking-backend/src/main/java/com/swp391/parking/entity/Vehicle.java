@@ -17,9 +17,9 @@ public class Vehicle extends BaseEntity {
     @Column(name = "vehicle_id")
     private Long id;
 
-    // Trỏ về user trong module Auth — không dùng @ManyToOne để tránh circular dependency
+    // Trỏ về user trong module Auth — Integer để match User.userId (Integer) của Quang
     @Column(name = "owner_user_id", nullable = false)
-    private Long userId;
+    private Integer userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_type_id", nullable = false)

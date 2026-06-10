@@ -67,8 +67,12 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     @Transactional
-    public Vehicle update(Long id, VehicleRequest req) {
+    public Vehicle update(Long id, Integer currentUserId, VehicleRequest req) {
         Vehicle vehicle = getById(id);
+        // Chỉ chủ xe mới được sửa
+        if (!vehicle.getUserId().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền sửa xe này");
+        }
         // Không cho đổi biển số và loại xe — chỉ đổi thông tin phụ
         vehicle.setBrand(req.getBrand());
         vehicle.setModel(req.getModel());
@@ -78,8 +82,12 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     @Transactional
-    public void deactivate(Long id) {
+    public void deactivate(Long id, Integer currentUserId) {
         Vehicle vehicle = getById(id);
+        // Chỉ chủ xe mới được xóa (ADMIN bypass: truyền userId của xe)
+        if (!vehicle.getUserId().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Bạn không có quyền xóa xe này");
+        }
         vehicle.setIsActive(false);
         vehicleRepo.save(vehicle);
     }
