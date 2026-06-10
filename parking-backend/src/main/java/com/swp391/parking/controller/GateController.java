@@ -21,6 +21,7 @@ public class GateController {
 
     /** GET /api/v1/gates?buildingId=1 — lấy tất cả cổng theo tòa nhà */
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<Gate>>> getByBuilding(
             @RequestParam Long buildingId) {
         return ResponseEntity.ok(ApiResponse.success(gateService.getByBuilding(buildingId)));
@@ -28,6 +29,7 @@ public class GateController {
 
     /** GET /api/v1/gates/active?buildingId=1 — lấy cổng đang hoạt động */
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<Gate>>> getActiveByBuilding(
             @RequestParam Long buildingId) {
         return ResponseEntity.ok(ApiResponse.success(gateService.getActiveByBuilding(buildingId)));
@@ -35,6 +37,7 @@ public class GateController {
 
     /** GET /api/v1/gates/by-type?buildingId=1&gateType=ENTRY */
     @GetMapping("/by-type")
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<Gate>>> getByType(
             @RequestParam Long buildingId,
             @RequestParam GateType gateType) {
@@ -44,6 +47,7 @@ public class GateController {
 
     /** GET /api/v1/gates/{id} */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<Gate>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(gateService.getById(id)));
     }
