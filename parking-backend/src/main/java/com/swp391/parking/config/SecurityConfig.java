@@ -37,10 +37,7 @@ public class SecurityConfig {
 
     // ── Các URL không cần đăng nhập ─────────────────────────────────────────
     private static final String[] PUBLIC_URLS = {
-            "/api/v1/auth/login",       // ← chỉ cho login
-            "/api/v1/auth/register",    // ← và register là public
-            "/api/v1/auth/forgot-password",
-            "/api/v1/auth/reset-password",
+            "/api/v1/auth/**",        // login, register, refresh token
             "/api/v1/public/**",      // thông tin bãi xe công khai
             "/swagger-ui/**",
             "/swagger-ui.html",
