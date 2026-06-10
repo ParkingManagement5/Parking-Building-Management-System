@@ -11,4 +11,5 @@ public interface PricingPolicyService {
     List<PricingPolicyResponse> getAllPolicies();
     PricingPolicyResponse updatePolicy(Long id, CreatePricingPolicyRequest request);
     void deletePolicy(Long id);
+     PricingPolicyResponse activatePolicy(Long id);
 }
