@@ -9,6 +9,6 @@ public interface VehicleService {
     Vehicle getById(Long id);
     Vehicle getByLicensePlate(String licensePlate); // Staff dùng khi xe vào/ra
     Vehicle create(Integer userId, VehicleRequest req);
-    Vehicle update(Long id, VehicleRequest req);
-    void deactivate(Long id);
+    Vehicle update(Long id, Integer currentUserId, VehicleRequest req);
+    void deactivate(Long id, Integer currentUserId);
 }
