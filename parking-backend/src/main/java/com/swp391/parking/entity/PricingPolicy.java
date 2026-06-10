@@ -14,7 +14,7 @@ public class PricingPolicy extends BaseEntity {
     private Long policyId;
 
 @Column(name = "vehicle_type_id")
-private Long vehicleTypeId;
+private VehicleType vehicleTypeId;
     
 
     @Column(name = "day_type", length = 20)

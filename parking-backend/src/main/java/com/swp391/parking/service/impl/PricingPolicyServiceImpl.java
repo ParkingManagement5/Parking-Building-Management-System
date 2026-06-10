@@ -5,6 +5,7 @@ import com.swp391.parking.dto.response.PricingPolicyResponse;
 import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.PricingPolicyRepository;
+import com.swp391.parking.repository.VehicleTypeRepository;
 import com.swp391.parking.service.PricingPolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,14 +16,16 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+
 public class PricingPolicyServiceImpl implements PricingPolicyService {
 
     private final PricingPolicyRepository pricingPolicyRepository;
+     private final VehicleTypeRepository vehicleTypeRepository;
 
     @Override
     public PricingPolicyResponse createPolicy(CreatePricingPolicyRequest request) {
         PricingPolicy policy = PricingPolicy.builder()
-                .vehicleTypeId(request.getVehicleTypeId())
+                .vehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId()).orElseThrow(() -> new RuntimeException("VehicleType not found")))
                 .dayType(request.getDayType())
                 .timeType(request.getTimeType())
                 .basePrice(request.getBasePrice())
@@ -52,7 +55,8 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
     public PricingPolicyResponse updatePolicy(Long id, CreatePricingPolicyRequest request) {
         PricingPolicy policy = pricingPolicyRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
-        policy.setVehicleTypeId(request.getVehicleTypeId());
+       policy.setVehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
+    .orElseThrow(() -> new RuntimeException("VehicleType not found")));
         policy.setDayType(request.getDayType());
         policy.setTimeType(request.getTimeType());
         policy.setBasePrice(request.getBasePrice());
@@ -67,11 +71,18 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
         pricingPolicyRepository.delete(policy);
     }
-
+@Override
+public PricingPolicyResponse activatePolicy(Long id) {
+    PricingPolicy policy = pricingPolicyRepository.findById(id)
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
+    policy.setStatus("ACTIVE");
+    policy = pricingPolicyRepository.save(policy);
+    return toResponse(policy);
+}
     private PricingPolicyResponse toResponse(PricingPolicy policy) {
         return PricingPolicyResponse.builder()
                 .policyId(policy.getPolicyId())
-                .vehicleTypeId(policy.getVehicleTypeId())
+               .vehicleTypeId(policy.getVehicleType() != null ? policy.getVehicleType().getId() : null)
                 .dayType(policy.getDayType())
                 .timeType(policy.getTimeType())
                 .basePrice(policy.getBasePrice())
