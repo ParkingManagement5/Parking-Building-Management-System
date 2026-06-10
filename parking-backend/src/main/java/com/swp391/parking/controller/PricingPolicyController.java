@@ -53,4 +53,9 @@ public class PricingPolicyController {
         pricingPolicyService.deletePolicy(id);
         return ResponseEntity.noContent().build();
     }
+    @PatchMapping("/{id}/activate")
+@Operation(summary = "Activate pricing policy")
+public ResponseEntity<PricingPolicyResponse> activate(@PathVariable Long id) {
+    return ResponseEntity.ok(pricingPolicyService.activatePolicy(id));
+}
 }
