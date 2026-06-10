@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
  * Không ai cần try-catch trong controller cả — throw từ service là đủ.
  */
 @Slf4j
+@SuppressWarnings("null")
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

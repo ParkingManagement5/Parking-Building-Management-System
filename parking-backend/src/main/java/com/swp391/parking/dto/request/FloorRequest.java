@@ -16,6 +16,7 @@ public class FloorRequest {
     @Size(max = 50)
     private String name; // "Tầng 1", "Hầm B1"
 
+    @Builder.Default
     @Min(value = 0, message = "Sức chứa không được âm")
     private Integer capacity = 0;
 }
