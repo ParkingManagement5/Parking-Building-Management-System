@@ -14,4 +14,6 @@ public interface ParkingSlotService {
     ParkingSlot updateStatus(Long id, Status newStatus);            // FR-3
     void validateSelectable(Long slotId);                           // BR-11
 
- 
+    // Row 13: tìm slot phù hợp theo building + vehicleType + floor (optional)
+    List<ParkingSlot> searchAvailableSlots(Long buildingId, Long vehicleTypeId, Long floorId);
+}

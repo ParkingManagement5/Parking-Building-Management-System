@@ -74,4 +74,20 @@ public class ParkingSlotController {
     public ResponseEntity<ApiResponse<ParkingSlot>> update(
             @PathVariable Long id,
             @Valid @RequestBody SlotRequest req) {
-        return ResponseEntity.ok(ApiResponse.succe
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật slot thành công",
+            slotService.update(id, req)));
+    }
+
+    /**
+     * PATCH /api/v1/slots/{id}/status?status=MAINTENANCE
+     * FR-3: đổi trạng thái slot (AVAILABLE, OCCUPIED, RESERVED, MAINTENANCE)
+     */
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ParkingSlot>> updateStatus(
+            @PathVariable Long id,
+            @RequestParam Status status) {
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái slot thành công",
+            slotService.updateStatus(id, status)));
+    }
+}
