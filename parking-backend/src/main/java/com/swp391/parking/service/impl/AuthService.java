@@ -1,13 +1,19 @@
 package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.ChangePasswordRequest;
+import com.swp391.parking.dto.request.ForgotPasswordRequest;
+import com.swp391.parking.dto.request.ResetPasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
 import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.AuthResponse;
+import com.swp391.parking.entity.PasswordResetToken;
+import com.swp391.parking.entity.ActivityLog;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.PasswordResetTokenRepository;
+import com.swp391.parking.repository.ActivityLogRepository;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.security.jwt.JwtUtil;
@@ -19,7 +25,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import com.swp391.parking.dto.response.UserProfileResponse;
 
@@ -29,6 +37,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final ActivityLogRepository activityLogRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
@@ -101,7 +111,6 @@ public class AuthService {
                 .build();
     }
 
-
     // ── Get Me ───────────────────────────────────────────────────────────────
     public UserProfileResponse getMe(String username) {
         User user = userRepository.findByUsername(username)
@@ -172,5 +181,74 @@ public class AuthService {
                 .roles(roles)
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    // ── Forgot Password ─────────────────────────────────────────────────────
+    @Transactional
+    public String forgotPassword(ForgotPasswordRequest req) {
+        User user = userRepository.findByEmail(req.getEmail())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Email không tồn tại"));
+
+        String token = UUID.randomUUID().toString();
+
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .token(token)
+                .user(user)
+                .expiryDate(LocalDateTime.now().plusMinutes(15))
+                .used(false)
+                .build();
+
+        passwordResetTokenRepository.save(resetToken);
+        logActivity(
+                user,
+                "FORGOT_PASSWORD",
+                "User yêu cầu reset password");
+
+        return token;
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest req) {
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(req.getToken())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Token không tồn tại"));
+
+        if (resetToken.isUsed()) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Token đã được sử dụng");
+        }
+
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Token đã hết hạn");
+        }
+
+        User user = resetToken.getUser();
+
+        user.setPasswordHash(
+                passwordEncoder.encode(req.getNewPassword()));
+
+        userRepository.save(user);
+
+        resetToken.setUsed(true);
+
+        passwordResetTokenRepository.save(resetToken);
+        logActivity(
+                user,
+                "RESET_PASSWORD",
+                "User reset password thành công");
+    }
+
+    private void logActivity(User user,
+            String action,
+            String description) {
+
+        ActivityLog log = ActivityLog.builder()
+                .user(user)
+                .action(action)
+                .description(description)
+                .build();
+
+        activityLogRepository.save(log);
     }
 }

@@ -1,6 +1,8 @@
 package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.ChangePasswordRequest;
+import com.swp391.parking.dto.request.ForgotPasswordRequest;
+import com.swp391.parking.dto.request.ResetPasswordRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
 import com.swp391.parking.dto.request.UpdateProfileRequest;
@@ -47,6 +49,32 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
+    }
+
+    /**
+     * POST /api/v1/auth/forgot-password
+     * Body: { email }
+     * Demo: trả token trực tiếp để test bằng Postman
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        String token = authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Tạo token reset password thành công", token));
+    }
+
+    /**
+     * POST /api/v1/auth/reset-password
+     * Body: { token, newPassword }
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Reset password thành công"));
     }
 
     /**
