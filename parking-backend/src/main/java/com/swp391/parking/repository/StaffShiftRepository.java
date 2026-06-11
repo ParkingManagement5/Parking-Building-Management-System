@@ -8,6 +8,6 @@ import java.util.List;
 
 @Repository
 public interface StaffShiftRepository extends JpaRepository<StaffShift, Long> {
-    List<StaffShift> findByUserId(Long userId);
+    List<StaffShift> findByUserUserId(int userId);
     List<StaffShift> findByWorkingDate(LocalDate workingDate);
 }
