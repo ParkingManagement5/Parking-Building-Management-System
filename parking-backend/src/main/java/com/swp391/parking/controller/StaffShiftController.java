@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,10 +48,11 @@ public class StaffShiftController {
     }
 
     @GetMapping("/date/{workingDate}")
-    @Operation(summary = "Get shifts by working date")
-    public ResponseEntity<List<StaffShiftResponse>> getByDate(@PathVariable LocalDate workingDate) {
-        return ResponseEntity.ok(staffShiftService.getByWorkingDate(workingDate));
-    }
+@Operation(summary = "Get shifts by working date")
+public ResponseEntity<List<StaffShiftResponse>> getByDate(
+        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate workingDate) {
+    return ResponseEntity.ok(staffShiftService.getByWorkingDate(workingDate));
+}
 
     @PutMapping("/{id}")
     @Operation(summary = "Update staff shift")
