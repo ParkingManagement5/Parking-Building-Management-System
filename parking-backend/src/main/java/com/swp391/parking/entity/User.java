@@ -22,7 +22,7 @@ public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
-    private Integer userId;
+    private int userId;
 
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
