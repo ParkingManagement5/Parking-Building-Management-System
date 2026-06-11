@@ -16,21 +16,22 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-
 public class PricingPolicyServiceImpl implements PricingPolicyService {
 
     private final PricingPolicyRepository pricingPolicyRepository;
-     private final VehicleTypeRepository vehicleTypeRepository;
+    private final VehicleTypeRepository vehicleTypeRepository;
 
     @Override
     public PricingPolicyResponse createPolicy(CreatePricingPolicyRequest request) {
         PricingPolicy policy = PricingPolicy.builder()
-                .vehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId()).orElseThrow(() -> new RuntimeException("VehicleType not found")))
+                .vehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
+                        .orElseThrow(() -> new RuntimeException("VehicleType not found")))
                 .dayType(request.getDayType())
                 .timeType(request.getTimeType())
-                .basePrice(request.getBasePrice())
-                .overtimePrice(request.getOvertimePrice())
-                .status("ACTIVE")
+                .startHour(request.getStartHour())
+                .endHour(request.getEndHour())
+                .pricePerHour(request.getPricePerHour())
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
         policy = pricingPolicyRepository.save(policy);
         return toResponse(policy);
@@ -55,12 +56,14 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
     public PricingPolicyResponse updatePolicy(Long id, CreatePricingPolicyRequest request) {
         PricingPolicy policy = pricingPolicyRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
-       policy.setVehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
-    .orElseThrow(() -> new RuntimeException("VehicleType not found")));
+        policy.setVehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
+                .orElseThrow(() -> new RuntimeException("VehicleType not found")));
         policy.setDayType(request.getDayType());
         policy.setTimeType(request.getTimeType());
-        policy.setBasePrice(request.getBasePrice());
-        policy.setOvertimePrice(request.getOvertimePrice());
+        policy.setStartHour(request.getStartHour());
+        policy.setEndHour(request.getEndHour());
+        policy.setPricePerHour(request.getPricePerHour());
+        if (request.getIsActive() != null) policy.setIsActive(request.getIsActive());
         policy = pricingPolicyRepository.save(policy);
         return toResponse(policy);
     }
@@ -71,23 +74,26 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
         pricingPolicyRepository.delete(policy);
     }
-@Override
-public PricingPolicyResponse activatePolicy(Long id) {
-    PricingPolicy policy = pricingPolicyRepository.findById(id)
-            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
-    policy.setStatus("ACTIVE");
-    policy = pricingPolicyRepository.save(policy);
-    return toResponse(policy);
-}
+
+    @Override
+    public PricingPolicyResponse activatePolicy(Long id) {
+        PricingPolicy policy = pricingPolicyRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
+        policy.setIsActive(true);
+        policy = pricingPolicyRepository.save(policy);
+        return toResponse(policy);
+    }
+
     private PricingPolicyResponse toResponse(PricingPolicy policy) {
         return PricingPolicyResponse.builder()
                 .policyId(policy.getPolicyId())
-               .vehicleTypeId(policy.getVehicleType() != null ? policy.getVehicleType().getId() : null)
+                .vehicleTypeId(policy.getVehicleType() != null ? policy.getVehicleType().getId() : null)
                 .dayType(policy.getDayType())
                 .timeType(policy.getTimeType())
-                .basePrice(policy.getBasePrice())
-                .overtimePrice(policy.getOvertimePrice())
-                .status(policy.getStatus())
+                .startHour(policy.getStartHour())
+                .endHour(policy.getEndHour())
+                .pricePerHour(policy.getPricePerHour())
+                .isActive(policy.getIsActive())
                 .createdAt(policy.getCreatedAt())
                 .updatedAt(policy.getUpdatedAt())
                 .build();

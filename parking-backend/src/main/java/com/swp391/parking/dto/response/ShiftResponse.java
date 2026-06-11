@@ -1,15 +1,13 @@
 package com.swp391.parking.dto.response;
 
 import lombok.*;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ShiftResponse {
     private Long shiftId;
     private String shiftName;
-    private String startTime;
-    private String endTime;
+    private LocalTime startTime;
+    private LocalTime endTime;
     private String status;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
