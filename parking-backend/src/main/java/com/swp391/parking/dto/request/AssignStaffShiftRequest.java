@@ -1,8 +1,8 @@
 package com.swp391.parking.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
@@ -15,8 +15,6 @@ public class AssignStaffShiftRequest {
     @NotNull(message = "Shift ID is required")
     private Long shiftId;
 
-    @NotBlank(message = "Working date is required")
-    private String workingDate;
-
-    private String status;
+    @NotNull(message = "Working date is required")
+    private LocalDate workingDate;
 }
