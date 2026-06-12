@@ -1,0 +1,217 @@
+package com.swp391.parking.service.impl;
+
+import com.swp391.parking.dto.request.CreateBookingRequest;
+import com.swp391.parking.dto.response.BookingResponse;
+import com.swp391.parking.entity.*;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.*;
+import com.swp391.parking.service.BookingService;
+import com.swp391.parking.util.QrTokenUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class BookingServiceImpl implements BookingService {
+
+    private final BookingRepository bookingRepository;
+    // BE2 repositories — inject khi Du merge
+    private final VehicleRepository vehicleRepository;
+    private final ParkingSlotRepository parkingSlotRepository;
+    private final QrTokenUtil qrTokenUtil;
+
+    @Override
+    @Transactional
+    public BookingResponse createBooking(Long currentUserId, CreateBookingRequest request) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startTime = request.getBookingStartTime();
+
+        // [BR-03a] Đặt trước ít nhất 10 phút
+        long minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime);
+        if (minutesUntilStart < 10) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Phải đặt trước ít nhất 10 phút. Đến ngay thì dùng walk-in.");
+        }
+
+        // Load vehicle (BE2) — kiểm tra chủ sở hữu
+        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy xe"));
+        if (!vehicle.getUserId().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Xe này không thuộc về bạn");
+        }
+
+        // Load slot (BE2)
+        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
+
+        // [BR-02] Loại xe phải match zone — so sánh slotSize
+        ParkingSlot.SlotSize vehicleSlotSize = vehicle.getVehicleType().getSlotSize() != null
+                ? ParkingSlot.SlotSize.valueOf(vehicle.getVehicleType().getSlotSize().name())
+                : null;
+        if (vehicleSlotSize == null || vehicleSlotSize != slot.getSlotSize()) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Kích cỡ xe (" + vehicle.getVehicleType().getSlotSize()
+                            + ") không phù hợp với slot " + slot.getSlotCode()
+                            + " (" + slot.getSlotSize() + ")");
+        }
+
+        // [BR-11] Slot không được MAINTENANCE
+        if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot đang bảo trì, không thể đặt");
+        }
+
+        // [BR-06] 1 xe chỉ có 1 booking active
+        bookingRepository.findByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
+        ).ifPresent(b -> {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe này đang có booking active (#" + b.getId() + ")");
+        });
+
+        // [BR-01] Kiểm tra slot bị double-book
+        LocalDateTime endTime = request.getBookingEndTime() != null
+                ? request.getBookingEndTime() : startTime.plusHours(2);
+        if (!bookingRepository.findConflictingBookings(slot.getId(), startTime, endTime).isEmpty()) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Slot " + slot.getSlotCode() + " đã được đặt trong giờ này");
+        }
+
+        // [BR-03b] expired_at = MIN(now+15p, start-5p)
+        LocalDateTime expiredAt = now.plusMinutes(15).isBefore(startTime.minusMinutes(5))
+                ? now.plusMinutes(15) : startTime.minusMinutes(5);
+
+        // Tính deposit [BR-03d, BR-03e]
+        BigDecimal deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
+
+        Booking booking = Booking.builder()
+                .userId(currentUserId)
+                .vehicle(vehicle)
+                .slot(slot)
+                .bookingStartTime(startTime)
+                .bookingEndTime(endTime)
+                .reservedAt(now)
+                .expiredAt(expiredAt)
+                .depositAmount(deposit)
+                .status(Booking.BookingStatus.PENDING_PAYMENT)
+                .build();
+
+        booking = bookingRepository.save(booking);
+        log.info("Booking #{} tạo bởi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
+        return toResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse confirmBookingAfterPayment(Long bookingId) {
+        Booking booking = getBookingEntity(bookingId);
+        if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
+        }
+
+        // Sinh QR token [BR-04]
+        String qr = qrTokenUtil.generateQrToken(
+                booking.getId(),
+                booking.getVehicle().getLicensePlate(),
+                booking.getSlot().getId(),
+                booking.getExpiredAt());
+
+        booking.setQrToken(qr);
+        booking.setQrIssuedAt(LocalDateTime.now());
+        booking.setDepositPaidAt(LocalDateTime.now());
+        booking.setStatus(Booking.BookingStatus.CONFIRMED);
+
+        // Mark slot RESERVED
+        ParkingSlot slot = booking.getSlot();
+        slot.setStatus(ParkingSlot.Status.RESERVED);
+        parkingSlotRepository.save(slot);
+
+        log.info("Booking #{} CONFIRMED, QR issued, slot {} RESERVED",
+                bookingId, slot.getSlotCode());
+        return toResponse(bookingRepository.save(booking));
+    }
+
+    @Override
+    public BookingResponse getBooking(Long bookingId) {
+        return toResponse(getBookingEntity(bookingId));
+    }
+
+    @Override
+    public List<BookingResponse> getMyBookings(Long currentUserId) {
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse cancelBooking(Long bookingId, Long currentUserId) {
+        Booking booking = getBookingEntity(bookingId);
+        if (!booking.getUserId().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền hủy booking này");
+        }
+        if (!List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
+                .contains(booking.getStatus())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chỉ hủy được PENDING_PAYMENT hoặc CONFIRMED");
+        }
+        // Giải phóng slot nếu đã CONFIRMED
+        if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
+            ParkingSlot slot = booking.getSlot();
+            slot.setStatus(ParkingSlot.Status.AVAILABLE);
+            parkingSlotRepository.save(slot);
+        }
+        booking.setStatus(Booking.BookingStatus.CANCELLED);
+        return toResponse(bookingRepository.save(booking));
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+    private Booking getBookingEntity(Long id) {
+        return bookingRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking #" + id));
+    }
+
+    private BigDecimal calculateDeposit(String vehicleTypeName, long minutesUntilStart) {
+        // BR-03d: chỉ CAR và ELECTRIC_CAR mới tính cọc, MOTORBIKE không tính
+        if (!vehicleTypeName.equalsIgnoreCase("CAR")
+                && !vehicleTypeName.equalsIgnoreCase("ELECTRIC_CAR")) {
+            return BigDecimal.ZERO;
+        }
+        if (minutesUntilStart < 30)  return BigDecimal.ZERO;
+        if (minutesUntilStart < 120) return new BigDecimal("10000");
+        if (minutesUntilStart < 240) return new BigDecimal("15000");
+        if (minutesUntilStart < 360) return new BigDecimal("20000");
+        return new BigDecimal("30000");
+    }
+
+    private BookingResponse toResponse(Booking b) {
+        return BookingResponse.builder()
+                .bookingId(b.getId())
+                .userId(b.getUserId())
+                .vehicleId(b.getVehicle().getId())
+                .licensePlate(b.getVehicle().getLicensePlate())
+                .slotId(b.getSlot().getId())
+                .slotCode(b.getSlot().getSlotCode())
+                .bookingStartTime(b.getBookingStartTime())
+                .bookingEndTime(b.getBookingEndTime())
+                .reservedAt(b.getReservedAt())
+                .expiredAt(b.getExpiredAt())
+                .qrToken(List.of(Booking.BookingStatus.CONFIRMED, Booking.BookingStatus.CHECKED_IN)
+                        .contains(b.getStatus()) ? b.getQrToken() : null)
+                .qrIssuedAt(b.getQrIssuedAt())
+                .qrUsed(b.getQrUsedAt() != null)
+                .depositAmount(b.getDepositAmount())
+                .depositPaidAt(b.getDepositPaidAt())
+                .status(b.getStatus().name())
+                .createdAt(b.getCreatedAt())
+                .build();
+    }
+}

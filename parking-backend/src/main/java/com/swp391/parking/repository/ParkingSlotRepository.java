@@ -28,4 +28,45 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
 
     boolean existsByZoneIdAndSlotCode(Long zoneId, String slotCode);
 
- 
+    boolean existsBySlotCode(String slotCode);
+
+    // Row 13: tìm slot AVAILABLE theo building + vehicleType, lọc thêm floor nếu có
+    @Query("""
+        SELECT s FROM ParkingSlot s
+        JOIN s.zone z
+        JOIN z.floor f
+        WHERE f.building.id = :buildingId
+          AND z.vehicleType.id = :vehicleTypeId
+          AND s.status = 'AVAILABLE'
+          AND s.isActive = true
+          AND z.isActive = true
+          AND (:floorId IS NULL OR f.id = :floorId)
+        ORDER BY s.slotCode
+        """)
+    List<ParkingSlot> searchAvailableSlots(
+            @Param("buildingId") Long buildingId,
+            @Param("vehicleTypeId") Long vehicleTypeId,
+            @Param("floorId") Long floorId);
+
+    // BR-02: SlotAssignmentService — tìm slot AVAILABLE theo slotSize trong 1 building
+    @Query("""
+        SELECT s FROM ParkingSlot s
+        JOIN s.zone z
+        JOIN z.floor f
+        WHERE f.building.id = :buildingId
+          AND s.slotSize = :slotSize
+          AND s.status = 'AVAILABLE'
+          AND s.isActive = true
+        """)
+    List<ParkingSlot> findAvailableByBuildingAndSlotSize(
+            @Param("buildingId") Long buildingId,
+            @Param("slotSize") ParkingSlot.SlotSize slotSize);
+
+    // BR-02: SlotAssignmentService — tìm slot AVAILABLE theo slotSize, bất kỳ building
+    List<ParkingSlot> findBySlotSizeAndStatusAndIsActiveTrue(
+            ParkingSlot.SlotSize slotSize, Status status);
+
+    default List<ParkingSlot> findAvailableBySlotSize(ParkingSlot.SlotSize slotSize) {
+        return findBySlotSizeAndStatusAndIsActiveTrue(slotSize, Status.AVAILABLE);
+    }
+}

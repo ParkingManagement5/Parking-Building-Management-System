@@ -34,7 +34,7 @@ public class VehicleController {
             Authentication authentication) {
         User user = resolveUser(authentication);
         return ResponseEntity.ok(ApiResponse.success(
-            vehicleService.getByUser(user.getUserId())));
+                vehicleService.getByUser(user.getUserId().longValue())));
     }
 
     /**
@@ -67,7 +67,7 @@ public class VehicleController {
             @Valid @RequestBody VehicleRequest req) {
         User user = resolveUser(authentication);
         return ResponseEntity.ok(ApiResponse.success("Đăng ký xe thành công",
-            vehicleService.create(user.getUserId(), req)));
+            vehicleService.create(user.getUserId().longValue(), req)));
     }
 
     /**
