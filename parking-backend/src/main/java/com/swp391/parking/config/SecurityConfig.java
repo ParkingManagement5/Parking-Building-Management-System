@@ -1,5 +1,8 @@
 package com.swp391.parking.config;
-
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.List;
 import com.swp391.parking.security.jwt.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -37,32 +40,46 @@ public class SecurityConfig {
 
     // ── Các URL không cần đăng nhập ─────────────────────────────────────────
     private static final String[] PUBLIC_URLS = {
-            "/api/v1/auth/login",       // ← chỉ cho login
-            "/api/v1/auth/register",    // ← và register là public
-            "/api/v1/auth/forgot-password",
-            "/api/v1/auth/reset-password",
+            "/api/v1/auth/**",        // login, register, refresh token
             "/api/v1/public/**",      // thông tin bãi xe công khai
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api-docs/**",
             "/v3/api-docs/**"
     };
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)           // REST API → disable CSRF
-            .sessionManagement(s -> s
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))  // không dùng session
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(PUBLIC_URLS).permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/parking-buildings/**").permitAll()
-                .anyRequest().authenticated())               // còn lại phải đăng nhập
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
 
-        return http.build();
-    }
+    config.setAllowedOrigins(List.of("http://localhost:5173"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+
+    return source;
+}
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers(PUBLIC_URLS).permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/parking-buildings/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/vehicle-types/**").permitAll()
+            .anyRequest().authenticated()
+        )
+        .authenticationProvider(authenticationProvider())
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
