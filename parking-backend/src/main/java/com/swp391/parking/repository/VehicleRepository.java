@@ -9,7 +9,7 @@ import java.util.Optional;
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
 
-    List<Vehicle> findByUserIdAndIsActiveTrue(Integer userId);
+    List<Vehicle> findByUserIdAndIsActiveTrue(Long userId);
 
     // Staff dùng khi xe vào/ra cổng
     Optional<Vehicle> findByLicensePlate(String licensePlate);
