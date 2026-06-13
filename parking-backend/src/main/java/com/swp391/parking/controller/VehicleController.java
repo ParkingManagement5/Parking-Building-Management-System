@@ -46,7 +46,7 @@ public class VehicleController {
     public ResponseEntity<ApiResponse<Vehicle>> getByPlate(
             @PathVariable String licensePlate) {
         return ResponseEntity.ok(ApiResponse.success(
-            vehicleService.getByLicensePlate(licensePlate)));
+                vehicleService.getByLicensePlate(licensePlate)));
     }
 
     /** GET /api/v1/vehicles/{id} */
@@ -67,7 +67,7 @@ public class VehicleController {
             @Valid @RequestBody VehicleRequest req) {
         User user = resolveUser(authentication);
         return ResponseEntity.ok(ApiResponse.success("Đăng ký xe thành công",
-            vehicleService.create(user.getUserId().longValue(), req)));
+                vehicleService.create(user.getUserId().longValue(), req)));
     }
 
     /**
@@ -80,7 +80,7 @@ public class VehicleController {
             @PathVariable Long id,
             @Valid @RequestBody VehicleRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật xe thành công",
-            vehicleService.update(id, req)));
+                vehicleService.update(id, req)));
     }
 
     /** DELETE /api/v1/vehicles/{id} — soft delete */
@@ -100,7 +100,7 @@ public class VehicleController {
     private User resolveUser(Authentication authentication) {
         String username = authentication.getName();
         return userRepository.findByUsername(username)
-            .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED,
-                "Không tìm thấy user: " + username));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED,
+                        "Không tìm thấy user: " + username));
     }
 }
