@@ -21,7 +21,8 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleTypeRepository vehicleTypeRepo;
 
     @Override
-    public List<Vehicle> getByUser(Integer userId) {
+    public List<Vehicle> getByUser(Long userId) {
+
         return vehicleRepo.findByUserIdAndIsActiveTrue(userId);
     }
 
@@ -41,7 +42,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     @Transactional
-    public Vehicle create(Integer userId, VehicleRequest req) {
+    public Vehicle create(Long userId, VehicleRequest req) {
         // Biển số phải unique toàn hệ thống
         if (vehicleRepo.existsByLicensePlate(req.getLicensePlate())) {
             throw new AppException(HttpStatus.CONFLICT,
