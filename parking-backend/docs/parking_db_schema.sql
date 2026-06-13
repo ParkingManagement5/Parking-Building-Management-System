@@ -374,11 +374,11 @@ INSERT INTO `vehicle_type` (`name`, `created_at`, `updated_at`) VALUES
 
 -- 3. Users — password: Password123!
 INSERT INTO `users` (`username`, `full_name`, `email`, `phone`, `password_hash`, `status`, `created_at`, `updated_at`) VALUES
-                                                                                                                           ('admin',   'Admin System',    'admin@parking.com',   '0900000001', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('manager', 'Nguyen Manager',  'manager@parking.com', '0900000002', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('staff1',  'Tran Staff One',  'staff1@parking.com',  '0900000003', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('driver1', 'Le Driver One',   'driver1@parking.com', '0900000004', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('driver2', 'Pham Driver Two', 'driver2@parking.com', '0900000005', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW());
+                                                                                                                           ('admin',   'Admin System',    'admin@parking.com',   '0900000001', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('manager', 'Nguyen Manager',  'manager@parking.com', '0900000002', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('staff1',  'Tran Staff One',  'staff1@parking.com',  '0900000003', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('driver1', 'Le Driver One',   'driver1@parking.com', '0900000004', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('driver2', 'Pham Driver Two', 'driver2@parking.com', '0900000005', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW());
 
 -- 4. User Roles
 INSERT INTO `user_role` (`user_id`, `role_id`) VALUES
