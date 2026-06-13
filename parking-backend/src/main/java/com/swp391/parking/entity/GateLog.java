@@ -15,6 +15,7 @@ public class GateLog extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "gate_log_id")
     private Long id;
 
     // FK → gate (Du)
