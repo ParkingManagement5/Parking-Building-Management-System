@@ -18,6 +18,7 @@ public class OcrScan extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "scan_id")
     private Long id;
 
     // Nullable — tạo scan trước, gắn session sau

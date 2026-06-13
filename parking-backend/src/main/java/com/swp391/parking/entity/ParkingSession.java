@@ -15,6 +15,7 @@ public class ParkingSession extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "session_id")
     private Long id;
 
     // NULL nếu walk-in
