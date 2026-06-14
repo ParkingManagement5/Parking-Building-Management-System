@@ -47,16 +47,18 @@ public class SecurityConfig {
             "/api-docs/**",
             "/v3/api-docs/**"
     };
-    @Bean
+@Bean
 public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
 
-    config.setAllowedOrigins(List.of("http://localhost:5173"));
-    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+    config.setAllowedOriginPatterns(List.of("*"));
+    config.setAllowedMethods(List.of("*"));
     config.setAllowedHeaders(List.of("*"));
-    config.setAllowCredentials(true);
+    config.setAllowCredentials(false);
 
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
+
     source.registerCorsConfiguration("/**", config);
 
     return source;
@@ -73,6 +75,10 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
             .requestMatchers(PUBLIC_URLS).permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/parking-buildings/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/vehicle-types/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/floors/building/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/zones/floor/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/gates/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/slots/zone/**").permitAll()
             .anyRequest().authenticated()
         )
         .authenticationProvider(authenticationProvider())

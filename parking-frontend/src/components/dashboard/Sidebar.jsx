@@ -8,20 +8,9 @@ import {
   Car,
   CreditCard,
   Users,
-  FileText,
   Bell,
   Shield,
   Settings,
-  ClipboardList,
-  LogIn,
-  ScanLine,
-  Clock3,
-  FilePenLine,
-  LogOut,
-  Calculator,
-  Wallet,
-  AlertTriangle,
-  MessageSquare,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -48,7 +37,6 @@ export default function Sidebar() {
     { label: "Vehicle Type Management", path: "/manager/vehicle-types", icon: <Car size={20} /> },
     { label: "Pricing Policy Management", path: "/manager/pricing-policies", icon: <CreditCard size={20} /> },
     { label: "Staff Shift Management", path: "/manager/staff-shifts", icon: <Users size={20} /> },
-    { label: "Reports", path: "/manager/reports", icon: <FileText size={20} /> },
     { label: "Notification Center", path: "/manager/notifications", icon: <Bell size={20} /> },
   ];
 
@@ -57,35 +45,17 @@ export default function Sidebar() {
     { label: "User Management", path: "/admin/users", icon: <Users size={20} /> },
     { label: "Role Management", path: "/admin/roles", icon: <Shield size={20} /> },
     { label: "System Configuration", path: "/admin/system-config", icon: <Settings size={20} /> },
-    { label: "Activity Logs", path: "/admin/activity-logs", icon: <ClipboardList size={20} /> },
-    { label: "Reports", path: "/admin/reports", icon: <FileText size={20} /> },
   ];
 
   const staffMenus = [
     { label: "Dashboard", path: "/staff", icon: <LayoutDashboard size={20} /> },
-    { label: "Vehicle Entry", path: "/staff/vehicle-entry", icon: <LogIn size={20} /> },
-    { label: "Vehicle Exit", path: "/staff/vehicle-exit", icon: <LogOut size={20} /> },
-    { label: "QR Verification", path: "/staff/qr-verification", icon: <ScanLine size={20} /> },
-    { label: "OCR Scan", path: "/staff/ocr-scan", icon: <ScanLine size={20} /> },
-    { label: "OCR Correction", path: "/staff/ocr-correction", icon: <FilePenLine size={20} /> },
-    { label: "Parking Sessions", path: "/staff/parking-sessions", icon: <Clock3 size={20} /> },
-    { label: "Fee Calculation", path: "/staff/fee-calculation", icon: <Calculator size={20} /> },
-    { label: "Payment Processing", path: "/staff/payment-processing", icon: <Wallet size={20} /> },
-    { label: "Request Processing", path: "/staff/requests", icon: <MessageSquare size={20} /> },
-    { label: "Exception Cases", path: "/staff/exceptions", icon: <AlertTriangle size={20} /> },
     { label: "Notifications", path: "/staff/notifications", icon: <Bell size={20} /> },
   ];
 
   const driverMenus = [
     { label: "Dashboard", path: "/driver", icon: <LayoutDashboard size={20} /> },
-    { label: "Profile", path: "/driver/profile", icon: <Users size={20} /> },
     { label: "My Vehicles", path: "/driver/vehicles", icon: <Car size={20} /> },
     { label: "Parking Slots", path: "/driver/parking-slots", icon: <SquareParking size={20} /> },
-    { label: "Booking", path: "/driver/booking", icon: <ClipboardList size={20} /> },
-    { label: "Booking History", path: "/driver/booking-history", icon: <FileText size={20} /> },
-    { label: "Current Session", path: "/driver/current-session", icon: <Clock3 size={20} /> },
-    { label: "Payment History", path: "/driver/payment-history", icon: <CreditCard size={20} /> },
-    { label: "Request Center", path: "/driver/requests", icon: <MessageSquare size={20} /> },
     { label: "Notifications", path: "/driver/notifications", icon: <Bell size={20} /> },
   ];
 
