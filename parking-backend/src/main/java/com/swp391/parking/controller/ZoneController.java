@@ -20,7 +20,6 @@ public class ZoneController {
     private final ZoneService zoneService;
 
     @GetMapping("/floor/{floorId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<Zone>>> getByFloor(@PathVariable Long floorId) {
         return ResponseEntity.ok(ApiResponse.success(zoneService.getByFloor(floorId)));
     }

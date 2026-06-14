@@ -5,9 +5,11 @@ export const systemConfigApi = {
 
   getById: (id) => axiosClient.get(`/system-configs/${id}`),
 
-  create: (data) => axiosClient.post("/system-configs", data),
+  create: (data, updatedBy) =>
+    axiosClient.post(`/system-configs?updatedBy=${updatedBy}`, data),
 
-  update: (id, data) => axiosClient.put(`/system-configs/${id}`, data),
+  update: (id, data, updatedBy) =>
+    axiosClient.put(`/system-configs/${id}?updatedBy=${updatedBy}`, data),
 
   delete: (id) => axiosClient.delete(`/system-configs/${id}`),
 };
