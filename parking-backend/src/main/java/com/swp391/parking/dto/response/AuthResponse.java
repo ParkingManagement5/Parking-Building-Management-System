@@ -13,6 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 public class AuthResponse {
     private String token;
+    private Integer userId;
     private String username;
     private String fullName;
     private String email;

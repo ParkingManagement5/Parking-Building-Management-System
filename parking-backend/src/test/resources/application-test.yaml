@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:parking_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+    defer-datasource-initialization: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  sql:
+    init:
+      mode: never
+
+jwt:
+  secret: test-secret-key-for-h2-profile-must-be-at-least-256-bits
+  expiration: 86400000
