@@ -92,6 +92,7 @@ public class AuthService {
 
         return AuthResponse.builder()
                 .token(token)
+                .userId(user.getUserId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
