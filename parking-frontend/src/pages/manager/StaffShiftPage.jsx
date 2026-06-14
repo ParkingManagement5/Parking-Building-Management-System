@@ -1,314 +1,222 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarRange, Clock3, ShieldCheck, Users, Plus, X } from "lucide-react";
+import axiosClient from "../../api/axiosClient";
+import { staffShiftApi } from "../../api/manager/staffShiftApi";
+import {
+  ManagerCell,
+  ManagerDataTable,
+  ManagerEmptyState,
+  ManagerField,
+  ManagerForm,
+  ManagerInput,
+  ManagerPageHeader,
+  ManagerPanel,
+  ManagerPrimaryButton,
+  ManagerRow,
+  ManagerSecondaryButton,
+  ManagerSelect,
+  ManagerStatCard,
+  ManagerStatsRow,
+  ManagerStatusBadge,
+} from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
 
 export default function StaffShiftPage() {
-  const staffUsers = [
-    { userId: 1, fullName: "Parking Staff 01" },
-    { userId: 2, fullName: "Parking Staff 02" },
-  ];
-
-  const shifts = [
-    {
-      shiftId: 1,
-      shiftName: "Morning Shift",
-      startTime: "07:00",
-      endTime: "15:00",
-    },
-    {
-      shiftId: 2,
-      shiftName: "Evening Shift",
-      startTime: "15:00",
-      endTime: "23:00",
-    },
-    {
-      shiftId: 3,
-      shiftName: "Night Shift",
-      startTime: "23:00",
-      endTime: "07:00",
-    },
-  ];
-
-  const mockData = [
-    {
-      staffShiftId: 1,
-      staffUserId: 1,
-      staffName: "Parking Staff 01",
-      shiftId: 1,
-      shiftName: "Morning Shift",
-      workingDate: "2026-06-06",
-      time: "07:00 - 15:00",
-      status: "Assigned",
-    },
-    {
-      staffShiftId: 2,
-      staffUserId: 2,
-      staffName: "Parking Staff 02",
-      shiftId: 2,
-      shiftName: "Evening Shift",
-      workingDate: "2026-06-06",
-      time: "15:00 - 23:00",
-      status: "Assigned",
-    },
-  ];
-
-  const [staffShifts, setStaffShifts] = useState(mockData);
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [shifts, setShifts] = useState([]);
+  const [staffShifts, setStaffShifts] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState({
-    staffUserId: "",
+    userId: "",
     shiftId: "",
     workingDate: "",
-    status: "Assigned",
   });
+
+  useEffect(() => {
+    void loadInitialData();
+  }, []);
+
+  async function loadInitialData() {
+    try {
+      const [usersRes, shiftsRes, staffShiftsRes] = await Promise.all([
+        axiosClient.get("/users?role=STAFF"),
+        axiosClient.get("/shifts"),
+        staffShiftApi.getAll(),
+      ]);
+      setLoadError("");
+      setStaffUsers(unwrapApiData(usersRes.data, []));
+      setShifts(unwrapApiData(shiftsRes.data, []));
+      setStaffShifts(unwrapApiData(staffShiftsRes.data, []));
+    } catch (error) {
+      console.error("Failed to load staff shift data", error);
+      setLoadError("Cannot load staff shift data from backend.");
+      setStaffUsers([]);
+      setShifts([]);
+      setStaffShifts([]);
+    }
+  }
+
+  const shiftMap = useMemo(() => Object.fromEntries(shifts.map((item) => [item.shiftId, item])), [shifts]);
+  const canAssign = staffUsers.length > 0 && shifts.length > 0;
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({
-      staffUserId: "",
-      shiftId: "",
-      workingDate: "",
-      status: "Assigned",
-    });
+    setForm({ userId: "", shiftId: "", workingDate: "" });
   };
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  const openCreateModal = () => {
+    resetForm();
+    setShowModal(true);
   };
 
-  const getStaffName = (staffUserId) => {
-    const staff = staffUsers.find(
-      (item) => item.userId === Number(staffUserId)
-    );
-
-    return staff ? staff.fullName : "";
+  const handleCloseModal = () => {
+    resetForm();
+    setShowModal(false);
   };
 
-  const getShift = (shiftId) => {
-    return shifts.find((item) => item.shiftId === Number(shiftId));
+  const handleChange = (event) => {
+    setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!form.staffUserId || !form.shiftId || !form.workingDate) {
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form.userId || !form.shiftId || !form.workingDate) {
       alert("Staff, shift and working date are required");
       return;
     }
 
-    const selectedShift = getShift(form.shiftId);
-
     const payload = {
-      staffUserId: Number(form.staffUserId),
+      userId: Number(form.userId),
       shiftId: Number(form.shiftId),
       workingDate: form.workingDate,
-      status: form.status,
-    };
-
-    const displayData = {
-      staffName: getStaffName(payload.staffUserId),
-      shiftName: selectedShift.shiftName,
-      time: `${selectedShift.startTime} - ${selectedShift.endTime}`,
     };
 
     try {
       if (editingId) {
-        setStaffShifts(
-          staffShifts.map((item) =>
-            item.staffShiftId === editingId
-              ? {
-                  ...item,
-                  ...payload,
-                  ...displayData,
-                }
-              : item
-          )
-        );
+        await staffShiftApi.update(editingId, payload);
       } else {
-        setStaffShifts([
-          ...staffShifts,
-          {
-            staffShiftId: Date.now(),
-            ...payload,
-            ...displayData,
-          },
-        ]);
+        await staffShiftApi.create(payload);
       }
-
-      resetForm();
+      await loadInitialData();
+      handleCloseModal();
     } catch (error) {
       console.error("Failed to save staff shift", error);
+      alert("Save staff shift failed");
     }
   };
 
   const handleEdit = (item) => {
     setEditingId(item.staffShiftId);
-
     setForm({
-      staffUserId: item.staffUserId,
+      userId: item.userId,
       shiftId: item.shiftId,
       workingDate: item.workingDate,
-      status: item.status,
     });
+    setShowModal(true);
   };
 
   const handleDelete = async (id) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to remove this staff shift?"
-    );
-
-    if (!confirmDelete) return;
-
+    if (!window.confirm("Are you sure you want to remove this staff shift?")) return;
     try {
-      setStaffShifts(staffShifts.filter((item) => item.staffShiftId !== id));
+      await staffShiftApi.delete(id);
+      await loadInitialData();
     } catch (error) {
       console.error("Failed to delete staff shift", error);
+      alert("Delete staff shift failed");
     }
   };
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1>Staff Shift Management</h1>
-          <p>Manage staff working schedules and shifts</p>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ManagerPageHeader
+        title="Staff Shift Management"
+        description="Assign shifts to staff members and keep schedule coverage visible by date."
+        action={
+          <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
+            <Plus size={14} /> Assign Shift
+          </ManagerPrimaryButton>
+        }
+      />
+      <ManagerStatsRow>
+        <ManagerStatCard icon={Users} label="Staff Users" value={staffUsers.length} hint="Staff accounts available for assignment" tone="violet" />
+        <ManagerStatCard icon={Clock3} label="Shift Templates" value={shifts.length} hint="Shift definitions from backend" tone="blue" />
+        <ManagerStatCard icon={CalendarRange} label="Assignments" value={staffShifts.length} hint="Saved staff shift records" tone="emerald" />
+        <ManagerStatCard icon={ShieldCheck} label="Ready to Assign" value={canAssign ? "Yes" : "No"} hint="Depends on staff users and shift templates" tone="amber" />
+      </ManagerStatsRow>
 
-      <div className="content-grid">
-        <div className="form-card">
-          <h3>{editingId ? "Update Staff Shift" : "Assign Staff Shift"}</h3>
+      <ManagerPanel title="Staff Shift Directory" subtitle={`${staffShifts.length} assignment records available`}>
+        {staffShifts.length === 0 ? (
+          <ManagerEmptyState title="No staff shifts yet" description="Create assignments after staff accounts and shift templates are available." />
+        ) : (
+          <ManagerDataTable columns={["Staff", "Shift", "Working Date", "Time", "Status", "Actions"]}>
+            {staffShifts.map((item) => {
+              const shift = shiftMap[item.shiftId];
+              return (
+                <ManagerRow key={item.staffShiftId}>
+                  <ManagerCell className="font-medium">{item.userName}</ManagerCell>
+                  <ManagerCell>{item.shiftName}</ManagerCell>
+                  <ManagerCell>{item.workingDate}</ManagerCell>
+                  <ManagerCell>{shift ? `${shift.startTime} - ${shift.endTime}` : "-"}</ManagerCell>
+                  <ManagerCell><ManagerStatusBadge tone="blue">Assigned</ManagerStatusBadge></ManagerCell>
+                  <ManagerCell>
+                    <div className="flex gap-2">
+                      <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Edit</ManagerSecondaryButton>
+                      <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.staffShiftId)}>Remove</ManagerSecondaryButton>
+                    </div>
+                  </ManagerCell>
+                </ManagerRow>
+              );
+            })}
+          </ManagerDataTable>
+        )}
+      </ManagerPanel>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Staff</label>
-              <select
-                name="staffUserId"
-                value={form.staffUserId}
-                onChange={handleChange}
-              >
-                <option value="">Select staff</option>
-                {staffUsers.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.fullName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Shift</label>
-              <select
-                name="shiftId"
-                value={form.shiftId}
-                onChange={handleChange}
-              >
-                <option value="">Select shift</option>
-                {shifts.map((item) => (
-                  <option key={item.shiftId} value={item.shiftId}>
-                    {item.shiftName} ({item.startTime} - {item.endTime})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Working Date</label>
-              <input
-                type="date"
-                name="workingDate"
-                value={form.workingDate}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Status</label>
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
-              >
-                <option value="Assigned">Assigned</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-
-            <div className="form-actions">
-              <button type="submit" className="primary-btn">
-                {editingId ? "Update" : "Assign"}
+      {showModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">{editingId ? "Update Staff Shift" : "Assign Staff Shift"}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Pair staff members with shift templates and working dates.</p>
+              </div>
+              <button type="button" onClick={handleCloseModal} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors">
+                <X size={18} />
               </button>
-
-              {editingId && (
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-              )}
             </div>
-          </form>
+            {loadError ? (
+              <ManagerEmptyState title="Backend data unavailable" description={loadError} />
+            ) : (
+              <ManagerForm onSubmit={handleSubmit}>
+                <ManagerField label="Staff">
+                  <ManagerSelect name="userId" value={form.userId} onChange={handleChange} disabled={staffUsers.length === 0}>
+                    <option value="">Select staff</option>
+                    {staffUsers.map((item) => (
+                      <option key={item.userId} value={item.userId}>{item.fullName}</option>
+                    ))}
+                  </ManagerSelect>
+                </ManagerField>
+                <ManagerField label="Shift">
+                  <ManagerSelect name="shiftId" value={form.shiftId} onChange={handleChange} disabled={shifts.length === 0}>
+                    <option value="">Select shift</option>
+                    {shifts.map((item) => (
+                      <option key={item.shiftId} value={item.shiftId}>{item.shiftName} ({item.startTime} - {item.endTime})</option>
+                    ))}
+                  </ManagerSelect>
+                </ManagerField>
+                <ManagerField label="Working Date">
+                  <ManagerInput type="date" name="workingDate" value={form.workingDate} onChange={handleChange} />
+                </ManagerField>
+                <div className="flex gap-3">
+                  <ManagerPrimaryButton type="submit" className="flex-1" disabled={!canAssign}>{editingId ? "Save Changes" : "Assign Shift"}</ManagerPrimaryButton>
+                  <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Cancel</ManagerSecondaryButton>
+                </div>
+              </ManagerForm>
+            )}
+          </div>
         </div>
-
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Staff</th>
-                <th>Shift</th>
-                <th>Working Date</th>
-                <th>Time</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {staffShifts.map((item) => (
-                <tr key={item.staffShiftId}>
-                  <td>{item.staffShiftId}</td>
-                  <td>{item.staffName}</td>
-                  <td>{item.shiftName}</td>
-                  <td>{item.workingDate}</td>
-                  <td>{item.time}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        item.status === "Assigned"
-                          ? "info"
-                          : item.status === "Completed"
-                          ? "success"
-                          : "warning"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="text-btn"
-                      onClick={() => handleEdit(item)}
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      className="text-btn danger"
-                      onClick={() => handleDelete(item.staffShiftId)}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

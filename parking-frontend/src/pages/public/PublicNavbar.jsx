@@ -8,7 +8,7 @@ export default function PublicNavbar() {
       <div className="public-menu">
         <NavLink to="/">Home</NavLink>
         <NavLink to="/parking-info">Parking Information</NavLink>
-        <NavLink to="/public-slots">Parking Slots</NavLink>
+        <NavLink to="/public-slots">Public Slots</NavLink>
       </div>
 
       <div className="public-actions">

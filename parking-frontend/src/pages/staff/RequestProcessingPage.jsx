@@ -1,88 +1,85 @@
 import { useState } from "react";
+import { createPortalId, formatStaffDateTime, getStaffPortalState, updateStaffPortalState } from "./staffPortalState";
+import {
+  StaffEmptyState,
+  StaffPageSection,
+  StaffPrimaryButton,
+  StaffSecondaryButton,
+  StaffStatusBadge,
+} from "./StaffUi";
 
 export default function RequestProcessingPage() {
-  const [requests, setRequests] = useState([
-    {
-      requestId: 1,
-      customerName: "Nguyen Van A",
-      type: "Booking Support",
-      content: "I want to change my parking slot.",
-      status: "Pending",
-      createdAt: "2026-06-06 09:00",
-    },
-    {
-      requestId: 2,
-      customerName: "Tran Thi B",
-      type: "Payment Issue",
-      content: "Payment was deducted but not confirmed.",
-      status: "Resolved",
-      createdAt: "2026-06-06 10:15",
-    },
-  ]);
+  const [requests, setRequests] = useState(() => getStaffPortalState().requests);
 
-  const handleResolve = (id) => {
-    setRequests(
-      requests.map((item) =>
-        item.requestId === id ? { ...item, status: "Resolved" } : item
-      )
+  const updateRequest = (request, status) => {
+    const next = requests.map((item) =>
+      item.requestId === request.requestId ? { ...item, status } : item
     );
+    setRequests(next);
+    updateStaffPortalState((current) => ({
+      ...current,
+      requests: next,
+      activity: [
+        {
+          id: createPortalId("ACT"),
+          plate: request.licensePlate,
+          action: `Request ${request.requestId} marked as ${status.toLowerCase()}`,
+          type: "update",
+          time: new Date().toISOString(),
+        },
+        ...current.activity,
+      ],
+    }));
   };
 
+  const pending = requests.filter((item) => item.status === "PENDING");
+
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1>Request Processing</h1>
-          <p>Handle support requests from parking users</p>
-        </div>
-      </div>
+    <StaffPageSection title="Request Processing" subtitle="Handle driver support requests while waiting for dedicated request APIs">
+      {requests.length === 0 ? (
+        <StaffEmptyState
+          title="No requests available"
+          description="Driver support requests will appear here when they are created."
+          tone="success"
+        />
+      ) : (
+        <div className="space-y-3">
+          {requests.map((item) => (
+            <div key={item.requestId} className="rounded-2xl border border-border p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{item.type}</p>
+                    <StaffStatusBadge tone={item.priority === "HIGH" ? "rose" : item.priority === "MEDIUM" ? "amber" : "slate"}>
+                      {item.priority.toLowerCase()}
+                    </StaffStatusBadge>
+                    <StaffStatusBadge tone={item.status === "RESOLVED" ? "emerald" : "blue"}>
+                      {item.status.toLowerCase()}
+                    </StaffStatusBadge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.requestId} • {item.driverName} • {item.licensePlate} • {formatStaffDateTime(item.createdAt)}
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground">{item.content}</p>
+                </div>
 
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Customer</th>
-              <th>Type</th>
-              <th>Content</th>
-              <th>Status</th>
-              <th>Created At</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {requests.map((item) => (
-              <tr key={item.requestId}>
-                <td>{item.requestId}</td>
-                <td>{item.customerName}</td>
-                <td>{item.type}</td>
-                <td>{item.content}</td>
-                <td>
-                  <span
-                    className={`badge ${
-                      item.status === "Resolved" ? "success" : "warning"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </td>
-                <td>{item.createdAt}</td>
-                <td>
-                  {item.status !== "Resolved" && (
-                    <button
-                      className="text-btn"
-                      onClick={() => handleResolve(item.requestId)}
-                    >
+                {item.status === "PENDING" ? (
+                  <div className="flex gap-3">
+                    <StaffPrimaryButton type="button" onClick={() => updateRequest(item, "RESOLVED")}>
                       Resolve
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                    </StaffPrimaryButton>
+                    <StaffSecondaryButton type="button" onClick={() => updateRequest(item, "ESCALATED")}>
+                      Escalate
+                    </StaffSecondaryButton>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-muted-foreground">{pending.length} request(s) still pending.</p>
+    </StaffPageSection>
   );
 }

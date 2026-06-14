@@ -10,8 +10,8 @@ export default function HomePage() {
           </p>
 
           <div className="hero-actions">
-            <a href="/public-slots" className="primary-btn">
-              View Parking Slots
+            <a href="/parking-info" className="primary-btn">
+              View Parking Buildings
             </a>
             <a href="/login" className="secondary-btn">
               Login

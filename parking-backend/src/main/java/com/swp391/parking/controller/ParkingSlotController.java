@@ -35,7 +35,6 @@ public class ParkingSlotController {
     }
 
     @GetMapping("/zone/{zoneId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId) {
         return ResponseEntity.ok(ApiResponse.success(slotService.getByZone(zoneId)));
     }

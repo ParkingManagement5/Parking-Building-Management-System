@@ -20,7 +20,6 @@ public class FloorController {
     private final FloorService floorService;
 
     @GetMapping("/building/{buildingId}")
-    @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<Floor>>> getByBuilding(@PathVariable Long buildingId) {
         return ResponseEntity.ok(ApiResponse.success(floorService.getByBuilding(buildingId)));
     }

@@ -1,26 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { activityLogApi } from "../../api/admin/activityLogApi";
 
 export default function ActivityLogPage() {
-  const mockData = [
-    {
-      logId: 1,
-      user: "admin01",
-      actionType: "CREATE",
-      action: "Created new system config QR_EXPIRE_MINUTES",
-      ipAddress: "127.0.0.1",
-      createdAt: "2026-06-06 09:10",
-    },
-    {
-      logId: 2,
-      user: "manager01",
-      actionType: "UPDATE",
-      action: "Updated parking slot A-001 status",
-      ipAddress: "127.0.0.1",
-      createdAt: "2026-06-06 10:25",
-    },
-  ];
+  const [logs, setLogs] = useState([]);
+  const [error, setError] = useState("");
 
-  const [logs] = useState(mockData);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchLogs() {
+      try {
+        const res = await activityLogApi.getAll();
+        if (!cancelled) {
+          setError("");
+          setLogs(res.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load activity logs", err);
+        if (!cancelled) {
+          setError("Activity log API is not available yet.");
+          setLogs([]);
+        }
+      }
+    }
+
+    void fetchLogs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div>
@@ -32,6 +41,8 @@ export default function ActivityLogPage() {
       </div>
 
       <div className="table-card">
+        {error && <p>{error}</p>}
+
         <table>
           <thead>
             <tr>
@@ -57,6 +68,12 @@ export default function ActivityLogPage() {
                 <td>{item.createdAt}</td>
               </tr>
             ))}
+
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan="6">No activity logs available.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
