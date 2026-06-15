@@ -1,7 +1,8 @@
 import axiosClient from "../axiosClient";
 
 export const userApi = {
-  getAll: () => axiosClient.get("/users"),
+  getAll: (role) =>
+    role ? axiosClient.get(`/users?role=${role}`) : axiosClient.get("/users"),
 
   getById: (id) => axiosClient.get(`/users/${id}`),
 

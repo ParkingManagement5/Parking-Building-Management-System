@@ -23,6 +23,8 @@ axiosClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("username");
     }
     return Promise.reject(error);
   }

@@ -1,11 +1,9 @@
 import axiosClient from "./axiosClient";
 
 export const notificationApi = {
-  getAll: () => axiosClient.get("/notifications"),
+  getByUser: (userId) => axiosClient.get(`/notifications/user/${userId}`),
 
-  getById: (id) => axiosClient.get(`/notifications/${id}`),
+  markAsRead: (id) => axiosClient.patch(`/notifications/${id}/read`),
 
-  markAsRead: (id) => axiosClient.put(`/notifications/${id}/read`),
-
-  delete: (id) => axiosClient.delete(`/notifications/${id}`),
+  markAllAsRead: (userId) => axiosClient.patch(`/notifications/user/${userId}/read-all`),
 };

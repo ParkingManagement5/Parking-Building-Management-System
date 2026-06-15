@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { authApi } from "../../api/auth/authApi";
-import { saveToken, saveRole } from "../../utils/auth";
+import { saveRole, saveToken, saveUserId, saveUsername } from "../../utils/auth";
+import { unwrapApiData } from "../../utils/api";
 
 export default function LoginPage() {
   const [form, setForm] = useState({
@@ -21,12 +22,18 @@ export default function LoginPage() {
     try {
       const res = await authApi.login(form);
 
-      const userData = res.data.data;
+      const userData = unwrapApiData(res.data, null);
+      if (!userData) {
+        throw new Error("Login response is missing user data");
+      }
+
       const token = userData.token;
       const role = userData.roles?.[0]?.replace("ROLE_", "");
 
       saveToken(token);
       saveRole(role);
+      saveUserId(userData.userId);
+      saveUsername(userData.username);
 
       if (role === "ADMIN") {
         window.location.href = "/admin";

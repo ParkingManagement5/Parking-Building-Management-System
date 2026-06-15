@@ -1,287 +1,190 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { roleApi } from "../../api/admin/roleApi";
+import { userApi } from "../../api/admin/userApi";
+import {
+  ManagerCell,
+  ManagerDataTable,
+  ManagerEmptyState,
+  ManagerPageHeader,
+  ManagerPanel,
+  ManagerSelect,
+  ManagerRow,
+  ManagerStatusBadge,
+} from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
+
+function toneForRole(role) {
+  const value = String(role || "").replace(/^ROLE_/, "").toUpperCase();
+  if (value === "ADMIN") return "rose";
+  if (value === "MANAGER") return "violet";
+  if (value === "STAFF") return "emerald";
+  return "blue";
+}
+
+function toneForStatus(status) {
+  const value = String(status || "").toUpperCase();
+  if (value === "ACTIVE") return "emerald";
+  if (value === "LOCKED") return "rose";
+  return "amber";
+}
+
+function roleLabel(value) {
+  return String(value || "UNKNOWN").replace(/^ROLE_/, "");
+}
 
 export default function UserManagementPage() {
-  const mockData = [
-    {
-      userId: 1,
-      username: "admin01",
-      fullName: "System Administrator",
-      email: "admin@gmail.com",
-      phone: "0900000001",
-      role: "ADMIN",
-      status: "Active",
-    },
-    {
-      userId: 2,
-      username: "manager01",
-      fullName: "Parking Manager",
-      email: "manager@gmail.com",
-      phone: "0900000002",
-      role: "MANAGER",
-      status: "Active",
-    },
-    {
-      userId: 3,
-      username: "staff01",
-      fullName: "Parking Staff",
-      email: "staff@gmail.com",
-      phone: "0900000003",
-      role: "STAFF",
-      status: "Active",
-    },
-    {
-      userId: 4,
-      username: "driver01",
-      fullName: "Parking User",
-      email: "driver@gmail.com",
-      phone: "0900000004",
-      role: "DRIVER",
-      status: "Locked",
-    },
-  ];
+  const [allUsers, setAllUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [selectedRole, setSelectedRole] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
 
-  const [users, setUsers] = useState(mockData);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({
-    username: "",
-    fullName: "",
-    email: "",
-    phone: "",
-    role: "DRIVER",
-    status: "Active",
-  });
+  useEffect(() => {
+    let cancelled = false;
 
-  const resetForm = () => {
-    setEditingId(null);
-    setForm({
-      username: "",
-      fullName: "",
-      email: "",
-      phone: "",
-      role: "DRIVER",
-      status: "Active",
-    });
-  };
-
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!form.username.trim() || !form.fullName.trim() || !form.email.trim()) {
-      alert("Username, full name and email are required");
-      return;
+    async function loadRoles() {
+      try {
+        const res = await roleApi.getAll();
+        if (!cancelled) {
+          setRoles(unwrapApiData(res.data, []));
+        }
+      } catch (err) {
+        console.error("Failed to load roles", err);
+        if (!cancelled) {
+          setRoles([]);
+        }
+      }
     }
 
-    const payload = {
-      username: form.username,
-      fullName: form.fullName,
-      email: form.email,
-      phone: form.phone,
-      role: form.role,
-      status: form.status,
+    void loadRoles();
+
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    try {
-      if (editingId) {
-        setUsers(
-          users.map((item) =>
-            item.userId === editingId ? { ...item, ...payload } : item
-          )
-        );
-      } else {
-        setUsers([
-          ...users,
-          {
-            userId: Date.now(),
-            ...payload,
-          },
-        ]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsers() {
+      try {
+        const res =
+          selectedRole !== "ALL" ? await userApi.getAll(selectedRole) : await userApi.getAll();
+        if (!cancelled) {
+          setError("");
+          setAllUsers(unwrapApiData(res.data, []));
+        }
+      } catch (err) {
+        console.error("Failed to load users", err);
+        if (!cancelled) {
+          setError("Unable to load users from backend.");
+          setAllUsers([]);
+        }
       }
-
-      resetForm();
-    } catch (error) {
-      console.error("Failed to save user", error);
     }
-  };
 
-  const handleEdit = (item) => {
-    setEditingId(item.userId);
+    void loadUsers();
 
-    setForm({
-      username: item.username,
-      fullName: item.fullName,
-      email: item.email,
-      phone: item.phone,
-      role: item.role,
-      status: item.status,
-    });
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRole]);
 
-  const handleToggleLock = async (item) => {
-    try {
-      if (item.status === "Locked") {
-        setUsers(
-          users.map((user) =>
-            user.userId === item.userId ? { ...user, status: "Active" } : user
-          )
-        );
-      } else {
-        setUsers(
-          users.map((user) =>
-            user.userId === item.userId ? { ...user, status: "Locked" } : user
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Failed to update user status", error);
+  const users = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) {
+      return allUsers;
     }
-  };
+
+    return allUsers.filter((item) =>
+      [item.username, item.fullName, item.email, item.phone]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [allUsers, search]);
+
+  const roleFilters = useMemo(
+    () => ["ALL", ...roles.map((item) => item.roleName)],
+    [roles]
+  );
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1>User Management</h1>
-          <p>Manage users, roles and account status</p>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ManagerPageHeader
+        title="User Management"
+        description="Browse users from the live backend and filter by role or search terms."
+      />
 
-      <div className="content-grid">
-        <div className="form-card">
-          <h3>{editingId ? "Update User" : "Add User"}</h3>
-
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Username</label>
-              <input
-                name="username"
-                value={form.username}
-                onChange={handleChange}
-                placeholder="Enter username"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Full Name</label>
-              <input
-                name="fullName"
-                value={form.fullName}
-                onChange={handleChange}
-                placeholder="Enter full name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="Enter email"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Phone</label>
-              <input
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder="Enter phone"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Role</label>
-              <select name="role" value={form.role} onChange={handleChange}>
-                <option value="DRIVER">DRIVER</option>
-                <option value="STAFF">STAFF</option>
-                <option value="MANAGER">MANAGER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Status</label>
-              <select name="status" value={form.status} onChange={handleChange}>
-                <option value="Active">Active</option>
-                <option value="Locked">Locked</option>
-              </select>
-            </div>
-
-            <div className="form-actions">
-              <button type="submit" className="primary-btn">
-                {editingId ? "Update" : "Create"}
+      <ManagerPanel>
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex max-w-sm items-center gap-2 rounded-2xl border border-border bg-muted px-3 py-2.5">
+            <Search size={14} className="text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search users..."
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="flex flex-wrap gap-1 rounded-2xl bg-muted p-1">
+            {roleFilters.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setSelectedRole(item)}
+                className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedRole === item
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item === "ALL" ? "All" : item}
               </button>
-
-              {editingId && (
-                <button type="button" className="secondary-btn" onClick={resetForm}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
+            ))}
+          </div>
         </div>
 
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Username</th>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {users.map((item) => (
-                <tr key={item.userId}>
-                  <td>{item.userId}</td>
-                  <td>{item.username}</td>
-                  <td>{item.fullName}</td>
-                  <td>{item.email}</td>
-                  <td>{item.phone}</td>
-                  <td>
-                    <span className="badge info">{item.role}</span>
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        item.status === "Active" ? "success" : "warning"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="text-btn" onClick={() => handleEdit(item)}>
-                      Edit
-                    </button>
-
-                    <button
-                      className="text-btn danger"
-                      onClick={() => handleToggleLock(item)}
-                    >
-                      {item.status === "Locked" ? "Unlock" : "Lock"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        {error ? (
+          <ManagerEmptyState title="Cannot load users" description={error} />
+        ) : users.length === 0 ? (
+          <ManagerEmptyState title="No users available" description="No users matched the current role filter or search query." />
+        ) : (
+          <ManagerDataTable columns={["User", "Role", "Status", "Contact", "User ID"]}>
+            {users.map((item) => (
+              <ManagerRow key={item.userId}>
+                <ManagerCell>
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {String(item.fullName || item.username || "U")
+                        .split(" ")
+                        .slice(0, 2)
+                        .map((part) => part[0] || "")
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{item.fullName || item.username}</p>
+                      <p className="truncate text-xs text-muted-foreground">{item.email || "No email"}</p>
+                    </div>
+                  </div>
+                </ManagerCell>
+                <ManagerCell>
+                  <ManagerStatusBadge tone={toneForRole(item.role)}>{roleLabel(item.role)}</ManagerStatusBadge>
+                </ManagerCell>
+                <ManagerCell>
+                  <ManagerStatusBadge tone={toneForStatus(item.status)}>{item.status}</ManagerStatusBadge>
+                </ManagerCell>
+                <ManagerCell>
+                  <div>{item.phone || "-"}</div>
+                  <div className="text-xs text-muted-foreground">{item.username}</div>
+                </ManagerCell>
+                <ManagerCell className="font-mono text-xs">{item.userId}</ManagerCell>
+              </ManagerRow>
+            ))}
+          </ManagerDataTable>
+        )}
+      </ManagerPanel>
     </div>
   );
 }
