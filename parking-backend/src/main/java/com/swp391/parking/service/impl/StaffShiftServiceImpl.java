@@ -56,14 +56,13 @@ public class StaffShiftServiceImpl implements StaffShiftService {
                 .collect(Collectors.toList());
     }
 
-    
     @Override
-public List<StaffShiftResponse> getByUser(Long userId) {
-    return staffShiftRepository.findByUserUserId((int)(long) userId)
-            .stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
-}
+    public List<StaffShiftResponse> getByUser(Long userId) {
+        return staffShiftRepository.findByUserUserId((int)(long)userId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
 
     @Override
     public List<StaffShiftResponse> getByWorkingDate(LocalDate workingDate) {
