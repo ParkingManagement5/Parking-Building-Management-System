@@ -123,7 +123,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.getId(),
                 booking.getVehicle().getLicensePlate(),
                 booking.getSlot().getId(),
-                booking.getExpiredAt());
+//                booking.getExpiredAt());
+                LocalDateTime.now().plusMinutes(15)); // QR có hạn 15 phút sau khi confirm
 
         booking.setQrToken(qr);
         booking.setQrIssuedAt(LocalDateTime.now());
