@@ -9,61 +9,77 @@ CREATE DATABASE parking_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE parking_db;
 
 CREATE TABLE `parking_building` (
-                                    `building_id` int PRIMARY KEY AUTO_INCREMENT,
-                                    `name` varchar(100) NOT NULL,
-                                    `address` varchar(255) NOT NULL,
-                                    `operating_hours` varchar(50),
-                                    `total_floors` int,
-                                    `status` varchar(20) NOT NULL,
-                                    `created_at` datetime,
-                                    `updated_at` datetime
+    `building_id` int PRIMARY KEY AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `address` varchar(255) NOT NULL,
+    `phone` varchar(20),
+    `email` varchar(100),
+    `description` text,
+    `open_time` time NOT NULL,
+    `close_time` time NOT NULL,
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime
 );
 
 CREATE TABLE `floor` (
-                         `floor_id` int PRIMARY KEY AUTO_INCREMENT,
-                         `building_id` int NOT NULL,
-                         `floor_number` int NOT NULL,
-                         `floor_name` varchar(50),
-                         `status` varchar(20) NOT NULL,
-                         `created_at` datetime,
-                         `updated_at` datetime
+    `floor_id` int PRIMARY KEY AUTO_INCREMENT,
+    `building_id` int NOT NULL,
+    `floor_number` int NOT NULL,
+    `floor_name` varchar(50) NOT NULL,
+    `capacity` int NOT NULL DEFAULT 0,
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime,
+    UNIQUE KEY `uk_floor_building_number` (`building_id`, `floor_number`)
 );
 
 CREATE TABLE `vehicle_type` (
-                                `vehicle_type_id` int PRIMARY KEY AUTO_INCREMENT,
-                                `name` varchar(50) UNIQUE NOT NULL,
-                                `created_at` datetime,
-                                `updated_at` datetime
+    `vehicle_type_id` int PRIMARY KEY AUTO_INCREMENT,
+    `name` varchar(50) UNIQUE NOT NULL,
+    `description` varchar(255),
+    `slot_size` varchar(20) NOT NULL,
+    `hourly_rate` decimal(10,2) NOT NULL DEFAULT 0,
+    `daily_rate` decimal(10,2),
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime
 );
 
 CREATE TABLE `zone` (
-                        `zone_id` int PRIMARY KEY AUTO_INCREMENT,
-                        `floor_id` int NOT NULL,
-                        `vehicle_type_id` int NOT NULL,
-                        `zone_name` varchar(50) NOT NULL,
-                        `status` varchar(20) NOT NULL,
-                        `created_at` datetime,
-                        `updated_at` datetime
+    `zone_id` int PRIMARY KEY AUTO_INCREMENT,
+    `floor_id` int NOT NULL,
+    `vehicle_type_id` int NOT NULL,
+    `zone_name` varchar(50) NOT NULL,
+    `description` varchar(255),
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime,
+    UNIQUE KEY `uk_zone_floor_name` (`floor_id`, `zone_name`)
 );
 
 CREATE TABLE `parking_slot` (
-                                `slot_id` int PRIMARY KEY AUTO_INCREMENT,
-                                `zone_id` int NOT NULL,
-                                `slot_code` varchar(20) UNIQUE NOT NULL,
-                                `priority` int,
-                                `distance_to_gate` int,
-                                `status` varchar(20) NOT NULL,
-                                `created_at` datetime,
-                                `updated_at` datetime
+    `slot_id` int PRIMARY KEY AUTO_INCREMENT,
+    `zone_id` int NOT NULL,
+    `slot_code` varchar(20) NOT NULL,
+    `slot_size` varchar(20) NOT NULL,
+    `priority` int,
+    `distance_to_gate` int,
+    `status` varchar(20) NOT NULL,
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime,
+    UNIQUE KEY `uk_slot_zone_code` (`zone_id`, `slot_code`)
 );
 
 CREATE TABLE `gate` (
-                        `gate_id` int PRIMARY KEY AUTO_INCREMENT,
-                        `building_id` int NOT NULL,
-                        `gate_code` varchar(50) UNIQUE NOT NULL,
-                        `gate_type` varchar(20) NOT NULL,
-                        `created_at` datetime,
-                        `updated_at` datetime
+    `gate_id` int PRIMARY KEY AUTO_INCREMENT,
+    `building_id` int NOT NULL,
+    `gate_code` varchar(50) UNIQUE NOT NULL,
+    `gate_type` varchar(20) NOT NULL,
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime
 );
 
 CREATE TABLE `users` (
@@ -99,12 +115,16 @@ CREATE TABLE `password_reset_token` (
 );
 
 CREATE TABLE `vehicle` (
-                           `vehicle_id` int PRIMARY KEY AUTO_INCREMENT,
-                           `owner_user_id` int NOT NULL,
-                           `vehicle_type_id` int NOT NULL,
-                           `license_plate` varchar(20) UNIQUE NOT NULL,
-                           `created_at` datetime,
-                           `updated_at` datetime
+    `vehicle_id` int PRIMARY KEY AUTO_INCREMENT,
+    `owner_user_id` int NOT NULL,
+    `vehicle_type_id` int NOT NULL,
+    `license_plate` varchar(20) UNIQUE NOT NULL,
+    `brand` varchar(50),
+    `model` varchar(50),
+    `color` varchar(30),
+    `is_active` boolean NOT NULL DEFAULT true,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime
 );
 
 CREATE TABLE `booking` (
@@ -190,21 +210,22 @@ CREATE TABLE `gate_log` (
 );
 
 CREATE TABLE `ocr_scan` (
-                            `scan_id` int PRIMARY KEY AUTO_INCREMENT,
-                            `session_id` int,
-                            `gate_id` int,
-                            `image_path` varchar(500),
-                            `detected_plate` varchar(20),
-                            `plate_confidence_score` float,
-                            `corrected_plate` varchar(20),
-                            `staff_vehicle_type_id` int,
-                            `is_corrected` boolean NOT NULL DEFAULT false,
-                            `corrected_by` int,
-                            `corrected_at` datetime,
-                            `correction_reason` varchar(255),
-                            `trigger_type` varchar(20) NOT NULL,
-                            `process_status` varchar(30) NOT NULL,
-                            `scanned_at` datetime
+    `scan_id` int PRIMARY KEY AUTO_INCREMENT,
+    `session_id` int,
+    `gate_id` int,
+    `image_path` varchar(500),
+    `detected_plate` varchar(20),
+    `plate_confidence_score` float,
+    `corrected_plate` varchar(20),
+    `is_corrected` boolean NOT NULL DEFAULT false,
+    `corrected_by_user_id` int,
+    `corrected_at` datetime,
+    `correction_reason` varchar(255),
+    `trigger_type` varchar(20) NOT NULL,
+    `process_status` varchar(30) NOT NULL,
+    `scanned_at` datetime,
+    `created_at` datetime NOT NULL,
+    `updated_at` datetime
 );
 
 CREATE TABLE `request` (
@@ -334,9 +355,7 @@ ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`session_id`) REFERENCES `parking_sessio
 
 ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`gate_id`) REFERENCES `gate` (`gate_id`);
 
-ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`staff_vehicle_type_id`) REFERENCES `vehicle_type` (`vehicle_type_id`);
-
-ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`corrected_by`) REFERENCES `users` (`user_id`);
+ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`corrected_by_user_id`) REFERENCES `users` (`user_id`);
 
 ALTER TABLE `request` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 
@@ -367,82 +386,97 @@ INSERT INTO `role` (`role_name`) VALUES
                                      ('ADMIN'), ('MANAGER'), ('STAFF'), ('DRIVER');
 
 -- 2. Vehicle Types
-INSERT INTO `vehicle_type` (`name`, `created_at`, `updated_at`) VALUES
-                                                                    ('MOTORBIKE',    NOW(), NOW()),
-                                                                    ('CAR',          NOW(), NOW()),
-                                                                    ('ELECTRIC_CAR', NOW(), NOW());
+INSERT INTO `vehicle_type`
+(`name`, `description`, `slot_size`, `hourly_rate`, `daily_rate`, `is_active`, `created_at`, `updated_at`) VALUES
+('MOTORBIKE', 'Xe máy',       'SMALL',  5000.00,  50000.00,  true, NOW(), NOW()),
+('CAR',       'Ô tô',         'LARGE', 15000.00, 150000.00, true, NOW(), NOW()),
+('ELECTRIC_CAR', 'Ô tô điện', 'LARGE', 15000.00, 150000.00, true, NOW(), NOW());
 
 -- 3. Users — password: Password123!
 INSERT INTO `users` (`username`, `full_name`, `email`, `phone`, `password_hash`, `status`, `created_at`, `updated_at`) VALUES
-                                                                                                                           ('admin',   'Admin System',    'admin@parking.com',   '0900000001', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('manager', 'Nguyen Manager',  'manager@parking.com', '0900000002', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('staff1',  'Tran Staff One',  'staff1@parking.com',  '0900000003', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('driver1', 'Le Driver One',   'driver1@parking.com', '0900000004', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW()),
-                                                                                                                           ('driver2', 'Pham Driver Two', 'driver2@parking.com', '0900000005', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ACTIVE', NOW(), NOW());
+                                                                                                                           ('admin',   'Admin System',    'admin@parking.com',   '0900000001', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('manager', 'Nguyen Manager',  'manager@parking.com', '0900000002', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('staff1',  'Tran Staff One',  'staff1@parking.com',  '0900000003', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('driver1', 'Le Driver One',   'driver1@parking.com', '0900000004', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW()),
+                                                                                                                           ('driver2', 'Pham Driver Two', 'driver2@parking.com', '0900000005', '$2b$10$WcFoS6UScbX1UQLiZzKDvuJ16Lhdn/wFTodpjeUmUFm3dOjBgoWBa', 'ACTIVE', NOW(), NOW());
 
 -- 4. User Roles
 INSERT INTO `user_role` (`user_id`, `role_id`) VALUES
                                                    (1, 1), (2, 2), (3, 3), (4, 4), (5, 4);
 
 -- 5. Parking Building
-INSERT INTO `parking_building` (`name`, `address`, `operating_hours`, `total_floors`, `status`, `created_at`, `updated_at`) VALUES
-    ('Bãi xe FPT HCM', 'Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP.HCM', '06:00-22:00', 3, 'ACTIVE', NOW(), NOW());
+INSERT INTO `parking_building`
+(`name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `is_active`, `created_at`, `updated_at`) VALUES
+('Bãi xe FPT HCM',
+ 'Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP.HCM',
+ '0900000010',
+ 'parking@fpt.edu.vn',
+ 'Bãi đỗ xe trong khuôn viên FPT HCM',
+ '06:00:00',
+ '22:00:00',
+ true,
+ NOW(),
+ NOW());
 
 -- 6. Floors
-INSERT INTO `floor` (`building_id`, `floor_number`, `floor_name`, `status`, `created_at`, `updated_at`) VALUES
-                                                                                                            (1, 1, 'Tầng 1', 'ACTIVE', NOW(), NOW()),
-                                                                                                            (1, 2, 'Tầng 2', 'ACTIVE', NOW(), NOW()),
-                                                                                                            (1, 3, 'Tầng 3', 'ACTIVE', NOW(), NOW());
+INSERT INTO `floor`
+(`building_id`, `floor_number`, `floor_name`, `capacity`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 1, 'Tầng 1', 13, true, NOW(), NOW()),
+(1, 2, 'Tầng 2', 10, true, NOW(), NOW()),
+(1, 3, 'Tầng 3',  6, true, NOW(), NOW());
 
 -- 7. Zones
-INSERT INTO `zone` (`floor_id`, `vehicle_type_id`, `zone_name`, `status`, `created_at`, `updated_at`) VALUES
-                                                                                                          (1, 1, 'T1-MOTO', 'ACTIVE', NOW(), NOW()),
-                                                                                                          (1, 2, 'T1-CAR',  'ACTIVE', NOW(), NOW()),
-                                                                                                          (1, 3, 'T1-ECAR', 'ACTIVE', NOW(), NOW()),
-                                                                                                          (2, 1, 'T2-MOTO', 'ACTIVE', NOW(), NOW()),
-                                                                                                          (2, 2, 'T2-CAR',  'ACTIVE', NOW(), NOW()),
-                                                                                                          (2, 3, 'T2-ECAR', 'ACTIVE', NOW(), NOW()),
-                                                                                                          (3, 1, 'T3-MOTO', 'ACTIVE', NOW(), NOW()),
-                                                                                                          (3, 2, 'T3-CAR',  'ACTIVE', NOW(), NOW()),
-                                                                                                          (3, 3, 'T3-ECAR', 'ACTIVE', NOW(), NOW());
+INSERT INTO `zone`
+(`floor_id`, `vehicle_type_id`, `zone_name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 1, 'T1-MOTO', 'Khu xe máy tầng 1', true, NOW(), NOW()),
+(1, 2, 'T1-CAR',  'Khu ô tô tầng 1', true, NOW(), NOW()),
+(1, 3, 'T1-ECAR', 'Khu ô tô điện tầng 1', true, NOW(), NOW()),
+(2, 1, 'T2-MOTO', 'Khu xe máy tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-CAR',  'Khu ô tô tầng 2', true, NOW(), NOW()),
+(2, 3, 'T2-ECAR', 'Khu ô tô điện tầng 2', true, NOW(), NOW()),
+(3, 1, 'T3-MOTO', 'Khu xe máy tầng 3', true, NOW(), NOW()),
+(3, 2, 'T3-CAR',  'Khu ô tô tầng 3', true, NOW(), NOW()),
+(3, 3, 'T3-ECAR', 'Khu ô tô điện tầng 3', true, NOW(), NOW());
 
 -- 8. Parking Slots
-INSERT INTO `parking_slot` (`zone_id`, `slot_code`, `priority`, `distance_to_gate`, `status`, `created_at`, `updated_at`) VALUES
-                                                                                                                              (1, 'T1-M-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (1, 'T1-M-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (1, 'T1-M-03', 3, 15, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (1, 'T1-M-04', 4, 20, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (1, 'T1-M-05', 5, 25, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (2, 'T1-C-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (2, 'T1-C-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (2, 'T1-C-03', 3, 15, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (2, 'T1-C-04', 4, 20, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (2, 'T1-C-05', 5, 25, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (3, 'T1-E-01', 1, 8,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (3, 'T1-E-02', 2, 12, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (3, 'T1-E-03', 3, 16, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (4, 'T2-M-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (4, 'T2-M-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (4, 'T2-M-03', 3, 15, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (4, 'T2-M-04', 4, 20, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (4, 'T2-M-05', 5, 25, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (5, 'T2-C-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (5, 'T2-C-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (5, 'T2-C-03', 3, 15, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (5, 'T2-C-04', 4, 20, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (5, 'T2-C-05', 5, 25, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (7, 'T3-M-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (7, 'T3-M-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (7, 'T3-M-03', 3, 15, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (8, 'T3-C-01', 1, 5,  'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (8, 'T3-C-02', 2, 10, 'AVAILABLE', NOW(), NOW()),
-                                                                                                                              (8, 'T3-C-03', 3, 15, 'AVAILABLE', NOW(), NOW());
+INSERT INTO `parking_slot`
+(`zone_id`, `slot_code`, `slot_size`, `priority`, `distance_to_gate`, `status`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'T1-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(1, 'T1-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(1, 'T1-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
+(1, 'T1-M-04', 'SMALL', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
+(1, 'T1-M-05', 'SMALL', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
+(2, 'T1-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(2, 'T1-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(2, 'T1-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
+(2, 'T1-C-04', 'LARGE', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
+(2, 'T1-C-05', 'LARGE', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
+(3, 'T1-E-01', 'LARGE', 1, 8, 'AVAILABLE', true, NOW(), NOW()),
+(3, 'T1-E-02', 'LARGE', 2, 12, 'AVAILABLE', true, NOW(), NOW()),
+(3, 'T1-E-03', 'LARGE', 3, 16, 'AVAILABLE', true, NOW(), NOW()),
+(4, 'T2-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(4, 'T2-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(4, 'T2-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
+(4, 'T2-M-04', 'SMALL', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
+(4, 'T2-M-05', 'SMALL', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
+(5, 'T2-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(5, 'T2-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(5, 'T2-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
+(5, 'T2-C-04', 'LARGE', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
+(5, 'T2-C-05', 'LARGE', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
+(7, 'T3-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(7, 'T3-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(7, 'T3-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
+(8, 'T3-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
+(8, 'T3-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
+(8, 'T3-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW());
 
 -- 9. Gates
-INSERT INTO `gate` (`building_id`, `gate_code`, `gate_type`, `created_at`, `updated_at`) VALUES
-                                                                                             (1, 'GATE-A', 'ENTRY', NOW(), NOW()),
-                                                                                             (1, 'GATE-B', 'EXIT',  NOW(), NOW()),
-                                                                                             (1, 'GATE-C', 'BOTH',  NOW(), NOW());
+INSERT INTO `gate`
+(`building_id`, `gate_code`, `gate_type`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'GATE-A', 'ENTRY', true, NOW(), NOW()),
+(1, 'GATE-B', 'EXIT',  true, NOW(), NOW()),
+(1, 'GATE-C', 'BOTH',  true, NOW(), NOW());
 
 -- 10. Pricing Policy
 INSERT INTO `pricing_policy` (`vehicle_type_id`, `time_type`, `day_type`, `start_hour`, `end_hour`, `price_per_hour`, `is_active`, `created_at`, `updated_at`) VALUES
@@ -457,10 +491,11 @@ INSERT INTO `pricing_policy` (`vehicle_type_id`, `time_type`, `day_type`, `start
                                                                                                                                                                    (3, 'NIGHT',  'WEEKDAY', 22,  6, 10000.00, true, NOW(), NOW());
 
 -- 11. Vehicles
-INSERT INTO `vehicle` (`owner_user_id`, `vehicle_type_id`, `license_plate`, `created_at`, `updated_at`) VALUES
-                                                                                                            (4, 1, '59F1-12345', NOW(), NOW()),
-                                                                                                            (4, 2, '51A-99999',  NOW(), NOW()),
-                                                                                                            (5, 1, '59G2-67890', NOW(), NOW());
+INSERT INTO `vehicle`
+(`owner_user_id`, `vehicle_type_id`, `license_plate`, `brand`, `model`, `color`, `is_active`, `created_at`, `updated_at`) VALUES
+(4, 1, '59F1-12345', 'Honda',  'Vision',  'Black', true, NOW(), NOW()),
+(4, 2, '51A-99999',  'Toyota', 'Vios',    'White', true, NOW(), NOW()),
+(5, 1, '59G2-67890', 'Yamaha', 'Janus',   'Blue',  true, NOW(), NOW());
 
 -- 12. Shifts
 INSERT INTO `shift` (`shift_name`, `start_time`, `end_time`, `status`) VALUES
