@@ -32,7 +32,7 @@ public class Notification {
 
     @Column(name = "entity_id")
     private Integer entityId;
-
+    @Builder.Default
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 
