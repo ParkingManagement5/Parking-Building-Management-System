@@ -32,6 +32,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final GateRepository gateRepository;
     private final VehicleRepository vehicleRepository;
     private final QrTokenUtil qrTokenUtil;
+    private final SlotAssignmentService slotAssignmentService;
 
     @Override
     @Transactional
@@ -97,25 +98,77 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return sessionRepository.save(session);
     }
 
+//    private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
+//                                              ParkingSession.EntryMode mode) {
+//        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
+//        }
+//        if (request.getSlotId() == null) {
+//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in");
+//        }
+//
+//        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
+//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+//                        "Không tìm thấy xe: " + request.getLicensePlate()));
+//
+//        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
+//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
+//
+//        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+//            throw new AppException(HttpStatus.CONFLICT,
+//                    "Slot " + slot.getSlotCode() + " không còn trống");
+//        }
+//
+//        slot.setStatus(ParkingSlot.Status.OCCUPIED);
+//        parkingSlotRepository.save(slot);
+//
+//        ParkingSession session = ParkingSession.builder()
+//                .slot(slot)
+//                .userId(vehicle.getUserId())
+//                .vehicle(vehicle)
+//                .entryGate(gate)
+//                .entryTime(LocalDateTime.now())
+//                .entryMode(mode)
+//                .status(ParkingSession.SessionStatus.ACTIVE)
+//                .build();
+//
+//        return sessionRepository.save(session);
+//    }
+
     private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
                                               ParkingSession.EntryMode mode) {
         if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
         }
-        if (request.getSlotId() == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in");
-        }
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy xe: " + request.getLicensePlate()));
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(
+                        ParkingSession.SessionStatus.ACTIVE,
+                        ParkingSession.SessionStatus.WAITING_PAYMENT
+                )
+        );
 
-        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
-
-        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
-            throw new AppException(HttpStatus.CONFLICT,
-                    "Slot " + slot.getSlotCode() + " không còn trống");
+        if (hasOpenSession) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất"
+            );
+        }
+        ParkingSlot slot;
+        if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
+            // Tự động tìm slot theo slotSize của loại xe [BR-02]
+            slot = slotAssignmentService.assignBestSlot(null,
+                    vehicle.getVehicleType().getSlotSize());
+        } else {
+            // WALK_IN_MANUAL: staff chỉ định slot
+            if (request.getSlotId() == null) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in manual");
+            }
+            slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
         }
 
         slot.setStatus(ParkingSlot.Status.OCCUPIED);
