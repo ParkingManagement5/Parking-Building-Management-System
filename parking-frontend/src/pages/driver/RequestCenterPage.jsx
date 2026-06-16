@@ -10,18 +10,28 @@ export default function RequestCenterPage() {
     content: "",
   });
 
-  async function loadRequests() {
-    try {
-      const res = await requestApi.getMyRequests();
-      setRequests(unwrapApiData(res.data, []));
-    } catch (error) {
-      console.error("Failed to load requests", error);
-      setRequests([]);
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadRequests() {
+      try {
+        const res = await requestApi.getMyRequests();
+        if (!cancelled) {
+          setRequests(unwrapApiData(res.data, []));
+        }
+      } catch (error) {
+        console.error("Failed to load requests", error);
+        if (!cancelled) {
+          setRequests([]);
+        }
+      }
+    }
+
     void loadRequests();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleSubmit = async (event) => {
@@ -37,12 +47,13 @@ export default function RequestCenterPage() {
         type: form.type,
         content: form.content.trim(),
       });
+      const res = await requestApi.getMyRequests();
+      setRequests(unwrapApiData(res.data, []));
 
       setForm({
         type: "Booking Support",
         content: "",
       });
-      await loadRequests();
     } catch (error) {
       console.error("Failed to create request", error);
       alert(error.response?.data?.message || "Create request failed");

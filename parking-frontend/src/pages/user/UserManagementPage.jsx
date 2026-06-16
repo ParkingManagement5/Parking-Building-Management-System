@@ -8,7 +8,6 @@ import {
   ManagerEmptyState,
   ManagerPageHeader,
   ManagerPanel,
-  ManagerSelect,
   ManagerRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";

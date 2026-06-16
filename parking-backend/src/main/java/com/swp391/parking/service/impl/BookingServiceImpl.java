@@ -142,11 +142,13 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public BookingResponse getBooking(Long bookingId) {
         return toResponse(getBookingEntity(bookingId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(Long currentUserId) {
         return bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream().map(this::toResponse).toList();
