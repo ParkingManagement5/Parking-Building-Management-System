@@ -25,43 +25,44 @@ import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { unwrapApiData } from "../../utils/api";
+import BrandLogo from "./BrandLogo";
 
 const FEATURES = [
   {
     icon: QrCode,
     title: "Smart QR Booking",
     desc: "Reserve your slot in seconds with a QR code that works as your parking ticket.",
-    color: "bg-indigo-50 text-indigo-600",
+    color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300",
   },
   {
     icon: ScanLine,
     title: "License Plate OCR",
     desc: "AI-powered camera systems automatically detect and log vehicles as they enter and exit.",
-    color: "bg-cyan-50 text-cyan-600",
+    color: "bg-cyan-50 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300",
   },
   {
     icon: BarChart3,
     title: "Revenue Analytics",
     desc: "Real-time dashboards for revenue, occupancy, peak hours, and vehicle type trends.",
-    color: "bg-violet-50 text-violet-600",
+    color: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
   },
   {
     icon: Shield,
     title: "Role-Based Access",
     desc: "Four distinct roles with tailored interfaces and permissions.",
-    color: "bg-emerald-50 text-emerald-600",
+    color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
   },
   {
     icon: Clock,
     title: "Real-time Tracking",
     desc: "Live occupancy maps, session timers, and instant notifications keep everyone informed.",
-    color: "bg-amber-50 text-amber-600",
+    color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
   },
   {
     icon: Smartphone,
     title: "Mobile Ready",
     desc: "Fully responsive design works seamlessly on desktop, tablet, and mobile devices.",
-    color: "bg-rose-50 text-rose-600",
+    color: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
   },
 ];
 
@@ -201,7 +202,7 @@ export default function LandingPage() {
         plate: liveData.buildings[0].name,
         action: `${slotSummary.available} slots available right now`,
         time: `Open ${liveData.buildings[0].openTime?.slice(0, 5) || "--:--"}`,
-        status: "bg-emerald-100 text-emerald-700",
+        status: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
       });
     }
     if (liveData.buildings[1]) {
@@ -209,7 +210,7 @@ export default function LandingPage() {
         plate: liveData.buildings[1].name,
         action: `${slotSummary.occupied} occupied slots in the system`,
         time: `Close ${liveData.buildings[1].closeTime?.slice(0, 5) || "--:--"}`,
-        status: "bg-blue-100 text-blue-700",
+        status: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
       });
     }
     if (liveData.vehicleTypes[0]) {
@@ -217,7 +218,7 @@ export default function LandingPage() {
         plate: liveData.vehicleTypes[0].name,
         action: `${liveData.vehicleTypes.length} supported vehicle categories`,
         time: `${liveData.gates.length} gates`,
-        status: "bg-amber-100 text-amber-700",
+        status: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
       });
     }
     return items;
@@ -230,28 +231,28 @@ export default function LandingPage() {
         value: liveData.buildings.length,
         hint: "Buildings currently configured in the system",
         icon: Building2,
-        tone: "bg-blue-50 text-blue-600",
+        tone: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
       },
       {
         title: "Floor Structure",
         value: liveData.slots.length ? new Set(liveData.slots.map((item) => item.zone?.floor?.floorId ?? item.zone?.floor?.id)).size : 0,
         hint: "Distinct floors currently carrying slot inventory",
         icon: Layers,
-        tone: "bg-violet-50 text-violet-600",
+        tone: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
       },
       {
         title: "Access Points",
         value: liveData.gates.length,
         hint: "Entry and exit gates now active in backend data",
         icon: DoorOpen,
-        tone: "bg-emerald-50 text-emerald-600",
+        tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
       },
       {
         title: "Live Capacity",
         value: slotSummary.available,
         hint: "Slots currently marked AVAILABLE in the database",
         icon: SquareParking,
-        tone: "bg-amber-50 text-amber-600",
+        tone: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
       },
     ],
     [liveData, slotSummary]
@@ -271,46 +272,8 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9" />
-                <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7" />
-                <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7" />
-                <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5" />
-              </svg>
-            </div>
-            <span className="font-bold text-foreground">ParkSmart</span>
-          </div>
-          <div className="hidden md:flex items-center gap-6 flex-1">
-            <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Features
-            </a>
-            <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Pricing
-            </a>
-            <button onClick={() => navigate("/parking-info")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Parking Info
-            </button>
-            <button onClick={() => navigate("/public-slots")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Public Slots
-            </button>
-          </div>
-          <div className="hidden md:flex items-center gap-3 ml-auto">
-            <button onClick={() => navigate("/login")} className="px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Sign in
-            </button>
-            <button onClick={() => navigate("/register")} className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-              Get started
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50 via-background to-cyan-50/40" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50 via-background to-cyan-50/40 dark:from-slate-950 dark:via-background dark:to-slate-900" />
         <div className="absolute right-0 top-20 -z-10 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute bottom-0 left-20 -z-10 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
 
@@ -334,7 +297,7 @@ export default function LandingPage() {
                 Start for free
                 <ArrowRight size={16} />
               </button>
-              <button onClick={() => navigate("/public-slots")} className="flex items-center gap-2 rounded-xl border border-primary/20 bg-card px-6 py-3 font-medium text-primary transition-colors hover:bg-primary/5">
+              <button onClick={() => navigate("/public-slots")} className="flex items-center gap-2 rounded-xl border border-primary/20 bg-card px-6 py-3 font-medium text-primary transition-colors hover:bg-primary/5 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10">
                 Browse public slots
                 <ChevronRight size={16} />
               </button>
@@ -355,7 +318,7 @@ export default function LandingPage() {
 
           <div className="relative hidden lg:block">
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10">
-              <div className="flex items-center gap-2 bg-[#4F46E5] p-4">
+              <div className="flex items-center gap-2 bg-[#4F46E5] p-4 dark:bg-[#1B2740]">
                 <div className="size-2.5 rounded-full bg-white/30" />
                 <div className="size-2.5 rounded-full bg-white/30" />
                 <div className="size-2.5 rounded-full bg-white/30" />
@@ -368,14 +331,14 @@ export default function LandingPage() {
                     { label: "Occupied", value: String(slotSummary.occupied), color: "text-rose-600", bg: "bg-rose-50" },
                     { label: "Reserved", value: String(slotSummary.reserved), color: "text-amber-600", bg: "bg-amber-50" },
                   ].map((item) => (
-                    <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center`}>
+                    <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center dark:bg-white/5`}>
                       <div className={`text-xl font-bold ${item.color}`}>{item.value}</div>
                       <div className="mt-0.5 text-xs text-muted-foreground">{item.label}</div>
                     </div>
                   ))}
                 </div>
 
-                <div className="rounded-xl bg-muted/50 p-3">
+                <div className="rounded-xl bg-muted/50 p-3 dark:bg-white/5">
                   <p className="mb-2 text-xs text-muted-foreground">
                     {liveData.buildings[0]?.name || "Live parking map"} - current slot status
                   </p>
@@ -479,7 +442,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-primary/5 py-16">
+      <section className="bg-primary/5 py-16 dark:bg-white/[0.03]">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
             <h2 className="mb-3 text-2xl font-bold text-foreground" style={{ fontWeight: 700 }}>Live System Coverage</h2>
@@ -605,7 +568,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-primary py-20">
+      <section className="bg-primary py-20 dark:bg-[#1B2740]">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-4 text-3xl font-bold text-white" style={{ fontWeight: 700 }}>
             Ready to transform your parking?
@@ -624,19 +587,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="bg-foreground py-12 text-white/60">
+      <footer className="bg-foreground py-12 text-white/60 dark:bg-[#050814]">
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
             <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9" />
-                  <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7" />
-                  <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7" />
-                  <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5" />
-                </svg>
-              </div>
-              <span className="font-semibold text-white">ParkSmart</span>
+              <BrandLogo compact size="sidebar" titleClassName="text-white" iconClassName="rounded-lg" />
             </div>
             <p className="text-sm">© 2026 ParkSmart. All rights reserved.</p>
             <div className="flex gap-6 text-sm">

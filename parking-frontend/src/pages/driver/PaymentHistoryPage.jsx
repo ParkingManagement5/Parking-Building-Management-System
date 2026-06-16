@@ -47,54 +47,61 @@ export default function PaymentHistoryPage() {
           <h3 className="font-semibold text-foreground text-sm">Transaction History</h3>
           <button className="text-xs text-primary hover:underline">Download CSV</button>
         </div>
-        <table className="w-full">
-          <thead>
-            <tr className="bg-muted/40">
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Transaction</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Description</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Method</th>
-              <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Amount</th>
-              <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {payments.map((item) => (
-              <tr key={item.paymentId || item.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-5 py-3.5">
-                  <p className="text-sm font-mono font-medium text-foreground">
-                    {item.paymentId || item.id}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDateTime(item.paidAt || item.createdAt)}
-                  </p>
-                </td>
-                <td className="px-5 py-3.5 text-sm text-muted-foreground">
-                  {item.bookingCode || item.bookingId || "Linked payment"}
-                </td>
-                <td className="px-5 py-3.5 text-sm text-foreground">
-                  {item.method || item.paymentMethod || "-"}
-                </td>
-                <td className="px-5 py-3.5 text-right text-sm font-semibold text-foreground">
-                  {formatCurrency(item.amount || item.totalAmount || 0)}
-                </td>
-                <td className="px-5 py-3.5 text-right">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(
-                      item.status || item.paymentStatus || "paid"
-                    )}`}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px]">
+            <thead>
+              <tr className="bg-muted/40">
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Transaction</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Description</th>
+                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Method</th>
+                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Amount</th>
+                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {payments.map((item) => (
+                <tr key={item.paymentId || item.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-5 py-3.5">
+                    <p className="text-sm font-mono font-medium text-foreground">
+                      {item.paymentId || item.id}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateTime(item.paidAt || item.createdAt)}
+                    </p>
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-muted-foreground">
+                    {item.bookingCode || item.bookingId || "Linked payment"}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-foreground">
+                    {item.method || item.paymentMethod || "-"}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-sm font-semibold text-foreground">
+                    {formatCurrency(item.amount || item.totalAmount || 0)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(
+                        item.status || item.paymentStatus || "paid"
+                      )}`}
+                    >
+                      {item.status || item.paymentStatus || "PAID"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {payments.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="px-5 py-10 text-center text-sm text-muted-foreground"
                   >
-                    {item.status || item.paymentStatus || "PAID"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {payments.length === 0 && (
-              <tr>
-                <td colSpan="5">No payment history returned from the backend.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    No payment history returned from the backend.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

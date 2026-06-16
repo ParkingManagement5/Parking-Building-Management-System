@@ -8,22 +8,29 @@ import {
 } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../ui/components/ui/select";
 import { unwrapApiData } from "../../utils/api";
 
 function slotClasses(status, active) {
   if (active) {
-    return "bg-[#5B4AE6] text-white shadow-md shadow-indigo-200";
+    return "bg-primary text-primary-foreground shadow-md shadow-primary/20";
   }
 
   if (status === "occupied") {
-    return "bg-[#EE7991] text-white cursor-not-allowed";
+    return "bg-rose-400 text-white cursor-not-allowed dark:bg-rose-500/80";
   }
 
   if (status === "reserved") {
-    return "bg-[#F8C933] text-white cursor-not-allowed";
+    return "bg-amber-400 text-white cursor-not-allowed dark:bg-amber-500/80";
   }
 
-  return "bg-[#6BD4A5] text-white hover:brightness-95";
+  return "bg-emerald-400 text-white hover:brightness-95 dark:bg-emerald-500/80";
 }
 
 function formatDateTime(value) {
@@ -222,6 +229,9 @@ export default function BookingPage() {
   );
 
   const steps = ["Vehicle & Building", "Floor & Zone", "Select Slot", "Result"];
+  const selectedVehicleBooking = vehiclesWithStatus.find(
+    (vehicle) => String(vehicle.vehicleId) === String(selection.vehicleId)
+  );
 
   async function handleConfirm() {
     if (!selection.vehicleId || !selectedSlot) {
@@ -268,8 +278,8 @@ export default function BookingPage() {
     return (
       <div className="max-w-lg mx-auto">
         <div className="bg-card border border-border rounded-2xl p-8 text-center">
-          <div className="size-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={30} className="text-emerald-600" />
+          <div className="size-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-500/15">
+            <CheckCircle2 size={30} className="text-emerald-600 dark:text-emerald-300" />
           </div>
           <h3 className="font-bold text-foreground mb-1 text-[1.25rem]">Booking Created</h3>
           <p className="text-muted-foreground text-sm mb-6">
@@ -340,14 +350,14 @@ export default function BookingPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       {loadError ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{loadError}</span>
         </div>
       ) : null}
 
       {submitError ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{submitError}</span>
         </div>
@@ -360,7 +370,7 @@ export default function BookingPage() {
               <div
                 className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   index <= step
-                    ? "bg-primary text-white"
+                    ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
@@ -390,44 +400,48 @@ export default function BookingPage() {
               <label className="block text-xs font-medium text-foreground mb-1.5">
                 Select Vehicle
               </label>
-              <select
+              <Select
                 value={selection.vehicleId}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setSelection({
                     building: "",
                     floor: "",
                     zone: "",
                     slotCode: "",
                     slotId: "",
-                    vehicleId: event.target.value,
+                    vehicleId: value,
                   })
                 }
-                className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
-                disabled={loadingVehicles}
               >
-                <option value="">
-                  {loadingVehicles ? "Loading vehicles..." : "Choose a vehicle"}
-                </option>
-                {vehiclesWithStatus.map((vehicle) => (
-                  <option
-                    key={vehicle.vehicleId || vehicle.id}
-                    value={vehicle.vehicleId || vehicle.id}
-                    disabled={vehicle.isLocked}
-                  >
-                    {vehicle.licensePlate}
-                    {vehicle.isLocked
-                      ? ` - already has booking #${vehicle.activeBooking.bookingId}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  className="h-12 rounded-xl border-border bg-background/80 px-4 text-sm text-foreground shadow-sm shadow-black/5 hover:border-primary/40 hover:bg-muted/40"
+                  disabled={loadingVehicles}
+                >
+                  <SelectValue
+                    placeholder={loadingVehicles ? "Loading vehicles..." : "Choose a vehicle"}
+                  />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border bg-card shadow-xl">
+                  {vehiclesWithStatus.map((vehicle) => (
+                    <SelectItem
+                      key={vehicle.vehicleId || vehicle.id}
+                      value={String(vehicle.vehicleId || vehicle.id)}
+                      disabled={vehicle.isLocked}
+                      className="rounded-lg px-3 py-2 text-sm"
+                    >
+                      {vehicle.licensePlate}
+                      {vehicle.isLocked
+                        ? ` - already has booking #${vehicle.activeBooking.bookingId}`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {selection.vehicleId && selectedVehicle ? (
-              vehiclesWithStatus.find(
-                (vehicle) => String(vehicle.vehicleId) === String(selection.vehicleId)
-              )?.isLocked ? (
-                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              selectedVehicleBooking?.isLocked ? (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   Xe nay dang co booking active. Vui long chon xe khac hoac huy booking cu.
                 </div>
               ) : null
@@ -440,37 +454,45 @@ export default function BookingPage() {
               </div>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3">
-              {buildingOptions.map((building) => (
-                <button
-                  key={building.id}
-                  onClick={() =>
-                    setSelection((prev) => ({
-                      ...prev,
-                      building: building.name,
-                      floor: "",
-                      zone: "",
-                      slotCode: "",
-                      slotId: "",
-                    }))
-                  }
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    selection.building === building.name
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="size-8 bg-muted rounded-lg flex items-center justify-center mb-2">
-                    <MapPin size={14} className="text-muted-foreground" />
-                  </div>
-                  <p className="font-medium text-sm text-foreground">{building.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {slotGrid.filter((item) => item.building === building.name).length} slots
-                    available
-                  </p>
-                </button>
-              ))}
-            </div>
+            {selection.vehicleId ? (
+              <div className="grid grid-cols-2 gap-3">
+                {buildingOptions.map((building) => (
+                  <button
+                    key={building.id}
+                    onClick={() =>
+                      setSelection((prev) => ({
+                        ...prev,
+                        building: building.name,
+                        floor: "",
+                        zone: "",
+                        slotCode: "",
+                        slotId: "",
+                      }))
+                    }
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      selection.building === building.name
+                        ? "border-primary/70 bg-primary/10 shadow-sm shadow-primary/10"
+                        : "border-border bg-background/80 hover:border-primary/40 hover:bg-muted/40"
+                    }`}
+                  >
+                    <div
+                      className={`mb-2 flex size-8 items-center justify-center rounded-lg ${
+                        selection.building === building.name
+                          ? "bg-primary/15 text-primary"
+                          : "bg-muted/70 text-muted-foreground"
+                      }`}
+                    >
+                      <MapPin size={14} />
+                    </div>
+                    <p className="font-medium text-sm text-foreground">{building.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {slotGrid.filter((item) => item.building === building.name).length} slots
+                      available
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
             {!loadingSlots && selection.vehicleId && buildingOptions.length === 0 ? (
               <div className="mt-4 rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
@@ -483,11 +505,9 @@ export default function BookingPage() {
               disabled={
                 !selection.vehicleId ||
                 !selection.building ||
-                vehiclesWithStatus.find(
-                  (vehicle) => String(vehicle.vehicleId) === String(selection.vehicleId)
-                )?.isLocked
+                selectedVehicleBooking?.isLocked
               }
-              className="w-full mt-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+              className="mt-5 w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
             >
               Next -&gt;
             </button>
@@ -517,8 +537,8 @@ export default function BookingPage() {
                       }
                       className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${
                         selection.floor === floor
-                          ? "border-primary bg-primary/5 text-primary font-medium"
-                          : "border-border hover:border-primary/40 text-foreground"
+                          ? "border-primary/70 bg-primary/10 text-primary font-medium shadow-sm shadow-primary/10"
+                          : "border-border bg-background/80 hover:border-primary/40 hover:bg-muted/40 text-foreground"
                       }`}
                     >
                       {floor}
@@ -544,8 +564,8 @@ export default function BookingPage() {
                       }
                       className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${
                         selection.zone === zone
-                          ? "border-primary bg-primary/5 text-primary font-medium"
-                          : "border-border hover:border-primary/40 text-foreground"
+                          ? "border-primary/70 bg-primary/10 text-primary font-medium shadow-sm shadow-primary/10"
+                          : "border-border bg-background/80 hover:border-primary/40 hover:bg-muted/40 text-foreground"
                       }`}
                     >
                       {zone}
@@ -557,14 +577,14 @@ export default function BookingPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(0)}
-                className="flex-1 py-2.5 border border-border rounded-xl text-sm hover:bg-muted transition-colors"
+                className="flex-1 rounded-xl border border-border py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(2)}
                 disabled={!selection.floor || !selection.zone}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
               >
                 Next -&gt;
               </button>
@@ -578,9 +598,9 @@ export default function BookingPage() {
               <h3 className="font-semibold text-foreground">Select a Slot</h3>
               <div className="flex items-center gap-3 text-xs">
                 {[
-                  ["bg-[#6BD4A5]", "Available"],
-                  ["bg-[#EE7991]", "Occupied"],
-                  ["bg-[#F8C933]", "Reserved"],
+                  ["bg-emerald-400 dark:bg-emerald-500/80", "Available"],
+                  ["bg-rose-400 dark:bg-rose-500/80", "Occupied"],
+                  ["bg-amber-400 dark:bg-amber-500/80", "Reserved"],
                 ].map(([cls, label]) => (
                   <div key={label} className="flex items-center gap-1">
                     <div className={`size-3 rounded-sm ${cls}`} />
@@ -628,14 +648,14 @@ export default function BookingPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(1)}
-                className="flex-1 py-2.5 border border-border rounded-xl text-sm hover:bg-muted transition-colors"
+                className="flex-1 rounded-xl border border-border py-2.5 text-sm text-foreground transition-colors hover:bg-muted"
               >
                 Back
               </button>
               <button
                 onClick={handleConfirm}
                 disabled={!selection.vehicleId || !selection.slotCode || submitting}
-                className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+                className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
               >
                 {submitting ? "Creating..." : "Confirm Booking"}
               </button>

@@ -551,7 +551,7 @@ function Profile() {
     return (<div className="max-w-2xl space-y-4">
       <div className="bg-card border border-border rounded-2xl p-6">
         <div className="flex items-center gap-4 mb-6">
-          <div className="size-16 bg-primary rounded-2xl flex items-center justify-center text-white text-xl font-bold">AJ</div>
+          <div className="size-16 rounded-2xl flex items-center justify-center bg-blue-600 text-xl font-bold text-white shadow-sm shadow-blue-500/20 dark:bg-blue-500 dark:text-slate-950">AJ</div>
           <div>
             <h2 className="font-bold text-foreground">Alex Johnson</h2>
             <p className="text-sm text-muted-foreground">alex.johnson@email.com</p>
