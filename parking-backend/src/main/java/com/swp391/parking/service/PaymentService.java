@@ -33,4 +33,6 @@ public interface PaymentService {
     List<PaymentResponse> getByBookingId(Integer bookingId);
 
     List<PaymentResponse> getBySessionId(Integer sessionId);
+
+    List<PaymentResponse> getMyPayments(Long userId);
 }

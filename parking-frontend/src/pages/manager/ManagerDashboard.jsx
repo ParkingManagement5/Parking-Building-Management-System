@@ -26,12 +26,10 @@ import {
 } from "recharts";
 import {
   Building2,
-  Car,
   DollarSign,
   Grid3x3,
   TrendingDown,
   TrendingUp,
-  Users,
 } from "lucide-react";
 
 function asArray(payload) {
