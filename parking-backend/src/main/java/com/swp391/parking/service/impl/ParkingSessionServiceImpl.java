@@ -1,0 +1,261 @@
+package com.swp391.parking.service.impl;
+
+import com.swp391.parking.dto.request.SessionEntryRequest;
+import com.swp391.parking.dto.request.SessionExitRequest;
+import com.swp391.parking.dto.response.SessionResponse;
+import com.swp391.parking.entity.*;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.*;
+import com.swp391.parking.service.ParkingSessionService;
+import com.swp391.parking.util.QrTokenUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ParkingSessionServiceImpl implements ParkingSessionService {
+
+    private final ParkingSessionRepository sessionRepository;
+    private final BookingRepository bookingRepository;
+    private final GateLogRepository gateLogRepository;
+    // BE2 repositories
+    private final ParkingSlotRepository parkingSlotRepository;
+    private final GateRepository gateRepository;
+    private final VehicleRepository vehicleRepository;
+    private final QrTokenUtil qrTokenUtil;
+    private final SlotAssignmentService slotAssignmentService;
+
+    @Override
+    @Transactional
+    public SessionResponse processEntry(SessionEntryRequest request) {
+        Gate gate = gateRepository.findById(request.getGateId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
+
+        ParkingSession.EntryMode mode = ParkingSession.EntryMode.valueOf(request.getEntryMode());
+        ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
+                ? processBookingEntry(request, gate)
+                : processWalkInEntry(request, gate, mode);
+
+        saveGateLog(gate, session, request.getLicensePlate(),
+                GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
+
+        return toResponse(session);
+    }
+
+    private ParkingSession processBookingEntry(SessionEntryRequest request, Gate gate) {
+        if (request.getQrToken() == null || request.getQrToken().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu QR token");
+        }
+
+        Claims claims;
+        try {
+            claims = qrTokenUtil.parseQrToken(request.getQrToken());
+        } catch (JwtException e) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR không hợp lệ hoặc đã hết hạn");
+        }
+
+        Long bookingId = claims.get("booking_id", Long.class);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking"));
+
+        // [BR-05] QR dùng 1 lần
+        if (booking.getQrUsedAt() != null) {
+            throw new AppException(HttpStatus.CONFLICT, "QR đã được dùng rồi");
+        }
+        if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
+        }
+
+        booking.setQrUsedAt(LocalDateTime.now());
+        booking.setStatus(Booking.BookingStatus.CHECKED_IN);
+        bookingRepository.save(booking);
+
+        // Slot → OCCUPIED
+        ParkingSlot slot = booking.getSlot();
+        slot.setStatus(ParkingSlot.Status.OCCUPIED);
+        parkingSlotRepository.save(slot);
+
+        ParkingSession session = ParkingSession.builder()
+                .booking(booking)
+                .slot(slot)
+                .userId(booking.getUserId())
+                .vehicle(booking.getVehicle())
+                .entryGate(gate)
+                .entryTime(LocalDateTime.now())
+                .entryMode(ParkingSession.EntryMode.BOOKING)
+                .status(ParkingSession.SessionStatus.ACTIVE)
+                .build();
+
+        return sessionRepository.save(session);
+    }
+
+//    private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
+//                                              ParkingSession.EntryMode mode) {
+//        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
+//        }
+//        if (request.getSlotId() == null) {
+//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in");
+//        }
+//
+//        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
+//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+//                        "Không tìm thấy xe: " + request.getLicensePlate()));
+//
+//        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
+//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
+//
+//        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+//            throw new AppException(HttpStatus.CONFLICT,
+//                    "Slot " + slot.getSlotCode() + " không còn trống");
+//        }
+//
+//        slot.setStatus(ParkingSlot.Status.OCCUPIED);
+//        parkingSlotRepository.save(slot);
+//
+//        ParkingSession session = ParkingSession.builder()
+//                .slot(slot)
+//                .userId(vehicle.getUserId())
+//                .vehicle(vehicle)
+//                .entryGate(gate)
+//                .entryTime(LocalDateTime.now())
+//                .entryMode(mode)
+//                .status(ParkingSession.SessionStatus.ACTIVE)
+//                .build();
+//
+//        return sessionRepository.save(session);
+//    }
+
+    private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
+                                              ParkingSession.EntryMode mode) {
+        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
+        }
+
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy xe: " + request.getLicensePlate()));
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(
+                        ParkingSession.SessionStatus.ACTIVE,
+                        ParkingSession.SessionStatus.WAITING_PAYMENT
+                )
+        );
+
+        if (hasOpenSession) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất"
+            );
+        }
+        ParkingSlot slot;
+        if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
+            // Tự động tìm slot theo slotSize của loại xe [BR-02]
+            slot = slotAssignmentService.assignBestSlot(null,
+                    vehicle.getVehicleType().getSlotSize());
+        } else {
+            // WALK_IN_MANUAL: staff chỉ định slot
+            if (request.getSlotId() == null) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in manual");
+            }
+            slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
+        }
+
+        slot.setStatus(ParkingSlot.Status.OCCUPIED);
+        parkingSlotRepository.save(slot);
+
+        ParkingSession session = ParkingSession.builder()
+                .slot(slot)
+                .userId(vehicle.getUserId())
+                .vehicle(vehicle)
+                .entryGate(gate)
+                .entryTime(LocalDateTime.now())
+                .entryMode(mode)
+                .status(ParkingSession.SessionStatus.ACTIVE)
+                .build();
+
+        return sessionRepository.save(session);
+    }
+
+    @Override
+    @Transactional
+    public SessionResponse processExit(Long sessionId, SessionExitRequest request) {
+        ParkingSession session = getSessionEntity(sessionId);
+        if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Session không ACTIVE (hiện: " + session.getStatus() + ")");
+        }
+
+        Gate gate = gateRepository.findById(request.getGateId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
+
+        session.setExitGate(gate);
+        session.setExitTime(LocalDateTime.now());
+        // [BR-09] Chờ BE4 xử lý payment → mới COMPLETED
+        session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
+        session = sessionRepository.save(session);
+
+        saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
+                GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, request.getStaffUserId());
+
+        log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
+        return toResponse(session);
+    }
+
+    @Override
+    public SessionResponse getSession(Long sessionId) {
+        return toResponse(getSessionEntity(sessionId));
+    }
+
+    @Override
+    public List<SessionResponse> getMySessions(Long currentUserId) {
+        return sessionRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+    private ParkingSession getSessionEntity(Long id) {
+        return sessionRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy session #" + id));
+    }
+
+    private void saveGateLog(Gate gate, ParkingSession session, String plate,
+                             GateLog.EventType evt, GateLog.ResultStatus result, Long staffId) {
+        gateLogRepository.save(GateLog.builder()
+                .gate(gate).session(session).licensePlate(plate)
+                .eventType(evt).resultStatus(result)
+                .staffUserId(staffId)
+                .eventTime(LocalDateTime.now())
+                .build());
+    }
+
+    private SessionResponse toResponse(ParkingSession s) {
+        return SessionResponse.builder()
+                .sessionId(s.getId())
+                .bookingId(s.getBooking() != null ? s.getBooking().getId() : null)
+                .slotId(s.getSlot().getId())
+                .slotCode(s.getSlot().getSlotCode())
+                .userId(s.getUserId())
+                .vehicleId(s.getVehicle().getId())
+                .licensePlate(s.getVehicle().getLicensePlate())
+                .entryGateId(s.getEntryGate() != null ? s.getEntryGate().getId() : null)
+                .exitGateId(s.getExitGate() != null ? s.getExitGate().getId() : null)
+                .entryTime(s.getEntryTime())
+                .exitTime(s.getExitTime())
+                .entryMode(s.getEntryMode().name())
+                .status(s.getStatus().name())
+                .createdAt(s.getCreatedAt())
+                .build();
+    }
+}
