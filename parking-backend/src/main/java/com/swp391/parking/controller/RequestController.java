@@ -1,0 +1,95 @@
+package com.swp391.parking.controller;
+
+import com.swp391.parking.dto.request.CreateRequestRequest;
+import com.swp391.parking.dto.response.ApiResponse;
+import com.swp391.parking.dto.response.RequestResponse;
+import com.swp391.parking.entity.Request.RequestStatus;
+import com.swp391.parking.entity.Request.RequestType;
+import com.swp391.parking.service.RequestService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/requests")
+@RequiredArgsConstructor
+@Tag(name = "Request", description = "Request management APIs")
+public class RequestController {
+
+    private final RequestService requestService;
+
+    @Operation(summary = "Create a new request")
+    @PostMapping
+    public ResponseEntity<ApiResponse<RequestResponse>> createRequest(
+            @RequestParam Integer userId,
+            @Valid @RequestBody CreateRequestRequest request) {
+        RequestResponse response = requestService.createRequest(userId, request);
+        return ResponseEntity.ok(
+            ApiResponse.success("Request created successfully", response));
+    }
+
+    @Operation(summary = "Get request by ID")
+    @GetMapping("/{requestId}")
+    public ResponseEntity<ApiResponse<RequestResponse>> getById(
+            @PathVariable Integer requestId) {
+        RequestResponse response = requestService.getById(requestId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Get requests by user ID")
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<List<RequestResponse>>> getByUserId(
+            @PathVariable Integer userId) {
+        List<RequestResponse> response = requestService.getByUserId(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Get requests by status")
+    @GetMapping("/status/{status}")
+    public ResponseEntity<ApiResponse<List<RequestResponse>>> getByStatus(
+            @PathVariable RequestStatus status) {
+        List<RequestResponse> response = requestService.getByStatus(status);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Get requests by type")
+    @GetMapping("/type/{type}")
+    public ResponseEntity<ApiResponse<List<RequestResponse>>> getByType(
+            @PathVariable RequestType type) {
+        List<RequestResponse> response = requestService.getByType(type);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Assign staff to request")
+    @PutMapping("/{requestId}/assign")
+    public ResponseEntity<ApiResponse<RequestResponse>> assignStaff(
+            @PathVariable Integer requestId,
+            @RequestParam Integer staffId) {
+        RequestResponse response = requestService.assignStaff(requestId, staffId);
+        return ResponseEntity.ok(
+            ApiResponse.success("Staff assigned successfully", response));
+    }
+
+    @Operation(summary = "Resolve request")
+    @PutMapping("/{requestId}/resolve")
+    public ResponseEntity<ApiResponse<RequestResponse>> resolveRequest(
+            @PathVariable Integer requestId) {
+        RequestResponse response = requestService.resolveRequest(requestId);
+        return ResponseEntity.ok(
+            ApiResponse.success("Request resolved successfully", response));
+    }
+
+    @Operation(summary = "Close request")
+    @PutMapping("/{requestId}/close")
+    public ResponseEntity<ApiResponse<RequestResponse>> closeRequest(
+            @PathVariable Integer requestId) {
+        RequestResponse response = requestService.closeRequest(requestId);
+        return ResponseEntity.ok(
+            ApiResponse.success("Request closed successfully", response));
+    }
+}
