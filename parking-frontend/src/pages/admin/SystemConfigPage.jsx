@@ -308,7 +308,7 @@ export default function SystemConfigPage() {
                     }`}
                   >
                     <span
-                      className={`m-0.5 inline-block size-8 rounded-full bg-white shadow transition-transform ${
+                      className={`m-0.5 inline-block size-8 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
                         normalizeToggleValue(currentValue) ? "translate-x-2.5" : "translate-x-0"
                       }`}
                     />

@@ -136,8 +136,8 @@ export default function StaffNotificationPage() {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="mt-1 flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm">
-                    <BellRing size={16} className={item.isRead ? "text-slate-500" : "text-primary"} />
+                  <div className="mt-1 flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm dark:bg-white/5">
+                    <BellRing size={16} className={item.isRead ? "text-slate-500 dark:text-slate-300" : "text-primary"} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
