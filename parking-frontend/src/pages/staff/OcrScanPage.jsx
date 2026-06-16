@@ -58,8 +58,8 @@ export default function OcrScanPage() {
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
         <StaffPageSection title="OCR Camera Interface" subtitle="Capture and analyze a plate image from the gate camera">
-          <div className="rounded-3xl bg-slate-950 p-5 text-center text-white">
-            <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-white/20 bg-slate-900">
+          <div className="rounded-3xl bg-slate-950 p-5 text-center text-white dark:bg-[#020617]">
+            <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-white/20 bg-slate-900 dark:bg-[#0f172a]">
               {scanning ? (
                 <div className="space-y-3">
                   <div className="mx-auto size-10 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />

@@ -210,17 +210,17 @@ export default function BuildingPage() {
             <p className="mb-4 mt-1 text-sm text-muted-foreground">{item.address}</p>
 
             <div className="mb-4 grid grid-cols-3 gap-3">
-              <div className="rounded-3xl bg-slate-100/80 p-4 text-center">
-                <p className="text-2xl font-semibold text-slate-950">{item.floors}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">Floors</p>
+              <div className="rounded-3xl bg-slate-100/80 p-4 text-center dark:bg-white/5">
+                <p className="text-2xl font-semibold text-slate-950 dark:text-slate-100">{item.floors}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Floors</p>
               </div>
-              <div className="rounded-3xl bg-slate-100/80 p-4 text-center">
-                <p className="text-2xl font-semibold text-slate-950">{item.totalSlots}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">Total Slots</p>
+              <div className="rounded-3xl bg-slate-100/80 p-4 text-center dark:bg-white/5">
+                <p className="text-2xl font-semibold text-slate-950 dark:text-slate-100">{item.totalSlots}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Total Slots</p>
               </div>
-              <div className="rounded-3xl bg-emerald-50/80 p-4 text-center">
-                <p className="text-2xl font-semibold text-emerald-700">{item.available}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-emerald-600">Available</p>
+              <div className="rounded-3xl bg-emerald-50/80 p-4 text-center dark:bg-emerald-500/10">
+                <p className="text-2xl font-semibold text-emerald-700 dark:text-emerald-300">{item.available}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">Available</p>
               </div>
             </div>
 

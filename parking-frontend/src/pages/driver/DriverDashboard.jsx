@@ -43,35 +43,35 @@ export default function DriverDashboard() {
       label: "Registered Vehicles",
       value: "0",
       icon: Car,
-      color: "bg-blue-50 text-blue-600",
+      color: "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200",
       action: "/driver/vehicles",
     },
     {
       label: "Active Booking",
       value: "0",
       icon: BookOpen,
-      color: "bg-emerald-50 text-emerald-600",
+      color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
       action: "/driver/booking",
     },
     {
       label: "Current Session",
       value: "--:--",
       icon: Clock,
-      color: "bg-indigo-50 text-indigo-600",
+      color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
       action: "/driver/current-session",
     },
     {
       label: "Notifications",
       value: "0",
       icon: Bell,
-      color: "bg-amber-50 text-amber-600",
+      color: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
       action: "/driver/notifications",
     },
     {
       label: "Monthly Expenses",
       value: "$0",
       icon: Wallet,
-      color: "bg-violet-50 text-violet-600",
+      color: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
       action: "/driver/payments",
     },
   ]);
@@ -127,7 +127,7 @@ export default function DriverDashboard() {
             label: "Registered Vehicles",
             value: String(vehicles.length),
             icon: Car,
-            color: "bg-blue-50 text-blue-600",
+            color: "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200",
             action: "/driver/vehicles",
           },
           {
@@ -143,7 +143,7 @@ export default function DriverDashboard() {
               }).length
             ),
             icon: BookOpen,
-            color: "bg-emerald-50 text-emerald-600",
+            color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
             action: "/driver/booking",
           },
           {
@@ -155,21 +155,21 @@ export default function DriverDashboard() {
                 )
               : "--:--",
             icon: Clock,
-            color: "bg-indigo-50 text-indigo-600",
+            color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
             action: "/driver/current-session",
           },
           {
             label: "Notifications",
             value: String(notifications.filter((item) => !item.isRead).length),
             icon: Bell,
-            color: "bg-amber-50 text-amber-600",
+            color: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
             action: "/driver/notifications",
           },
           {
             label: "Monthly Expenses",
             value: formatCurrency(monthlyExpenses),
             icon: CreditCard,
-            color: "bg-violet-50 text-violet-600",
+            color: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
             action: "/driver/payments",
           },
         ]);
@@ -199,7 +199,7 @@ export default function DriverDashboard() {
             <button
               key={item.label}
               onClick={() => navigate(item.action)}
-              className="bg-card border border-border rounded-2xl p-4 text-left hover:shadow-md hover:shadow-primary/5 transition-all"
+              className="rounded-2xl border border-border/80 bg-card p-4 text-left shadow-sm shadow-slate-950/5 transition-all hover:border-primary/20 hover:shadow-md hover:shadow-primary/10 dark:bg-slate-900/70 dark:shadow-black/10"
             >
               <div
                 className={`size-9 rounded-xl flex items-center justify-center ${item.color} mb-3`}
@@ -213,16 +213,16 @@ export default function DriverDashboard() {
         })}
       </div>
 
-      <div className="bg-gradient-to-r from-primary to-[#4338CA] rounded-2xl p-6 text-white">
+      <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-600 p-6 text-white shadow-lg shadow-indigo-500/15 dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-[#161b33] dark:via-[#1d2450] dark:to-[#2a2160] dark:shadow-black/20">
         <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
           <div>
-            <p className="text-white/70 text-xs mb-1">Active Parking Session</p>
+            <p className="mb-1 text-xs text-white/75 dark:text-slate-300/80">Active Parking Session</p>
             <h2 className="font-bold mb-0.5 text-xl">
               {activeBooking?.buildingName ||
                 activeBooking?.parkingBuildingName ||
                 "No active session"}
             </h2>
-            <p className="text-white/70 text-sm">
+            <p className="text-sm text-white/80 dark:text-slate-300/85">
               {activeBooking
                 ? `${
                     activeBooking.slotCode ||
@@ -237,7 +237,7 @@ export default function DriverDashboard() {
             </p>
           </div>
 
-          <div className="bg-white/20 rounded-xl px-4 py-2 text-center min-w-[92px]">
+          <div className="min-w-[92px] rounded-xl border border-white/20 bg-white/12 px-4 py-2 text-center backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
             <div className="text-2xl font-bold font-mono">
               {activeBooking
                 ? formatDuration(
@@ -250,19 +250,19 @@ export default function DriverDashboard() {
                   )
                 : "--:--"}
             </div>
-            <div className="text-xs text-white/70">Duration</div>
+            <div className="text-xs text-white/70 dark:text-slate-400">Duration</div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white/10 rounded-xl p-3">
-            <p className="text-white/60 text-xs">Booking Status</p>
+          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
+            <p className="text-xs text-white/70 dark:text-slate-400">Booking Status</p>
             <p className="font-semibold text-sm mt-0.5 capitalize">
               {activeBooking ? getBookingStatus(activeBooking) : "waiting"}
             </p>
           </div>
-          <div className="bg-white/10 rounded-xl p-3">
-            <p className="text-white/60 text-xs">Estimated Fee</p>
+          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
+            <p className="text-xs text-white/70 dark:text-slate-400">Estimated Fee</p>
             <p className="font-semibold text-sm mt-0.5">
               {formatCurrency(
                 activeBooking?.amount ||
@@ -272,8 +272,8 @@ export default function DriverDashboard() {
               )}
             </p>
           </div>
-          <div className="bg-white/10 rounded-xl p-3">
-            <p className="text-white/60 text-xs">Vehicle</p>
+          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
+            <p className="text-xs text-white/70 dark:text-slate-400">Vehicle</p>
             <p className="font-semibold text-sm mt-0.5">
               {activeBooking?.licensePlate || activeBooking?.vehiclePlate || "Not assigned"}
             </p>
@@ -282,8 +282,8 @@ export default function DriverDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-5">
-        <div className="bg-card border border-border rounded-2xl">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="rounded-2xl border border-border/80 bg-card shadow-sm shadow-slate-950/5 dark:bg-slate-900/70 dark:shadow-black/10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/80">
             <h3 className="font-semibold text-foreground text-sm">Recent Bookings</h3>
             <button
               onClick={() => navigate("/driver/bookings")}
@@ -296,9 +296,9 @@ export default function DriverDashboard() {
             {recentBookings.map((item, index) => (
               <div
                 key={item.bookingId || item.id || index}
-                className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 transition-colors"
+                className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-primary/[0.04]"
               >
-                <div className="size-9 bg-muted rounded-xl flex items-center justify-center shrink-0">
+                <div className="size-9 rounded-xl bg-muted/70 flex items-center justify-center shrink-0 dark:bg-white/5">
                   <MapPin size={14} className="text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -328,8 +328,8 @@ export default function DriverDashboard() {
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="rounded-2xl border border-border/80 bg-card shadow-sm shadow-slate-950/5 dark:bg-slate-900/70 dark:shadow-black/10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/80">
             <h3 className="font-semibold text-foreground text-sm">Recent Notifications</h3>
             <button
               onClick={() => navigate("/driver/notifications")}
@@ -342,12 +342,14 @@ export default function DriverDashboard() {
             {recentNotifications.map((item, index) => (
               <div
                 key={item.notificationId || index}
-                className="px-5 py-4 hover:bg-muted/30 transition-colors"
+                className="px-5 py-4 transition-colors hover:bg-primary/[0.04]"
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={`size-8 rounded-full flex items-center justify-center shrink-0 ${
-                      item.isRead ? "bg-slate-100 text-slate-500" : "bg-amber-100 text-amber-600"
+                      item.isRead
+                        ? "bg-slate-100 text-slate-500 dark:bg-slate-500/15 dark:text-slate-300"
+                        : "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"
                     }`}
                   >
                     <Bell size={14} />

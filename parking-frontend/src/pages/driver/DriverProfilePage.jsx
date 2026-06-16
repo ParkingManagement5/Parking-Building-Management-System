@@ -25,9 +25,44 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback;
 }
 
+function normalizeRole(value) {
+  return String(value || "DRIVER").trim().toUpperCase();
+}
+
+function roleLabel(value) {
+  const role = normalizeRole(value);
+  return role.charAt(0) + role.slice(1).toLowerCase();
+}
+
+function roleBadgeClasses(value) {
+  switch (normalizeRole(value)) {
+    case "ADMIN":
+      return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+    case "MANAGER":
+      return "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300";
+    case "STAFF":
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+    default:
+      return "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
+  }
+}
+
+function roleAvatarClasses(value) {
+  switch (normalizeRole(value)) {
+    case "ADMIN":
+      return "bg-rose-600 text-white shadow-sm shadow-rose-500/20 dark:bg-rose-500 dark:text-slate-950";
+    case "MANAGER":
+      return "bg-violet-600 text-white shadow-sm shadow-violet-500/20 dark:bg-violet-500 dark:text-slate-950";
+    case "STAFF":
+      return "bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 dark:bg-emerald-500 dark:text-slate-950";
+    default:
+      return "bg-blue-600 text-white shadow-sm shadow-blue-500/20 dark:bg-blue-500 dark:text-slate-950";
+  }
+}
+
 export default function DriverProfilePage() {
   const username = getUsername() || "driver";
-  const role = getRole() || "DRIVER";
+  const role = normalizeRole(getRole() || "DRIVER");
   const userId = getUserId() || "Unknown";
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -155,14 +190,22 @@ export default function DriverProfilePage() {
     <div className="max-w-2xl space-y-4">
       <div className="bg-card border border-border rounded-2xl p-6">
         <div className="flex items-center gap-4 mb-6">
-          <div className="size-16 bg-primary rounded-2xl flex items-center justify-center text-white text-xl font-bold">
+          <div
+            className={`flex size-16 items-center justify-center rounded-2xl text-xl font-bold ${roleAvatarClasses(
+              role
+            )}`}
+          >
             {initials || "DR"}
           </div>
           <div>
             <h2 className="font-bold text-foreground">{profile.fullName || profile.username}</h2>
             <p className="text-sm text-muted-foreground">{profile.email || "No email yet"}</p>
-            <span className="inline-flex items-center gap-1 mt-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-              Driver
+            <span
+              className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${roleBadgeClasses(
+                role
+              )}`}
+            >
+              {roleLabel(role)}
             </span>
           </div>
           <button
@@ -174,7 +217,7 @@ export default function DriverProfilePage() {
         </div>
 
         {profileMessage ? (
-          <div className="mb-4 rounded-xl bg-primary/5 px-3 py-2 text-sm text-primary">
+          <div className="mb-4 rounded-xl bg-primary/5 px-3 py-2 text-sm text-primary dark:bg-primary/10">
             {profileMessage}
           </div>
         ) : null}
@@ -260,7 +303,7 @@ export default function DriverProfilePage() {
           </div>
         </div>
         {passwordMessage ? (
-          <div className="mb-3 rounded-xl bg-primary/5 px-3 py-2 text-sm text-primary">
+          <div className="mb-3 rounded-xl bg-primary/5 px-3 py-2 text-sm text-primary dark:bg-primary/10">
             {passwordMessage}
           </div>
         ) : null}
@@ -304,7 +347,7 @@ export default function DriverProfilePage() {
             {savingPassword ? "Updating..." : "Reset Password"}
           </button>
           <p className="text-xs text-muted-foreground">
-            Session user id: {profile.userId || userId} - role: {role}
+            Session user id: {profile.userId || userId} - role: {roleLabel(role)}
           </p>
         </div>
       </div>

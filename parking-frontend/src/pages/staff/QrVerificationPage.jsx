@@ -138,9 +138,9 @@ export default function QrVerificationPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex size-10 items-center justify-center rounded-2xl bg-muted">
                         {item.status === "VALID" ? (
-                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-300" />
                         ) : item.status === "REVIEW" ? (
-                          <ShieldAlert size={16} className="text-amber-600" />
+                          <ShieldAlert size={16} className="text-amber-600 dark:text-amber-300" />
                         ) : (
                           <QrCode size={16} className="text-primary" />
                         )}
