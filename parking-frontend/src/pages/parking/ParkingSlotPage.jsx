@@ -120,37 +120,37 @@ export default function ParkingSlotPage() {
     });
   }, [floors, selectedBuildingId]);
 
-  useEffect(() => {
+  const resolvedActiveFloorId = useMemo(() => {
     if (!buildingFloors.length) {
-      setActiveFloorId("");
-      return;
+      return "";
     }
-    if (!buildingFloors.some((floor) => String(floor.floorId ?? floor.id) === String(activeFloorId))) {
-      setActiveFloorId(String(buildingFloors[0].floorId ?? buildingFloors[0].id));
+    if (buildingFloors.some((floor) => String(floor.floorId ?? floor.id) === String(activeFloorId))) {
+      return String(activeFloorId);
     }
+    return String(buildingFloors[0].floorId ?? buildingFloors[0].id);
   }, [buildingFloors, activeFloorId]);
 
   const floorZones = useMemo(
-    () => zones.filter((zone) => String(zone.floor?.floorId ?? zone.floor?.id) === String(activeFloorId)),
-    [zones, activeFloorId]
+    () => zones.filter((zone) => String(zone.floor?.floorId ?? zone.floor?.id) === String(resolvedActiveFloorId)),
+    [zones, resolvedActiveFloorId]
   );
 
   const floorSlots = useMemo(() => {
-    const current = slots.filter((slot) => String(slot.floorId) === String(activeFloorId));
+    const current = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
     if (filter === "all") {
       return current;
     }
     return current.filter((slot) => slot.status.toLowerCase() === filter);
-  }, [slots, activeFloorId, filter]);
+  }, [slots, resolvedActiveFloorId, filter]);
 
   const counts = useMemo(() => {
-    const current = slots.filter((slot) => String(slot.floorId) === String(activeFloorId));
+    const current = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
     return {
       available: current.filter((slot) => slot.status === "AVAILABLE").length,
       occupied: current.filter((slot) => slot.status === "OCCUPIED").length,
       reserved: current.filter((slot) => slot.status === "RESERVED").length,
     };
-  }, [slots, activeFloorId]);
+  }, [slots, resolvedActiveFloorId]);
 
   const selectedZone = useMemo(
     () => zones.find((zone) => String(zone.zoneId ?? zone.id) === String(form.zoneId)),
@@ -171,7 +171,7 @@ export default function ParkingSlotPage() {
     setEditingId(null);
     setForm({
       buildingId: selectedBuildingId || "",
-      floorId: activeFloorId || "",
+      floorId: resolvedActiveFloorId || "",
       zoneId: "",
       slotCode: "",
       status: "AVAILABLE",
@@ -301,13 +301,13 @@ export default function ParkingSlotPage() {
       <div className="rounded-3xl border border-border bg-card p-5">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex gap-1 rounded-xl bg-muted p-1">
-            {buildingFloors.map((floor) => (
+             {buildingFloors.map((floor) => (
               <button
                 key={floor.floorId ?? floor.id}
                 type="button"
                 onClick={() => setActiveFloorId(String(floor.floorId ?? floor.id))}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  String(activeFloorId) === String(floor.floorId ?? floor.id)
+                  String(resolvedActiveFloorId) === String(floor.floorId ?? floor.id)
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -337,7 +337,7 @@ export default function ParkingSlotPage() {
 
         <div className="rounded-2xl bg-muted/30 p-4">
           <p className="mb-3 text-xs text-muted-foreground">
-            Floor {buildingFloors.find((floor) => String(floor.floorId ?? floor.id) === String(activeFloorId))?.label || "--"} -{" "}
+            Floor {buildingFloors.find((floor) => String(floor.floorId ?? floor.id) === String(resolvedActiveFloorId))?.label || "--"} -{" "}
             {selectedBuilding?.name || "No building selected"}
           </p>
           <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(10, minmax(0, 1fr))" }}>

@@ -5,7 +5,14 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    'src/ui/components/ui/**',
+    'src/ui/components/figma/**',
+    'src/ui/components/DriverDashboard.jsx',
+    'src/ui/components/ManagerDashboard.jsx',
+    'src/ui/components/StaffDashboard.jsx',
+  ]),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

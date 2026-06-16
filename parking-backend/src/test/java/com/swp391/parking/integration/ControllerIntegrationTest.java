@@ -16,6 +16,7 @@ import com.swp391.parking.entity.Floor;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.entity.Booking;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Shift;
 import com.swp391.parking.entity.User;
@@ -27,6 +28,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -192,6 +194,37 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
         mockMvc.perform(get("/api/v1/vehicles/my"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].licensePlate").value("59A-12345"));
+    }
+
+    @Test
+    @WithMockUser(username = "driver-booking", roles = "DRIVER")
+    void bookingControllerShouldReturnCurrentUsersBookings() throws Exception {
+        User driver = createUser("driver-booking", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Booking Tower");
+        Floor floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Booking Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Booking Zone");
+        ParkingSlot slot = createSlot(zone, "BK-01", ParkingSlot.Status.AVAILABLE);
+        var vehicle = createVehicle(driver, vehicleType, "77A-12345");
+
+        bookingRepository.save(Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(LocalDateTime.now().plusHours(1))
+            .bookingEndTime(LocalDateTime.now().plusHours(3))
+            .reservedAt(LocalDateTime.now())
+            .expiredAt(LocalDateTime.now().plusMinutes(15))
+            .depositAmount(BigDecimal.ZERO)
+            .status(Booking.BookingStatus.PENDING_PAYMENT)
+            .build());
+
+        mockMvc.perform(get("/api/bookings/my"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data[0].licensePlate").value("77A-12345"))
+            .andExpect(jsonPath("$.data[0].slotCode").value("BK-01"))
+            .andExpect(jsonPath("$.data[0].status").value("PENDING_PAYMENT"));
     }
 
     @Test

@@ -40,8 +40,7 @@ public class Zone extends BaseEntity {
     private String description;
 
     @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Transient
     private Status status = Status.ACTIVE;
 
     @Builder.Default
