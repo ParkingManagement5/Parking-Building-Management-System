@@ -7,7 +7,6 @@ import {
   ManagerField,
   ManagerForm,
   ManagerInput,
-  ManagerPageHeader,
   ManagerPrimaryButton,
   ManagerSecondaryButton,
 } from "../../ui/components/manager/ManagerUi";

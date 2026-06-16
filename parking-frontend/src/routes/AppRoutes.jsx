@@ -13,6 +13,7 @@ import DriverNotificationPage from "../pages/driver/DriverNotificationPage";
 import DriverParkingSlotPage from "../pages/driver/DriverParkingSlotPage";
 import MyVehiclesPage from "../pages/driver/MyVehiclesPage";
 import BookingPage from "../pages/driver/BookingPage";
+import BookingHistoryPage from "../pages/driver/BookingHistoryPage";
 import CurrentSessionPage from "../pages/driver/CurrentSessionPage";
 import PaymentHistoryPage from "../pages/driver/PaymentHistoryPage";
 import RequestCenterPage from "../pages/driver/RequestCenterPage";
@@ -65,6 +66,7 @@ export default function AppRoutes() {
             <Route path="vehicles" element={<MyVehiclesPage />} />
             <Route path="parking-slots" element={<DriverParkingSlotPage />} />
             <Route path="booking" element={<BookingPage />} />
+            <Route path="bookings" element={<BookingHistoryPage />} />
             <Route path="current-session" element={<CurrentSessionPage />} />
             <Route path="payments" element={<PaymentHistoryPage />} />
             <Route path="requests" element={<RequestCenterPage />} />

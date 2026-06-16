@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, Layers, Plus, Rows3, ShieldCheck, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
@@ -44,23 +44,7 @@ export default function FloorPage() {
     capacity: "",
   });
 
-  useEffect(() => {
-    void loadInitialData();
-  }, []);
-
-  async function loadInitialData() {
-    try {
-      const buildingRes = await buildingApi.getAll();
-      const buildingList = buildingRes.data?.data || [];
-      setBuildings(buildingList);
-      await refreshFloors(buildingList);
-    } catch (error) {
-      console.error("Failed to load buildings", error);
-      alert("Cannot load buildings");
-    }
-  }
-
-  async function refreshFloors(buildingList = buildings) {
+  const refreshFloors = useCallback(async (buildingList) => {
     try {
       const responses = await Promise.all(
         buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
@@ -70,7 +54,32 @@ export default function FloorPage() {
       console.error("Failed to fetch floors", error);
       alert("Cannot load floors");
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialData() {
+      try {
+        const buildingRes = await buildingApi.getAll();
+        const buildingList = buildingRes.data?.data || [];
+        if (cancelled) {
+          return;
+        }
+        setBuildings(buildingList);
+        await refreshFloors(buildingList);
+      } catch (error) {
+        console.error("Failed to load buildings", error);
+        alert("Cannot load buildings");
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshFloors]);
 
   const stats = useMemo(() => {
     const active = floors.filter((item) => item.isActive).length;
@@ -117,7 +126,7 @@ export default function FloorPage() {
       } else {
         await floorApi.create(payload);
       }
-      await refreshFloors();
+      await refreshFloors(buildings);
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save floor", error);
@@ -140,7 +149,7 @@ export default function FloorPage() {
     if (!window.confirm("Are you sure you want to delete this floor?")) return;
     try {
       await floorApi.delete(id);
-      await refreshFloors();
+      await refreshFloors(buildings);
     } catch (error) {
       console.error("Failed to delete floor", error);
       alert(error.response?.data?.message || "Delete floor failed");
