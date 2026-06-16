@@ -1,50 +1,62 @@
 .public-navbar {
-  height: 72px;
-  background: white;
+  min-height: 68px;
+  background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid var(--border-color);
-  padding: 0 48px;
-
+  padding: 0 28px 0 36px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.public-logo {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--primary-color);
+  justify-content: center;
 }
 
 .public-menu {
-  display: flex;
-  gap: 28px;
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr);
+  align-items: center;
+  gap: 30px;
 }
 
 .public-menu a {
-  color: var(--text-primary);
+  color: #64748b;
+  font-size: 0.98rem;
   font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
+.public-menu a:hover,
 .public-menu a.active {
   color: var(--primary-color);
 }
 
-.public-actions {
-  display: flex;
+.public-brand {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  text-decoration: none;
 }
 
-.login-link {
-  color: var(--primary-color);
-  font-weight: 600;
+.public-menu-brand {
+  justify-self: center;
+  padding: 0 4px;
 }
 
-.register-btn {
-  background: var(--primary-color);
+.public-brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6d5efc, #5b45ea);
   color: white;
-  padding: 10px 16px;
-  border-radius: 10px;
+  box-shadow: 0 10px 22px rgba(91, 69, 234, 0.24);
+}
+
+.public-brand-name {
+  color: #1e293b;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .public-section {
@@ -77,4 +89,17 @@
 .service-card p {
   color: var(--text-secondary);
   line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .public-navbar {
+    padding: 16px 20px;
+    justify-content: center;
+  }
+
+  .public-menu {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
 }
