@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, Building2, DoorOpen, Plus, ShieldCheck, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
@@ -42,23 +42,7 @@ export default function GatePage() {
     gateType: "ENTRY",
   });
 
-  useEffect(() => {
-    void loadInitialData();
-  }, []);
-
-  async function loadInitialData() {
-    try {
-      const buildingRes = await buildingApi.getAll();
-      const buildingList = buildingRes.data?.data || [];
-      setBuildings(buildingList);
-      await refreshGates(buildingList);
-    } catch (error) {
-      console.error("Failed to load gate dependencies", error);
-      alert("Cannot load buildings");
-    }
-  }
-
-  async function refreshGates(buildingList = buildings) {
+  const refreshGates = useCallback(async (buildingList) => {
     try {
       const responses = await Promise.all(
         buildingList.map((building) => gateApi.getByBuilding(building.buildingId ?? building.id))
@@ -68,7 +52,32 @@ export default function GatePage() {
       console.error("Failed to fetch gates", error);
       alert("Cannot load gates");
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialData() {
+      try {
+        const buildingRes = await buildingApi.getAll();
+        const buildingList = buildingRes.data?.data || [];
+        if (cancelled) {
+          return;
+        }
+        setBuildings(buildingList);
+        await refreshGates(buildingList);
+      } catch (error) {
+        console.error("Failed to load gate dependencies", error);
+        alert("Cannot load buildings");
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshGates]);
 
   const stats = useMemo(
     () => ({
@@ -117,7 +126,7 @@ export default function GatePage() {
       } else {
         await gateApi.create(payload);
       }
-      await refreshGates();
+      await refreshGates(buildings);
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save gate", error);
@@ -139,7 +148,7 @@ export default function GatePage() {
     if (!window.confirm("Are you sure you want to delete this gate?")) return;
     try {
       await gateApi.delete(id);
-      await refreshGates();
+      await refreshGates(buildings);
     } catch (error) {
       console.error("Failed to delete gate", error);
       alert(error.response?.data?.message || "Delete gate failed");

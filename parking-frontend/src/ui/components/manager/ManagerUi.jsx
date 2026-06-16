@@ -1,10 +1,14 @@
 export function ManagerPageHeader({ title, description, action }) {
-  if (!action) {
+  if (!title && !description && !action) {
     return null;
   }
 
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        {title ? <h2 className="text-xl font-semibold text-foreground">{title}</h2> : null}
+        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+      </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );

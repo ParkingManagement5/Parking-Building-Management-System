@@ -7,30 +7,48 @@ import { formatRelativeTime } from "./driverPortalUtils";
 export default function DriverNotificationPage() {
   const [notifications, setNotifications] = useState([]);
 
-  async function loadNotifications() {
-    const userId = getUserId();
-    if (!userId) {
-      setNotifications([]);
-      return;
-    }
-
-    try {
-      const res = await notificationApi.getByUser(userId);
-      setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
-    } catch (error) {
-      console.error("Failed to load notifications", error);
-      setNotifications([]);
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadNotifications() {
+      const userId = getUserId();
+      if (!userId) {
+        if (!cancelled) {
+          setNotifications([]);
+        }
+        return;
+      }
+
+      try {
+        const res = await notificationApi.getByUser(userId);
+        if (!cancelled) {
+          setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to load notifications", error);
+        if (!cancelled) {
+          setNotifications([]);
+        }
+      }
+    }
+
     void loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleMarkAsRead = async (id) => {
     try {
       await notificationApi.markAsRead(id);
-      await loadNotifications();
+      const userId = getUserId();
+      if (!userId) {
+        setNotifications([]);
+        return;
+      }
+      const res = await notificationApi.getByUser(userId);
+      setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
@@ -44,7 +62,8 @@ export default function DriverNotificationPage() {
 
     try {
       await notificationApi.markAllAsRead(userId);
-      await loadNotifications();
+      const res = await notificationApi.getByUser(userId);
+      setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
     } catch (error) {
       console.error("Failed to mark all notifications as read", error);
     }

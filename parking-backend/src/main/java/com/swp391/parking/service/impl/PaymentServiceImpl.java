@@ -7,6 +7,7 @@ import com.swp391.parking.entity.Payment.PaymentStatus;
 import com.swp391.parking.entity.Payment.PaymentType;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.PaymentRepository;
+import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,14 +24,17 @@ import java.util.stream.Collectors;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final BookingService bookingService;
 
     @Override
     @Transactional
-    public PaymentResponse createDeposit(Integer bookingId,
-                                          BigDecimal depositAmount,
-                                          PaymentMethod paymentMethod) {
+    public PaymentResponse createDeposit(
+        Integer bookingId,
+        BigDecimal depositAmount,
+        PaymentMethod paymentMethod
+    ) {
         paymentRepository.findByBookingIdAndPaymentType(bookingId, PaymentType.DEPOSIT)
-            .ifPresent(p -> {
+            .ifPresent(payment -> {
                 throw new AppException(HttpStatus.CONFLICT,
                     "Deposit already exists for this booking");
             });
@@ -58,22 +62,30 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaymentStatus(PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
 
-        return toResponse(paymentRepository.save(payment));
+        Payment savedPayment = paymentRepository.save(payment);
+
+        if (savedPayment.getBookingId() != null) {
+            bookingService.confirmBookingAfterPayment(savedPayment.getBookingId().longValue());
+        }
+
+        return toResponse(savedPayment);
     }
 
     @Override
     @Transactional
-    public PaymentResponse createParkingFee(Integer sessionId,
-                                             Integer bookingId,
-                                             Integer policyId,
-                                             BigDecimal appliedRate,
-                                             BigDecimal baseFee,
-                                             BigDecimal overtimeFee,
-                                             BigDecimal penaltyFee,
-                                             BigDecimal discount,
-                                             BigDecimal depositDeducted,
-                                             BigDecimal totalAmount,
-                                             PaymentMethod paymentMethod) {
+    public PaymentResponse createParkingFee(
+        Integer sessionId,
+        Integer bookingId,
+        Integer policyId,
+        BigDecimal appliedRate,
+        BigDecimal baseFee,
+        BigDecimal overtimeFee,
+        BigDecimal penaltyFee,
+        BigDecimal discount,
+        BigDecimal depositDeducted,
+        BigDecimal totalAmount,
+        PaymentMethod paymentMethod
+    ) {
         Payment payment = Payment.builder()
             .sessionId(sessionId)
             .bookingId(bookingId)
@@ -95,8 +107,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse confirmParkingFee(Integer paymentId,
-                                              String transactionRef) {
+    public PaymentResponse confirmParkingFee(Integer paymentId, String transactionRef) {
         Payment payment = findById(paymentId);
 
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
@@ -111,11 +122,13 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PaymentResponse getById(Integer paymentId) {
         return toResponse(findById(paymentId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PaymentResponse> getByBookingId(Integer bookingId) {
         return paymentRepository.findByBookingId(bookingId)
             .stream().map(this::toResponse)
@@ -123,18 +136,24 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PaymentResponse> getBySessionId(Integer sessionId) {
         return paymentRepository.findBySessionId(sessionId)
             .stream().map(this::toResponse)
             .collect(Collectors.toList());
     }
 
-    // ── Helper ───────────────────────────────────────────────
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getMyPayments(Long userId) {
+        return paymentRepository.findByUserIdOrderByCreatedAtDesc(userId)
+            .stream().map(this::toResponse)
+            .collect(Collectors.toList());
+    }
 
     private Payment findById(Integer paymentId) {
         return paymentRepository.findById(paymentId)
-            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Payment not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Payment not found"));
     }
 
     private PaymentResponse toResponse(Payment payment) {

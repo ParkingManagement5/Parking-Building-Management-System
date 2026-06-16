@@ -20,6 +20,7 @@ import com.swp391.parking.repository.FloorRepository;
 import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.NotificationRepository;
 import com.swp391.parking.repository.ParkingBuildingRepository;
+import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.repository.PricingPolicyRepository;
 import com.swp391.parking.repository.RoleRepository;
@@ -61,6 +62,9 @@ public abstract class AbstractIntegrationTestSupport {
 
     @Autowired
     protected ParkingBuildingRepository buildingRepository;
+
+    @Autowired
+    protected BookingRepository bookingRepository;
 
     @Autowired
     protected FloorRepository floorRepository;
