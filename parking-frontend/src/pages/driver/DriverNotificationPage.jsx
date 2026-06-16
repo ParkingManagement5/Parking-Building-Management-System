@@ -73,25 +73,25 @@ export default function DriverNotificationPage() {
     const type = String(item.type || item.level || "").toLowerCase();
     if (type.includes("success")) {
       return {
-        wrap: "bg-emerald-100",
-        icon: <CheckCircle2 size={14} className="text-emerald-600" />,
+        wrap: "bg-emerald-100 dark:bg-emerald-500/15",
+        icon: <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-300" />,
       };
     }
     if (type.includes("warning")) {
       return {
-        wrap: "bg-amber-100",
-        icon: <AlertCircle size={14} className="text-amber-600" />,
+        wrap: "bg-amber-100 dark:bg-amber-500/15",
+        icon: <AlertCircle size={14} className="text-amber-600 dark:text-amber-300" />,
       };
     }
     if (type.includes("info")) {
       return {
-        wrap: "bg-blue-100",
-        icon: <Bell size={14} className="text-blue-600" />,
+        wrap: "bg-blue-100 dark:bg-blue-500/15",
+        icon: <Bell size={14} className="text-blue-600 dark:text-blue-300" />,
       };
     }
     return {
-      wrap: item.isRead ? "bg-muted" : "bg-blue-100",
-      icon: <Bell size={14} className={item.isRead ? "text-muted-foreground" : "text-blue-600"} />,
+      wrap: item.isRead ? "bg-muted" : "bg-blue-100 dark:bg-blue-500/15",
+      icon: <Bell size={14} className={item.isRead ? "text-muted-foreground" : "text-blue-600 dark:text-blue-300"} />,
     };
   };
 

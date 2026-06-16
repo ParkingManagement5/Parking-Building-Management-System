@@ -14,7 +14,7 @@ function QRCodeMock({ value }) {
   );
 
   return (
-    <div className="p-3 bg-white inline-block rounded-xl border border-border">
+    <div className="inline-block rounded-xl border border-border bg-white p-3 dark:bg-slate-50">
       <div
         className="grid gap-0.5"
         style={{ gridTemplateColumns: "repeat(10, 1fr)", width: 100 }}
@@ -22,7 +22,7 @@ function QRCodeMock({ value }) {
         {grid.flat().map((filled, index) => (
           <div
             key={index}
-            className={filled ? "bg-slate-800 aspect-square" : "bg-white aspect-square"}
+            className={filled ? "bg-slate-800 aspect-square" : "bg-white aspect-square dark:bg-slate-100"}
             style={{ width: 9, height: 9 }}
           />
         ))}
@@ -68,7 +68,7 @@ export default function CurrentSessionPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="bg-gradient-to-r from-primary to-[#4338CA] rounded-2xl p-7 text-white">
+      <div className="rounded-2xl bg-gradient-to-r from-primary to-[#4338CA] p-7 text-white dark:to-[#312E81]">
         <div className="flex items-start justify-between mb-6">
           <div>
             <p className="text-white/60 text-xs mb-1">ACTIVE SESSION</p>
@@ -79,7 +79,7 @@ export default function CurrentSessionPage() {
               {session.zoneName || "Zone"} - {session.slotCode || session.parkingSlotCode || "Slot"}
             </p>
           </div>
-          <span className="flex items-center gap-1.5 bg-white/20 text-white text-xs px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-xs text-white dark:bg-white/10">
             <span className="size-1.5 bg-emerald-400 rounded-full animate-pulse" />
             Active
           </span>
@@ -94,19 +94,19 @@ export default function CurrentSessionPage() {
           <p className="text-white/60 text-sm">Duration</p>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white/10 rounded-xl p-3">
+          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
             <p className="text-white/60 text-xs">Entry Time</p>
             <p className="font-semibold mt-0.5">
               {formatDateTime(session.startTime || session.checkInTime || session.createdAt)}
             </p>
           </div>
-          <div className="bg-white/10 rounded-xl p-3">
+          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
             <p className="text-white/60 text-xs">Estimated Fee</p>
             <p className="font-semibold mt-0.5">
               {formatCurrency(session.amount || session.estimatedFee || session.totalAmount || 0)}
             </p>
           </div>
-          <div className="bg-white/10 rounded-xl p-3">
+          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
             <p className="text-white/60 text-xs">Rate</p>
             <p className="font-semibold mt-0.5">
               {session.rateLabel || "Live from backend"}

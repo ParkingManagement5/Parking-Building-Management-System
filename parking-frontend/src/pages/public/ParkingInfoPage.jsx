@@ -98,7 +98,7 @@ export default function ParkingInfoPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <section className="border-b border-border bg-gradient-to-br from-sky-50 via-background to-emerald-50/40">
+      <section className="border-b border-border bg-gradient-to-br from-sky-50 via-background to-emerald-50/40 dark:from-slate-950 dark:via-background dark:to-slate-900">
         <div className="mx-auto max-w-6xl px-6 py-16">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
@@ -132,7 +132,7 @@ export default function ParkingInfoPage() {
                         <span>{item.address || "No address"}</span>
                       </div>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.isActive !== false ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.isActive !== false ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300"}`}>
                       {item.isActive !== false ? "Active" : "Inactive"}
                     </span>
                   </div>
@@ -159,12 +159,12 @@ export default function ParkingInfoPage() {
                       </div>
                       <p className="text-xl font-bold text-foreground">{item.slotCount}</p>
                     </div>
-                    <div className="rounded-2xl bg-emerald-50 p-4">
-                      <div className="mb-2 flex items-center gap-2 text-emerald-700">
+                    <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+                      <div className="mb-2 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
                         <SquareParking size={14} />
                         <span className="text-xs">Available</span>
                       </div>
-                      <p className="text-xl font-bold text-emerald-700">{item.availableSlots}</p>
+                      <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{item.availableSlots}</p>
                     </div>
                   </div>
 

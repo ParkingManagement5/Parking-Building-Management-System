@@ -89,21 +89,21 @@ export function getBookingStatus(item) {
 export function getStatusClasses(status) {
   const key = String(status || "pending").toLowerCase();
   const palette = {
-    active: "bg-emerald-100 text-emerald-700",
-    available: "bg-emerald-100 text-emerald-700",
-    confirmed: "bg-emerald-100 text-emerald-700",
-    completed: "bg-slate-100 text-slate-600",
-    paid: "bg-emerald-100 text-emerald-700",
-    read: "bg-slate-100 text-slate-600",
-    pending: "bg-amber-100 text-amber-700",
-    reserved: "bg-amber-100 text-amber-700",
-    processing: "bg-blue-100 text-blue-700",
-    unread: "bg-amber-100 text-amber-700",
-    inactive: "bg-slate-100 text-slate-600",
-    refunded: "bg-violet-100 text-violet-700",
-    cancelled: "bg-rose-100 text-rose-700",
-    failed: "bg-rose-100 text-rose-700",
+    active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    available: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    confirmed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    completed: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+    read: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    pending: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    reserved: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    processing: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+    unread: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+    inactive: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    refunded: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+    cancelled: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
+    failed: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
   };
 
-  return palette[key] || "bg-slate-100 text-slate-600";
+  return palette[key] || "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300";
 }
