@@ -1,6 +1,9 @@
-import { Bell, Lock, Settings, Shield } from "lucide-react";
+import { Bell, Lock, Moon, Settings, Shield, Sun } from "lucide-react";
+import { useTheme } from "../../utils/theme";
 
 export default function PortalSettingsPage({ portal = "portal" }) {
+  const { resolvedTheme, setTheme } = useTheme();
+
   return (
     <div className="max-w-3xl space-y-4">
       <div className="bg-card border border-border rounded-2xl p-6">
@@ -17,6 +20,26 @@ export default function PortalSettingsPage({ portal = "portal" }) {
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
+          <div className="bg-muted/40 rounded-2xl p-4 md:col-span-2">
+            <div className="flex items-center gap-2 mb-2 text-foreground">
+              {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              <span className="font-medium text-sm">Appearance</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Apply the new ParkSmart control-layer palette across the portal and switch between light and dark mode.
+            </p>
+            <button
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              {resolvedTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+              {resolvedTheme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            </button>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Active display: <span className="font-medium text-foreground capitalize">{resolvedTheme}</span>
+            </p>
+          </div>
+
           <div className="bg-muted/40 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2 text-foreground">
               <Bell size={16} />

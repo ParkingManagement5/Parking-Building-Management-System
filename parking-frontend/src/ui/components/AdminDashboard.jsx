@@ -67,27 +67,27 @@ const CONFIG_SETTINGS = [
 ];
 function StatusBadge({ status }) {
     const map = {
-        active: 'bg-emerald-100 text-emerald-700',
-        suspended: 'bg-rose-100 text-rose-700',
-        inactive: 'bg-slate-100 text-slate-600',
-        healthy: 'bg-emerald-100 text-emerald-700',
-        degraded: 'bg-amber-100 text-amber-700',
-        down: 'bg-rose-100 text-rose-700',
-        Driver: 'bg-blue-100 text-blue-700',
-        Staff: 'bg-emerald-100 text-emerald-700',
-        Manager: 'bg-violet-100 text-violet-700',
-        Admin: 'bg-rose-100 text-rose-700',
+        active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+        suspended: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+        inactive: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
+        healthy: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+        degraded: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+        down: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+        Driver: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+        Staff: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+        Manager: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+        Admin: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
     };
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? 'bg-slate-100 text-slate-600'}`}>{status}</span>;
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300'}`}>{status}</span>;
 }
 function Overview() {
     return (<div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-            { label: 'Total Users', value: '1,248', change: '+68 this month', icon: Users, color: 'bg-blue-50 text-blue-600' },
-            { label: 'Total Revenue', value: '$284,600', change: '+18.4% YoY', icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600' },
-            { label: 'Active Sessions', value: '38', change: 'Right now', icon: Activity, color: 'bg-violet-50 text-violet-600' },
-            { label: 'System Health', value: '99.8%', change: '1 service degraded', icon: CheckCircle2, color: 'bg-amber-50 text-amber-600' },
+            { label: 'Total Users', value: '1,248', change: '+68 this month', icon: Users, color: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' },
+            { label: 'Total Revenue', value: '$284,600', change: '+18.4% YoY', icon: TrendingUp, color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' },
+            { label: 'Active Sessions', value: '38', change: 'Right now', icon: Activity, color: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300' },
+            { label: 'System Health', value: '99.8%', change: '1 service degraded', icon: CheckCircle2, color: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300' },
         ].map(s => {
             const Icon = s.icon;
             return (<div key={s.label} className="bg-card border border-border rounded-2xl p-4">
@@ -329,10 +329,10 @@ function RoleManagement() {
         { name: 'Admin', users: 8, description: 'Full system access and user management', permissions: ['all_permissions', 'manage_users', 'system_config', 'view_logs', 'manage_roles'] },
     ];
     const colors = {
-        Driver: 'bg-blue-50 border-blue-200 text-blue-700',
-        Staff: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-        Manager: 'bg-violet-50 border-violet-200 text-violet-700',
-        Admin: 'bg-rose-50 border-rose-200 text-rose-700',
+        Driver: 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300',
+        Staff: 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300',
+        Manager: 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/10 dark:border-violet-500/20 dark:text-violet-300',
+        Admin: 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300',
     };
     return (<div className="grid md:grid-cols-2 gap-4">
       {ROLES.map(r => (<div key={r.name} className={`rounded-2xl border p-5 ${colors[r.name]}`}>
