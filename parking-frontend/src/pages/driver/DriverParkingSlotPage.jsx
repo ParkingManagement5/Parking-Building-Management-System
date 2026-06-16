@@ -51,44 +51,76 @@ export default function DriverParkingSlotPage() {
         </div>
       </div>
 
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Building</th>
-              <th>Floor</th>
-              <th>Zone</th>
-              <th>Slot Code</th>
-              <th>Vehicle Type</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slots.map((item) => (
-              <tr key={item.id || item.slotId}>
-                <td>{item.zone?.floor?.building?.name || "-"}</td>
-                <td>{item.zone?.floor?.name || "-"}</td>
-                <td>{item.zone?.name || "-"}</td>
-                <td>{item.slotCode || "-"}</td>
-                <td>{item.zone?.vehicleType?.name || "-"}</td>
-                <td>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(
-                      item.status || "available"
-                    )}`}
-                  >
-                    {item.status || "AVAILABLE"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {slots.length === 0 && (
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px]">
+            <thead className="bg-muted/40">
               <tr>
-                <td colSpan="6">No available slots returned from the backend.</td>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Building
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Floor
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Zone
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Slot Code
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Vehicle Type
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Status
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {slots.map((item) => (
+                <tr
+                  key={item.id || item.slotId}
+                  className="transition-colors hover:bg-muted/20"
+                >
+                  <td className="px-5 py-3.5 text-sm text-foreground">
+                    {item.zone?.floor?.building?.name || "-"}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-muted-foreground">
+                    {item.zone?.floor?.name || "-"}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-muted-foreground">
+                    {item.zone?.name || "-"}
+                  </td>
+                  <td className="px-5 py-3.5 font-mono text-sm font-medium text-foreground">
+                    {item.slotCode || "-"}
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-muted-foreground">
+                    {item.zone?.vehicleType?.name || "-"}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClasses(
+                        item.status || "available"
+                      )}`}
+                    >
+                      {item.status || "AVAILABLE"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {slots.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="6"
+                    className="px-5 py-10 text-center text-sm text-muted-foreground"
+                  >
+                    No available slots returned from the backend.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

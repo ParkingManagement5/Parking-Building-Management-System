@@ -310,7 +310,7 @@ export default function VehicleEntryPage() {
               </StaffField>
 
               {lookup.error ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {lookup.error}
                 </div>
               ) : null}
@@ -330,16 +330,16 @@ export default function VehicleEntryPage() {
 
           {step === 2 && lookup.vehicle ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium text-emerald-700">Vehicle Found</p>
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Vehicle Found</p>
                     <p className="mt-1 text-xl font-bold text-foreground">{lookup.vehicle.licensePlate}</p>
                     <p className="text-sm text-muted-foreground">
                       {lookup.vehicle.user?.fullName || lookup.vehicle.user?.username || "Registered driver"}
                     </p>
                   </div>
-                  <CheckCircle2 size={22} className="text-emerald-600" />
+                  <CheckCircle2 size={22} className="text-emerald-600 dark:text-emerald-300" />
                 </div>
               </div>
 
@@ -380,8 +380,8 @@ export default function VehicleEntryPage() {
 
           {step === 3 && confirmedSession ? (
             <div className="mx-auto max-w-md rounded-3xl border border-border bg-background p-6 text-center">
-              <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-100">
-                <CheckCircle2 size={28} className="text-emerald-600" />
+              <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
+                <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-300" />
               </div>
               <h3 className="text-xl font-bold text-foreground">Entry Confirmed</h3>
               <p className="mt-2 text-sm text-muted-foreground">

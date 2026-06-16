@@ -31,10 +31,10 @@ function formatStatusLabel(value) {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState([
-    { label: "Total Users", value: "0", change: "Live from backend", icon: Users, color: "bg-blue-50 text-blue-600" },
-    { label: "Active Users", value: "0", change: "Accounts with ACTIVE status", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Roles", value: "0", change: "Roles returned by API", icon: Shield, color: "bg-violet-50 text-violet-600" },
-    { label: "Inactive Users", value: "0", change: "Need review", icon: AlertTriangle, color: "bg-amber-50 text-amber-600" },
+    { label: "Total Users", value: "0", change: "Live from backend", icon: Users, color: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300" },
+    { label: "Active Users", value: "0", change: "Accounts with ACTIVE status", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" },
+    { label: "Roles", value: "0", change: "Roles returned by API", icon: Shield, color: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" },
+    { label: "Inactive Users", value: "0", change: "Need review", icon: AlertTriangle, color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300" },
   ]);
   const [roleChart, setRoleChart] = useState([]);
   const [statusChart, setStatusChart] = useState([]);
@@ -75,28 +75,28 @@ export default function AdminDashboard() {
             value: String(users.length),
             change: "Live from backend",
             icon: Users,
-            color: "bg-blue-50 text-blue-600",
+            color: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
           },
           {
             label: "Active Users",
             value: String(users.filter((item) => item.status === "ACTIVE").length),
             change: "Accounts with ACTIVE status",
             icon: CheckCircle2,
-            color: "bg-emerald-50 text-emerald-600",
+            color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
           },
           {
             label: "Roles",
             value: String(roles.length),
             change: "Roles returned by API",
             icon: Shield,
-            color: "bg-violet-50 text-violet-600",
+            color: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
           },
           {
             label: "Inactive Users",
             value: String(users.filter((item) => item.status !== "ACTIVE").length),
             change: "Need review",
             icon: AlertTriangle,
-            color: "bg-amber-50 text-amber-600",
+            color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
           },
         ]);
 

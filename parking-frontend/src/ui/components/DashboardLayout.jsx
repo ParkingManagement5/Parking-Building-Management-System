@@ -1,16 +1,39 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, LogOut, Settings, Menu, X, ChevronDown, Search } from 'lucide-react';
+import { Bell, LogOut, Settings, Menu, X, ChevronDown, Search, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../../utils/theme';
+import BrandLogo, { BrandLogoIcon } from './BrandLogo';
 const ROLE_META = {
-    driver: { color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500', label: 'Driver' },
-    staff: { color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', label: 'Staff' },
-    manager: { color: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500', label: 'Manager' },
-    admin: { color: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500', label: 'Admin' },
+    driver: {
+        color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+        dot: 'bg-blue-500',
+        label: 'Driver',
+        avatar: 'bg-blue-600 text-white shadow-sm shadow-blue-500/20 dark:bg-blue-500 dark:text-slate-950 dark:shadow-blue-500/30',
+    },
+    staff: {
+        color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+        dot: 'bg-emerald-500',
+        label: 'Staff',
+        avatar: 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 dark:bg-emerald-500 dark:text-slate-950 dark:shadow-emerald-500/30',
+    },
+    manager: {
+        color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+        dot: 'bg-violet-500',
+        label: 'Manager',
+        avatar: 'bg-violet-600 text-white shadow-sm shadow-violet-500/20 dark:bg-violet-500 dark:text-slate-950 dark:shadow-violet-500/30',
+    },
+    admin: {
+        color: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+        dot: 'bg-rose-500',
+        label: 'Admin',
+        avatar: 'bg-rose-600 text-white shadow-sm shadow-rose-500/20 dark:bg-rose-500 dark:text-slate-950 dark:shadow-rose-500/30',
+    },
 };
 export default function DashboardLayout({ role, navItems, currentPage, setCurrentPage, title, subtitle, userName = 'Alex Johnson', userInitials = 'AJ', userEmail = 'alex@parksmart.io', notificationCount = 0, notificationItems = [], onMarkNotificationRead, onMarkAllNotificationsRead, notificationPath, settingsPath, children, }) {
     const [collapsed, setCollapsed] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [notificationOpen, setNotificationOpen] = useState(false);
+    const { resolvedTheme, setTheme } = useTheme();
     const navigate = useNavigate();
     const meta = ROLE_META[role];
     return (<div className="flex h-screen bg-background overflow-hidden">
@@ -19,24 +42,9 @@ export default function DashboardLayout({ role, navItems, currentPage, setCurren
         {/* Sidebar header */}
         <div className={`h-14 flex items-center border-b border-border ${collapsed ? 'px-4 justify-center' : 'px-4 gap-3'}`}>
           {!collapsed && (<div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="size-7 bg-primary rounded-lg flex items-center justify-center shrink-0">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9"/>
-                  <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-                  <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-                  <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-                </svg>
-              </div>
-              <span className="font-semibold text-sm text-foreground tracking-tight">ParkSmart</span>
+              <BrandLogo compact size="sidebar" iconClassName="rounded-lg" titleClassName="tracking-tight" />
             </div>)}
-          {collapsed && (<div className="size-7 bg-primary rounded-lg flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9"/>
-                <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-                <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-                <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-              </svg>
-            </div>)}
+          {collapsed && <BrandLogoIcon className="size-7 rounded-lg" iconSize={14} />}
           {!collapsed && (<button onClick={() => setCollapsed(true)} className="p-1 hover:bg-muted rounded-md transition-colors text-muted-foreground">
               <X size={14}/>
             </button>)}
@@ -76,7 +84,7 @@ export default function DashboardLayout({ role, navItems, currentPage, setCurren
         <div className="p-3 border-t border-border">
           {!collapsed ? (<div className="relative">
               <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted transition-colors">
-                <div className="size-7 bg-primary rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0">
+                <div className={`size-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${meta.avatar}`}>
                   {userInitials}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
@@ -118,6 +126,14 @@ export default function DashboardLayout({ role, navItems, currentPage, setCurren
             <Search size={13} className="text-muted-foreground shrink-0"/>
             <input placeholder="Search..." className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none flex-1 w-full"/>
           </div>
+
+          <button
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            className="rounded-lg border border-border bg-background p-2 transition-colors hover:bg-muted"
+            title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {resolvedTheme === 'dark' ? <Sun size={16} className="text-muted-foreground"/> : <Moon size={16} className="text-muted-foreground"/>}
+          </button>
 
           {/* Notifications */}
           <div className="relative">
@@ -173,7 +189,7 @@ export default function DashboardLayout({ role, navItems, currentPage, setCurren
           </div>
 
           {/* Avatar */}
-          <div className="size-7 bg-primary rounded-full flex items-center justify-center text-white text-xs font-medium">
+          <div className={`size-7 rounded-full flex items-center justify-center text-xs font-medium ${meta.avatar}`}>
             {userInitials}
           </div>
         </header>

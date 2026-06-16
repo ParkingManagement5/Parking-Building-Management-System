@@ -27,24 +27,24 @@ const PENDING_REQUESTS = [
 ];
 function StatusBadge({ status }) {
     const map = {
-        active: 'bg-emerald-100 text-emerald-700',
-        completed: 'bg-slate-100 text-slate-600',
-        pending: 'bg-blue-100 text-blue-700',
-        high: 'bg-rose-100 text-rose-700',
-        medium: 'bg-amber-100 text-amber-700',
-        low: 'bg-slate-100 text-slate-600',
-        paid: 'bg-emerald-100 text-emerald-700',
+        active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+        completed: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
+        pending: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+        high: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+        medium: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+        low: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
+        paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     };
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${map[status] ?? 'bg-slate-100 text-slate-600'}`}>{status}</span>;
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${map[status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300'}`}>{status}</span>;
 }
 function Overview() {
     return (<div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-            { label: 'Vehicles Today', value: '142', change: '+12 from yesterday', icon: Car, color: 'bg-blue-50 text-blue-600' },
-            { label: 'Current Sessions', value: '38', change: '5 ending soon', icon: Clock, color: 'bg-emerald-50 text-emerald-600' },
-            { label: 'Pending Requests', value: '7', change: '3 high priority', icon: MessageSquare, color: 'bg-amber-50 text-amber-600' },
-            { label: 'Revenue Today', value: '$2,840', change: '+$340 from avg', icon: CreditCard, color: 'bg-violet-50 text-violet-600' },
+            { label: 'Vehicles Today', value: '142', change: '+12 from yesterday', icon: Car, color: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' },
+            { label: 'Current Sessions', value: '38', change: '5 ending soon', icon: Clock, color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' },
+            { label: 'Pending Requests', value: '7', change: '3 high priority', icon: MessageSquare, color: 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300' },
+            { label: 'Revenue Today', value: '$2,840', change: '+$340 from avg', icon: CreditCard, color: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300' },
         ].map(s => {
             const Icon = s.icon;
             return (<div key={s.label} className="bg-card border border-border rounded-2xl p-4">
@@ -129,7 +129,7 @@ function VehicleEntry() {
           <h3 className="font-semibold text-foreground mb-5">License Plate OCR Scan</h3>
 
           {/* Camera mock */}
-          <div className="relative bg-slate-900 rounded-xl aspect-video flex items-center justify-center mb-5 overflow-hidden">
+          <div className="relative overflow-hidden rounded-xl border border-white/5 bg-slate-900 aspect-video flex items-center justify-center mb-5 dark:bg-[#0f172a]">
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-64 h-20 border-2 border-emerald-400 rounded-lg relative">
                 <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-emerald-400"/>
@@ -148,10 +148,10 @@ function VehicleEntry() {
             <Camera size={32} className="text-white/10 absolute"/>
           </div>
 
-          {detected ? (<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+          {detected ? (<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4 dark:bg-emerald-500/10 dark:border-emerald-500/20">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-emerald-600 font-medium mb-0.5">Plate Detected</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-300 font-medium mb-0.5">Plate Detected</p>
                   <p className="text-2xl font-bold font-mono text-foreground">{detected}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Confidence: 97.3% · Toyota Camry 2022</p>
                 </div>
@@ -302,7 +302,7 @@ function OCRScanner() {
         <h3 className="font-semibold text-foreground mb-4">OCR Camera Interface</h3>
 
         {/* Camera view */}
-        <div className="bg-slate-900 rounded-xl aspect-video flex items-center justify-center relative overflow-hidden mb-5">
+        <div className="bg-slate-900 rounded-xl aspect-video flex items-center justify-center relative overflow-hidden mb-5 dark:bg-[#0f172a]">
           {scanning ? (<div className="flex flex-col items-center gap-3">
               <div className="size-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"/>
               <p className="text-emerald-400 text-sm">Analyzing license plate...</p>
@@ -359,7 +359,7 @@ function Sessions() {
     return (<div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-foreground">Active Sessions</h2>
-        <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">{ACTIVE_SESSIONS.length} active</span>
+        <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium dark:bg-emerald-500/15 dark:text-emerald-300">{ACTIVE_SESSIONS.length} active</span>
       </div>
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <table className="w-full">
@@ -395,7 +395,7 @@ function RequestProcessing() {
     return (<div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-foreground">Pending Requests</h2>
-        <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">{requests.length} pending</span>
+        <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium dark:bg-amber-500/15 dark:text-amber-300">{requests.length} pending</span>
       </div>
       <div className="space-y-3">
         {requests.map(r => (<div key={r.id} className="bg-card border border-border rounded-2xl p-5">
