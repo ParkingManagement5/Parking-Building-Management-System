@@ -80,10 +80,10 @@ export default function PaymentHistoryPage() {
                 <td className="px-5 py-3.5 text-right">
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(
-                      item.status || "paid"
+                      item.status || item.paymentStatus || "paid"
                     )}`}
                   >
-                    {item.status || "PAID"}
+                    {item.status || item.paymentStatus || "PAID"}
                   </span>
                 </td>
               </tr>

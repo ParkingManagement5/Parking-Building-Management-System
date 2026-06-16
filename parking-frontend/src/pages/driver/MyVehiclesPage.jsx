@@ -17,18 +17,28 @@ export default function MyVehiclesPage() {
     year: "",
   });
 
-  async function loadVehicles() {
-    try {
-      const res = await axiosClient.get("/vehicles/my");
-      setVehicles(unwrapApiData(res.data, []));
-    } catch (error) {
-      console.error("Failed to load vehicles", error);
-      setVehicles([]);
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadVehicles() {
+      try {
+        const res = await axiosClient.get("/vehicles/my");
+        if (!cancelled) {
+          setVehicles(unwrapApiData(res.data, []));
+        }
+      } catch (error) {
+        console.error("Failed to load vehicles", error);
+        if (!cancelled) {
+          setVehicles([]);
+        }
+      }
+    }
+
     void loadVehicles();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const resetForm = () => {
@@ -85,9 +95,10 @@ export default function MyVehiclesPage() {
         await axiosClient.post("/vehicles", payload);
       }
 
+      const res = await axiosClient.get("/vehicles/my");
+      setVehicles(unwrapApiData(res.data, []));
       setShowModal(false);
       resetForm();
-      await loadVehicles();
     } catch (error) {
       console.error("Failed to save vehicle", error);
       alert(error.response?.data?.message || "Save vehicle failed");
@@ -101,7 +112,8 @@ export default function MyVehiclesPage() {
 
     try {
       await axiosClient.delete(`/vehicles/${id}`);
-      await loadVehicles();
+      const res = await axiosClient.get("/vehicles/my");
+      setVehicles(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to delete vehicle", error);
       alert(error.response?.data?.message || "Delete vehicle failed");

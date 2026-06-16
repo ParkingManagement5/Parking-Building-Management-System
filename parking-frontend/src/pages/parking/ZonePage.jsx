@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, Car, Grid3x3, Layers, Plus, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
@@ -52,35 +52,7 @@ export default function ZonePage() {
     description: "",
   });
 
-  useEffect(() => {
-    void loadInitialData();
-  }, []);
-
-  async function loadInitialData() {
-    try {
-      const [buildingRes, vehicleTypeRes] = await Promise.all([
-        buildingApi.getAll(),
-        vehicleTypeApi.getAll(),
-      ]);
-      const buildingList = buildingRes.data?.data || [];
-      const vehicleTypeList = vehicleTypeRes.data?.data || [];
-      setBuildings(buildingList);
-      setVehicleTypes(vehicleTypeList);
-
-      const floorResponses = await Promise.all(
-        buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
-      );
-      const floorList = floorResponses.flatMap((res) => res.data?.data || []);
-      setFloors(floorList);
-
-      await refreshZones(floorList);
-    } catch (error) {
-      console.error("Failed to load zone dependencies", error);
-      alert("Cannot load zone data");
-    }
-  }
-
-  async function refreshZones(sourceFloors = floors) {
+  const refreshZones = useCallback(async (sourceFloors) => {
     try {
       const responses = await Promise.all(sourceFloors.map((floor) => zoneApi.getByFloor(floor.floorId ?? floor.id)));
       setZones(responses.flatMap((res) => (res.data?.data || []).map(normalizeZone)));
@@ -88,7 +60,47 @@ export default function ZonePage() {
       console.error("Failed to fetch zones", error);
       alert("Cannot load zones");
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadInitialData() {
+      try {
+        const [buildingRes, vehicleTypeRes] = await Promise.all([
+          buildingApi.getAll(),
+          vehicleTypeApi.getAll(),
+        ]);
+        const buildingList = buildingRes.data?.data || [];
+        const vehicleTypeList = vehicleTypeRes.data?.data || [];
+        if (cancelled) {
+          return;
+        }
+        setBuildings(buildingList);
+        setVehicleTypes(vehicleTypeList);
+
+        const floorResponses = await Promise.all(
+          buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
+        );
+        const floorList = floorResponses.flatMap((res) => res.data?.data || []);
+        if (cancelled) {
+          return;
+        }
+        setFloors(floorList);
+
+        await refreshZones(floorList);
+      } catch (error) {
+        console.error("Failed to load zone dependencies", error);
+        alert("Cannot load zone data");
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshZones]);
 
   const filteredFloors = form.buildingId
     ? floors.filter((item) => (item.building?.buildingId ?? item.building?.id) === Number(form.buildingId))
@@ -153,7 +165,7 @@ export default function ZonePage() {
       } else {
         await zoneApi.create(payload);
       }
-      await refreshZones();
+      await refreshZones(floors);
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save zone", error);
@@ -177,7 +189,7 @@ export default function ZonePage() {
     if (!window.confirm("Are you sure you want to delete this zone?")) return;
     try {
       await zoneApi.delete(id);
-      await refreshZones();
+      await refreshZones(floors);
     } catch (error) {
       console.error("Failed to delete zone", error);
       alert(error.response?.data?.message || "Delete zone failed");

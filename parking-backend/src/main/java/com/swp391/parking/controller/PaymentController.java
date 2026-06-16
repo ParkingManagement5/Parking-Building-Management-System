@@ -3,11 +3,15 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PaymentResponse;
 import com.swp391.parking.entity.Payment.PaymentMethod;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -20,6 +24,7 @@ import java.util.List;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final UserRepository userRepository;
 
     @Operation(summary = "Create deposit for booking")
     @PostMapping("/deposit")
@@ -59,6 +64,16 @@ public class PaymentController {
             @PathVariable Integer paymentId) {
         PaymentResponse response = paymentService.getById(paymentId);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @Operation(summary = "Get current user's payments")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getMyPayments(
+            Authentication authentication) {
+        Long userId = userRepository.findByUsername(authentication.getName())
+            .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay user"))
+            .getUserId().longValue();
+        return ResponseEntity.ok(ApiResponse.success(paymentService.getMyPayments(userId)));
     }
 
     @Operation(summary = "Get payments by booking ID")

@@ -3,7 +3,6 @@ import { Camera, CheckCircle2, RefreshCw, ScanLine } from "lucide-react";
 import {
   createPortalId,
   formatStaffDateTime,
-  getStaffPortalState,
   updateStaffPortalState,
 } from "./staffPortalState";
 import {

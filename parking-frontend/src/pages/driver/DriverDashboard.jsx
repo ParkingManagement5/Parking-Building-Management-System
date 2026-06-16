@@ -286,7 +286,7 @@ export default function DriverDashboard() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <h3 className="font-semibold text-foreground text-sm">Recent Bookings</h3>
             <button
-              onClick={() => navigate("/driver/booking")}
+              onClick={() => navigate("/driver/bookings")}
               className="text-xs text-primary hover:underline flex items-center gap-1"
             >
               View all <ChevronRight size={12} />
