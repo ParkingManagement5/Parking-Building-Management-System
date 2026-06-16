@@ -51,4 +51,36 @@ List<ParkingSlot> searchAvailableSlots(
         @Param("vehicleTypeId") Long vehicleTypeId,
         @Param("floorId") Long floorId
 );
+
+@Query(value = """
+    SELECT ps.*
+    FROM parking_slot ps
+    JOIN zone z ON ps.zone_id = z.zone_id
+    JOIN floor f ON z.floor_id = f.floor_id
+    WHERE f.building_id = :buildingId
+      AND ps.slot_size = :slotSize
+      AND ps.status = 'AVAILABLE'
+      AND ps.is_active = true
+      AND z.is_active = true
+      AND f.is_active = true
+    ORDER BY f.floor_number, ps.slot_code
+    """, nativeQuery = true)
+List<ParkingSlot> findAvailableByBuildingAndSlotSize(
+        @Param("buildingId") Long buildingId,
+        @Param("slotSize") ParkingSlot.SlotSize slotSize
+);
+
+@Query(value = """
+    SELECT ps.*
+    FROM parking_slot ps
+    JOIN zone z ON ps.zone_id = z.zone_id
+    JOIN floor f ON z.floor_id = f.floor_id
+    WHERE ps.slot_size = :slotSize
+      AND ps.status = 'AVAILABLE'
+      AND ps.is_active = true
+      AND z.is_active = true
+      AND f.is_active = true
+    ORDER BY f.floor_number, ps.slot_code
+    """, nativeQuery = true)
+List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") ParkingSlot.SlotSize slotSize);
 }
