@@ -301,10 +301,6 @@ export default function LandingPage() {
                 Browse public slots
                 <ChevronRight size={16} />
               </button>
-              <button onClick={() => navigate("/login")} className="flex items-center gap-2 rounded-xl border border-border px-6 py-3 font-medium text-foreground transition-colors hover:bg-muted">
-                View demo
-                <ChevronRight size={16} />
-              </button>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-6">
               {["No credit card required", "Free 14-day trial", "Cancel anytime"].map((text) => (
@@ -538,7 +534,7 @@ export default function LandingPage() {
           </div>
           <div className="grid gap-6 md:grid-cols-3">
             {PLANS.map((plan) => (
-              <div key={plan.name} className={`rounded-2xl border p-7 ${plan.highlight ? "scale-[1.02] border-primary bg-primary text-primary-foreground shadow-2xl shadow-primary/30" : "border-border bg-card"}`}>
+              <div key={plan.name} className={`rounded-2xl border p-7 ${plan.highlight ? "scale-[1.02] border-primary bg-primary text-primary-foreground shadow-2xl shadow-primary/30 dark:border-indigo-400/40 dark:bg-[#1B2740] dark:text-white dark:shadow-[0_24px_60px_rgba(15,23,42,0.45)]" : "border-border bg-card"}`}>
                 {plan.highlight ? (
                   <span className="mb-3 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white">
                     <Zap size={10} />
@@ -559,7 +555,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => navigate("/register")} className={`w-full rounded-xl py-2.5 text-sm font-medium transition-all ${plan.highlight ? "bg-white text-primary hover:bg-white/90" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                <button onClick={() => navigate("/register")} className={`w-full rounded-xl py-2.5 text-sm font-medium transition-all ${plan.highlight ? "bg-white text-primary hover:bg-white/90 dark:bg-slate-100 dark:text-[#1B2740] dark:hover:bg-white" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
                   {plan.cta}
                 </button>
               </div>
@@ -577,7 +573,7 @@ export default function LandingPage() {
             Join facilities already using ParkSmart to modernize their operations.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <button onClick={() => navigate("/register")} className="flex items-center gap-2 rounded-xl bg-white px-8 py-3 font-semibold text-primary shadow-lg transition-all hover:bg-white/90">
+            <button onClick={() => navigate("/register")} className="flex items-center gap-2 rounded-xl bg-white px-8 py-3 font-semibold text-primary shadow-lg transition-all hover:bg-white/90 dark:bg-slate-100 dark:text-[#1B2740] dark:shadow-[0_16px_40px_rgba(15,23,42,0.35)] dark:hover:bg-white">
               Get started free <ArrowRight size={16} />
             </button>
             <button onClick={() => navigate("/login")} className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-8 py-3 font-medium text-white transition-all hover:bg-white/20">
