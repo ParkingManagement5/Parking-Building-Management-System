@@ -267,8 +267,7 @@ export default function RegisterPage() {
             </div>
 
             <div className="mb-8">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">Driver Register</p>
-              <h1 className="text-5xl font-bold leading-[1.02] tracking-[-0.035em] text-slate-950 dark:text-white xl:text-6xl">Create Driver Account</h1>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">Register</p>
             </div>
 
             {error ? (
@@ -335,33 +334,19 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="phone" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Phone
-                  </label>
-                  <div className="relative">
-                    <Phone size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="phone"
-                      value={form.phone}
-                      onChange={update("phone")}
-                      placeholder="+1 555 0100"
-                      className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 text-base text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-400 dark:focus:bg-slate-900"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Account Type
-                  </label>
-                  <div className="flex h-14 items-center rounded-2xl border border-slate-300 bg-white px-4 text-base font-medium text-slate-900 dark:border-white/10 dark:bg-slate-900/60 dark:text-white">
-                    Driver
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-300">
-                    Public signup only creates driver accounts.
-                  </p>
+              <div className="space-y-2">
+                <label htmlFor="phone" className="text-sm font-medium text-slate-600 dark:text-slate-200">
+                  Phone
+                </label>
+                <div className="relative">
+                  <Phone size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="phone"
+                    value={form.phone}
+                    onChange={update("phone")}
+                    placeholder="+1 555 0100"
+                    className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 text-base text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-400 dark:focus:bg-slate-900"
+                  />
                 </div>
               </div>
 
@@ -447,7 +432,7 @@ export default function RegisterPage() {
                   <span className="size-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
                 ) : (
                   <>
-                    Create account
+                    Register
                     <ArrowRight size={16} />
                   </>
                 )}
