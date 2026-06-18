@@ -34,6 +34,12 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse createBooking(Long currentUserId, CreateBookingRequest request) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startTime = request.getBookingStartTime();
+        LocalDateTime endTime = request.getBookingEndTime() != null
+                ? request.getBookingEndTime() : startTime.plusHours(2);
+        if (!endTime.isAfter(startTime)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "bookingEndTime phải sau bookingStartTime");
+        }
 
         // [BR-03a] Đặt trước ít nhất 10 phút
         long minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime);
@@ -79,8 +85,6 @@ public class BookingServiceImpl implements BookingService {
         });
 
         // [BR-01] Kiểm tra slot bị double-book
-        LocalDateTime endTime = request.getBookingEndTime() != null
-                ? request.getBookingEndTime() : startTime.plusHours(2);
         if (!bookingRepository.findConflictingBookings(slot.getId(), startTime, endTime).isEmpty()) {
             throw new AppException(HttpStatus.CONFLICT,
                     "Slot " + slot.getSlotCode() + " đã được đặt trong giờ này");
@@ -118,17 +122,26 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        if (booking.getExpiredAt() != null && !now.isBefore(booking.getExpiredAt())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã hết hạn thanh toán");
+        }
+
+        LocalDateTime qrExpiresAt = booking.getBookingStartTime().plusMinutes(30);
+        if (!qrExpiresAt.isAfter(now)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã quá giờ check-in");
+        }
+
         // Sinh QR token [BR-04]
         String qr = qrTokenUtil.generateQrToken(
                 booking.getId(),
                 booking.getVehicle().getLicensePlate(),
                 booking.getSlot().getId(),
-//                booking.getExpiredAt());
-                LocalDateTime.now().plusMinutes(15)); // QR có hạn 15 phút sau khi confirm
+                qrExpiresAt);
 
         booking.setQrToken(qr);
-        booking.setQrIssuedAt(LocalDateTime.now());
-        booking.setDepositPaidAt(LocalDateTime.now());
+        booking.setQrIssuedAt(now);
+        booking.setDepositPaidAt(now);
         booking.setStatus(Booking.BookingStatus.CONFIRMED);
 
         // Mark slot RESERVED
