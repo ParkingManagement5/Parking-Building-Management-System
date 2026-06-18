@@ -8,6 +8,7 @@ import java.util.List;
 public interface ParkingSessionService {
     SessionResponse processEntry(SessionEntryRequest request);
     SessionResponse processExit(Long sessionId, SessionExitRequest request);
+    SessionResponse completeSessionAfterPayment(Long sessionId);
     SessionResponse getSession(Long sessionId);
     List<SessionResponse> getMySessions(Long currentUserId);
 }

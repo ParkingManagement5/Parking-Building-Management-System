@@ -208,6 +208,35 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     @Override
+    @Transactional
+    public SessionResponse completeSessionAfterPayment(Long sessionId) {
+        ParkingSession session = getSessionEntity(sessionId);
+        if (session.getStatus() != ParkingSession.SessionStatus.WAITING_PAYMENT) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Session khong o trang thai cho thanh toan");
+        }
+
+        ParkingSlot slot = session.getSlot();
+        if (slot == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Session khong co slot");
+        }
+
+        session.setStatus(ParkingSession.SessionStatus.COMPLETED);
+        slot.setStatus(ParkingSlot.Status.AVAILABLE);
+
+        Booking booking = session.getBooking();
+        if (booking != null && booking.getStatus() == Booking.BookingStatus.CHECKED_IN) {
+            booking.setStatus(Booking.BookingStatus.COMPLETED);
+            bookingRepository.save(booking);
+        }
+
+        parkingSlotRepository.save(slot);
+        sessionRepository.save(session);
+
+        return toResponse(session);
+    }
+
+    @Override
     public SessionResponse getSession(Long sessionId) {
         return toResponse(getSessionEntity(sessionId));
     }
