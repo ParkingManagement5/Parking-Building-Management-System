@@ -1,7 +1,9 @@
 package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.SessionEntryRequest;
+import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.Booking;
+import com.swp391.parking.entity.Floor;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.GateLog;
 import com.swp391.parking.entity.ParkingBuilding;
@@ -9,6 +11,7 @@ import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
+import com.swp391.parking.entity.Zone;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.GateLogRepository;
@@ -52,6 +55,7 @@ class ParkingSessionServiceImplTest {
     private static final Long SLOT_ID = 4L;
     private static final Long BOOKING_ID = 5L;
     private static final Long USER_ID = 6L;
+    private static final Long OTHER_BUILDING_ID = 99L;
     private static final String LICENSE_PLATE = "51A-12345";
     private static final String QR_TOKEN = "qr-token";
 
@@ -172,6 +176,129 @@ class ParkingSessionServiceImplTest {
         assertEquals(LICENSE_PLATE, gateLogCaptor.getValue().getLicensePlate());
     }
 
+    @Test
+    void walkInManual_shouldRejectWrongSlotSize() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.LARGE,
+                true, true, true, true, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectSlotFromDifferentBuilding() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, OTHER_BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectInactiveSlot() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                false, true, true, true, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectInactiveZone() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, false, true, true, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectInactiveFloor() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, false, true, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectInactiveBuilding() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, false, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldRejectMaintenanceSlot() {
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.MAINTENANCE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+
+        AppException exception = assertWalkInManualRejected(slot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void walkInManual_shouldCreateActiveSessionOccupySlotAndLogPlate() {
+        SessionEntryRequest request = walkInManualRequest();
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(vehicleRepository.findByLicensePlate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(slotAssignmentService.assignSpecificSlot(SLOT_ID)).willReturn(slot);
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request);
+
+        assertEquals("ACTIVE", response.getStatus());
+        assertEquals(ParkingSlot.Status.OCCUPIED, slot.getStatus());
+
+        ArgumentCaptor<ParkingSlot> slotCaptor = ArgumentCaptor.forClass(ParkingSlot.class);
+        verify(parkingSlotRepository).save(slotCaptor.capture());
+        assertEquals(ParkingSlot.Status.OCCUPIED, slotCaptor.getValue().getStatus());
+
+        ArgumentCaptor<ParkingSession> sessionCaptor = ArgumentCaptor.forClass(ParkingSession.class);
+        verify(sessionRepository).save(sessionCaptor.capture());
+        ParkingSession savedSession = sessionCaptor.getValue();
+        assertEquals(ParkingSession.EntryMode.WALK_IN_MANUAL, savedSession.getEntryMode());
+        assertEquals(ParkingSession.SessionStatus.ACTIVE, savedSession.getStatus());
+        assertEquals(LICENSE_PLATE, savedSession.getVehicle().getLicensePlate());
+        assertEquals(SLOT_ID, savedSession.getSlot().getId());
+
+        ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
+        verify(gateLogRepository).save(gateLogCaptor.capture());
+        assertEquals(LICENSE_PLATE, gateLogCaptor.getValue().getLicensePlate());
+    }
+
+    private AppException assertWalkInManualRejected(ParkingSlot slot) {
+        SessionEntryRequest request = walkInManualRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(vehicleRepository.findByLicensePlate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(slotAssignmentService.assignSpecificSlot(SLOT_ID)).willReturn(slot);
+        lenient().when(sessionRepository.save(any(ParkingSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request));
+
+        verify(sessionRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+        return exception;
+    }
+
     private void stubSuccessfulWalkInAuto() {
         Vehicle vehicle = vehicle();
         ParkingSlot slot = slot(ParkingSlot.Status.AVAILABLE);
@@ -193,6 +320,13 @@ class ParkingSessionServiceImplTest {
     private SessionEntryRequest walkInAutoRequest() {
         SessionEntryRequest request = entryRequest(ParkingSession.EntryMode.WALK_IN_AUTO.name());
         request.setLicensePlate(LICENSE_PLATE);
+        return request;
+    }
+
+    private SessionEntryRequest walkInManualRequest() {
+        SessionEntryRequest request = entryRequest(ParkingSession.EntryMode.WALK_IN_MANUAL.name());
+        request.setLicensePlate(LICENSE_PLATE);
+        request.setSlotId(SLOT_ID);
         return request;
     }
 
@@ -237,6 +371,46 @@ class ParkingSessionServiceImplTest {
                 .slotCode("A-01")
                 .slotSize(ParkingSlot.SlotSize.MEDIUM)
                 .status(status)
+                .build();
+    }
+
+    private ParkingSlot manualSlot(ParkingSlot.Status status,
+                                   ParkingSlot.SlotSize slotSize,
+                                   boolean slotActive,
+                                   boolean zoneActive,
+                                   boolean floorActive,
+                                   boolean buildingActive,
+                                   Long buildingId) {
+        ParkingBuilding building = ParkingBuilding.builder()
+                .id(buildingId)
+                .isActive(buildingActive)
+                .build();
+        Floor floor = Floor.builder()
+                .id(20L)
+                .building(building)
+                .floorNumber(1)
+                .name("Floor 1")
+                .isActive(floorActive)
+                .build();
+        Zone zone = Zone.builder()
+                .id(30L)
+                .floor(floor)
+                .vehicleType(VehicleType.builder()
+                        .id(10L)
+                        .name("CAR")
+                        .slotSize(VehicleType.SlotSize.MEDIUM)
+                        .build())
+                .name("Zone A")
+                .isActive(zoneActive)
+                .build();
+
+        return ParkingSlot.builder()
+                .id(SLOT_ID)
+                .zone(zone)
+                .slotCode("A-01")
+                .slotSize(slotSize)
+                .status(status)
+                .isActive(slotActive)
                 .build();
     }
 

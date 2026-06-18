@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -160,6 +161,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in manual");
             }
             slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
+            validateManualSlot(slot, vehicle, gate);
         }
 
         slot.setStatus(ParkingSlot.Status.OCCUPIED);
@@ -254,6 +256,49 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     HttpStatus.CONFLICT,
                     "Xe đang có phiên đỗ xe chưa hoàn tất"
             );
+        }
+    }
+
+    private void validateManualSlot(ParkingSlot slot, Vehicle vehicle, Gate gate) {
+        if (slot == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong hop le");
+        }
+        if (!Boolean.TRUE.equals(slot.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong hoat dong");
+        }
+        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong trong");
+        }
+
+        Zone zone = slot.getZone();
+        if (zone == null || !Boolean.TRUE.equals(zone.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Zone cua slot khong hoat dong");
+        }
+
+        Floor floor = zone.getFloor();
+        if (floor == null || !Boolean.TRUE.equals(floor.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Floor cua slot khong hoat dong");
+        }
+
+        ParkingBuilding slotBuilding = floor.getBuilding();
+        if (slotBuilding == null || !Boolean.TRUE.equals(slotBuilding.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Building cua slot khong hoat dong");
+        }
+
+        ParkingBuilding gateBuilding = gate.getBuilding();
+        if (gateBuilding == null || !Objects.equals(slotBuilding.getId(), gateBuilding.getId())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong thuoc building cua gate");
+        }
+
+        VehicleType vehicleType = vehicle.getVehicleType();
+        if (vehicleType == null || vehicleType.getSlotSize() == null || slot.getSlotSize() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Kich co slot khong hop le");
+        }
+
+        ParkingSlot.SlotSize requiredSlotSize = ParkingSlot.SlotSize.valueOf(
+                vehicleType.getSlotSize().name());
+        if (slot.getSlotSize() != requiredSlotSize) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong phu hop voi loai xe");
         }
     }
 
