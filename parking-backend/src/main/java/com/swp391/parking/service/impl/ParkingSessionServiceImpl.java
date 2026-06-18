@@ -40,12 +40,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
-        ParkingSession.EntryMode mode = ParkingSession.EntryMode.valueOf(request.getEntryMode());
+        validateEntryGate(gate);
+        ParkingSession.EntryMode mode = parseEntryMode(request.getEntryMode());
         ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
                 ? processBookingEntry(request, gate)
                 : processWalkInEntry(request, gate, mode);
 
-        saveGateLog(gate, session, request.getLicensePlate(),
+        saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
                 GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
 
         return toResponse(session);
@@ -74,6 +75,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
         }
+
+        ensureNoOpenSession(booking.getVehicle());
 
         booking.setQrUsedAt(LocalDateTime.now());
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
@@ -144,24 +147,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy xe: " + request.getLicensePlate()));
-        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
-                vehicle.getId(),
-                List.of(
-                        ParkingSession.SessionStatus.ACTIVE,
-                        ParkingSession.SessionStatus.WAITING_PAYMENT
-                )
-        );
+        ensureNoOpenSession(vehicle);
 
-        if (hasOpenSession) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "Xe đang có phiên đỗ xe chưa hoàn tất"
-            );
-        }
         ParkingSlot slot;
         if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
             // Tự động tìm slot theo slotSize của loại xe [BR-02]
-            slot = slotAssignmentService.assignBestSlot(null,
+            slot = slotAssignmentService.assignBestSlot(gate.getBuilding().getId(),
                     vehicle.getVehicleType().getSlotSize());
         } else {
             // WALK_IN_MANUAL: staff chỉ định slot
@@ -228,6 +219,42 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return sessionRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy session #" + id));
+    }
+
+    private ParkingSession.EntryMode parseEntryMode(String value) {
+        if (value == null || value.isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "entryMode không hợp lệ");
+        }
+        try {
+            return ParkingSession.EntryMode.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "entryMode không hợp lệ");
+        }
+    }
+
+    private void validateEntryGate(Gate gate) {
+        if (!Boolean.TRUE.equals(gate.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate không hoạt động");
+        }
+        if (gate.getGateType() == Gate.GateType.EXIT) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate EXIT không được dùng cho xe vào");
+        }
+    }
+
+    private void ensureNoOpenSession(Vehicle vehicle) {
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(
+                        ParkingSession.SessionStatus.ACTIVE,
+                        ParkingSession.SessionStatus.WAITING_PAYMENT
+                )
+        );
+        if (hasOpenSession) {
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất"
+            );
+        }
     }
 
     private void saveGateLog(Gate gate, ParkingSession session, String plate,
