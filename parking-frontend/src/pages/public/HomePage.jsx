@@ -13,7 +13,7 @@ export default function HomePage() {
               View Parking Buildings
             </a>
             <a href="/login" className="rounded-2xl border border-border px-5 py-3 text-sm font-medium text-foreground transition hover:bg-muted">
-              Login
+              Sign in
             </a>
           </div>
         </div>
