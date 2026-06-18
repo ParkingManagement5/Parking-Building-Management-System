@@ -192,6 +192,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
+        validateExitGate(gate);
+
         session.setExitGate(gate);
         session.setExitTime(LocalDateTime.now());
         // [BR-09] Chờ BE4 xử lý payment → mới COMPLETED
@@ -240,6 +242,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
         if (gate.getGateType() == Gate.GateType.EXIT) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Gate EXIT không được dùng cho xe vào");
+        }
+    }
+
+    private void validateExitGate(Gate gate) {
+        if (!Boolean.TRUE.equals(gate.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate không hoạt động");
+        }
+        if (gate.getGateType() == Gate.GateType.ENTRY) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate ENTRY không được dùng cho xe ra");
         }
     }
 
