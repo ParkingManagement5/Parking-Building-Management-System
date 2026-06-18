@@ -55,7 +55,7 @@ export default function MainPublicNavbar() {
             Sign in
           </button>
           <button type="button" onClick={() => navigate("/register")} className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-            Get started
+            Register
           </button>
         </div>
       </div>

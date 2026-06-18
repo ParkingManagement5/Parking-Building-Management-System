@@ -5,7 +5,6 @@ import {
   CarFront,
   Eye,
   EyeOff,
-  KeyRound,
   LockKeyhole,
   ShieldCheck,
   UserRound,
@@ -251,7 +250,7 @@ export default function LoginPage() {
             </div>
 
             <div className="mb-8">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">Sign In</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">Sign in</p>
               <h1 className="text-5xl font-bold leading-[1.02] tracking-[-0.035em] text-slate-950 dark:text-white xl:text-6xl">Welcome Back</h1>
             </div>
 
@@ -316,7 +315,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="h-14 w-full rounded-2xl border border-transparent bg-gradient-to-r from-[#2563eb] to-[#4f46e5] text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition-all duration-200 hover:from-[#1d4ed8] hover:to-[#4338ca] hover:shadow-[0_16px_36px_rgba(37,99,235,0.32)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-500"
               >
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? "Signing in..." : "Sign in"}
               </button>
             </form>
 
@@ -329,7 +328,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <SocialButton
                 icon={
                   <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -342,7 +341,6 @@ export default function LoginPage() {
               >
                 Google
               </SocialButton>
-              <SocialButton icon={<KeyRound size={18} className="opacity-70" />}>SSO</SocialButton>
             </div>
 
             <div className="mt-6 text-center">
