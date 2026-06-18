@@ -390,6 +390,102 @@ class ParkingSessionServiceImplTest {
         assertEquals(GateLog.EventType.EXIT, gateLog.getEventType());
     }
 
+    @Test
+    void completeSessionAfterPayment_shouldCompleteWaitingPaymentSession() {
+        ParkingSession session = waitingPaymentSession();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        SessionResponse response = sessionService.completeSessionAfterPayment(SESSION_ID);
+
+        assertEquals(ParkingSession.SessionStatus.COMPLETED, session.getStatus());
+        assertEquals("COMPLETED", response.getStatus());
+        verify(sessionRepository).save(session);
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldReleaseOccupiedSlot() {
+        ParkingSession session = waitingPaymentSession();
+        ParkingSlot slot = session.getSlot();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        sessionService.completeSessionAfterPayment(SESSION_ID);
+
+        assertEquals(ParkingSlot.Status.AVAILABLE, slot.getStatus());
+        verify(parkingSlotRepository).save(slot);
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldCompleteLinkedBooking() {
+        ParkingSession session = waitingPaymentSessionWithBooking();
+        Booking booking = session.getBooking();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        sessionService.completeSessionAfterPayment(SESSION_ID);
+
+        assertEquals(Booking.BookingStatus.COMPLETED, booking.getStatus());
+        verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldAllowWalkInWithoutBooking() {
+        ParkingSession session = waitingPaymentSession();
+        session.setBooking(null);
+        ParkingSlot slot = session.getSlot();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        sessionService.completeSessionAfterPayment(SESSION_ID);
+
+        assertEquals(ParkingSession.SessionStatus.COMPLETED, session.getStatus());
+        assertEquals(ParkingSlot.Status.AVAILABLE, slot.getStatus());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldRejectSessionNotWaitingPayment() {
+        ParkingSession session = activeSession();
+        ParkingSlot slot = session.getSlot();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.completeSessionAfterPayment(SESSION_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertEquals(ParkingSession.SessionStatus.ACTIVE, session.getStatus());
+        assertEquals(ParkingSlot.Status.OCCUPIED, slot.getStatus());
+        verify(sessionRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldRejectMissingSlot() {
+        ParkingSession session = waitingPaymentSession();
+        session.setSlot(null);
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.completeSessionAfterPayment(SESSION_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertEquals(ParkingSession.SessionStatus.WAITING_PAYMENT, session.getStatus());
+        verify(sessionRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void completeSessionAfterPayment_shouldRejectMissingSession() {
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.completeSessionAfterPayment(SESSION_ID));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        verify(sessionRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
     private AppException assertWalkInManualRejected(ParkingSlot slot) {
         SessionEntryRequest request = walkInManualRequest();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
@@ -479,6 +575,29 @@ class ParkingSessionServiceImplTest {
                 .entryGate(gate(Gate.GateType.ENTRY, true))
                 .entryMode(ParkingSession.EntryMode.WALK_IN_MANUAL)
                 .status(ParkingSession.SessionStatus.ACTIVE)
+                .build();
+    }
+
+    private ParkingSession waitingPaymentSession() {
+        ParkingSession session = activeSession();
+        session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
+        return session;
+    }
+
+    private ParkingSession waitingPaymentSessionWithBooking() {
+        ParkingSession session = waitingPaymentSession();
+        session.setEntryMode(ParkingSession.EntryMode.BOOKING);
+        session.setBooking(checkedInBooking());
+        return session;
+    }
+
+    private Booking checkedInBooking() {
+        return Booking.builder()
+                .id(BOOKING_ID)
+                .userId(USER_ID)
+                .vehicle(vehicle())
+                .slot(slot(ParkingSlot.Status.OCCUPIED))
+                .status(Booking.BookingStatus.CHECKED_IN)
                 .build();
     }
 
