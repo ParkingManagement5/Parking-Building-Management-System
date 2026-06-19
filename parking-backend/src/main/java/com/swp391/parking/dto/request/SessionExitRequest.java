@@ -10,6 +10,4 @@ public class SessionExitRequest {
 
     @NotNull(message = "paymentMethod không được để trống")
     private String paymentMethod; // CASH / MOCK / VNPAY
-
-    private Long staffUserId;
 }

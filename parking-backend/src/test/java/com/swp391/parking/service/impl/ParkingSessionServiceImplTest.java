@@ -60,10 +60,12 @@ class ParkingSessionServiceImplTest {
     private static final Long BOOKING_ID = 5L;
     private static final Long USER_ID = 6L;
     private static final Long OTHER_USER_ID = 66L;
+    private static final Long ACTOR_USER_ID = 77L;
     private static final Long SESSION_ID = 7L;
     private static final Long OTHER_BUILDING_ID = 99L;
     private static final String LICENSE_PLATE = "51A-12345";
     private static final String QR_TOKEN = "qr-token";
+    private static final String AUTH_USERNAME = "staff";
 
     @Mock
     private ParkingSessionRepository sessionRepository;
@@ -103,7 +105,7 @@ class ParkingSessionServiceImplTest {
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processEntry(request));
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         verify(sessionRepository, never()).save(any());
@@ -116,7 +118,7 @@ class ParkingSessionServiceImplTest {
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, false)));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processEntry(request));
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         verify(sessionRepository, never()).save(any());
@@ -129,7 +131,7 @@ class ParkingSessionServiceImplTest {
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.EXIT, true)));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processEntry(request));
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         verify(sessionRepository, never()).save(any());
@@ -144,11 +146,12 @@ class ParkingSessionServiceImplTest {
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
         given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
         given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         lenient().when(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .thenReturn(true);
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processEntry(request));
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatus());
         verify(sessionRepository, never()).save(any());
@@ -159,9 +162,10 @@ class ParkingSessionServiceImplTest {
     void walkInAuto_shouldAssignBestSlotByGateBuildingId() {
         SessionEntryRequest request = walkInAutoRequest();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         stubSuccessfulWalkInAuto();
 
-        sessionService.processEntry(request);
+        sessionService.processEntry(request, AUTH_USERNAME);
 
         verify(slotAssignmentService).assignBestSlot(BUILDING_ID, VehicleType.SlotSize.MEDIUM);
     }
@@ -174,15 +178,69 @@ class ParkingSessionServiceImplTest {
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
         given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
         given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(confirmedBooking()));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         lenient().when(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .thenReturn(false);
         given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        sessionService.processEntry(request);
+        sessionService.processEntry(request, AUTH_USERNAME);
 
         ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
         verify(gateLogRepository).save(gateLogCaptor.capture());
         assertEquals(LICENSE_PLATE, gateLogCaptor.getValue().getLicensePlate());
+    }
+
+    @Test
+    void processBookingEntry_shouldUseAuthenticatedActorForGateLog() {
+        SessionEntryRequest request = bookingRequest();
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(confirmedBooking()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
+        verify(gateLogRepository).save(gateLogCaptor.capture());
+        assertEquals(ACTOR_USER_ID, gateLogCaptor.getValue().getStaffUserId());
+    }
+
+    @Test
+    void processWalkInAuto_shouldUseAuthenticatedActorForGateLog() {
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        stubSuccessfulWalkInAuto();
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
+        verify(gateLogRepository).save(gateLogCaptor.capture());
+        assertEquals(ACTOR_USER_ID, gateLogCaptor.getValue().getStaffUserId());
+    }
+
+    @Test
+    void processWalkInManual_shouldUseAuthenticatedActorForGateLog() {
+        SessionEntryRequest request = walkInManualRequest();
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(slotAssignmentService.assignSpecificSlot(SLOT_ID)).willReturn(slot);
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
+        verify(gateLogRepository).save(gateLogCaptor.capture());
+        assertEquals(ACTOR_USER_ID, gateLogCaptor.getValue().getStaffUserId());
     }
 
     @Test
@@ -261,13 +319,14 @@ class ParkingSessionServiceImplTest {
         ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
                 true, true, true, true, BUILDING_ID);
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         given(vehicleRepository.findByLicensePlate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
         given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .willReturn(false);
         given(slotAssignmentService.assignSpecificSlot(SLOT_ID)).willReturn(slot);
         given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        SessionResponse response = sessionService.processEntry(request);
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
 
         assertEquals("ACTIVE", response.getStatus());
         assertEquals(ParkingSlot.Status.OCCUPIED, slot.getStatus());
@@ -300,7 +359,7 @@ class ParkingSessionServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processExit(SESSION_ID, request));
+                () -> sessionService.processExit(SESSION_ID, request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         assertEquals(ParkingSession.SessionStatus.ACTIVE, session.getStatus());
@@ -319,7 +378,7 @@ class ParkingSessionServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processExit(SESSION_ID, request));
+                () -> sessionService.processExit(SESSION_ID, request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         assertEquals(ParkingSession.SessionStatus.ACTIVE, session.getStatus());
@@ -336,7 +395,7 @@ class ParkingSessionServiceImplTest {
         given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processExit(SESSION_ID, request));
+                () -> sessionService.processExit(SESSION_ID, request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         assertEquals(ParkingSession.SessionStatus.WAITING_PAYMENT, session.getStatus());
@@ -356,7 +415,7 @@ class ParkingSessionServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processExit(SESSION_ID, request));
+                () -> sessionService.processExit(SESSION_ID, request, AUTH_USERNAME));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         assertEquals(ParkingSession.SessionStatus.ACTIVE, session.getStatus());
@@ -373,9 +432,10 @@ class ParkingSessionServiceImplTest {
         Gate exitGate = gate(Gate.GateType.EXIT, true);
         given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(exitGate));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        SessionResponse response = sessionService.processExit(SESSION_ID, request);
+        SessionResponse response = sessionService.processExit(SESSION_ID, request, AUTH_USERNAME);
 
         assertEquals("WAITING_PAYMENT", response.getStatus());
         assertEquals(ParkingSession.SessionStatus.WAITING_PAYMENT, session.getStatus());
@@ -394,6 +454,59 @@ class ParkingSessionServiceImplTest {
         assertEquals(exitGate, gateLog.getGate());
         assertEquals(LICENSE_PLATE, gateLog.getLicensePlate());
         assertEquals(GateLog.EventType.EXIT, gateLog.getEventType());
+    }
+
+    @Test
+    void processExit_shouldUseAuthenticatedActorForGateLog() {
+        SessionExitRequest request = exitRequest("CASH");
+        ParkingSession session = activeSession();
+        Gate exitGate = gate(Gate.GateType.EXIT, true);
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(exitGate));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processExit(SESSION_ID, request, AUTH_USERNAME);
+
+        ArgumentCaptor<GateLog> gateLogCaptor = ArgumentCaptor.forClass(GateLog.class);
+        verify(gateLogRepository).save(gateLogCaptor.capture());
+        assertEquals(ACTOR_USER_ID, gateLogCaptor.getValue().getStaffUserId());
+    }
+
+    @Test
+    void processEntry_shouldRejectWhenAuthenticatedUserNotFound() {
+        SessionEntryRequest request = bookingRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        verify(bookingRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processExit_shouldRejectWhenAuthenticatedUserNotFound() {
+        SessionExitRequest request = exitRequest("CASH");
+        ParkingSession session = activeSession();
+        ParkingSlot slot = session.getSlot();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.EXIT, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processExit(SESSION_ID, request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals(ParkingSession.SessionStatus.ACTIVE, session.getStatus());
+        assertEquals(ParkingSlot.Status.OCCUPIED, slot.getStatus());
+        verify(sessionRepository, never()).save(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
     }
 
     @Test
@@ -555,6 +668,7 @@ class ParkingSessionServiceImplTest {
     private AppException assertWalkInManualRejected(ParkingSlot slot) {
         SessionEntryRequest request = walkInManualRequest();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
         given(vehicleRepository.findByLicensePlate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
         given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .willReturn(false);
@@ -563,7 +677,7 @@ class ParkingSessionServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         AppException exception = assertThrows(AppException.class,
-                () -> sessionService.processEntry(request));
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
 
         verify(sessionRepository, never()).save(any());
         verify(parkingSlotRepository, never()).save(any());
@@ -612,7 +726,6 @@ class ParkingSessionServiceImplTest {
         SessionExitRequest request = new SessionExitRequest();
         request.setGateId(GATE_ID);
         request.setPaymentMethod(paymentMethod);
-        request.setStaffUserId(USER_ID);
         return request;
     }
 
@@ -681,9 +794,13 @@ class ParkingSessionServiceImplTest {
     }
 
     private User user(Long userId) {
+        return user(userId, "driver");
+    }
+
+    private User user(Long userId, String username) {
         return User.builder()
                 .userId(userId.intValue())
-                .username("driver")
+                .username(username)
                 .fullName("Driver User")
                 .email("driver@example.com")
                 .passwordHash("hash")

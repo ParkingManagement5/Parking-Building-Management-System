@@ -16,5 +16,4 @@ public class SessionEntryRequest {
     private String entryMode;     // BOOKING / WALK_IN_AUTO / WALK_IN_MANUAL
 
     private Long slotId;          // walk-in: staff chọn slot
-    private Long staffUserId;     // null nếu fully auto
 }

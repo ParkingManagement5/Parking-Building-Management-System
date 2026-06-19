@@ -36,9 +36,10 @@ public class ParkingSessionController {
     @Operation(summary = "Xe vào cổng",
             description = "entryMode: BOOKING (truyền qrToken) | WALK_IN_AUTO | WALK_IN_MANUAL (truyền licensePlate + slotId)")
     public ResponseEntity<ApiResponse<SessionResponse>> entry(
-            @Valid @RequestBody SessionEntryRequest request) {
+            @Valid @RequestBody SessionEntryRequest request,
+            @AuthenticationPrincipal UserDetails ud) {
         return ResponseEntity.ok(ApiResponse.success("Xe đã vào bãi",
-                sessionService.processEntry(request)));
+                sessionService.processEntry(request, ud.getUsername())));
     }
 
     @PostMapping("/{id}/exit")
@@ -47,9 +48,10 @@ public class ParkingSessionController {
             description = "Session → WAITING_PAYMENT. BE4 xử lý payment sau.")
     public ResponseEntity<ApiResponse<SessionResponse>> exit(
             @PathVariable Long id,
-            @Valid @RequestBody SessionExitRequest request) {
+            @Valid @RequestBody SessionExitRequest request,
+            @AuthenticationPrincipal UserDetails ud) {
         return ResponseEntity.ok(ApiResponse.success("Xe đang chờ thanh toán",
-                sessionService.processExit(id, request)));
+                sessionService.processExit(id, request, ud.getUsername())));
     }
 
     @GetMapping("/{id}")
