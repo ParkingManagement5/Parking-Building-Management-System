@@ -32,6 +32,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final ParkingSlotRepository parkingSlotRepository;
     private final GateRepository gateRepository;
     private final VehicleRepository vehicleRepository;
+    private final UserRepository userRepository;
     private final QrTokenUtil qrTokenUtil;
     private final SlotAssignmentService slotAssignmentService;
 
@@ -239,6 +240,20 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     @Override
     public SessionResponse getSession(Long sessionId) {
         return toResponse(getSessionEntity(sessionId));
+    }
+
+    @Override
+    public SessionResponse getOwnedSession(Long sessionId, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy session #" + sessionId));
+        ParkingSession session = getSessionEntity(sessionId);
+        Vehicle vehicle = session.getVehicle();
+        if (vehicle == null || !Objects.equals(vehicle.getUserId(), user.getUserId().longValue())) {
+            throw new AppException(HttpStatus.NOT_FOUND,
+                    "Không tìm thấy session #" + sessionId);
+        }
+        return toResponse(session);
     }
 
     @Override

@@ -55,8 +55,17 @@ public class ParkingSessionController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Xem chi tiết session")
-    public ResponseEntity<ApiResponse<SessionResponse>> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(sessionService.getSession(id)));
+    public ResponseEntity<ApiResponse<SessionResponse>> getOne(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails ud) {
+        boolean privileged = ud.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_STAFF")
+                        || authority.getAuthority().equals("ROLE_MANAGER")
+                        || authority.getAuthority().equals("ROLE_ADMIN"));
+        SessionResponse response = privileged
+                ? sessionService.getSession(id)
+                : sessionService.getOwnedSession(id, ud.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/my")

@@ -10,6 +10,7 @@ import com.swp391.parking.entity.GateLog;
 import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.entity.User;
 import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.entity.Zone;
@@ -19,6 +20,7 @@ import com.swp391.parking.repository.GateLogRepository;
 import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.util.QrTokenUtil;
 import io.jsonwebtoken.Claims;
@@ -57,6 +59,7 @@ class ParkingSessionServiceImplTest {
     private static final Long SLOT_ID = 4L;
     private static final Long BOOKING_ID = 5L;
     private static final Long USER_ID = 6L;
+    private static final Long OTHER_USER_ID = 66L;
     private static final Long SESSION_ID = 7L;
     private static final Long OTHER_BUILDING_ID = 99L;
     private static final String LICENSE_PLATE = "51A-12345";
@@ -79,6 +82,9 @@ class ParkingSessionServiceImplTest {
 
     @Mock
     private VehicleRepository vehicleRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private QrTokenUtil qrTokenUtil;
@@ -486,6 +492,66 @@ class ParkingSessionServiceImplTest {
         verify(bookingRepository, never()).save(any());
     }
 
+    @Test
+    void getOwnedSession_shouldReturnSessionWhenDriverOwnsVehicle() {
+        ParkingSession session = activeSession();
+        given(userRepository.findByUsername("driver")).willReturn(Optional.of(user(USER_ID)));
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        SessionResponse response = sessionService.getOwnedSession(SESSION_ID, "driver");
+
+        assertEquals(SESSION_ID, response.getSessionId());
+        assertEquals(USER_ID, response.getUserId());
+        assertEquals(VEHICLE_ID, response.getVehicleId());
+    }
+
+    @Test
+    void getOwnedSession_shouldReturnNotFoundWhenSessionBelongsToAnotherDriver() {
+        ParkingSession session = activeSession();
+        session.getVehicle().setUserId(OTHER_USER_ID);
+        session.setUserId(OTHER_USER_ID);
+        given(userRepository.findByUsername("driver")).willReturn(Optional.of(user(USER_ID)));
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.getOwnedSession(SESSION_ID, "driver"));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void getOwnedSession_shouldReturnNotFoundWhenSessionDoesNotExist() {
+        given(userRepository.findByUsername("driver")).willReturn(Optional.of(user(USER_ID)));
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.getOwnedSession(SESSION_ID, "driver"));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void getOwnedSession_shouldReturnNotFoundWhenAuthenticatedUserDoesNotExist() {
+        given(userRepository.findByUsername("missing-driver")).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.getOwnedSession(SESSION_ID, "missing-driver"));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        verify(sessionRepository, never()).findById(any());
+    }
+
+    @Test
+    void getSession_shouldReturnSessionForPrivilegedPath() {
+        ParkingSession session = activeSession();
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+
+        SessionResponse response = sessionService.getSession(SESSION_ID);
+
+        assertEquals(SESSION_ID, response.getSessionId());
+        assertEquals(USER_ID, response.getUserId());
+    }
+
     private AppException assertWalkInManualRejected(ParkingSlot slot) {
         SessionEntryRequest request = walkInManualRequest();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
@@ -611,6 +677,17 @@ class ParkingSessionServiceImplTest {
                         .name("CAR")
                         .slotSize(VehicleType.SlotSize.MEDIUM)
                         .build())
+                .build();
+    }
+
+    private User user(Long userId) {
+        return User.builder()
+                .userId(userId.intValue())
+                .username("driver")
+                .fullName("Driver User")
+                .email("driver@example.com")
+                .passwordHash("hash")
+                .status(User.UserStatus.ACTIVE)
                 .build();
     }
 
