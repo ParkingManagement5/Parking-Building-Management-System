@@ -12,6 +12,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,6 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final QrTokenUtil qrTokenUtil;
-    private final SlotAssignmentService slotAssignmentService;
 
     @Override
     @Transactional
@@ -80,13 +80,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
 
         ensureNoOpenSession(booking.getVehicle());
+        ParkingSlot slot = lockBookingSlot(booking);
 
         booking.setQrUsedAt(LocalDateTime.now());
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
         bookingRepository.save(booking);
 
-        // Slot → OCCUPIED
-        ParkingSlot slot = booking.getSlot();
         slot.setStatus(ParkingSlot.Status.OCCUPIED);
         parkingSlotRepository.save(slot);
 
@@ -154,15 +153,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         ParkingSlot slot;
         if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
-            // Tự động tìm slot theo slotSize của loại xe [BR-02]
-            slot = slotAssignmentService.assignBestSlot(gate.getBuilding().getId(),
-                    vehicle.getVehicleType().getSlotSize());
+            slot = lockBestAvailableSlot(gate.getBuilding().getId(), vehicle.getVehicleType().getSlotSize());
         } else {
             // WALK_IN_MANUAL: staff chỉ định slot
             if (request.getSlotId() == null) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in manual");
             }
-            slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
+            slot = parkingSlotRepository.findByIdForUpdate(request.getSlotId())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                            "Không tìm thấy slot #" + request.getSlotId()));
             validateManualSlot(slot, vehicle, gate);
         }
 
@@ -307,6 +306,32 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .longValue();
     }
 
+    private ParkingSlot lockBookingSlot(Booking booking) {
+        ParkingSlot bookingSlot = booking.getSlot();
+        if (bookingSlot == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không có slot");
+        }
+        ParkingSlot slot = parkingSlotRepository.findByIdForUpdate(bookingSlot.getId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy slot #" + bookingSlot.getId()));
+        if (slot.getStatus() != ParkingSlot.Status.RESERVED) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Slot " + slot.getSlotCode() + " không còn RESERVED");
+        }
+        return slot;
+    }
+
+    private ParkingSlot lockBestAvailableSlot(Long buildingId, VehicleType.SlotSize slotSize) {
+        ParkingSlot.SlotSize targetSize = ParkingSlot.SlotSize.valueOf(slotSize.name());
+        return parkingSlotRepository.findFirstAvailableByBuildingAndSlotSizeForUpdate(
+                        buildingId, targetSize, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new AppException(HttpStatus.CONFLICT,
+                        "Không còn slot trống cho kích cỡ " + slotSize
+                                + " tại tòa nhà #" + buildingId));
+    }
+
     private void ensureNoOpenSession(Vehicle vehicle) {
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 vehicle.getId(),
@@ -330,8 +355,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         if (!Boolean.TRUE.equals(slot.getIsActive())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong hoat dong");
         }
-        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+        if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Slot khong trong");
+        }
+        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+            throw new AppException(HttpStatus.CONFLICT, "Slot khong trong");
         }
 
         Zone zone = slot.getZone();
