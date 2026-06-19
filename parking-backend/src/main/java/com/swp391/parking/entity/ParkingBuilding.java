@@ -44,6 +44,10 @@ public class ParkingBuilding extends BaseEntity {
     private LocalTime closeTime;
 
     @Builder.Default
+    @Column(name = "is_24_hours", nullable = false)
+    private Boolean is24Hours = false;
+
+    @Builder.Default
     @Transient
     private Status status = Status.ACTIVE;
 

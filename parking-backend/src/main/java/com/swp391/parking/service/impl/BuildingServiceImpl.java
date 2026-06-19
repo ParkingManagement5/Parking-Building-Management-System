@@ -47,10 +47,8 @@ public class BuildingServiceImpl implements BuildingService {
                 "Toa nha '" + req.getName() + "' da ton tai");
         }
 
-        if (!req.getCloseTime().isAfter(req.getOpenTime())) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                "Gio dong cua phai sau gio mo cua");
-        }
+        boolean is24Hours = resolveCreateIs24Hours(req);
+        validateOperatingHours(req, is24Hours);
 
         ParkingBuilding building = ParkingBuilding.builder()
             .name(req.getName())
@@ -60,6 +58,7 @@ public class BuildingServiceImpl implements BuildingService {
             .description(req.getDescription())
             .openTime(req.getOpenTime())
             .closeTime(req.getCloseTime())
+            .is24Hours(is24Hours)
             .status(req.getStatus() != null ? req.getStatus() : Status.ACTIVE)
             .isActive(true)
             .build();
@@ -78,10 +77,8 @@ public class BuildingServiceImpl implements BuildingService {
                 "Toa nha '" + req.getName() + "' da ton tai");
         }
 
-        if (!req.getCloseTime().isAfter(req.getOpenTime())) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                "Gio dong cua phai sau gio mo cua");
-        }
+        boolean targetIs24Hours = resolveUpdateIs24Hours(req, building);
+        validateOperatingHours(req, targetIs24Hours);
 
         building.setName(req.getName());
         building.setAddress(req.getAddress());
@@ -90,6 +87,7 @@ public class BuildingServiceImpl implements BuildingService {
         building.setDescription(req.getDescription());
         building.setOpenTime(req.getOpenTime());
         building.setCloseTime(req.getCloseTime());
+        building.setIs24Hours(targetIs24Hours);
         if (req.getStatus() != null) {
             building.setStatus(req.getStatus());
         }
@@ -113,5 +111,27 @@ public class BuildingServiceImpl implements BuildingService {
 
         floorRepo.deleteAllInBatch(floors);
         buildingRepo.delete(building);
+    }
+
+    private void validateOperatingHours(BuildingRequest req, boolean is24Hours) {
+        if (req.getOpenTime() == null || req.getCloseTime() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                "Gio mo cua va gio dong cua khong duoc de trong");
+        }
+
+        if (!is24Hours && req.getOpenTime().equals(req.getCloseTime())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                "Gio dong cua phai khac gio mo cua");
+        }
+    }
+
+    private boolean resolveCreateIs24Hours(BuildingRequest req) {
+        return Boolean.TRUE.equals(req.getIs24Hours());
+    }
+
+    private boolean resolveUpdateIs24Hours(BuildingRequest req, ParkingBuilding building) {
+        return req.getIs24Hours() != null
+            ? req.getIs24Hours()
+            : Boolean.TRUE.equals(building.getIs24Hours());
     }
 }

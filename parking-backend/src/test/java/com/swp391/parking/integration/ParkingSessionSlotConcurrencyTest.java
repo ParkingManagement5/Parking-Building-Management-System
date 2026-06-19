@@ -29,10 +29,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -45,10 +51,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class ParkingSessionSlotConcurrencyTest {
+
+    private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final LocalDate TEST_DATE = LocalDate.of(2026, 6, 19);
 
     @Autowired
     private ParkingSessionService sessionService;
@@ -72,10 +82,13 @@ class ParkingSessionSlotConcurrencyTest {
     private ParkingSessionRepository sessionRepository;
     @Autowired
     private GateLogRepository gateLogRepository;
+    @MockBean
+    private Clock clock;
 
     @BeforeEach
     void cleanDatabase() {
         cleanup();
+        setCurrentTime(LocalTime.NOON);
     }
 
     @AfterEach
@@ -330,6 +343,12 @@ class ParkingSessionSlotConcurrencyTest {
                 .passwordHash("hash")
                 .status(User.UserStatus.ACTIVE)
                 .build());
+    }
+
+    private void setCurrentTime(LocalTime time) {
+        Instant instant = LocalDateTime.of(TEST_DATE, time).atZone(TEST_ZONE).toInstant();
+        when(clock.getZone()).thenReturn(TEST_ZONE);
+        when(clock.instant()).thenReturn(instant);
     }
 
     private record TestFacility(VehicleType vehicleType, Gate gate, List<ParkingSlot> slots) {

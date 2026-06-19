@@ -17,6 +17,7 @@ CREATE TABLE `parking_building` (
     `description` text,
     `open_time` time NOT NULL,
     `close_time` time NOT NULL,
+    `is_24_hours` BIT NOT NULL DEFAULT 0,
     `is_active` boolean NOT NULL DEFAULT true,
     `created_at` datetime NOT NULL,
     `updated_at` datetime
@@ -406,7 +407,7 @@ INSERT INTO `user_role` (`user_id`, `role_id`) VALUES
 
 -- 5. Parking Building
 INSERT INTO `parking_building`
-(`name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `is_active`, `created_at`, `updated_at`) VALUES
+(`name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `is_24_hours`, `is_active`, `created_at`, `updated_at`) VALUES
 ('Bãi xe FPT HCM',
  'Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP.HCM',
  '0900000010',
@@ -414,6 +415,7 @@ INSERT INTO `parking_building`
  'Bãi đỗ xe trong khuôn viên FPT HCM',
  '06:00:00',
  '22:00:00',
+ 0,
  true,
  NOW(),
  NOW());
