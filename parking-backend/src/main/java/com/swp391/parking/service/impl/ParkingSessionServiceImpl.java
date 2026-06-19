@@ -79,7 +79,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
         }
 
-        ensureNoOpenSession(booking.getVehicle());
+        Vehicle vehicle = lockVehicle(booking.getVehicle());
+        ensureNoOpenSession(vehicle);
         ParkingSlot slot = lockBookingSlot(booking);
 
         booking.setQrUsedAt(LocalDateTime.now());
@@ -93,7 +94,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .booking(booking)
                 .slot(slot)
                 .userId(booking.getUserId())
-                .vehicle(booking.getVehicle())
+                .vehicle(vehicle)
                 .entryGate(gate)
                 .entryTime(LocalDateTime.now())
                 .entryMode(ParkingSession.EntryMode.BOOKING)
@@ -146,7 +147,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
         }
 
-        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
+        Vehicle vehicle = vehicleRepository.findByLicensePlateForUpdate(request.getLicensePlate())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy xe: " + request.getLicensePlate()));
         ensureNoOpenSession(vehicle);
@@ -319,6 +320,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     "Slot " + slot.getSlotCode() + " không còn RESERVED");
         }
         return slot;
+    }
+
+    private Vehicle lockVehicle(Vehicle vehicle) {
+        if (vehicle == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không có xe");
+        }
+        return vehicleRepository.findByIdForUpdate(vehicle.getId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy xe #" + vehicle.getId()));
     }
 
     private ParkingSlot lockBestAvailableSlot(Long buildingId, VehicleType.SlotSize slotSize) {
