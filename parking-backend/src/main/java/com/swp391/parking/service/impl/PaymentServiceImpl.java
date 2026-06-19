@@ -8,6 +8,7 @@ import com.swp391.parking.entity.Payment.PaymentType;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.PaymentRepository;
 import com.swp391.parking.service.BookingService;
+import com.swp391.parking.service.ParkingSessionService;
 import com.swp391.parking.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final BookingService bookingService;
+    private final ParkingSessionService parkingSessionService;
 
     @Override
     @Transactional
@@ -113,6 +115,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
         }
+        if (payment.getSessionId() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Parking fee payment must have sessionId");
+        }
+
+        parkingSessionService.completeSessionAfterPayment(payment.getSessionId().longValue());
 
         payment.setPaymentStatus(PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
