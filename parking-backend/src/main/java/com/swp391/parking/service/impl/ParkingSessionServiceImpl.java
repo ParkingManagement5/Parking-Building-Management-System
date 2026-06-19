@@ -85,7 +85,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         Vehicle vehicle = lockVehicle(booking.getVehicle());
         ensureNoOpenSession(vehicle);
-        ParkingSlot slot = lockBookingSlot(booking);
+        ParkingSlot slot = lockBookingSlot(booking, vehicle, gate);
 
         booking.setQrUsedAt(LocalDateTime.now());
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
@@ -337,7 +337,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .longValue();
     }
 
-    private ParkingSlot lockBookingSlot(Booking booking) {
+    private ParkingSlot lockBookingSlot(Booking booking, Vehicle vehicle, Gate gate) {
         ParkingSlot bookingSlot = booking.getSlot();
         if (bookingSlot == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không có slot");
@@ -349,7 +349,50 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.CONFLICT,
                     "Slot " + slot.getSlotCode() + " không còn RESERVED");
         }
+        validateReservedBookingSlot(slot, bookingSlot, vehicle, gate);
         return slot;
+    }
+
+    private void validateReservedBookingSlot(ParkingSlot slot, ParkingSlot bookingSlot, Vehicle vehicle, Gate gate) {
+        if (!Objects.equals(slot.getId(), bookingSlot.getId())) {
+            throw new AppException(HttpStatus.CONFLICT, "Reserved parking slot is no longer valid");
+        }
+        if (!Boolean.TRUE.equals(slot.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reserved parking slot is no longer valid");
+        }
+
+        Zone zone = slot.getZone();
+        if (zone == null || !Boolean.TRUE.equals(zone.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reserved parking slot is no longer valid");
+        }
+
+        Floor floor = zone.getFloor();
+        if (floor == null || !Boolean.TRUE.equals(floor.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reserved parking slot is no longer valid");
+        }
+
+        ParkingBuilding slotBuilding = floor.getBuilding();
+        if (slotBuilding == null || !Boolean.TRUE.equals(slotBuilding.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reserved parking slot is no longer valid");
+        }
+
+        ParkingBuilding gateBuilding = gate.getBuilding();
+        if (gateBuilding == null || !Objects.equals(slotBuilding.getId(), gateBuilding.getId())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Reserved parking slot belongs to another building");
+        }
+
+        VehicleType vehicleType = vehicle.getVehicleType();
+        if (vehicleType == null || vehicleType.getSlotSize() == null || slot.getSlotSize() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Reserved parking slot is incompatible with the vehicle");
+        }
+
+        ParkingSlot.SlotSize requiredSlotSize = ParkingSlot.SlotSize.valueOf(vehicleType.getSlotSize().name());
+        if (slot.getSlotSize() != requiredSlotSize) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Reserved parking slot is incompatible with the vehicle");
+        }
     }
 
     private Vehicle lockVehicle(Vehicle vehicle) {
