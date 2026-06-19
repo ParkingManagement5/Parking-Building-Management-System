@@ -10,5 +10,6 @@ public interface ParkingSessionService {
     SessionResponse processExit(Long sessionId, SessionExitRequest request);
     SessionResponse completeSessionAfterPayment(Long sessionId);
     SessionResponse getSession(Long sessionId);
+    SessionResponse getOwnedSession(Long sessionId, String username);
     List<SessionResponse> getMySessions(Long currentUserId);
 }
