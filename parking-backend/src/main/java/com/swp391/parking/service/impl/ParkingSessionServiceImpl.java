@@ -38,18 +38,19 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
     @Override
     @Transactional
-    public SessionResponse processEntry(SessionEntryRequest request) {
+    public SessionResponse processEntry(SessionEntryRequest request, String authenticatedUsername) {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
         validateEntryGate(gate);
         ParkingSession.EntryMode mode = parseEntryMode(request.getEntryMode());
+        Long actorUserId = resolveActorUserId(authenticatedUsername);
         ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
                 ? processBookingEntry(request, gate)
                 : processWalkInEntry(request, gate, mode);
 
         saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
-                GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
+                GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, actorUserId);
 
         return toResponse(session);
     }
@@ -183,7 +184,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
     @Override
     @Transactional
-    public SessionResponse processExit(Long sessionId, SessionExitRequest request) {
+    public SessionResponse processExit(Long sessionId, SessionExitRequest request, String authenticatedUsername) {
         ParkingSession session = getSessionEntity(sessionId);
         if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -194,6 +195,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
         validateExitGate(gate);
+        Long actorUserId = resolveActorUserId(authenticatedUsername);
 
         session.setExitGate(gate);
         session.setExitTime(LocalDateTime.now());
@@ -202,7 +204,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         session = sessionRepository.save(session);
 
         saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
-                GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, request.getStaffUserId());
+                GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, actorUserId);
 
         log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
         return toResponse(session);
@@ -296,6 +298,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         if (gate.getGateType() == Gate.GateType.ENTRY) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Gate ENTRY không được dùng cho xe ra");
         }
+    }
+
+    private Long resolveActorUserId(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy user thao tác"))
+                .getUserId()
+                .longValue();
     }
 
     private void ensureNoOpenSession(Vehicle vehicle) {

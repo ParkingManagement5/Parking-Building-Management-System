@@ -6,8 +6,8 @@ import com.swp391.parking.dto.response.SessionResponse;
 import java.util.List;
 
 public interface ParkingSessionService {
-    SessionResponse processEntry(SessionEntryRequest request);
-    SessionResponse processExit(Long sessionId, SessionExitRequest request);
+    SessionResponse processEntry(SessionEntryRequest request, String authenticatedUsername);
+    SessionResponse processExit(Long sessionId, SessionExitRequest request, String authenticatedUsername);
     SessionResponse completeSessionAfterPayment(Long sessionId);
     SessionResponse getSession(Long sessionId);
     SessionResponse getOwnedSession(Long sessionId, String username);

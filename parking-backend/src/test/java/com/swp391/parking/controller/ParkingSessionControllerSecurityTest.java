@@ -7,6 +7,7 @@ import com.swp391.parking.support.AbstractIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -24,6 +26,158 @@ class ParkingSessionControllerSecurityTest extends AbstractIntegrationTestSuppor
 
     @MockBean
     private ParkingSessionService sessionService;
+
+    @Test
+    @WithMockUser(username = "staff", roles = "STAFF")
+    void entry_shouldPassStaffPrincipalToService() throws Exception {
+        given(sessionService.processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff")))
+                .willReturn(sessionResponse());
+
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(sessionService).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff"));
+    }
+
+    @Test
+    @WithMockUser(username = "manager", roles = "MANAGER")
+    void entry_shouldAllowManager() throws Exception {
+        given(sessionService.processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("manager")))
+                .willReturn(sessionResponse());
+
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(sessionService).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("manager"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void entry_shouldAllowAdmin() throws Exception {
+        given(sessionService.processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("admin")))
+                .willReturn(sessionResponse());
+
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(sessionService).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("admin"));
+    }
+
+    @Test
+    @WithMockUser(username = "driver", roles = "DRIVER")
+    void entry_shouldRejectDriver() throws Exception {
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(sessionService, never()).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void entry_shouldRejectUnauthenticated() throws Exception {
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        verify(sessionService, never()).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @WithMockUser(username = "staff", roles = "STAFF")
+    void exit_shouldPassStaffPrincipalToService() throws Exception {
+        given(sessionService.processExit(org.mockito.ArgumentMatchers.eq(SESSION_ID),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff")))
+                .willReturn(sessionResponse());
+
+        mockMvc.perform(post("/api/sessions/{id}/exit", SESSION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "paymentMethod": "CASH"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(sessionService).processExit(org.mockito.ArgumentMatchers.eq(SESSION_ID),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff"));
+    }
+
+    @Test
+    @WithMockUser(username = "driver", roles = "DRIVER")
+    void exit_shouldRejectDriver() throws Exception {
+        mockMvc.perform(post("/api/sessions/{id}/exit", SESSION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "paymentMethod": "CASH"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(sessionService, never()).processExit(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @WithMockUser(username = "staff", roles = "STAFF")
+    void entry_shouldIgnoreClientSuppliedStaffUserId() throws Exception {
+        given(sessionService.processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff")))
+                .willReturn(sessionResponse());
+
+        mockMvc.perform(post("/api/sessions/entry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "gateId": 2,
+                                  "entryMode": "WALK_IN_AUTO",
+                                  "licensePlate": "51A-12345",
+                                  "staffUserId": 999
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(sessionService).processEntry(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("staff"));
+    }
 
     @Test
     @WithMockUser(username = "driver-owner", roles = "DRIVER")
