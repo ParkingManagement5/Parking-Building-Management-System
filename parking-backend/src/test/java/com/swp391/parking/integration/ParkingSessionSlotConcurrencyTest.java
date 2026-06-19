@@ -144,6 +144,94 @@ class ParkingSessionSlotConcurrencyTest {
                         == ParkingSlot.Status.OCCUPIED));
     }
 
+    @Test
+    void concurrentWalkInAuto_sameVehicleWithTwoSlots_shouldCreateOnlyOneOpenSession() throws Exception {
+        TestFacility facility = createFacility("Same Vehicle", 2);
+        Vehicle vehicle = createVehicle("same-vehicle-owner", "51A-30001", facility.vehicleType());
+        User staff = createUser("staff-same-vehicle");
+
+        List<Attempt> attempts = runConcurrentEntries(facility.gate(), staff, vehicle, vehicle);
+
+        long successCount = attempts.stream().filter(Attempt::success).count();
+        List<Attempt> failures = attempts.stream().filter(attempt -> !attempt.success()).toList();
+        assertEquals(1, successCount);
+        assertEquals(1, failures.size());
+        AppException failure = assertInstanceOf(AppException.class, failures.get(0).exception());
+        assertEquals(HttpStatus.CONFLICT, failure.getStatus());
+        assertEquals(1, sessionRepository.findAll().stream()
+                .filter(session -> session.getVehicle().getId().equals(vehicle.getId()))
+                .filter(session -> session.getStatus() == ParkingSession.SessionStatus.ACTIVE
+                        || session.getStatus() == ParkingSession.SessionStatus.WAITING_PAYMENT)
+                .count());
+        assertEquals(1, gateLogRepository.findAll().stream()
+                .filter(log -> log.getEventType() == GateLog.EventType.ENTRY)
+                .count());
+        assertEquals(1, facility.slots().stream()
+                .filter(slot -> parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus()
+                        == ParkingSlot.Status.OCCUPIED)
+                .count());
+        assertEquals(1, facility.slots().stream()
+                .filter(slot -> parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus()
+                        == ParkingSlot.Status.AVAILABLE)
+                .count());
+    }
+
+    @Test
+    void concurrentWalkInAuto_twoVehiclesWithTwoSlots_shouldCreateOneSessionPerVehicle() throws Exception {
+        TestFacility facility = createFacility("Two Vehicles", 2);
+        Vehicle vehicleOne = createVehicle("owner-five", "51A-40001", facility.vehicleType());
+        Vehicle vehicleTwo = createVehicle("owner-six", "51A-40002", facility.vehicleType());
+        User staff = createUser("staff-two-vehicles");
+
+        List<Attempt> attempts = runConcurrentEntries(facility.gate(), staff, vehicleOne, vehicleTwo);
+
+        assertEquals(2, attempts.stream().filter(Attempt::success).count());
+        List<ParkingSession> sessions = sessionRepository.findAll();
+        assertEquals(2, sessions.size());
+        assertEquals(1, sessions.stream().filter(session -> session.getVehicle().getId().equals(vehicleOne.getId())).count());
+        assertEquals(1, sessions.stream().filter(session -> session.getVehicle().getId().equals(vehicleTwo.getId())).count());
+        assertNotEquals(sessions.get(0).getSlot().getId(), sessions.get(1).getSlot().getId());
+        assertEquals(2, gateLogRepository.findAll().stream()
+                .filter(log -> log.getEventType() == GateLog.EventType.ENTRY)
+                .count());
+        assertTrue(facility.slots().stream()
+                .allMatch(slot -> parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus()
+                        == ParkingSlot.Status.OCCUPIED));
+    }
+
+    @Test
+    void walkInAuto_vehicleWithWaitingPaymentSession_shouldRejectWithoutCreatingNewSessionOrGateLog() {
+        TestFacility facility = createFacility("Waiting Payment", 2);
+        Vehicle vehicle = createVehicle("waiting-owner", "51A-50001", facility.vehicleType());
+        User staff = createUser("staff-waiting-payment");
+        ParkingSlot occupiedSlot = facility.slots().get(0);
+        occupiedSlot.setStatus(ParkingSlot.Status.OCCUPIED);
+        parkingSlotRepository.save(occupiedSlot);
+        sessionRepository.save(ParkingSession.builder()
+                .slot(occupiedSlot)
+                .userId(vehicle.getUserId())
+                .vehicle(vehicle)
+                .entryGate(facility.gate())
+                .entryMode(ParkingSession.EntryMode.WALK_IN_AUTO)
+                .status(ParkingSession.SessionStatus.WAITING_PAYMENT)
+                .build());
+
+        SessionEntryRequest request = new SessionEntryRequest();
+        request.setGateId(facility.gate().getId());
+        request.setEntryMode(ParkingSession.EntryMode.WALK_IN_AUTO.name());
+        request.setLicensePlate(vehicle.getLicensePlate());
+
+        AppException exception = assertInstanceOf(AppException.class,
+                org.junit.jupiter.api.Assertions.assertThrows(Exception.class,
+                        () -> sessionService.processEntry(request, staff.getUsername())));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+        assertEquals(1, sessionRepository.findAll().size());
+        assertEquals(0, gateLogRepository.findAll().size());
+        assertEquals(ParkingSlot.Status.AVAILABLE,
+                parkingSlotRepository.findById(facility.slots().get(1).getId()).orElseThrow().getStatus());
+    }
+
     private List<Attempt> runConcurrentEntries(Gate gate, User staff, Vehicle vehicleOne, Vehicle vehicleTwo)
             throws Exception {
         CountDownLatch ready = new CountDownLatch(2);
