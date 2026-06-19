@@ -2,17 +2,25 @@ package com.swp391.parking.repository;
 
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.ParkingSlot.Status;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> {
 
     List<ParkingSlot> findByZoneId(Long zoneId);
 
     List<ParkingSlot> findByZoneIdAndStatus(Long zoneId, Status status);
+
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT ps FROM ParkingSlot ps WHERE ps.id = :slotId")
+Optional<ParkingSlot> findByIdForUpdate(@Param("slotId") Long slotId);
 
 @Query(value = """
     SELECT ps.*
@@ -68,6 +76,28 @@ List<ParkingSlot> searchAvailableSlots(
 List<ParkingSlot> findAvailableByBuildingAndSlotSize(
         @Param("buildingId") Long buildingId,
         @Param("slotSize") ParkingSlot.SlotSize slotSize
+);
+
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("""
+    SELECT ps
+    FROM ParkingSlot ps
+    JOIN ps.zone z
+    JOIN z.floor f
+    JOIN f.building b
+    WHERE b.id = :buildingId
+      AND ps.slotSize = :slotSize
+      AND ps.status = 'AVAILABLE'
+      AND ps.isActive = true
+      AND z.isActive = true
+      AND f.isActive = true
+      AND b.isActive = true
+    ORDER BY f.floorNumber, ps.slotCode, ps.id
+    """)
+List<ParkingSlot> findFirstAvailableByBuildingAndSlotSizeForUpdate(
+        @Param("buildingId") Long buildingId,
+        @Param("slotSize") ParkingSlot.SlotSize slotSize,
+        Pageable pageable
 );
 
 @Query(value = """
