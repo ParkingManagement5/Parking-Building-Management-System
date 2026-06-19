@@ -48,6 +48,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -168,7 +169,8 @@ class ParkingSessionServiceImplTest {
         given(parkingSlotRepository.findFirstAvailableByBuildingAndSlotSizeForUpdate(
                 eq(BUILDING_ID), eq(ParkingSlot.SlotSize.MEDIUM), any()))
                 .willReturn(List.of(slot));
-        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(sessionRepository.save(any(ParkingSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
 
@@ -385,7 +387,7 @@ class ParkingSessionServiceImplTest {
         SessionEntryRequest request = bookingRequest();
         Booking booking = confirmedBooking();
         Claims claims = claimsForBooking();
-        ParkingSlot lockedSlot = slot(ParkingSlot.Status.RESERVED);
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
                 Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0), true)));
         given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
@@ -395,7 +397,8 @@ class ParkingSessionServiceImplTest {
         given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .willReturn(false);
         given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
-        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(sessionRepository.save(any(ParkingSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
 
@@ -496,7 +499,7 @@ class ParkingSessionServiceImplTest {
     void processBookingEntry_shouldLockVehicleBeforeCheckingOpenSession() {
         SessionEntryRequest request = bookingRequest();
         Booking booking = confirmedBooking();
-        ParkingSlot lockedSlot = slot(ParkingSlot.Status.RESERVED);
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
         Claims claims = claimsForBooking();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
         given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
@@ -664,7 +667,7 @@ class ParkingSessionServiceImplTest {
     void processBookingEntry_shouldLockReservedSlotBeforeOccupying() {
         SessionEntryRequest request = bookingRequest();
         Booking booking = confirmedBooking();
-        ParkingSlot lockedSlot = slot(ParkingSlot.Status.RESERVED);
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
         Claims claims = claimsForBooking();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
         given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
@@ -706,7 +709,7 @@ class ParkingSessionServiceImplTest {
     void processBookingEntry_shouldRejectWhenLockedSlotIsNotReservedOrExpectedStatus() {
         SessionEntryRequest request = bookingRequest();
         Booking booking = confirmedBooking();
-        ParkingSlot lockedSlot = slot(ParkingSlot.Status.OCCUPIED);
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.OCCUPIED);
         Claims claims = claimsForBooking();
         given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
         given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
@@ -724,6 +727,242 @@ class ParkingSessionServiceImplTest {
         verify(bookingRepository, never()).save(any());
         verify(sessionRepository, never()).save(any());
         verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_shouldLockReservedSlotBeforeMutation() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        InOrder inOrder = inOrder(vehicleRepository, sessionRepository, parkingSlotRepository);
+        inOrder.verify(vehicleRepository).findByIdForUpdate(VEHICLE_ID);
+        inOrder.verify(sessionRepository).existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList());
+        inOrder.verify(parkingSlotRepository).findByIdForUpdate(SLOT_ID);
+        assertEquals(ParkingSlot.Status.OCCUPIED, lockedSlot.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectWhenBookingHasNoSlot() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        booking.setSlot(null);
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        verify(parkingSlotRepository, never()).findByIdForUpdate(any());
+        verify(bookingRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectWhenLockedSlotDoesNotExist() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.empty());
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        verify(bookingRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectAvailableSlot() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.AVAILABLE));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectOccupiedSlot() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.OCCUPIED));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectMaintenanceSlot() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.MAINTENANCE));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectInactiveSlot() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.MEDIUM,
+                        false, true, true, true, BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectInactiveZone() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.MEDIUM,
+                        true, false, true, true, BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectInactiveFloor() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.MEDIUM,
+                        true, true, false, true, BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectInactiveSlotBuilding() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.MEDIUM,
+                        true, true, true, false, BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectSlotFromDifferentGateBuilding() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.MEDIUM,
+                        true, true, true, true, OTHER_BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldRejectIncompatibleSlotSizeOrType() {
+        AppException exception = assertBookingEntryRejectedForLockedSlot(
+                bookingSlot(ParkingSlot.Status.RESERVED, ParkingSlot.SlotSize.SMALL,
+                        true, true, true, true, BUILDING_ID));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void bookingEntry_shouldUseLockedSlotForCreatedSession() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        ArgumentCaptor<ParkingSession> captor = ArgumentCaptor.forClass(ParkingSession.class);
+        verify(sessionRepository).save(captor.capture());
+        assertSame(lockedSlot, captor.getValue().getSlot());
+    }
+
+    @Test
+    void bookingEntry_invalidSlot_shouldNotSaveBooking() {
+        assertBookingEntryRejectedForLockedSlot(bookingSlot(ParkingSlot.Status.AVAILABLE));
+
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_invalidSlot_shouldNotSaveSession() {
+        assertBookingEntryRejectedForLockedSlot(bookingSlot(ParkingSlot.Status.AVAILABLE));
+
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_invalidSlot_shouldNotSaveGateLog() {
+        assertBookingEntryRejectedForLockedSlot(bookingSlot(ParkingSlot.Status.AVAILABLE));
+
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void bookingEntry_validReservedSlot_shouldBecomeOccupied() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals(ParkingSlot.Status.OCCUPIED, lockedSlot.getStatus());
+    }
+
+    @Test
+    void bookingEntry_validReservedSlot_shouldSetBookingCheckedIn() {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        ParkingSlot lockedSlot = bookingSlot(ParkingSlot.Status.RESERVED);
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals(Booking.BookingStatus.CHECKED_IN, booking.getStatus());
     }
 
     @Test
@@ -759,7 +998,7 @@ class ParkingSessionServiceImplTest {
         given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
         lenient().when(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .thenReturn(false);
-        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(slot(ParkingSlot.Status.RESERVED)));
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(bookingSlot(ParkingSlot.Status.RESERVED)));
         given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         sessionService.processEntry(request, AUTH_USERNAME);
@@ -780,7 +1019,7 @@ class ParkingSessionServiceImplTest {
         given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
         given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
                 .willReturn(false);
-        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(slot(ParkingSlot.Status.RESERVED)));
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(bookingSlot(ParkingSlot.Status.RESERVED)));
         given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         sessionService.processEntry(request, AUTH_USERNAME);
@@ -1266,6 +1505,28 @@ class ParkingSessionServiceImplTest {
         return exception;
     }
 
+    private AppException assertBookingEntryRejectedForLockedSlot(ParkingSlot lockedSlot) {
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        Claims claims = claimsForBooking();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gate(Gate.GateType.ENTRY, true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        lenient().when(sessionRepository.save(any(ParkingSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        verify(parkingSlotRepository, never()).save(any());
+        return exception;
+    }
+
     private void stubSuccessfulWalkInAuto() {
         Vehicle vehicle = vehicle();
         ParkingSlot slot = slot(ParkingSlot.Status.AVAILABLE);
@@ -1397,6 +1658,20 @@ class ParkingSessionServiceImplTest {
                 .slotSize(ParkingSlot.SlotSize.MEDIUM)
                 .status(status)
                 .build();
+    }
+
+    private ParkingSlot bookingSlot(ParkingSlot.Status status) {
+        return bookingSlot(status, ParkingSlot.SlotSize.MEDIUM, true, true, true, true, BUILDING_ID);
+    }
+
+    private ParkingSlot bookingSlot(ParkingSlot.Status status,
+                                    ParkingSlot.SlotSize slotSize,
+                                    boolean slotActive,
+                                    boolean zoneActive,
+                                    boolean floorActive,
+                                    boolean buildingActive,
+                                    Long buildingId) {
+        return manualSlot(status, slotSize, slotActive, zoneActive, floorActive, buildingActive, buildingId);
     }
 
     private ParkingSlot manualSlot(ParkingSlot.Status status,
