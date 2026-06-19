@@ -24,6 +24,7 @@ import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.util.QrTokenUtil;
 import io.jsonwebtoken.Claims;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -36,6 +37,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,6 +75,8 @@ class ParkingSessionServiceImplTest {
     private static final String LICENSE_PLATE = "51A-12345";
     private static final String QR_TOKEN = "qr-token";
     private static final String AUTH_USERNAME = "staff";
+    private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final LocalDate TEST_DATE = LocalDate.of(2026, 6, 19);
 
     @Mock
     private ParkingSessionRepository sessionRepository;
@@ -93,8 +102,16 @@ class ParkingSessionServiceImplTest {
     @Mock
     private QrTokenUtil qrTokenUtil;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private ParkingSessionServiceImpl sessionService;
+
+    @BeforeEach
+    void setUpClock() {
+        setCurrentTime(LocalTime.NOON);
+    }
 
     @ParameterizedTest
     @NullSource
@@ -135,6 +152,323 @@ class ParkingSessionServiceImplTest {
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         verify(sessionRepository, never()).save(any());
         verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processEntry_shouldAllowAtNormalOpeningBoundary() {
+        setCurrentTime(LocalTime.of(6, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        ParkingSlot slot = slot(ParkingSlot.Status.AVAILABLE);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findFirstAvailableByBuildingAndSlotSizeForUpdate(
+                eq(BUILDING_ID), eq(ParkingSlot.SlotSize.MEDIUM), any()))
+                .willReturn(List.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldAllowBeforeNormalClosingBoundary() {
+        setCurrentTime(LocalTime.of(21, 59, 59));
+        SessionEntryRequest request = walkInManualRequest();
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectAtNormalClosingBoundary() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectBeforeNormalOpeningBoundary() {
+        setCurrentTime(LocalTime.of(5, 59));
+        SessionEntryRequest request = bookingRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldAllowAtOvernightOpeningBoundary() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        ParkingSlot slot = slot(ParkingSlot.Status.AVAILABLE);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(22, 0), LocalTime.of(6, 0))));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findFirstAvailableByBuildingAndSlotSizeForUpdate(
+                eq(BUILDING_ID), eq(ParkingSlot.SlotSize.MEDIUM), any()))
+                .willReturn(List.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldAllowAfterMidnightWithinOvernightHours() {
+        setCurrentTime(LocalTime.of(2, 0));
+        SessionEntryRequest request = walkInManualRequest();
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(22, 0), LocalTime.of(6, 0))));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectAtOvernightClosingBoundary() {
+        setCurrentTime(LocalTime.of(6, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(22, 0), LocalTime.of(6, 0))));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectOutsideOvernightHours() {
+        setCurrentTime(LocalTime.NOON);
+        SessionEntryRequest request = bookingRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(22, 0), LocalTime.of(6, 0))));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectInactiveBuilding() {
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, false, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        verify(vehicleRepository, never()).findByLicensePlateForUpdate(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processEntry_shouldAllowAnyTimeWhenBuildingIs24Hours() {
+        setCurrentTime(LocalTime.of(3, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        ParkingSlot slot = slot(ParkingSlot.Status.AVAILABLE);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0), true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findFirstAvailableByBuildingAndSlotSizeForUpdate(
+                eq(BUILDING_ID), eq(ParkingSlot.SlotSize.MEDIUM), any()))
+                .willReturn(List.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldStillRejectInactive24HourBuilding() {
+        setCurrentTime(LocalTime.of(3, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, false, LocalTime.of(6, 0), LocalTime.of(22, 0), true)));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        verify(vehicleRepository, never()).findByLicensePlateForUpdate(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processEntry_shouldIgnoreEqualOpenCloseWhenBuildingIs24Hours() {
+        setCurrentTime(LocalTime.of(3, 0));
+        SessionEntryRequest request = walkInManualRequest();
+        ParkingSlot slot = manualSlot(ParkingSlot.Status.AVAILABLE, ParkingSlot.SlotSize.MEDIUM,
+                true, true, true, true, BUILDING_ID);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(6, 0), true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(vehicleRepository.findByLicensePlateForUpdate(LICENSE_PLATE)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(slot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_shouldRejectEqualOpenCloseWhenBuildingIsNot24Hours() {
+        setCurrentTime(LocalTime.of(3, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(6, 0), false)));
+
+        AppException exception = assertThrows(AppException.class,
+                () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        verify(vehicleRepository, never()).findByLicensePlateForUpdate(any());
+        verify(parkingSlotRepository, never()).save(any());
+        verify(sessionRepository, never()).save(any());
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processBookingEntry_shouldAllowAnyTimeWhenBuildingIs24Hours() {
+        setCurrentTime(LocalTime.of(3, 0));
+        SessionEntryRequest request = bookingRequest();
+        Booking booking = confirmedBooking();
+        Claims claims = claimsForBooking();
+        ParkingSlot lockedSlot = slot(ParkingSlot.Status.RESERVED);
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0), true)));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(qrTokenUtil.parseQrToken(QR_TOKEN)).willReturn(claims);
+        given(bookingRepository.findById(BOOKING_ID)).willReturn(Optional.of(booking));
+        given(vehicleRepository.findByIdForUpdate(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(sessionRepository.existsByVehicle_IdAndStatusIn(eq(VEHICLE_ID), anyList()))
+                .willReturn(false);
+        given(parkingSlotRepository.findByIdForUpdate(SLOT_ID)).willReturn(Optional.of(lockedSlot));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processEntry(request, AUTH_USERNAME);
+
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void processEntry_outsideHours_shouldNotLockVehicleOrSlot() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = walkInManualRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        assertThrows(AppException.class, () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        verify(vehicleRepository, never()).findByLicensePlateForUpdate(any());
+        verify(vehicleRepository, never()).findByIdForUpdate(any());
+        verify(parkingSlotRepository, never()).findByIdForUpdate(any());
+        verify(parkingSlotRepository, never()).findFirstAvailableByBuildingAndSlotSizeForUpdate(any(), any(), any());
+    }
+
+    @Test
+    void processEntry_outsideHours_shouldNotSaveBooking() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = bookingRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        assertThrows(AppException.class, () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void processEntry_outsideHours_shouldNotSaveSession() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        assertThrows(AppException.class, () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void processEntry_outsideHours_shouldNotSaveGateLog() {
+        setCurrentTime(LocalTime.of(22, 0));
+        SessionEntryRequest request = walkInAutoRequest();
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(gateWithHours(
+                Gate.GateType.ENTRY, true, true, LocalTime.of(6, 0), LocalTime.of(22, 0))));
+
+        assertThrows(AppException.class, () -> sessionService.processEntry(request, AUTH_USERNAME));
+
+        verify(gateLogRepository, never()).save(any());
+    }
+
+    @Test
+    void processExit_shouldRemainAllowedOutsideOperatingHours() {
+        setCurrentTime(LocalTime.of(23, 0));
+        SessionExitRequest request = exitRequest("CASH");
+        ParkingSession session = activeSession();
+        Gate exitGate = gateWithHours(Gate.GateType.EXIT, true, true,
+                LocalTime.of(6, 0), LocalTime.of(22, 0));
+        given(sessionRepository.findById(SESSION_ID)).willReturn(Optional.of(session));
+        given(gateRepository.findById(GATE_ID)).willReturn(Optional.of(exitGate));
+        given(userRepository.findByUsername(AUTH_USERNAME)).willReturn(Optional.of(user(ACTOR_USER_ID, AUTH_USERNAME)));
+        given(sessionRepository.save(any(ParkingSession.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        SessionResponse response = sessionService.processExit(SESSION_ID, request, AUTH_USERNAME);
+
+        assertEquals("WAITING_PAYMENT", response.getStatus());
+        verify(gateLogRepository).save(any());
     }
 
     @Test
@@ -1106,12 +1440,34 @@ class ParkingSessionServiceImplTest {
     }
 
     private Gate gate(Gate.GateType gateType, boolean active) {
+        return gateWithHours(gateType, active, true, LocalTime.of(6, 0), LocalTime.of(22, 0));
+    }
+
+    private Gate gateWithHours(Gate.GateType gateType, boolean gateActive, boolean buildingActive,
+                               LocalTime openTime, LocalTime closeTime) {
+        return gateWithHours(gateType, gateActive, buildingActive, openTime, closeTime, false);
+    }
+
+    private Gate gateWithHours(Gate.GateType gateType, boolean gateActive, boolean buildingActive,
+                               LocalTime openTime, LocalTime closeTime, boolean is24Hours) {
         return Gate.builder()
                 .id(GATE_ID)
-                .building(ParkingBuilding.builder().id(BUILDING_ID).build())
+                .building(ParkingBuilding.builder()
+                        .id(BUILDING_ID)
+                        .openTime(openTime)
+                        .closeTime(closeTime)
+                        .is24Hours(is24Hours)
+                        .isActive(buildingActive)
+                        .build())
                 .gateCode("G-01")
                 .gateType(gateType)
-                .isActive(active)
+                .isActive(gateActive)
                 .build();
+    }
+
+    private void setCurrentTime(LocalTime time) {
+        Instant instant = LocalDateTime.of(TEST_DATE, time).atZone(TEST_ZONE).toInstant();
+        lenient().when(clock.getZone()).thenReturn(TEST_ZONE);
+        lenient().when(clock.instant()).thenReturn(instant);
     }
 }

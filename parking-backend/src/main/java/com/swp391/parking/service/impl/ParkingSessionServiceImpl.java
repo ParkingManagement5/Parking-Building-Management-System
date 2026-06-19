@@ -17,7 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,6 +37,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final QrTokenUtil qrTokenUtil;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -43,6 +46,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
         validateEntryGate(gate);
+        validateEntryBuilding(gate.getBuilding(), LocalTime.now(clock));
         ParkingSession.EntryMode mode = parseEntryMode(request.getEntryMode());
         Long actorUserId = resolveActorUserId(authenticatedUsername);
         ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
@@ -288,6 +292,32 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
         if (gate.getGateType() == Gate.GateType.EXIT) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Gate EXIT không được dùng cho xe vào");
+        }
+    }
+
+    private void validateEntryBuilding(ParkingBuilding building, LocalTime currentTime) {
+        if (building == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Parking building is invalid");
+        }
+        if (!Boolean.TRUE.equals(building.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Parking building is inactive");
+        }
+        if (Boolean.TRUE.equals(building.getIs24Hours())) {
+            return;
+        }
+
+        LocalTime openTime = building.getOpenTime();
+        LocalTime closeTime = building.getCloseTime();
+        if (openTime == null || closeTime == null || openTime.equals(closeTime)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Parking building operating hours are invalid");
+        }
+
+        boolean withinOperatingHours = openTime.isBefore(closeTime)
+                ? !currentTime.isBefore(openTime) && currentTime.isBefore(closeTime)
+                : !currentTime.isBefore(openTime) || currentTime.isBefore(closeTime);
+        if (!withinOperatingHours) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Parking building is outside operating hours");
         }
     }
 

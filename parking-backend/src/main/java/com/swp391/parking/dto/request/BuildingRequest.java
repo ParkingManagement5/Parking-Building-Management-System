@@ -37,5 +37,7 @@ public class BuildingRequest {
     @NotNull(message = "Giờ đóng cửa không được để trống")
     private LocalTime closeTime; // format: "22:00:00"
 
+    private Boolean is24Hours;
+
     private Status status;
 }

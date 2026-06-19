@@ -28,9 +28,9 @@ INSERT INTO vehicle_type (name, description, slot_size, hourly_rate, daily_rate,
 ('SUV', 'Sport Utility Vehicle', 'LARGE', 50000.00, 250000.00, true);
 
 -- 5. INSERT PARKING BUILDINGS (columns: name, address, phone, email, description, open_time, close_time, status, is_active)
-INSERT INTO parking_building (name, address, phone, email, description, open_time, close_time, status, is_active) VALUES
-('City Center Parking', '123 Main Street, Downtown', '0201234567', 'citypark@parking.com', 'Downtown parking facility', '06:00:00', '23:00:00', 'ACTIVE', true),
-('Mall Parking', '456 Shopping Avenue, Mall Zone', '0201234568', 'mallpark@parking.com', 'Shopping mall parking', '07:00:00', '22:00:00', 'ACTIVE', true);
+INSERT INTO parking_building (name, address, phone, email, description, open_time, close_time, is_24_hours, status, is_active) VALUES
+('City Center Parking', '123 Main Street, Downtown', '0201234567', 'citypark@parking.com', 'Downtown parking facility', '06:00:00', '23:00:00', false, 'ACTIVE', true),
+('Mall Parking', '456 Shopping Avenue, Mall Zone', '0201234568', 'mallpark@parking.com', 'Shopping mall parking', '07:00:00', '22:00:00', false, 'ACTIVE', true);
 
 -- 6. INSERT FLOORS (columns: building_id, floor_number, name, capacity, status, is_active)
 INSERT INTO floor (building_id, floor_number, name, capacity, status, is_active) VALUES
