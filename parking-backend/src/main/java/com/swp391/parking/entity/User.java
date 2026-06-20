@@ -3,6 +3,7 @@ package com.swp391.parking.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -39,6 +40,12 @@ public class User extends BaseEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "email_verification_code", length = 10)
+    private String emailVerificationCode;
+
+    @Column(name = "email_verification_expires_at")
+    private LocalDateTime emailVerificationExpiresAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private UserStatus status;
@@ -56,6 +63,6 @@ public class User extends BaseEntity {
 
     // ── Enum status ──────────────────────────────────────────────────────────
     public enum UserStatus {
-        ACTIVE, INACTIVE, LOCKED
+        PENDING, ACTIVE, INACTIVE, LOCKED
     }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Clock3, LoaderCircle, MapPin, ReceiptText } from "lucide-react";
+import { AlertCircle, Clock3, LoaderCircle, MapPin, QrCode, ReceiptText } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
@@ -19,6 +20,12 @@ function StatusBadge({ status }) {
       {String(status || "pending")}
     </span>
   );
+}
+
+function shortToken(value) {
+  if (!value) return "";
+  if (value.length <= 28) return value;
+  return `${value.slice(0, 14)}...${value.slice(-10)}`;
 }
 
 export default function BookingHistoryPage() {
@@ -190,6 +197,31 @@ export default function BookingHistoryPage() {
                     </button>
                   ) : null}
                 </div>
+
+                {item.qrToken ? (
+                  <div className="rounded-2xl border border-border bg-background p-4 lg:col-span-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                      <div className="flex size-36 shrink-0 items-center justify-center rounded-2xl bg-white p-3">
+                        <QRCodeSVG value={item.qrToken} size={120} level="M" includeMargin={false} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <QrCode size={16} />
+                          Entry QR
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Show this QR at the entry gate after deposit is paid.
+                        </p>
+                        <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
+                          {shortToken(item.qrToken)}
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Issued {formatDateTime(item.qrIssuedAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

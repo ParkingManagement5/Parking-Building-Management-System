@@ -13,6 +13,12 @@ public class BookingResponse {
     private String licensePlate;
     private Long slotId;
     private String slotCode;
+    private Long zoneId;
+    private String zoneName;
+    private Long floorId;
+    private String floorName;
+    private Long buildingId;
+    private String buildingName;
     private LocalDateTime bookingStartTime;
     private LocalDateTime bookingEndTime;
     private LocalDateTime reservedAt;

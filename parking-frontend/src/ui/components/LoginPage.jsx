@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -70,11 +70,44 @@ function SocialButton({ children, icon }) {
   );
 }
 
+function routeForRole(rawRole) {
+  const role = rawRole.toString().replace("ROLE_", "").toUpperCase();
+
+  return role.includes("ADMIN")
+    ? "/admin"
+    : role.includes("MANAGER")
+      ? "/manager"
+      : role.includes("STAFF")
+        ? "/staff"
+        : "/driver";
+}
+
+function saveAuthData(data) {
+  const token = data.token || data.accessToken || data.jwt;
+  const rawRole =
+    data.role || data.roleName || data.roles?.[0] || data.user?.role || data.user?.roles?.[0] || "DRIVER";
+  const role = rawRole.toString().replace("ROLE_", "").toUpperCase();
+
+  if (token) localStorage.setItem("token", token);
+  localStorage.setItem("role", role);
+  if (data.userId || data.user?.userId || data.user?.id) {
+    localStorage.setItem("userId", data.userId || data.user?.userId || data.user?.id);
+  }
+  if (data.username || data.user?.username) {
+    localStorage.setItem("username", data.username || data.user?.username);
+  }
+
+  return routeForRole(role);
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
+  const googleButtonRef = useRef(null);
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [occupancy, setOccupancy] = useState(0);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [form, setForm] = useState({
@@ -108,6 +141,68 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const initializeGoogle = () => {
+      if (!window.google?.accounts?.id) return;
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response) => {
+          if (!response?.credential) {
+            setError("Google login did not return a credential.");
+            return;
+          }
+
+          setGoogleLoading(true);
+          setError("");
+          try {
+            const res = await authApi.googleLogin({ credential: response.credential });
+            const data = res.data?.data || res.data || {};
+            navigate(saveAuthData(data));
+          } catch (err) {
+            setError(err.response?.data?.message || "Google login failed.");
+          } finally {
+            setGoogleLoading(false);
+          }
+        },
+      });
+      if (googleButtonRef.current) {
+        googleButtonRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          text: "continue_with",
+          shape: "rectangular",
+          width: googleButtonRef.current.offsetWidth || 360,
+        });
+      }
+      setGoogleReady(true);
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogle();
+      return;
+    }
+
+    const existingScript = document.querySelector("script[src='https://accounts.google.com/gsi/client']");
+    if (existingScript) {
+      existingScript.addEventListener("load", initializeGoogle, { once: true });
+      return () => existingScript.removeEventListener("load", initializeGoogle);
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeGoogle;
+    script.onerror = () => setError("Could not load Google login.");
+    document.head.appendChild(script);
+  }, [navigate]);
+
+  useEffect(() => {
     const interval = window.setInterval(() => {
       const next = LIVE_ACTIVITIES[Math.floor(Math.random() * LIVE_ACTIVITIES.length)];
       setActivities((previous) => [next, ...previous].slice(0, 5));
@@ -128,29 +223,7 @@ export default function LoginPage() {
       });
 
       const data = res.data?.data || res.data || {};
-      const token = data.token || data.accessToken || data.jwt;
-      const rawRole =
-        data.role || data.roleName || data.roles?.[0] || data.user?.role || data.user?.roles?.[0] || "DRIVER";
-      const role = rawRole.toString().replace("ROLE_", "").toUpperCase();
-
-      if (token) localStorage.setItem("token", token);
-      localStorage.setItem("role", role);
-      if (data.userId || data.user?.userId || data.user?.id) {
-        localStorage.setItem("userId", data.userId || data.user?.userId || data.user?.id);
-      }
-      if (data.username || data.user?.username) {
-        localStorage.setItem("username", data.username || data.user?.username);
-      }
-
-      const nextRoute = role.includes("ADMIN")
-        ? "/admin"
-        : role.includes("MANAGER")
-          ? "/manager"
-          : role.includes("STAFF")
-            ? "/staff"
-            : "/driver";
-
-      navigate(nextRoute);
+      navigate(saveAuthData(data));
     } catch (err) {
       setError(err.response?.data?.message || "Dang nhap that bai. Vui long kiem tra tai khoan hoac mat khau.");
     } finally {
@@ -329,18 +402,14 @@ export default function LoginPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <SocialButton
-                icon={
-                  <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-                    <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 3l5.7-5.7C34.1 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5Z" />
-                    <path fill="#FF3D00" d="M6.3 14.7 12.9 19.5C14.7 15 19 12 24 12c3 0 5.7 1.1 7.8 3l5.7-5.7C34.1 6.1 29.4 4 24 4c-7.7 0-14.3 4.3-17.7 10.7Z" />
-                    <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.5 16.2 44 24 44Z" />
-                    <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.9-3 5.2-5.9 6.6l.1-.1 6.2 5.2C35.3 40 44 34 44 24c0-1.3-.1-2.3-.4-3.5Z" />
-                  </svg>
-                }
-              >
-                Google
-              </SocialButton>
+              <div className="min-h-11">
+                <div ref={googleButtonRef} className="flex w-full justify-center" />
+                {!googleReady || googleLoading ? (
+                  <div className="flex h-11 items-center justify-center rounded-xl border border-slate-300/80 bg-white/92 text-sm font-medium text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                    {googleLoading ? "Signing in..." : "Loading Google..."}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-6 text-center">

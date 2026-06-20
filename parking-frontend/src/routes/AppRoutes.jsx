@@ -7,6 +7,7 @@ import ParkingInfoPage from "../pages/public/ParkingInfoPage";
 import PublicSlotListPage from "../pages/public/PublicSlotListPage";
 import LoginPage from "../ui/components/LoginPage";
 import RegisterPage from "../ui/components/RegisterPage";
+import VerifyEmailPage from "../ui/components/VerifyEmailPage";
 import UnauthorizedPage from "../pages/auth/UnauthorizedPage";
 import RolePortalLayout from "../ui/components/RolePortalLayout";
 import DriverDashboard from "../pages/driver/DriverDashboard";
@@ -16,6 +17,7 @@ import MyVehiclesPage from "../pages/driver/MyVehiclesPage";
 import BookingPage from "../pages/driver/BookingPage";
 import BookingHistoryPage from "../pages/driver/BookingHistoryPage";
 import CurrentSessionPage from "../pages/driver/CurrentSessionPage";
+import DriverParkingMapPage from "../pages/driver/DriverParkingMapPage";
 import PaymentHistoryPage from "../pages/driver/PaymentHistoryPage";
 import RequestCenterPage from "../pages/driver/RequestCenterPage";
 import DriverProfilePage from "../pages/driver/DriverProfilePage";
@@ -61,6 +63,7 @@ export default function AppRoutes() {
 
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={["DRIVER"]} />}>
@@ -71,6 +74,7 @@ export default function AppRoutes() {
             <Route path="booking" element={<BookingPage />} />
             <Route path="bookings" element={<BookingHistoryPage />} />
             <Route path="current-session" element={<CurrentSessionPage />} />
+            <Route path="parking-map" element={<DriverParkingMapPage />} />
             <Route path="payments" element={<PaymentHistoryPage />} />
             <Route path="requests" element={<RequestCenterPage />} />
             <Route path="notifications" element={<DriverNotificationPage />} />
