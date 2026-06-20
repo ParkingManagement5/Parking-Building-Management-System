@@ -14,6 +14,7 @@ import {
   LogIn,
   LogOut,
   MessageSquare,
+  Map,
   QrCode,
   ScanLine,
   Settings,
@@ -38,6 +39,7 @@ const CONFIG = {
       { id: "parking-slots", label: "Parking Slots", icon: SquareParking },
       { id: "booking", label: "Book a Slot", icon: BookOpen },
       { id: "current-session", label: "Current Session", icon: Clock },
+      { id: "parking-map", label: "Parking Map", icon: Map },
       { id: "payments", label: "Payment History", icon: CreditCard },
       { id: "requests", label: "Request Center", icon: MessageSquare },
       { id: "notifications", label: "Notifications", icon: Bell },
@@ -63,6 +65,10 @@ const CONFIG = {
       "current-session": {
         title: "Current Session",
         subtitle: "Check your active parking session and real-time details",
+      },
+      "parking-map": {
+        title: "Parking Map",
+        subtitle: "Visual route from entry gate to your booked slot",
       },
       payments: {
         title: "Payment History",

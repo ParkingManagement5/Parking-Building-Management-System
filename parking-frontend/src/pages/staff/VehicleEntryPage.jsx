@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Search, ShieldAlert } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
+import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
   createPortalId,
@@ -32,6 +33,10 @@ function normalizeVehicleType(vehicle) {
   return String(vehicle?.vehicleType?.typeName || vehicle?.vehicleTypeName || "CAR").toUpperCase();
 }
 
+function getBuildingId(building) {
+  return building?.buildingId || building?.id || "";
+}
+
 export default function VehicleEntryPage() {
   const [step, setStep] = useState(1);
   const [buildings, setBuildings] = useState([]);
@@ -59,7 +64,7 @@ export default function VehicleEntryPage() {
           setBuildings(items);
           setForm((prev) => ({
             ...prev,
-            buildingId: prev.buildingId || String(items[0]?.buildingId || ""),
+            buildingId: prev.buildingId || String(getBuildingId(items[0])),
           }));
         }
       } catch (error) {
@@ -88,11 +93,13 @@ export default function VehicleEntryPage() {
       try {
         const res = await gateApi.getActiveByBuilding(form.buildingId);
         if (!cancelled) {
-          const items = unwrapApiData(res.data, []);
+          const items = unwrapApiData(res.data, []).filter((item) =>
+            ["ENTRY", "BOTH"].includes(String(item.gateType || "").toUpperCase())
+          );
           setGates(items);
           setForm((prev) => ({
             ...prev,
-            gateId: prev.gateId || String(items[0]?.gateId || ""),
+            gateId: prev.gateId || String(items[0]?.gateId || items[0]?.id || ""),
           }));
         }
       } catch (error) {
@@ -110,11 +117,11 @@ export default function VehicleEntryPage() {
   }, [form.buildingId]);
 
   const selectedBuilding = useMemo(
-    () => buildings.find((item) => String(item.buildingId) === String(form.buildingId)),
+    () => buildings.find((item) => String(getBuildingId(item)) === String(form.buildingId)),
     [buildings, form.buildingId]
   );
   const selectedGate = useMemo(
-    () => gates.find((item) => String(item.gateId) === String(form.gateId)),
+    () => gates.find((item) => String(item.gateId || item.id) === String(form.gateId)),
     [gates, form.gateId]
   );
 
@@ -159,7 +166,7 @@ export default function VehicleEntryPage() {
       licensePlate: lookup.vehicle.licensePlate || form.licensePlate.trim().toUpperCase(),
       driverName: lookup.vehicle.user?.fullName || lookup.vehicle.user?.username || "Registered Driver",
       slotCode: "ENTRY-PENDING",
-      gateName: selectedGate.gateName || selectedGate.name || `Gate ${selectedGate.gateId}`,
+      gateName: selectedGate.gateName || selectedGate.gateCode || selectedGate.name || `Gate ${selectedGate.gateId || selectedGate.id}`,
       buildingName: selectedBuilding.name,
       entryTime: new Date().toISOString(),
       status: "ACTIVE",
@@ -203,6 +210,81 @@ export default function VehicleEntryPage() {
     setRecentEntries(latestState.sessions.filter((item) => item.status === "ACTIVE").slice(0, 5));
     setConfirmedSession(session);
     setStep(3);
+  };
+
+  const handleQrEntry = async () => {
+    if (!form.qrCode.trim()) {
+      setLookup({ loading: false, error: "Enter a QR token to process booking entry.", vehicle: null });
+      return;
+    }
+
+    if (!selectedGate) {
+      setLookup({ loading: false, error: "Select an entry gate before processing QR.", vehicle: null });
+      return;
+    }
+
+    setLookup((prev) => ({ ...prev, loading: true, error: "" }));
+    try {
+      const res = await sessionApi.entry({
+        gateId: Number(form.gateId),
+        entryMode: "BOOKING",
+        qrToken: form.qrCode.trim(),
+        staffUserId: Number(localStorage.getItem("userId")) || null,
+      });
+      const payload = unwrapApiData(res.data, null);
+      const session = {
+        sessionId: payload?.sessionId || createPortalId("SES"),
+        licensePlate: payload?.licensePlate || "QR booking",
+        driverName: "Booking Driver",
+        slotCode: payload?.slotCode || "Booked slot",
+        gateName: selectedGate.gateName || selectedGate.gateCode || selectedGate.name || `Gate ${selectedGate.gateId || selectedGate.id}`,
+        buildingName: selectedBuilding?.name || "Selected building",
+        entryTime: payload?.entryTime || new Date().toISOString(),
+        status: payload?.status || "ACTIVE",
+        feeAmount: 0,
+        paymentStatus: "UNPAID",
+        qrCode: form.qrCode.trim(),
+        source: "booking-qr",
+      };
+
+      updateStaffPortalState((current) => ({
+        ...current,
+        sessions: [session, ...current.sessions],
+        qrLogs: [
+          {
+            id: createPortalId("QR"),
+            bookingCode: `Booking #${payload?.bookingId || session.sessionId}`,
+            plate: session.licensePlate,
+            status: "valid",
+            checkedAt: session.entryTime,
+          },
+          ...current.qrLogs,
+        ],
+        activity: [
+          {
+            id: createPortalId("ACT"),
+            plate: session.licensePlate,
+            action: `Entered by booking QR via ${session.gateName}`,
+            type: "entry",
+            time: session.entryTime,
+          },
+          ...current.activity,
+        ],
+      }));
+
+      const latestState = getStaffPortalState();
+      setRecentEntries(latestState.sessions.filter((item) => item.status === "ACTIVE").slice(0, 5));
+      setConfirmedSession(session);
+      setLookup({ loading: false, error: "", vehicle: null });
+      setStep(3);
+    } catch (error) {
+      console.error("QR booking entry failed", error);
+      setLookup({
+        loading: false,
+        error: error.response?.data?.message || "QR khong hop le hoac booking khong con hieu luc.",
+        vehicle: null,
+      });
+    }
   };
 
   const handleCreateException = () => {
@@ -281,7 +363,7 @@ export default function VehicleEntryPage() {
                   <StaffSelect name="buildingId" value={form.buildingId} onChange={handleChange}>
                     <option value="">Select building</option>
                     {buildings.map((item) => (
-                      <option key={item.buildingId} value={item.buildingId}>
+                      <option key={getBuildingId(item)} value={getBuildingId(item)}>
                         {item.name}
                       </option>
                     ))}
@@ -292,8 +374,8 @@ export default function VehicleEntryPage() {
                   <StaffSelect name="gateId" value={form.gateId} onChange={handleChange}>
                     <option value="">Select gate</option>
                     {gates.map((item) => (
-                      <option key={item.gateId} value={item.gateId}>
-                        {item.gateName || item.name || `Gate ${item.gateId}`}
+                      <option key={item.gateId || item.id} value={item.gateId || item.id}>
+                        {item.gateName || item.gateCode || item.name || `Gate ${item.gateId || item.id}`}
                       </option>
                     ))}
                   </StaffSelect>
@@ -305,7 +387,7 @@ export default function VehicleEntryPage() {
                   name="qrCode"
                   value={form.qrCode}
                   onChange={handleChange}
-                  placeholder="BK-852977"
+                  placeholder="Paste booking QR token"
                 />
               </StaffField>
 
@@ -320,6 +402,10 @@ export default function VehicleEntryPage() {
                   <Search size={15} />
                   {lookup.loading ? "Checking..." : "Lookup Vehicle"}
                 </StaffPrimaryButton>
+                <StaffSecondaryButton type="button" onClick={handleQrEntry} disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
+                  <CheckCircle2 size={15} />
+                  Process QR Entry
+                </StaffSecondaryButton>
                 <StaffSecondaryButton type="button" onClick={handleCreateException} className="flex items-center justify-center gap-2 sm:flex-1">
                   <ShieldAlert size={15} />
                   Open Exception
@@ -351,7 +437,7 @@ export default function VehicleEntryPage() {
                 <div className="rounded-2xl bg-muted/30 p-4">
                   <p className="text-xs text-muted-foreground">Assigned Gate</p>
                   <p className="mt-1 font-semibold text-foreground">
-                    {selectedGate?.gateName || selectedGate?.name || "--"}
+                    {selectedGate?.gateName || selectedGate?.gateCode || selectedGate?.name || "--"}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-muted/30 p-4">

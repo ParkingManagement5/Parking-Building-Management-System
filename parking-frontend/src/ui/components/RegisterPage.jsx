@@ -129,7 +129,12 @@ export default function RegisterPage() {
         phone: form.phone,
         password: form.password,
       });
-      setDone(true);
+      navigate("/verify-email", {
+        state: {
+          username: form.username,
+          email: form.email,
+        },
+      });
     } catch (err) {
       setError(err.response?.data?.message || "Dang ky that bai. Vui long thu lai.");
     } finally {
@@ -154,8 +159,8 @@ export default function RegisterPage() {
               <CheckCircle2 size={32} className="text-emerald-600 dark:text-emerald-300" />
             </div>
             <h2 className="text-2xl font-bold text-foreground">Account created</h2>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">
-              Your account is ready.
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+              Your account is created. Please verify your email before signing in.
             </p>
             <div className="mt-8 flex gap-3">
               <button
