@@ -68,6 +68,10 @@ public class BookingServiceImpl implements BookingService {
         if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Slot đang bảo trì, không thể đặt");
         }
+        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Slot " + slot.getSlotCode() + " không khả dụng (trạng thái: " + slot.getStatus() + ")");
+        }
 
         // [BR-06] 1 xe chỉ có 1 booking active
         bookingRepository.findByVehicle_IdAndStatusIn(
@@ -196,13 +200,24 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BookingResponse toResponse(Booking b) {
+        ParkingSlot slot = b.getSlot();
+        Zone zone = slot.getZone();
+        Floor floor = zone.getFloor();
+        ParkingBuilding building = floor.getBuilding();
+
         return BookingResponse.builder()
                 .bookingId(b.getId())
                 .userId(b.getUserId())
                 .vehicleId(b.getVehicle().getId())
                 .licensePlate(b.getVehicle().getLicensePlate())
-                .slotId(b.getSlot().getId())
-                .slotCode(b.getSlot().getSlotCode())
+                .slotId(slot.getId())
+                .slotCode(slot.getSlotCode())
+                .zoneId(zone.getId())
+                .zoneName(zone.getName())
+                .floorId(floor.getId())
+                .floorName(floor.getName())
+                .buildingId(building.getId())
+                .buildingName(building.getName())
                 .bookingStartTime(b.getBookingStartTime())
                 .bookingEndTime(b.getBookingEndTime())
                 .reservedAt(b.getReservedAt())

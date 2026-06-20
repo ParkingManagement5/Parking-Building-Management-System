@@ -19,7 +19,7 @@ directClient.interceptors.request.use((config) => {
 });
 
 function bookingUrl(path = "") {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = path ? (path.startsWith("/") ? path : `/${path}`) : "";
 
   if (/^https?:\/\//i.test(apiBase)) {
     return `${apiBase.replace(/\/api\/v1\/?$/, "")}/api/bookings${normalizedPath}`;
