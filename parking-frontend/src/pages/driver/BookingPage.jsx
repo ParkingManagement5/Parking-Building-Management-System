@@ -46,6 +46,29 @@ function formatDateTime(value) {
   return parsed.toLocaleString("vi-VN");
 }
 
+function formatLocalDateTime(value) {
+  const pad = (number) => String(number).padStart(2, "0");
+
+  return [
+    value.getFullYear(),
+    pad(value.getMonth() + 1),
+    pad(value.getDate()),
+  ].join("-") + `T${[
+    pad(value.getHours()),
+    pad(value.getMinutes()),
+    pad(value.getSeconds()),
+  ].join(":")}`;
+}
+
+function getErrorMessage(error, fallback) {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    fallback
+  );
+}
+
 export default function BookingPage() {
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
@@ -246,8 +269,8 @@ export default function BookingPage() {
       const res = await bookingApi.create({
         vehicleId: Number(selection.vehicleId),
         slotId: Number(selectedSlot.slotId),
-        bookingStartTime: start.toISOString().slice(0, 19),
-        bookingEndTime: end.toISOString().slice(0, 19),
+        bookingStartTime: formatLocalDateTime(start),
+        bookingEndTime: formatLocalDateTime(end),
       });
 
       const payload = res.data?.data || res.data || {};
@@ -267,7 +290,7 @@ export default function BookingPage() {
     } catch (error) {
       console.error("Create booking failed", error);
       setSubmitError(
-        error.response?.data?.message || "Tao booking that bai. Vui long thu lai."
+        getErrorMessage(error, "Tao booking that bai. Vui long thu lai.")
       );
     } finally {
       setSubmitting(false);

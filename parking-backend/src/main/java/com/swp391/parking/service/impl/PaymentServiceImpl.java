@@ -33,11 +33,10 @@ public class PaymentServiceImpl implements PaymentService {
         BigDecimal depositAmount,
         PaymentMethod paymentMethod
     ) {
-        paymentRepository.findByBookingIdAndPaymentType(bookingId, PaymentType.DEPOSIT)
-            .ifPresent(payment -> {
-                throw new AppException(HttpStatus.CONFLICT,
-                    "Deposit already exists for this booking");
-            });
+        var existingDeposit = paymentRepository.findByBookingIdAndPaymentType(bookingId, PaymentType.DEPOSIT);
+        if (existingDeposit.isPresent()) {
+            return toResponse(existingDeposit.get());
+        }
 
         Payment payment = Payment.builder()
             .bookingId(bookingId)
