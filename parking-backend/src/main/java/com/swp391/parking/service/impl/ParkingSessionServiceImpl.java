@@ -244,11 +244,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public SessionResponse getSession(Long sessionId) {
         return toResponse(getSessionEntity(sessionId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public SessionResponse getOwnedSession(Long sessionId, String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
@@ -263,6 +265,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SessionResponse> getMySessions(Long currentUserId) {
         return sessionRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream().map(this::toResponse).toList();
