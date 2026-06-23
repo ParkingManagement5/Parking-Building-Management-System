@@ -1,25 +1,61 @@
 import { useEffect, useMemo, useState } from "react";
 import { MapPin, SquareParking } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
+import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
 import { unwrapApiData } from "../../utils/api";
 import { getStatusClasses } from "./driverPortalUtils";
 
 export default function DriverParkingSlotPage() {
   const [slots, setSlots] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const res = await driverVehicleApi.getMyVehicles();
+        const items = unwrapApiData(res.data, []);
+        setVehicles(items);
+        setSelectedVehicleId(String(items[0]?.id || items[0]?.vehicleId || ""));
+      } catch (error) {
+        console.error("Load vehicles failed:", error);
+        setVehicles([]);
+        setError("Could not load your vehicles.");
+      }
+    }
+
+    void loadVehicles();
+  }, []);
 
   useEffect(() => {
     async function loadSlots() {
+      const selectedVehicle = vehicles.find((item) => String(item.id || item.vehicleId) === String(selectedVehicleId));
+      const vehicleTypeId =
+        selectedVehicle?.vehicleType?.vehicleTypeId ??
+        selectedVehicle?.vehicleType?.id ??
+        selectedVehicle?.vehicleTypeId;
+
+      if (!vehicleTypeId) {
+        setSlots([]);
+        return;
+      }
+
       try {
-        const res = await axiosClient.get("/slots/available?vehicleTypeId=1");
+        const res = await axiosClient.get("/slots/available", {
+          params: { vehicleTypeId },
+        });
         setSlots(unwrapApiData(res.data, []));
+        setError("");
       } catch (error) {
         console.error("Load slots failed:", error);
         setSlots([]);
+        setError("Could not load available slots for the selected vehicle.");
       }
     }
 
     void loadSlots();
-  }, []);
+  }, [vehicles, selectedVehicleId]);
 
   const summary = useMemo(() => {
     const buildingCount = new Set(
@@ -34,6 +70,29 @@ export default function DriverParkingSlotPage() {
 
   return (
     <div className="space-y-5">
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="grid gap-3 md:grid-cols-[1fr_260px] md:items-center">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Available Parking Slots</h2>
+            <p className="text-sm text-muted-foreground">
+              Slots are filtered by the selected vehicle type.
+            </p>
+          </div>
+          <select
+            value={selectedVehicleId}
+            onChange={(event) => setSelectedVehicleId(event.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          >
+            {vehicles.map((vehicle) => (
+              <option key={vehicle.id || vehicle.vehicleId} value={vehicle.id || vehicle.vehicleId}>
+                {vehicle.licensePlate} - {vehicle.vehicleType?.name || vehicle.vehicleTypeName || "Vehicle"}
+              </option>
+            ))}
+          </select>
+        </div>
+        {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
+      </div>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="bg-card border border-border rounded-2xl p-4">
           <div className="size-9 rounded-xl flex items-center justify-center bg-emerald-50 text-emerald-600 mb-3">

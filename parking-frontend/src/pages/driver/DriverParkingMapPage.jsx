@@ -1,20 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Bike,
   Building2,
   CarFront,
-  Clock3,
-  Layers3,
+  CheckCircle2,
+  CircleDot,
   LoaderCircle,
   LocateFixed,
   MapPin,
   Navigation,
   QrCode,
-  Route,
-  ShieldCheck,
   SquareParking,
-  TrafficCone,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
@@ -24,15 +21,41 @@ import { zoneApi } from "../../api/manager/zoneApi";
 import { unwrapApiData } from "../../utils/api";
 import { getBookingStatus } from "./driverPortalUtils";
 
+const ZONE_COUNT = 6;
+
+const STATUS_STYLE = {
+  mine: {
+    label: "Your slot",
+    slot: "border-sky-700 bg-sky-600 text-white shadow-[0_0_0_4px_rgba(186,230,253,0.9)]",
+    dot: "bg-sky-600",
+  },
+  available: {
+    label: "Available",
+    slot: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    dot: "bg-emerald-500",
+  },
+  occupied: {
+    label: "Occupied",
+    slot: "border-slate-300 bg-slate-200 text-slate-500",
+    dot: "bg-slate-400",
+  },
+  reserved: {
+    label: "Reserved",
+    slot: "border-amber-300 bg-amber-50 text-amber-800",
+    dot: "bg-amber-400",
+  },
+  maintenance: {
+    label: "Maintenance",
+    slot: "border-rose-300 bg-rose-50 text-rose-700",
+    dot: "bg-rose-500",
+  },
+};
+
 function getActiveBooking(bookings) {
   return bookings.find((item) => {
-    const status = getBookingStatus(item);
-    return (
-      status.includes("pending") ||
-      status.includes("confirmed") ||
-      status.includes("checked_in") ||
-      status.includes("active")
-    );
+    const status = getBookingStatus(item).toUpperCase();
+    const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
+    return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
   });
 }
 
@@ -42,6 +65,20 @@ function normalizeSlotCode(session) {
 
 function getSlotId(slot) {
   return slot?.id || slot?.slotId || slot?.parkingSlotId;
+}
+
+function getSlotCode(slot) {
+  return slot?.slotCode || slot?.parkingSlotCode || "S";
+}
+
+function slotMatchesSession(slot, session) {
+  const sessionSlotId = session?.slotId || session?.parkingSlotId;
+  const sessionSlotCode = normalizeSlotCode(session);
+
+  return (
+    (sessionSlotId && String(getSlotId(slot)) === String(sessionSlotId)) ||
+    (sessionSlotCode && String(getSlotCode(slot)).toLowerCase() === String(sessionSlotCode).toLowerCase())
+  );
 }
 
 function getZoneId(zone) {
@@ -71,8 +108,7 @@ function getVehicleType(zone) {
 function getFloorIndex(floorLike, fallback = 1) {
   const raw = floorLike?.floorNumber || floorLike?.level || floorLike?.index;
   if (Number.isFinite(Number(raw))) return Number(raw);
-  const name = getFloorName(floorLike);
-  const match = String(name).match(/(\d+)/);
+  const match = String(getFloorName(floorLike)).match(/(\d+)/);
   return match ? Number(match[1]) : fallback;
 }
 
@@ -80,193 +116,407 @@ function expectedVehicleLabel(floorIndex) {
   return floorIndex === 1 ? "Motorbike" : "Car";
 }
 
+function formatGateLabel(gate) {
+  const value = String(gate || "Entry").trim();
+  return value.toLowerCase() === "entry" ? "Entry" : `Entry ${value}`;
+}
+
+function getSlotStatus(slot, session) {
+  if (slotMatchesSession(slot, session)) return "mine";
+  return String(slot?.status || "AVAILABLE").toLowerCase();
+}
+
+function sortSlots(slots) {
+  return [...slots].sort((a, b) =>
+    String(getSlotCode(a)).localeCompare(String(getSlotCode(b)), undefined, { numeric: true })
+  );
+}
+
+function makeFallbackSlots(session, active) {
+  return Array.from({ length: 10 }, (_, index) => ({
+    id: `fallback-${active ? "target" : "slot"}-${index}`,
+    slotCode: active && index === 4 ? normalizeSlotCode(session) : `S-${String(index + 1).padStart(2, "0")}`,
+    status: active && index === 4 ? "mine" : index % 4 === 0 ? "OCCUPIED" : "AVAILABLE",
+  }));
+}
+
 function createPlaceholderZone(floorIndex, order, session, activeFloorId, currentFloorId) {
   const zoneLetter = String.fromCharCode(64 + order);
-  const isActiveFloor = String(activeFloorId) === String(currentFloorId);
-  const shouldIncludeTarget = isActiveFloor && order === 3;
+  const isActive = String(activeFloorId) === String(currentFloorId) && order === 3;
 
   return {
     id: `placeholder-${floorIndex}-${zoneLetter}`,
     name: `Zone ${zoneLetter}`,
     vehicleType: expectedVehicleLabel(floorIndex),
-    slots: shouldIncludeTarget
-      ? arrangeSlots([], session).flatMap((row) => row.slots)
-      : [],
+    slots: isActive ? makeFallbackSlots(session, true) : [],
   };
 }
 
-function getSlotStatus(slot, session) {
-  if (String(getSlotId(slot)) === String(session?.slotId)) return "mine";
-  return String(slot?.status || "AVAILABLE").toLowerCase();
+function getZoneStats(section) {
+  const slots = section?.slots || [];
+  const available = slots.filter((slot) => String(slot.status || "").toLowerCase() === "available").length;
+  const occupied = slots.filter((slot) => String(slot.status || "").toLowerCase() === "occupied").length;
+  const reserved = slots.filter((slot) => String(slot.status || "").toLowerCase() === "reserved").length;
+
+  return { total: slots.length, available, occupied, reserved };
 }
 
-function formatStatusLabel(status) {
-  if (status === "mine") return "Your slot";
-  return String(status || "available").replaceAll("_", " ");
-}
-
-function arrangeSlots(slots, session) {
-  const list = slots.length
-    ? slots
-    : Array.from({ length: 8 }, (_, index) => ({
-        id: `fallback-${index}`,
-        slotCode: index === 3 ? normalizeSlotCode(session) : `S-${String(index + 1).padStart(2, "0")}`,
-        status: index === 3 ? "mine" : "AVAILABLE",
-      }));
-
-  const sorted = [...list].sort((a, b) =>
-    String(a.slotCode || "").localeCompare(String(b.slotCode || ""), undefined, { numeric: true })
-  );
-  const midpoint = Math.ceil(sorted.length / 2);
-
-  return [
-    { label: "Row A", slots: sorted.slice(0, midpoint) },
-    { label: "Row B", slots: sorted.slice(midpoint) },
-  ];
-}
-
-function Chip({ value }) {
+function StatPill({ icon: Icon, label, value }) {
   return (
-    <span className="rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
-      {value}
-    </span>
-  );
-}
-
-function DirectionRail({ gate, zone, floor, slotCode }) {
-  const steps = [
-    { icon: CarFront, label: "Enter gate", value: gate },
-    { icon: Route, label: "Go to floor", value: floor },
-    { icon: TrafficCone, label: "Follow zone", value: zone },
-    { icon: SquareParking, label: "Park at", value: slotCode },
-  ];
-
-  return (
-    <div className="rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.5)] backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Driver route</p>
-          <h3 className="mt-1 text-base font-bold text-slate-900">Follow this sequence</h3>
-        </div>
-        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">Easy navigation</span>
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <div className="grid size-9 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-700">
+        <Icon size={17} />
       </div>
-
-      <div className="grid gap-3 lg:grid-cols-4">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-
-          return (
-            <div key={step.label} className="relative rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-              <div className="mb-3 flex size-10 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                <Icon size={18} />
-              </div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{step.label}</p>
-              <p className="mt-1 text-sm font-bold text-slate-900">{step.value}</p>
-              {index < steps.length - 1 ? (
-                <ArrowRight className="absolute right-3 top-1/2 hidden size-4 -translate-y-1/2 text-slate-300 lg:block" />
-              ) : null}
-            </div>
-          );
-        })}
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="truncate text-sm font-bold text-slate-950">{value}</p>
       </div>
     </div>
   );
 }
 
-function BuildingStack({ floors, selectedFloorId, onSelectFloor }) {
+function FloorTabs({ floors, selectedFloorId, onSelectFloor }) {
   return (
-    <div className="rounded-[28px] border border-white/60 bg-white/90 p-4 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.5)] backdrop-blur">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Building stack</p>
-          <h3 className="mt-1 text-base font-bold text-slate-900">3-floor parking configuration</h3>
-        </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">6 zones per floor</span>
-      </div>
+    <div className="flex gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white p-2">
+      {floors.map((floor) => {
+        const selected = String(floor.id) === String(selectedFloorId);
+        const Icon = floor.floorIndex === 1 ? Bike : CarFront;
+        const stats = floor.sections.reduce(
+          (result, section) => {
+            const zoneStats = getZoneStats(section);
+            return {
+              total: result.total + zoneStats.total,
+              available: result.available + zoneStats.available,
+            };
+          },
+          { total: 0, available: 0 }
+        );
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        {floors.map((floorItem) => {
-          const isSelected = String(floorItem.id) === String(selectedFloorId);
-          const Icon = floorItem.floorIndex === 1 ? Bike : CarFront;
-          const free = floorItem.sections.reduce(
-            (total, section) =>
-              total + (section.slots || []).filter((slot) => String(slot.status || "").toLowerCase() === "available").length,
-            0
-          );
-          const total = floorItem.sections.reduce((sum, section) => sum + (section.slots?.length || 0), 0);
-
-          return (
-            <button
-              key={floorItem.id}
-              type="button"
-              onClick={() => onSelectFloor(floorItem.id)}
-              className={`rounded-[24px] border p-4 text-left transition-all ${
-                isSelected
-                  ? "border-sky-300 bg-sky-50 shadow-[0_20px_40px_-28px_rgba(2,132,199,0.65)]"
-                  : "border-slate-200 bg-slate-50/80 hover:bg-white"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className={`flex size-12 items-center justify-center rounded-2xl ${isSelected ? "bg-sky-600 text-white" : "bg-slate-900 text-white"}`}>
-                  <Icon size={20} />
-                </div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${isSelected ? "bg-sky-100 text-sky-700" : "bg-white text-slate-500"}`}>
-                  Floor {floorItem.floorIndex}
-                </span>
-              </div>
-
-              <div className="mt-4">
-                <h4 className="text-lg font-bold text-slate-900">{floorItem.name}</h4>
-                <p className="mt-1 text-sm text-slate-500">{floorItem.vehicleCategory} parking layout</p>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-white/70 bg-white/90 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Zones</p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">{floorItem.sections.length}</p>
-                </div>
-                <div className="rounded-2xl border border-white/70 bg-white/90 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Open</p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">{free}/{total || 0}</p>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+        return (
+          <button
+            key={floor.id}
+            type="button"
+            onClick={() => onSelectFloor(floor.id)}
+            className={`flex min-w-[180px] items-center gap-3 rounded-md border px-3 py-2 text-left transition ${
+              selected ? "border-sky-500 bg-sky-50 text-sky-950" : "border-transparent bg-slate-50 text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            <span className={`grid size-9 shrink-0 place-items-center rounded-md ${selected ? "bg-sky-600 text-white" : "bg-white text-slate-700"}`}>
+              <Icon size={17} />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-bold">{floor.name}</span>
+              <span className="block text-xs text-slate-500">
+                {stats.available}/{stats.total || 0} open
+              </span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function ZoneBadge({ section, active, order }) {
-  const total = section.slots?.length || 0;
-  const free = (section.slots || []).filter((slot) => String(slot.status || "").toLowerCase() === "available").length;
+function Legend() {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-1">
+      {Object.entries(STATUS_STYLE).map(([status, config]) => (
+        <div key={status} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+          <span className={`size-2.5 rounded-full ${config.dot}`} />
+          <span className="text-xs font-semibold text-slate-700">{config.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ParkingSlot({ slot, session, activeZone }) {
+  const status = getSlotStatus(slot, activeZone ? session : null);
+  const config = STATUS_STYLE[status] || STATUS_STYLE.occupied;
 
   return (
     <div
-      className={`relative min-w-[180px] rounded-[24px] border px-4 py-3 shadow-sm ${
-        active ? "border-sky-300 bg-sky-50 text-sky-900" : "border-slate-200 bg-white/90 text-slate-800"
-      }`}
+      className={`flex h-10 min-w-[62px] items-center justify-center rounded-md border text-xs font-black ${config.slot}`}
+      title={`${getSlotCode(slot)} - ${config.label}`}
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <span
-          className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
-            active ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          Zone {order}
-        </span>
-        <span className="text-[11px] font-semibold text-slate-500">{free}/{total} free</span>
-      </div>
-      <p className="truncate text-sm font-bold">{section.name}</p>
-      <p className="mt-1 truncate text-xs text-slate-500">{section.vehicleType}</p>
-      {active ? (
-        <div className="mt-3 inline-flex rounded-full bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white">Your zone</div>
-      ) : null}
+      {getSlotCode(slot)}
     </div>
   );
 }
 
+function ZoneBlock({ section, active, session, order, laneSide }) {
+  const stats = getZoneStats(section);
+  const slots = sortSlots((section.slots || []).length ? section.slots : makeFallbackSlots(session, active));
+  const targetSlot = slots.find((slot) => slotMatchesSession(slot, session));
+  const visibleSlots = slots.slice(0, 6);
+
+  if (active && targetSlot && !visibleSlots.some((slot) => slotMatchesSession(slot, session))) {
+    visibleSlots[5] = targetSlot;
+  }
+
+  while (visibleSlots.length < 6) {
+    visibleSlots.push({
+      id: `${section.id || section.name}-placeholder-${visibleSlots.length}`,
+      slotCode: `S-${String(visibleSlots.length + 1).padStart(2, "0")}`,
+      status: "AVAILABLE",
+    });
+  }
+  const upperSlots = visibleSlots.slice(0, 3);
+  const lowerSlots = visibleSlots.slice(3, 6);
+
+  return (
+    <section
+      className={`relative flex min-h-[188px] flex-col rounded-lg border-2 p-3 ${
+        active ? "border-sky-600 bg-sky-50 shadow-[0_20px_42px_-28px_rgba(2,132,199,0.9)]" : "border-slate-300 bg-white"
+      }`}
+    >
+      {laneSide ? (
+        <div
+          className={`pointer-events-none absolute left-1/2 z-20 h-5 -translate-x-1/2 border-l-2 ${
+            active ? "border-sky-600" : "border-slate-300"
+          } ${laneSide === "bottom" ? "-bottom-5" : "-top-5"}`}
+        />
+      ) : null}
+      {laneSide ? (
+        <div
+          className={`pointer-events-none absolute left-1/2 z-20 h-4 -translate-x-1/2 border-l-2 ${
+            active ? "border-sky-600" : "border-slate-300"
+          } ${laneSide === "bottom" ? "bottom-0" : "top-0"}`}
+        />
+      ) : null}
+
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={`grid size-11 shrink-0 place-items-center rounded-md text-base font-black ${active ? "bg-sky-600 text-white" : "bg-slate-900 text-white"}`}>
+            {order}
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-black text-slate-950">{section.name}</h3>
+            <p className="truncate text-xs font-semibold text-slate-500">{section.vehicleType}</p>
+          </div>
+        </div>
+
+        {active ? <MapPin className="size-6 shrink-0 fill-sky-600 text-sky-600" /> : null}
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-3 px-1">
+          {upperSlots.map((slot) => (
+            <ParkingSlot key={getSlotId(slot) || getSlotCode(slot)} slot={slot} session={session} activeZone={active} />
+          ))}
+        </div>
+
+        <div className="relative h-8">
+          <svg className="absolute inset-0 size-full" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              d="M8 16 H92"
+              fill="none"
+              stroke={active ? "#0284c7" : "#cbd5e1"}
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+            {[18, 50, 82].map((x) => (
+              <g key={x}>
+                <path
+                  d={`M${x} 16 V10`}
+                  fill="none"
+                  stroke={active ? "#0284c7" : "#cbd5e1"}
+                  strokeWidth="1.1"
+                  strokeLinecap="round"
+                />
+                <path
+                  d={`M${x} 16 V22`}
+                  fill="none"
+                  stroke={active ? "#0284c7" : "#cbd5e1"}
+                  strokeWidth="1.1"
+                  strokeLinecap="round"
+                />
+              </g>
+            ))}
+          </svg>
+          {laneSide ? (
+            <div
+              className={`absolute left-1/2 h-6 w-0.5 -translate-x-1/2 rounded-full ${
+                active ? "bg-sky-600" : "bg-slate-300"
+              } ${laneSide === "bottom" ? "bottom-1/2" : "top-1/2"}`}
+            />
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 px-1">
+          {lowerSlots.map((slot) => (
+            <ParkingSlot key={getSlotId(slot) || getSlotCode(slot)} slot={slot} session={session} activeZone={active} />
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-3 text-xs font-semibold">
+        <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">{stats.available} open</span>
+        <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{stats.total || visibleSlots.length} slots</span>
+        {active ? <span className="rounded-md bg-sky-600 px-2 py-1 text-white">Target</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function ParkingMapBoard({ floor, sections, activeSection, session, gate }) {
+  const activeIndex = Math.max(
+    0,
+    sections.findIndex((section) => String(section.id) === String(activeSection?.id))
+  );
+  const activeSectionHasSlot = (activeSection?.slots || []).some((slot) => slotMatchesSession(slot, session));
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="rounded-lg border border-slate-300 bg-slate-100 p-3">
+        <div className="rounded-lg border border-slate-300 bg-white p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Floor schematic</p>
+              <h2 className="text-xl font-black text-slate-950">{floor?.name}</h2>
+            </div>
+            <div className="flex items-center gap-2 rounded-md bg-sky-50 px-3 py-2 text-sky-700">
+              <CircleDot size={16} />
+              <span className="text-sm font-bold">{activeSectionHasSlot ? `Zone ${activeIndex + 1}` : "Route"}</span>
+              <ArrowRight size={15} />
+              <span className="text-sm font-black">{activeSectionHasSlot ? normalizeSlotCode(session) : "Main road"}</span>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <div className="relative mx-auto min-w-[820px] max-w-[1040px] rounded-lg border-[3px] border-slate-800 bg-slate-200 p-14 shadow-inner">
+              <svg className="pointer-events-none absolute inset-4 z-0 size-[calc(100%-2rem)]" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <marker id="parking-route-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L6,3 L0,6 Z" fill="#0284c7" />
+                  </marker>
+                </defs>
+                <path
+                  d="M8 6 H92 Q96 6 96 10 V90 Q96 94 92 94 H8 Q4 94 4 90 V10 Q4 6 8 6"
+                  fill="none"
+                  stroke="#0ea5e9"
+                  strokeWidth="0.55"
+                  markerEnd="url(#parking-route-arrow)"
+                />
+              </svg>
+
+              <div className="absolute left-1/2 top-2 z-20 -translate-x-1/2 text-sky-800">
+                <div className="flex flex-col items-center gap-1">
+                  <CarFront size={18} />
+                  <span className="text-[10px] font-black uppercase tracking-wide">{formatGateLabel(gate)}</span>
+                </div>
+              </div>
+
+              <div className="absolute right-7 top-1/2 z-20 -translate-y-1/2 text-sky-700">
+                <div className="flex flex-col items-center gap-1">
+                  <ArrowRight className="-rotate-90" size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-wide [writing-mode:vertical-rl]">Up ramp</span>
+                </div>
+              </div>
+
+              <div className="absolute bottom-2 right-10 z-20 text-sky-700">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-wide">Exit</span>
+                  <ArrowRight size={15} />
+                </div>
+              </div>
+
+              <div className="absolute left-7 top-1/2 z-20 -translate-y-1/2 text-sky-700">
+                <div className="flex flex-col items-center gap-1">
+                  <ArrowRight className="rotate-90" size={15} />
+                  <span className="text-[10px] font-black uppercase tracking-wide [writing-mode:vertical-rl]">Down</span>
+                </div>
+              </div>
+
+              <div className="relative z-10 rounded-lg border border-slate-300 bg-white/80 p-3">
+                <div className="grid gap-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    {sections.slice(0, 3).map((section, index) => (
+                      <ZoneBlock
+                        key={section.id}
+                        section={section}
+                        active={activeSectionHasSlot && String(section.id) === String(activeSection?.id)}
+                        session={session}
+                        order={index + 1}
+                        laneSide="bottom"
+                      />
+                    ))}
+                  </div>
+
+                  <div className="relative h-12 text-sky-700">
+                    <svg className="absolute inset-x-0 top-1/2 h-4 -translate-y-1/2" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+                      <defs>
+                        <marker id="parking-main-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+                          <path d="M0,0 L6,3 L0,6 Z" fill="#0284c7" />
+                        </marker>
+                      </defs>
+                      <path
+                        d="M2 5 H98"
+                        fill="none"
+                        stroke="#0ea5e9"
+                        strokeWidth="0.8"
+                        markerEnd="url(#parking-main-arrow)"
+                      />
+                      {[16.666, 50, 83.333].map((x) => (
+                        <g key={x}>
+                          <path d={`M${x} 5 V0.6`} fill="none" stroke="#94a3b8" strokeWidth="0.45" />
+                          <path d={`M${x} 5 V9.4`} fill="none" stroke="#94a3b8" strokeWidth="0.45" />
+                        </g>
+                      ))}
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="bg-white/90 px-2 text-[10px] font-black uppercase tracking-wide">
+                        {activeSectionHasSlot ? `${activeSection?.name || "Target zone"} / ${normalizeSlotCode(session)}` : "Main road"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {sections.slice(3, 6).map((section, index) => (
+                      <ZoneBlock
+                        key={section.id}
+                        section={section}
+                        active={activeSectionHasSlot && String(section.id) === String(activeSection?.id)}
+                        session={session}
+                        order={index + 4}
+                        laneSide="top"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside className="space-y-4">
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-center">
+          <MapPin className="mx-auto size-9 fill-sky-600 text-sky-600" />
+          <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-sky-700">Park here</p>
+          <p className="mt-1 text-4xl font-black tracking-wide text-sky-950">{normalizeSlotCode(session)}</p>
+          <p className="mt-1 text-sm font-semibold text-sky-800">
+            {activeSection?.name || "Zone"} · {floor?.name || "Floor"}
+          </p>
+        </div>
+
+        <Legend />
+      </aside>
+    </div>
+  );
+}
+
+function EmptyMapState() {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
+      <SquareParking className="mx-auto size-11 text-slate-400" />
+      <h2 className="mt-3 text-xl font-black text-slate-950">No active parking session</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+        Your assigned floor, zone, and slot will appear here after a booking is confirmed.
+      </p>
+    </div>
+  );
+}
 
 export default function DriverParkingMapPage() {
   const [session, setSession] = useState(null);
@@ -274,6 +524,8 @@ export default function DriverParkingMapPage() {
   const [selectedFloorId, setSelectedFloorId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showQr, setShowQr] = useState(false);
+  const [routeFocused, setRouteFocused] = useState(false);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,55 +541,56 @@ export default function DriverParkingMapPage() {
         const activeFloorId = getFloorId(active);
         const activeBuildingId = getBuildingId(active);
 
-        if (activeBuildingId || activeFloorId) {
-          let floors = [];
-
-          if (activeBuildingId) {
-            const floorsRes = await floorApi.getByBuilding(activeBuildingId);
-            floors = unwrapApiData(floorsRes.data, []);
-          }
-
-          if (!floors.length && activeFloorId) {
-            floors = [{ id: activeFloorId, name: active?.floorName || "Floor" }];
-          }
-
-          const floorSections = await Promise.all(
-            floors.map(async (floorItem, index) => {
-              const floorId = getFloorId(floorItem);
-              const zonesRes = floorId ? await zoneApi.getByFloor(floorId) : null;
-              const zones = unwrapApiData(zonesRes?.data, []);
-
-              const sections = await Promise.all(
-                zones.map(async (zone) => {
-                  const zoneId = getZoneId(zone);
-                  const slotRes = zoneId ? await parkingSlotApi.getByZone(zoneId) : { data: [] };
-
-                  return {
-                    id: zoneId,
-                    name: getZoneName(zone),
-                    vehicleType: getVehicleType(zone),
-                    slots: unwrapApiData(slotRes.data, []),
-                  };
-                })
-              );
-
-              return {
-                id: floorId || `fallback-floor-${index + 1}`,
-                name: getFloorName(floorItem),
-                floorIndex: getFloorIndex(floorItem, index + 1),
-                vehicleCategory: expectedVehicleLabel(getFloorIndex(floorItem, index + 1)),
-                sections,
-              };
-            })
-          );
-
-          if (!cancelled) {
-            setBuildingFloors(floorSections);
-            setSelectedFloorId(activeFloorId || floorSections[0]?.id || null);
-          }
-        } else {
+        if (!activeBuildingId && !activeFloorId) {
           setBuildingFloors([]);
           setSelectedFloorId(null);
+          return;
+        }
+
+        let floors = [];
+        if (activeBuildingId) {
+          const floorsRes = await floorApi.getByBuilding(activeBuildingId);
+          floors = unwrapApiData(floorsRes.data, []);
+        }
+        if (!floors.length && activeFloorId) {
+          floors = [{ id: activeFloorId, name: active?.floorName || "Floor" }];
+        }
+
+        const floorSections = await Promise.all(
+          floors.map(async (floorItem, index) => {
+            const floorId = getFloorId(floorItem);
+            const zonesRes = floorId ? await zoneApi.getByFloor(floorId) : null;
+            const zones = unwrapApiData(zonesRes?.data, []);
+
+            const sections = await Promise.all(
+              zones.map(async (zone) => {
+                const zoneId = getZoneId(zone);
+                const slotRes = zoneId ? await parkingSlotApi.getByZone(zoneId) : { data: [] };
+
+                return {
+                  id: zoneId,
+                  name: getZoneName(zone),
+                  vehicleType: getVehicleType(zone),
+                  slots: unwrapApiData(slotRes.data, []),
+                };
+              })
+            );
+
+            const floorIndex = getFloorIndex(floorItem, index + 1);
+
+            return {
+              id: floorId || `fallback-floor-${index + 1}`,
+              name: getFloorName(floorItem),
+              floorIndex,
+              vehicleCategory: expectedVehicleLabel(floorIndex),
+              sections,
+            };
+          })
+        );
+
+        if (!cancelled) {
+          setBuildingFloors(floorSections);
+          setSelectedFloorId(activeFloorId || floorSections[0]?.id || null);
         }
       } catch (error) {
         console.error("Failed to load parking map", error);
@@ -367,7 +620,7 @@ export default function DriverParkingMapPage() {
         name: `Floor ${floorIndex}`,
         floorIndex,
         vehicleCategory: expectedVehicleLabel(floorIndex),
-        sections: Array.from({ length: 6 }, (_, zoneIndex) =>
+        sections: Array.from({ length: ZONE_COUNT }, (_, zoneIndex) =>
           createPlaceholderZone(floorIndex, zoneIndex + 1, session, getFloorId(session), `fallback-floor-${floorIndex}`)
         ),
         isFallback: true,
@@ -378,15 +631,13 @@ export default function DriverParkingMapPage() {
       const floorItem =
         floors.find((candidate) => getFloorIndex(candidate, index + 1) === blueprint.floorIndex) || blueprint;
       const floorIndex = floorItem.floorIndex || blueprint.floorIndex;
-      const paddedSections = Array.from({ length: 6 }, (_, zoneIndex) => {
+      const paddedSections = Array.from({ length: ZONE_COUNT }, (_, zoneIndex) => {
         const zoneName = `Zone ${String.fromCharCode(65 + zoneIndex)}`;
         const matched =
           (floorItem.sections || []).find((section) => getZoneName(section).toLowerCase() === zoneName.toLowerCase()) ||
           floorItem.sections?.[zoneIndex];
 
-        return (
-          matched || createPlaceholderZone(floorIndex, zoneIndex + 1, session, getFloorId(session), floorItem.id)
-        );
+        return matched || createPlaceholderZone(floorIndex, zoneIndex + 1, session, getFloorId(session), floorItem.id);
       });
 
       return {
@@ -402,431 +653,103 @@ export default function DriverParkingMapPage() {
   }, [buildingFloors, session]);
 
   const currentFloor =
+    floorProfiles.find((floorItem) =>
+      (floorItem.sections || []).some((section) => (section.slots || []).some((slot) => slotMatchesSession(slot, session)))
+    ) ||
     floorProfiles.find((floorItem) => String(floorItem.id) === String(selectedFloorId)) ||
     floorProfiles.find((floorItem) => floorItem.isActiveFloor) ||
     floorProfiles[0];
   const displaySections = currentFloor?.sections || [];
+  const sectionWithSessionSlot = displaySections.find((section) =>
+    (section.slots || []).some((slot) => slotMatchesSession(slot, session))
+  );
   const activeSection =
+    sectionWithSessionSlot ||
     displaySections.find((section) => String(section.id) === String(session?.zoneId)) ||
     displaySections.find((section) => getZoneName(section) === session?.zoneName) ||
     displaySections[0];
-  const slotCode = normalizeSlotCode(session);
   const building = session?.buildingName || session?.parkingBuildingName || "Parking Building";
   const floor = currentFloor?.name || session?.floorName || "Floor";
   const zone = activeSection?.name || session?.zoneName || "Zone";
   const gate = session?.entryGateCode || session?.gateCode || "Entry";
-  const freeSlots = displaySections.reduce(
-    (total, section) =>
-      total + (section.slots || []).filter((slot) => String(slot.status || "").toLowerCase() === "available").length,
-    0
-  );
-  const totalSlots = displaySections.reduce((total, section) => total + (section.slots?.length || 0), 0);
-  const mapStats = [
-    { label: "Building", value: `${floorProfiles.length || 3} floors`, icon: Building2, tone: "bg-slate-100 text-slate-700" },
-    { label: "Entry gate", value: gate, icon: LocateFixed, tone: "bg-sky-100 text-sky-700" },
-    { label: "Floor type", value: currentFloor?.vehicleCategory || expectedVehicleLabel(1), icon: currentFloor?.floorIndex === 1 ? Bike : CarFront, tone: "bg-amber-100 text-amber-700" },
-    { label: "Open slots", value: `${freeSlots}/${totalSlots || 0}`, icon: ShieldCheck, tone: "bg-emerald-100 text-emerald-700" },
-  ];
-  const sideFacts = [
-    ["Building", building],
-    ["Floor", floor],
-    ["Vehicle", currentFloor?.vehicleCategory || expectedVehicleLabel(1)],
-    ["Zone", zone],
-    ["Slot", slotCode],
-  ];
+  const slotCode = normalizeSlotCode(session);
+
+  function handleFocusRoute() {
+    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setRouteFocused(true);
+    window.setTimeout(() => setRouteFocused(false), 1600);
+  }
 
   if (loading) {
     return (
-      <div className="flex min-h-[520px] items-center justify-center rounded-2xl border border-border bg-card">
+      <div className="flex min-h-[520px] items-center justify-center rounded-lg border border-border bg-card">
         <LoaderCircle className="size-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  return (
-    <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_28%),linear-gradient(180deg,#f8fbff_0%,#eef4f8_100%)] text-slate-900 shadow-[0_30px_80px_-45px_rgba(15,23,42,0.5)]">
-      <div className="border-b border-slate-200/80 px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Driver parking guide</p>
-              <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Parking map designed for quick scanning</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Zones are separated clearly, the driving path is highlighted, and your assigned slot is pinned so the driver can recognize it immediately.
-              </p>
-            </div>
+  if (!session) {
+    return <EmptyMapState />;
+  }
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Chip value={building} />
-              <Chip value={floor} />
-              <Chip value={zone} />
-              <Chip value={slotCode} />
+  return (
+    <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-950">
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Driver parking map</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-black tracking-tight text-slate-950">{slotCode}</h1>
+              <span className="rounded-md bg-sky-100 px-3 py-1 text-sm font-bold text-sky-700">{zone}</span>
+              <span className="rounded-md bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">{floor}</span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {mapStats.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div key={item.label} className="rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex size-10 items-center justify-center rounded-2xl ${item.tone}`}>
-                      <Icon size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
-                      <p className="text-sm font-bold text-slate-900">{item.value}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setShowQr((value) => !value)}
-              className="inline-flex size-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-              title="Show QR"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             >
-              <QrCode size={18} />
+              <QrCode size={16} />
+              QR
             </button>
             <button
               type="button"
-              className="inline-flex h-12 items-center gap-2 rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              onClick={handleFocusRoute}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-slate-800"
             >
-              <Navigation size={17} />
-              Start route
+              <Navigation size={16} />
+              Focus route
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-4 p-4 sm:p-5">
-        <DirectionRail gate={gate} zone={zone} floor={floor} slotCode={slotCode} />
-        <BuildingStack floors={floorProfiles} selectedFloorId={currentFloor?.id} onSelectFloor={setSelectedFloorId} />
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="relative min-h-[780px] overflow-hidden rounded-[30px] border border-slate-200 bg-[#e9f0f5] p-4 sm:p-5">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.22)_1px,transparent_1px)] bg-[size:36px_36px]" />
-            <div className="absolute inset-y-0 left-[84px] w-px bg-slate-300/70" />
-
-            <div className="relative z-10 grid h-full gap-5 lg:grid-cols-[92px_minmax(0,1fr)]">
-              <div className="flex flex-col items-center rounded-[24px] border border-slate-200 bg-white/92 px-3 py-5 shadow-sm backdrop-blur">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Entry</span>
-                <div className="mt-4 grid size-16 place-items-center rounded-[22px] bg-slate-900 text-white shadow-lg">
-                  <CarFront size={28} />
-                </div>
-                <span className="mt-3 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">{gate}</span>
-                <div className="my-5 flex flex-1 flex-col items-center">
-                  <div className="w-px flex-1 rounded-full bg-gradient-to-b from-sky-200 via-slate-200 to-slate-200" />
-                  <div className="my-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    flow
-                  </div>
-                  <ArrowRight className="rotate-90 text-sky-500" size={18} />
-                  <div className="mt-3 w-px flex-1 rounded-full bg-gradient-to-b from-slate-200 to-slate-300" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Exit</span>
-              </div>
-
-              <div className="space-y-4 rounded-[28px] border border-white/70 bg-white/72 p-4 shadow-sm backdrop-blur">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Detailed floor scheme</p>
-                    <h2 className="mt-1 text-xl font-bold text-slate-950">{floor}</h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {currentFloor?.vehicleCategory || "Parking"} layout with 6 grouped zones. Your destination stays pinned on the selected floor.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                      <i className="size-2.5 rounded-full bg-emerald-500" />
-                      Available
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                      <i className="size-2.5 rounded-full bg-slate-300" />
-                      Occupied
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                      <i className="size-2.5 rounded-full bg-amber-300" />
-                      Reserved
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                      <i className="size-2.5 rounded-full bg-sky-600" />
-                      Your slot
-                    </span>
-                  </div>
-                </div>
-
-                <FloorZoneBoard sections={displaySections} activeSection={activeSection} session={session} />
-              </div>
-            </div>
-
-            <div className="absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border border-white/70 bg-white/92 px-4 py-2 text-sm font-semibold text-slate-800 shadow-lg backdrop-blur">
-              <span>{gate}</span>
-              <ArrowRight size={15} className="text-slate-400" />
-              <span>{floor}</span>
-              <ArrowRight size={15} className="text-slate-400" />
-              <span>{zone}</span>
-              <ArrowRight size={15} className="text-slate-400" />
-              <span className="text-sky-700">{slotCode}</span>
-              <span className="text-slate-300">|</span>
-              <span>2 min</span>
-            </div>
-          </div>
-
-          <aside className="space-y-4">
-            <div className="rounded-[28px] border border-slate-200 bg-white/92 p-4 shadow-sm backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Primary destination</p>
-              <div className="mt-3 rounded-[24px] border-2 border-sky-500 bg-[linear-gradient(180deg,#f0f9ff_0%,#e0f2fe_100%)] p-5 text-center shadow-[0_24px_50px_-34px_rgba(2,132,199,0.8)]">
-                <MapPin className="mx-auto mb-3 size-9 fill-sky-600 text-white" />
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Park here</p>
-                <p className="mt-2 text-3xl font-black tracking-[0.08em] text-sky-900">{slotCode}</p>
-                <p className="mt-2 text-sm text-sky-700">{zone} | {floor}</p>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white/92 p-4 shadow-sm backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Quick facts</p>
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                {sideFacts.map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-slate-800">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {showQr && session?.qrToken ? (
-              <div className="rounded-[28px] border border-slate-200 bg-white/92 p-4 shadow-sm backdrop-blur">
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Entry QR</p>
-                <div className="grid place-items-center rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                  <QRCodeSVG value={session.qrToken} size={220} level="M" includeMargin={false} />
-                </div>
-              </div>
-            ) : null}
-          </aside>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <StatPill icon={Building2} label="Building" value={building} />
+          <StatPill icon={LocateFixed} label="Gate" value={gate} />
+          <StatPill icon={currentFloor?.floorIndex === 1 ? Bike : CarFront} label="Vehicle" value={currentFloor?.vehicleCategory || "Parking"} />
+          <StatPill icon={CheckCircle2} label="Destination" value={`${zone} / ${slotCode}`} />
         </div>
       </div>
-    </div>
-  );
-}
 
-function SchematicSlot({ slot, session, active }) {
-  const status = getSlotStatus(slot, active ? session : null);
-  const code = slot?.slotCode || slot?.parkingSlotCode || "S";
+      <FloorTabs floors={floorProfiles} selectedFloorId={currentFloor?.id} onSelectFloor={setSelectedFloorId} />
 
-  return (
-    <div
-      className={`flex h-14 w-10 items-center justify-center rounded-sm border text-[9px] font-bold tracking-wide ${
-        status === "mine"
-          ? "border-sky-600 bg-sky-100 text-sky-900 shadow-[0_0_0_3px_rgba(224,242,254,0.95)]"
-          : status === "occupied"
-            ? "border-slate-400 bg-slate-200 text-slate-500"
-            : status === "reserved"
-              ? "border-amber-400 bg-amber-50 text-amber-800"
-              : status === "maintenance"
-                ? "border-rose-300 bg-rose-50 text-rose-700"
-                : "border-slate-300 bg-white text-slate-700"
-      }`}
-      title={`${code} - ${formatStatusLabel(status)}`}
-    >
-      <span className="-rotate-90 whitespace-nowrap">{code}</span>
-    </div>
-  );
-}
+      {showQr && session?.qrToken ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="grid w-fit place-items-center rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <QRCodeSVG value={session.qrToken} size={180} level="M" includeMargin={false} />
+          </div>
+        </div>
+      ) : null}
 
-function SchematicZoneStrip({ section, session, active, orientation = "horizontal", labelSide = "start" }) {
-  const slots = (section.slots || []).length
-    ? [...section.slots].sort((a, b) =>
-        String(a.slotCode || "").localeCompare(String(b.slotCode || ""), undefined, { numeric: true })
-      )
-    : arrangeSlots([], active ? session : null).flatMap((row) => row.slots);
-
-  return (
-    <div
-      className={`rounded-[18px] border p-2 ${
-        active ? "border-sky-300 bg-sky-50/80" : "border-slate-300 bg-white/90"
-      }`}
-    >
       <div
-        className={`mb-2 flex items-center gap-2 ${
-          labelSide === "end" ? "justify-end" : "justify-start"
+        ref={mapRef}
+        className={`rounded-lg transition-shadow duration-300 ${
+          routeFocused ? "shadow-[0_0_0_4px_rgba(14,165,233,0.35),0_20px_50px_-30px_rgba(2,132,199,0.8)]" : ""
         }`}
       >
-        <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${active ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-600"}`}>
-          {section.name}
-        </span>
-      </div>
-      <div
-        className={`flex gap-1.5 overflow-x-auto ${
-          orientation === "vertical" ? "max-h-[290px] flex-col items-center overflow-y-auto overflow-x-hidden" : "flex-row"
-        }`}
-      >
-        {slots.map((slot) => (
-          <SchematicSlot key={getSlotId(slot) || slot.slotCode} slot={slot} session={session} active={active} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FloorZoneBoard({ sections, activeSection, session }) {
-  const topSections = sections.slice(0, Math.ceil(sections.length / 2));
-  const bottomSections = sections.slice(Math.ceil(sections.length / 2));
-  const activeZoneIndex = Math.max(
-    0,
-    sections.findIndex((section) => String(section.id) === String(activeSection?.id))
-  );
-  const activeZoneOrder = activeZoneIndex + 1;
-  const targetSlotCode = normalizeSlotCode(session);
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-[28px] border border-slate-200 bg-slate-50/80 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Parking floor drawing</p>
-            <h3 className="mt-1 text-base font-bold text-slate-900">Layout grouped like a real floor plan</h3>
-          </div>
-          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-            Zone strips + center lane
-          </span>
-        </div>
-
-        <div className="rounded-[26px] border-[1.5px] border-slate-400 bg-white p-4 shadow-inner">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {sections.map((section, index) => (
-                <ZoneBadge
-                  key={section.id}
-                  section={section}
-                  active={String(section.id) === String(activeSection?.id)}
-                  order={index + 1}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-start justify-center gap-3">
-              {topSections.map((section) => (
-                <div key={section.id} className="min-w-[200px] flex-1">
-                  <SchematicZoneStrip
-                    section={section}
-                    session={session}
-                    active={String(section.id) === String(activeSection?.id)}
-                    orientation="horizontal"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-[24px] border-[1.5px] border-slate-400 bg-slate-50 px-4 py-8">
-              <div className="flex flex-col items-center justify-center gap-3 text-center">
-                <p className="text-lg font-bold uppercase tracking-[0.24em] text-slate-700">Bai giu xe</p>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Main circulation lane</p>
-                <div className="flex w-full max-w-3xl items-center justify-around text-slate-500">
-                  <ArrowRight size={24} />
-                  <ArrowRight size={24} />
-                  <ArrowRight size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-sky-200 bg-[linear-gradient(180deg,rgba(239,246,255,0.95)_0%,rgba(224,242,254,0.9)_100%)] px-4 py-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-sky-700">Driving guide line</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">
-                    Follow the highlighted route from entry to {activeSection?.name || "target zone"}, then park at {targetSlotCode}.
-                  </p>
-                </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-700 shadow-sm">
-                  Zone {activeZoneOrder} target
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-[120px_minmax(0,1fr)_220px] lg:items-center">
-                <div className="rounded-2xl border border-white/80 bg-white/95 px-3 py-3 text-center shadow-sm">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Start</p>
-                  <p className="mt-1 text-sm font-bold text-slate-900">Entry Gate</p>
-                </div>
-
-                <div className="relative h-12 overflow-hidden rounded-full border border-sky-200 bg-white/80">
-                  <div className="absolute inset-x-5 top-1/2 -translate-y-1/2 border-t-[3px] border-dashed border-sky-500" />
-                  <div className="absolute left-5 top-1/2 size-3 -translate-y-1/2 rounded-full bg-sky-600 shadow-[0_0_0_5px_rgba(224,242,254,0.95)]" />
-                  <div className="absolute right-5 top-1/2 size-3 -translate-y-1/2 rounded-full bg-sky-600 shadow-[0_0_0_5px_rgba(224,242,254,0.95)]" />
-                  <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-around px-8 text-sky-600">
-                    <ArrowRight size={16} />
-                    <ArrowRight size={16} />
-                    <ArrowRight size={16} />
-                    <ArrowRight size={16} />
-                  </div>
-                  <div
-                    className="absolute top-1/2 h-7 -translate-y-1/2 rounded-full bg-sky-100/90 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700 shadow-sm"
-                    style={{ left: `${Math.min(74, 12 + activeZoneIndex * 14)}%`, transform: "translate(-50%, -50%)" }}
-                  >
-                    {activeSection?.name || "Target zone"}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-sky-200 bg-white/95 px-3 py-3 shadow-sm">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Finish</p>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold text-slate-900">{targetSlotCode}</span>
-                    <MapPin className="fill-sky-600 text-sky-600" size={16} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-start justify-center gap-3">
-              {bottomSections.map((section) => (
-                <div key={section.id} className="min-w-[200px] flex-1">
-                  <SchematicZoneStrip
-                    section={section}
-                    session={session}
-                    active={String(section.id) === String(activeSection?.id)}
-                    orientation="horizontal"
-                    labelSide="end"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)_180px]">
-              <div className="rounded-[18px] border border-slate-300 bg-white p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Entry edge</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <CarFront className="text-slate-700" size={22} />
-                  <ArrowRight className="text-slate-500" size={18} />
-                  <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">Gate in</span>
-                </div>
-              </div>
-
-              <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50/80 p-3">
-                <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  <span className="inline-flex items-center gap-2"><i className="size-2.5 rounded-full bg-slate-300" /> Occupied</span>
-                  <span className="inline-flex items-center gap-2"><i className="size-2.5 rounded-full bg-white ring-1 ring-slate-400" /> Available</span>
-                  <span className="inline-flex items-center gap-2"><i className="size-2.5 rounded-full bg-amber-300" /> Reserved</span>
-                  <span className="inline-flex items-center gap-2"><i className="size-2.5 rounded-full bg-sky-600" /> Your slot</span>
-                </div>
-              </div>
-
-              <div className="rounded-[18px] border border-slate-300 bg-white p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Target</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">{activeSection?.name}</span>
-                  <MapPin className="fill-sky-600 text-sky-600" size={18} />
-                  <span className="text-sm font-bold text-sky-800">{normalizeSlotCode(session)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ParkingMapBoard floor={currentFloor} sections={displaySections} activeSection={activeSection} session={session} gate={gate} />
       </div>
     </div>
   );

@@ -15,8 +15,6 @@ import {
   LogOut,
   MessageSquare,
   Map,
-  QrCode,
-  ScanLine,
   Settings,
   Shield,
   SquareParking,
@@ -97,16 +95,12 @@ const CONFIG = {
     role: "staff",
     navItems: [
       { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "entry", label: "Vehicle Entry", icon: LogIn },
-      { id: "exit", label: "Vehicle Exit", icon: LogOut },
-      { id: "qr", label: "QR Verification", icon: QrCode },
-      { id: "ocr", label: "OCR Scanner", icon: ScanLine },
-      { id: "ocr-correction", label: "OCR Correction", icon: ScanLine },
-      { id: "sessions", label: "Parking Sessions", icon: Clock },
-      { id: "payments", label: "Payment Processing", icon: CreditCard },
-      { id: "requests", label: "Request Processing", icon: MessageSquare },
-      { id: "exceptions", label: "Exception Cases", icon: AlertTriangle },
-      { id: "notifications", label: "Notifications", icon: Bell },
+      { id: "entry", label: "Gate Entry", icon: LogIn },
+      { id: "exit", label: "Gate Exit", icon: LogOut },
+      { id: "sessions", label: "Sessions", icon: Clock },
+      { id: "payments", label: "Payments", icon: CreditCard },
+      { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
+      { id: "requests", label: "Requests", icon: MessageSquare },
     ],
     titles: {
       overview: {
@@ -114,44 +108,28 @@ const CONFIG = {
         subtitle: "Monitor daily processing, queue status and incoming alerts",
       },
       entry: {
-        title: "Vehicle Entry",
-        subtitle: "",
+        title: "Gate Entry",
+        subtitle: "Scan plates, process QR bookings, registered vehicles, and direct walk-ins",
       },
       exit: {
-        title: "Vehicle Exit",
-        subtitle: "",
-      },
-      qr: {
-        title: "QR Verification",
-        subtitle: "",
-      },
-      ocr: {
-        title: "OCR Scanner",
-        subtitle: "",
-      },
-      "ocr-correction": {
-        title: "OCR Correction",
-        subtitle: "",
+        title: "Gate Exit",
+        subtitle: "Find active sessions, record exit, and move vehicles to payment",
       },
       sessions: {
-        title: "Parking Sessions",
-        subtitle: "",
+        title: "Sessions",
+        subtitle: "Search and monitor active, payment, completed, and exception sessions",
       },
       payments: {
-        title: "Payment Processing",
-        subtitle: "",
+        title: "Payments",
+        subtitle: "Collect and review sessions waiting for payment",
       },
       requests: {
-        title: "Request Processing",
-        subtitle: "",
+        title: "Requests",
+        subtitle: "Handle driver support requests and staff assignments",
       },
       exceptions: {
-        title: "Exception Cases",
-        subtitle: "",
-      },
-      notifications: {
-        title: "Notifications",
-        subtitle: "",
+        title: "Exceptions",
+        subtitle: "Review OCR corrections, unregistered vehicles, lost QR, and payment issues",
       },
       settings: {
         title: "Settings",

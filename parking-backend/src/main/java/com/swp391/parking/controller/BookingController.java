@@ -57,6 +57,13 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(bookingService.getMyBookings(getCurrentUserId(ud))));
     }
 
+    @PostMapping("/verify-qr")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Verify booking QR without consuming it")
+    public ResponseEntity<ApiResponse<BookingResponse>> verifyQr(@RequestParam String qrToken) {
+        return ResponseEntity.ok(ApiResponse.success("QR hop le", bookingService.verifyQrToken(qrToken)));
+    }
+
     @PutMapping("/{id}/cancel")
     @PreAuthorize("hasRole('DRIVER')")
     @Operation(summary = "Hủy booking", description = "Chỉ hủy được PENDING_PAYMENT hoặc CONFIRMED.")

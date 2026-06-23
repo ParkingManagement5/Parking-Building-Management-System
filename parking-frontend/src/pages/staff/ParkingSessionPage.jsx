@@ -1,16 +1,42 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Clock3 } from "lucide-react";
+import { sessionApi } from "../../api/staff/sessionApi";
+import { unwrapApiData } from "../../utils/api";
 import {
   computeSessionFee,
   formatStaffCurrency,
   formatStaffDateTime,
-  getStaffPortalState,
 } from "./staffPortalState";
 import { StaffEmptyState, StaffInput, StaffPageSection, StaffStatusBadge } from "./StaffUi";
 
 export default function ParkingSessionPage() {
   const [keyword, setKeyword] = useState("");
-  const sessions = getStaffPortalState().sessions;
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadSessions() {
+    setLoading(true);
+    setError("");
+    try {
+      const responses = await Promise.all([
+        sessionApi.getSessions({ status: "ACTIVE" }),
+        sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
+        sessionApi.getSessions({ status: "COMPLETED" }),
+      ]);
+      setSessions(responses.flatMap((res) => unwrapApiData(res.data, [])));
+    } catch (err) {
+      console.error("Failed to load parking sessions", err);
+      setError(err.response?.data?.message || "Khong tai duoc danh sach session.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadSessions();
+  }, []);
 
   const filteredSessions = useMemo(() => {
     const query = keyword.trim().toLowerCase();
@@ -19,24 +45,30 @@ export default function ParkingSessionPage() {
       (item) =>
         String(item.licensePlate || "").toLowerCase().includes(query) ||
         String(item.sessionId || "").toLowerCase().includes(query) ||
-        String(item.gateName || "").toLowerCase().includes(query)
+        String(item.slotCode || "").toLowerCase().includes(query)
     );
   }, [sessions, keyword]);
 
   return (
     <div className="space-y-5">
-      <StaffPageSection title="Parking Sessions" subtitle="Track active and completed session records in one view">
+      <StaffPageSection title="Parking Sessions" subtitle="Track backend active, waiting-payment, and completed sessions">
         <StaffInput
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Filter by plate, session ID, or gate"
+          placeholder="Filter by plate, session ID, or slot"
           className="mb-4"
         />
 
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+            {error}
+          </div>
+        ) : null}
+
         {filteredSessions.length === 0 ? (
           <StaffEmptyState
-            title="No session records"
-            description="Vehicle entry confirmations will populate this list."
+            title={loading ? "Loading sessions" : "No session records"}
+            description="Backend vehicle entry confirmations will populate this list."
           />
         ) : (
           <div className="space-y-3">
@@ -46,15 +78,12 @@ export default function ParkingSessionPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
-                      <StaffStatusBadge tone={item.status === "ACTIVE" ? "emerald" : "slate"}>
-                        {item.status.toLowerCase()}
-                      </StaffStatusBadge>
-                      <StaffStatusBadge tone={item.paymentStatus === "PAID" ? "violet" : "amber"}>
-                        {item.paymentStatus.toLowerCase()}
+                      <StaffStatusBadge tone={item.status === "ACTIVE" ? "emerald" : item.status === "WAITING_PAYMENT" ? "amber" : "slate"}>
+                        {String(item.status || "unknown").toLowerCase()}
                       </StaffStatusBadge>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {item.sessionId} • {item.gateName} • {item.slotCode}
+                      Session #{item.sessionId} - Slot {item.slotCode}
                     </p>
                   </div>
 
@@ -66,7 +95,7 @@ export default function ParkingSessionPage() {
                     <div className="rounded-2xl bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Current Fee</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
-                        {formatStaffCurrency(item.status === "ACTIVE" ? computeSessionFee(item.entryTime) : item.feeAmount)}
+                        {formatStaffCurrency(item.status === "ACTIVE" || item.status === "WAITING_PAYMENT" ? computeSessionFee(item.entryTime) : 0)}
                       </p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">
@@ -89,7 +118,7 @@ export default function ParkingSessionPage() {
           <div>
             <p className="text-sm font-semibold text-foreground">Session Summary</p>
             <p className="text-xs text-muted-foreground">
-              {sessions.filter((item) => item.status === "ACTIVE").length} active • {sessions.filter((item) => item.status === "COMPLETED").length} completed
+              {sessions.filter((item) => item.status === "ACTIVE").length} active - {sessions.filter((item) => item.status === "COMPLETED").length} completed
             </p>
           </div>
         </div>

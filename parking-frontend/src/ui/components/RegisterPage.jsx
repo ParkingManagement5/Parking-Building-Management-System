@@ -65,7 +65,7 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done] = useState(false);
   const [error, setError] = useState("");
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [provisioning, setProvisioning] = useState(0);

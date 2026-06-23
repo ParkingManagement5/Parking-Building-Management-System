@@ -69,6 +69,15 @@ function getErrorMessage(error, fallback) {
   );
 }
 
+function isOpenBooking(booking) {
+  const status = String(booking?.status || booking?.bookingStatus || "").toUpperCase();
+  const qrUsed = booking?.qrUsed === true || Boolean(booking?.qrUsedAt);
+  const expiryValue = booking?.expiredAt || booking?.bookingEndTime;
+  const expiresAt = expiryValue ? new Date(expiryValue).getTime() : null;
+  const isExpired = Number.isFinite(expiresAt) && expiresAt < Date.now();
+  return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed && !isExpired);
+}
+
 export default function BookingPage() {
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
@@ -126,12 +135,7 @@ export default function BookingPage() {
       const vehicleId = vehicle.vehicleId || vehicle.id;
       const activeBooking = myBookings.find((booking) => {
         const bookingVehicleId = booking.vehicleId || booking.vehicle?.id;
-        return (
-          String(bookingVehicleId) === String(vehicleId) &&
-          ["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN"].includes(
-            String(booking.status || "").toUpperCase()
-          )
-        );
+        return String(bookingVehicleId) === String(vehicleId) && isOpenBooking(booking);
       });
 
       return {
