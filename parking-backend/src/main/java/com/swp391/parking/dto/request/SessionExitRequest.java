@@ -9,4 +9,6 @@ public class SessionExitRequest {
     private Long gateId;
 
     private Long staffUserId;
+
+    private Boolean qrVerified;
 }

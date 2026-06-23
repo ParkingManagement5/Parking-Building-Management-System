@@ -129,41 +129,52 @@ export default function LandingPage() {
     let cancelled = false;
 
     async function loadPublicData() {
-      try {
-        const [buildingRes, vehicleTypeRes] = await Promise.all([
-          buildingApi.getAll(),
-          vehicleTypeApi.getAll(),
-        ]);
+      const [buildingResult, vehicleTypeResult] = await Promise.allSettled([
+        buildingApi.getAll(),
+        vehicleTypeApi.getAll(),
+      ]);
 
-        const buildings = unwrapApiData(buildingRes.data, []);
-        const vehicleTypes = unwrapApiData(vehicleTypeRes.data, []);
+      const buildings = getSettledData(buildingResult, []);
+      const vehicleTypes = getSettledData(vehicleTypeResult, []);
 
-        const [floorResponses, gateResponses] = await Promise.all([
-          Promise.allSettled(buildings.map((item) => floorApi.getByBuilding(getBuildingId(item)))),
-          Promise.allSettled(buildings.map((item) => gateApi.getByBuilding(getBuildingId(item)))),
-        ]);
+      if (buildingResult.status === "rejected" || vehicleTypeResult.status === "rejected") {
+        console.error("Failed to load core landing data", {
+          buildingsError: buildingResult.status === "rejected" ? buildingResult.reason : null,
+          vehicleTypesError: vehicleTypeResult.status === "rejected" ? vehicleTypeResult.reason : null,
+        });
+      }
 
-        const floors = floorResponses.flatMap((result) => getSettledData(result, []));
-        const gates = gateResponses.flatMap((result) => getSettledData(result, []));
+      const [floorResponses, gateResponses] = await Promise.all([
+        Promise.allSettled(buildings.map((item) => floorApi.getByBuilding(getBuildingId(item)))),
+        Promise.allSettled(buildings.map((item) => gateApi.getByBuilding(getBuildingId(item)))),
+      ]);
 
-        const zoneResponses = await Promise.allSettled(
-          floors.map((item) => zoneApi.getByFloor(getFloorId(item)))
-        );
-        const zones = zoneResponses.flatMap((result) => getSettledData(result, []));
+      const floors = floorResponses.flatMap((result) => getSettledData(result, []));
+      const gates = gateResponses.flatMap((result) => getSettledData(result, []));
 
-        const slotResponses = await Promise.allSettled(
-          zones.map((item) => parkingSlotApi.getByZone(getZoneId(item)))
-        );
-        const slots = slotResponses.flatMap((result) => getSettledData(result, []));
+      const zoneResponses = await Promise.allSettled(
+        floors.map((item) => zoneApi.getByFloor(getFloorId(item)))
+      );
+      const zones = zoneResponses.flatMap((result) => getSettledData(result, []));
 
-        if (!cancelled) {
-          setLiveData({ buildings, vehicleTypes, gates, slots });
-        }
-      } catch (error) {
-        console.error("Failed to load public landing data", error);
-        if (!cancelled) {
-          setLiveData({ buildings: [], vehicleTypes: [], gates: [], slots: [] });
-        }
+      const slotResponses = await Promise.allSettled(
+        zones.map((item) => parkingSlotApi.getByZone(getZoneId(item)))
+      );
+      const slots = slotResponses.flatMap((result) => getSettledData(result, []));
+
+      const failedGroups = {
+        floors: floorResponses.filter((result) => result.status === "rejected").length,
+        gates: gateResponses.filter((result) => result.status === "rejected").length,
+        zones: zoneResponses.filter((result) => result.status === "rejected").length,
+        slots: slotResponses.filter((result) => result.status === "rejected").length,
+      };
+
+      if (Object.values(failedGroups).some((count) => count > 0)) {
+        console.error("Landing page loaded with partial public data", failedGroups);
+      }
+
+      if (!cancelled) {
+        setLiveData({ buildings, vehicleTypes, gates, slots });
       }
     }
 
