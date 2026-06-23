@@ -66,7 +66,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label>Password</label>     
             <input
               type="password"
               name="password"

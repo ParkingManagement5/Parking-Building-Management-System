@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, LoaderCircle, Navigation } from "lucide-react";
+import { AlertCircle, CreditCard, LoaderCircle, Navigation } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { bookingApi } from "../../api/driver/bookingApi";
-import { paymentApi } from "../../api/driver/paymentApi";
+import { driverSessionApi } from "../../api/driver/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
   formatCurrency,
@@ -22,61 +21,55 @@ export default function CurrentSessionPage() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
+  const [generatingExitQr, setGeneratingExitQr] = useState(false);
+  const [exitQr, setExitQr] = useState(null);
   const [error, setError] = useState("");
 
   async function loadSession() {
     setLoading(true);
     setError("");
+    setExitQr(null);
     try {
-      const res = await bookingApi.getMyBookings();
-      const bookings = unwrapApiData(res.data, []);
-      const active = bookings.find((item) => {
-        const status = getBookingStatus(item);
-        return (
-          status.includes("pending") ||
-          status.includes("confirmed") ||
-          status.includes("checked_in") ||
-          status.includes("active")
-        );
-      });
-      setSession(active || null);
+      const sessionRes = await driverSessionApi.getMySessions();
+      const mySessions = unwrapApiData(sessionRes.data, []);
+      const activeSession = mySessions.find((item) => String(item.status || "").toUpperCase() === "ACTIVE");
+      if (activeSession) {
+        setSession({ ...activeSession, source: "parking-session" });
+        return;
+      }
+      const waitingPaymentSession = mySessions.find((item) => String(item.status || "").toUpperCase() === "WAITING_PAYMENT");
+      if (waitingPaymentSession) {
+        setSession({ ...waitingPaymentSession, source: "parking-session" });
+        return;
+      }
+      setSession(null);
     } catch (loadError) {
       console.error("Failed to load current session", loadError);
       setSession(null);
-      setError(loadError.response?.data?.message || "Khong tai duoc booking hien tai.");
+      setError(loadError.response?.data?.message || "Khong tai duoc parking session hien tai.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSession();
   }, []);
 
-  async function handlePayDeposit() {
-    if (!session?.bookingId) return;
+  async function handleCreateExitQr() {
+    if (!session?.sessionId) return;
 
-    setPaying(true);
+    setGeneratingExitQr(true);
     setError("");
     try {
-      const createRes = await paymentApi.createDeposit({
-        bookingId: session.bookingId,
-        depositAmount: session.depositAmount ?? 0,
-        paymentMethod: "CASH",
-      });
-
-      const payment = unwrapApiData(createRes.data, null);
-      if (payment?.paymentId) {
-        await paymentApi.confirmDeposit(payment.paymentId);
-      }
-
-      await loadSession();
-    } catch (paymentError) {
-      console.error("Failed to pay deposit", paymentError);
-      setError(paymentError.response?.data?.message || "Khong thanh toan duoc deposit cho booking nay.");
+      const res = await driverSessionApi.createExitQr(session.sessionId);
+      setExitQr(unwrapApiData(res.data, null));
+    } catch (qrError) {
+      console.error("Failed to create exit QR", qrError);
+      setError(qrError.response?.data?.message || "Khong tao duoc Exit QR cho session nay.");
     } finally {
-      setPaying(false);
+      setGeneratingExitQr(false);
     }
   }
 
@@ -97,8 +90,11 @@ export default function CurrentSessionPage() {
   }
 
   const status = getBookingStatus(session);
-  const isPendingPayment = status === "pending_payment" || status.includes("pending");
-  const hasEntryQr = Boolean(session.qrToken);
+  const isParkingSession = session.source === "parking-session" || Boolean(session.sessionId);
+  const sessionStatus = String(session.status || "").toUpperCase();
+  const isWaitingPayment = sessionStatus === "WAITING_PAYMENT";
+  const headerLabel = isWaitingPayment ? "WAITING PAYMENT" : isParkingSession ? "ACTIVE SESSION" : "BOOKING";
+  const badgeLabel = isWaitingPayment ? "Waiting payment" : isParkingSession ? "Active" : status;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -112,7 +108,7 @@ export default function CurrentSessionPage() {
       <div className="rounded-2xl bg-gradient-to-r from-primary to-[#4338CA] p-7 text-white dark:to-[#312E81]">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <p className="text-white/60 text-xs mb-1">ACTIVE SESSION</p>
+            <p className="text-white/60 text-xs mb-1">{headerLabel}</p>
             <h2 className="font-bold mb-1 text-[1.375rem]">
               {session.buildingName || session.parkingBuildingName || "Parking Building"}
             </h2>
@@ -122,7 +118,7 @@ export default function CurrentSessionPage() {
           </div>
           <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-xs text-white dark:bg-white/10">
             <span className="size-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            Active
+            {badgeLabel}
           </span>
         </div>
         <div className="text-center mb-6">
@@ -201,46 +197,64 @@ export default function CurrentSessionPage() {
           Navigate to Slot
         </button>
 
-        {hasEntryQr ? (
+        {isWaitingPayment ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-4">Your Entry QR Code</p>
-            <div className="rounded-2xl bg-white p-4">
-              <QRCodeSVG value={session.qrToken} size={156} level="M" includeMargin={false} />
-            </div>
-            <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {shortToken(session.qrToken)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              Show this QR at the entry gate. It works after deposit payment is confirmed.
-            </p>
-          </>
-        ) : isPendingPayment ? (
-          <>
-            <p className="text-sm font-semibold text-foreground mb-2">Deposit Required</p>
+            <p className="text-sm font-semibold text-foreground mb-2">Waiting for Payment</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Booking da tao nhung chua co QR. Thanh toan deposit de backend tao Entry QR.
+              Gate Exit has already recorded this vehicle out. Staff must finish the parking-fee payment before this session disappears.
             </p>
             <button
               type="button"
-              onClick={() => void handlePayDeposit()}
-              disabled={paying}
-              className="mt-4 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              onClick={() => navigate("/driver/payment-history")}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
-              {paying ? (
-                <>
-                  <LoaderCircle size={14} className="mr-2 animate-spin" />
-                  Processing
-                </>
-              ) : (
-                `Pay Deposit (${formatCurrency(session.depositAmount || 0)})`
-              )}
+              <CreditCard size={14} />
+              View Payments
             </button>
+          </>
+        ) : isParkingSession ? (
+          <>
+            <p className="text-sm font-semibold text-foreground mb-4">Your Exit QR Code</p>
+            {exitQr?.qrToken ? (
+              <>
+                <div className="rounded-2xl bg-white p-5 shadow-sm">
+                  <QRCodeSVG value={exitQr.qrToken} size={240} level="H" includeMargin />
+                </div>
+                <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
+                  {shortToken(exitQr.qrToken)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Show this QR at Gate Exit. It expires at {formatDateTime(exitQr.expiresAt)}.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="max-w-sm text-center text-xs text-muted-foreground">
+                  Generate this QR when you are at the exit gate. Staff scans it to find your session automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleCreateExitQr()}
+                  disabled={generatingExitQr}
+                  className="mt-4 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {generatingExitQr ? (
+                    <>
+                      <LoaderCircle size={14} className="mr-2 animate-spin" />
+                      Generating
+                    </>
+                  ) : (
+                    "Generate Exit QR"
+                  )}
+                </button>
+              </>
+            )}
           </>
         ) : (
           <>
             <p className="text-sm font-semibold text-foreground mb-2">QR Not Available</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Backend chua tra ve QR cho booking/status hien tai.
+              Current Session only shows active parking sessions. Entry QR is available from booking screens before check-in.
             </p>
           </>
         )}

@@ -19,7 +19,7 @@ directClient.interceptors.request.use((config) => {
 });
 
 function sessionUrl(path = "") {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = path ? (path.startsWith("/") ? path : `/${path}`) : "";
 
   if (/^https?:\/\//i.test(apiBase)) {
     return `${apiBase.replace(/\/api\/v1\/?$/, "")}/api/sessions${normalizedPath}`;
@@ -30,4 +30,10 @@ function sessionUrl(path = "") {
 
 export const sessionApi = {
   entry: (data) => directClient.post(sessionUrl("/entry"), data),
+  getSessions: (params = {}) => directClient.get(sessionUrl(), { params }),
+  getById: (id) => directClient.get(sessionUrl(`/${id}`)),
+  exit: (id, data) => directClient.post(sessionUrl(`/${id}/exit`), data),
+  exitByQr: (data) => directClient.post(sessionUrl("/exit/qr"), data),
+  createExitQr: (id) => directClient.post(sessionUrl(`/${id}/exit-qr`)),
+  getMySessions: () => directClient.get(sessionUrl("/my")),
 };

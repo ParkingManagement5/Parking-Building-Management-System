@@ -25,9 +25,6 @@ import StaffDashboard from "../pages/staff/StaffDashboard";
 import StaffNotificationPage from "../pages/staff/StaffNotificationPage";
 import VehicleEntryPage from "../pages/staff/VehicleEntryPage";
 import VehicleExitPage from "../pages/staff/VehicleExitPage";
-import QrVerificationPage from "../pages/staff/QrVerificationPage";
-import OcrScanPage from "../pages/staff/OcrScanPage";
-import OcrCorrectionPage from "../pages/staff/OcrCorrectionPage";
 import ParkingSessionPage from "../pages/staff/ParkingSessionPage";
 import PaymentProcessingPage from "../pages/staff/PaymentProcessingPage";
 import RequestProcessingPage from "../pages/staff/RequestProcessingPage";
@@ -88,9 +85,9 @@ export default function AppRoutes() {
             <Route index element={<StaffDashboard />} />
             <Route path="entry" element={<VehicleEntryPage />} />
             <Route path="exit" element={<VehicleExitPage />} />
-            <Route path="qr" element={<QrVerificationPage />} />
-            <Route path="ocr" element={<OcrScanPage />} />
-            <Route path="ocr-correction" element={<OcrCorrectionPage />} />
+            <Route path="qr" element={<Navigate to="/staff/entry" replace />} />
+            <Route path="ocr" element={<Navigate to="/staff/entry" replace />} />
+            <Route path="ocr-correction" element={<Navigate to="/staff/exceptions" replace />} />
             <Route path="sessions" element={<ParkingSessionPage />} />
             <Route path="payments" element={<PaymentProcessingPage />} />
             <Route path="requests" element={<RequestProcessingPage />} />

@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 import { Car, Plus, X } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
+import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { unwrapApiData } from "../../utils/api";
 import { getStatusClasses } from "./driverPortalUtils";
 
+function getVehicleTypeId(item) {
+  return item?.vehicleTypeId ?? item?.id ?? "";
+}
+
 export default function MyVehiclesPage() {
   const [vehicles, setVehicles] = useState([]);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
     licensePlate: "",
-    vehicleTypeId: 1,
+    vehicleTypeId: "",
     color: "",
     brand: "",
     model: "",
@@ -22,14 +28,24 @@ export default function MyVehiclesPage() {
 
     async function loadVehicles() {
       try {
-        const res = await axiosClient.get("/vehicles/my");
+        const [vehiclesRes, typesRes] = await Promise.all([
+          axiosClient.get("/vehicles/my"),
+          vehicleTypeApi.getAll(),
+        ]);
         if (!cancelled) {
-          setVehicles(unwrapApiData(res.data, []));
+          const types = unwrapApiData(typesRes.data, []);
+          setVehicles(unwrapApiData(vehiclesRes.data, []));
+          setVehicleTypes(types);
+          setForm((prev) => ({
+            ...prev,
+            vehicleTypeId: prev.vehicleTypeId || String(getVehicleTypeId(types[0])),
+          }));
         }
       } catch (error) {
-        console.error("Failed to load vehicles", error);
+        console.error("Failed to load vehicles or vehicle types", error);
         if (!cancelled) {
           setVehicles([]);
+          setVehicleTypes([]);
         }
       }
     }
@@ -45,7 +61,7 @@ export default function MyVehiclesPage() {
     setEditingId(null);
     setForm({
       licensePlate: "",
-      vehicleTypeId: 1,
+      vehicleTypeId: String(getVehicleTypeId(vehicleTypes[0])),
       color: "",
       brand: "",
       model: "",
@@ -62,7 +78,7 @@ export default function MyVehiclesPage() {
     setEditingId(item.vehicleId || item.id);
     setForm({
       licensePlate: item.licensePlate || "",
-      vehicleTypeId: item.vehicleType?.id || item.vehicleTypeId || 1,
+      vehicleTypeId: String(item.vehicleType?.vehicleTypeId || item.vehicleType?.id || item.vehicleTypeId || getVehicleTypeId(vehicleTypes[0])),
       color: item.color || "",
       brand: item.brand || "",
       model: item.model || "",
@@ -78,14 +94,17 @@ export default function MyVehiclesPage() {
       alert("License plate is required");
       return;
     }
+    if (!form.vehicleTypeId) {
+      alert("Vehicle type is required. Please ask a manager to create vehicle types first.");
+      return;
+    }
 
     const payload = {
       vehicleTypeId: Number(form.vehicleTypeId),
-      licensePlate: form.licensePlate.trim(),
+      licensePlate: form.licensePlate.trim().toUpperCase(),
       brand: form.brand || "Unknown",
       model: form.model || "Unknown",
       color: form.color || "",
-      year: form.year || null,
     };
 
     try {
@@ -106,7 +125,7 @@ export default function MyVehiclesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this vehicle?")) {
+    if (!window.confirm("Deactivate this vehicle? It will be hidden from new bookings but history is kept.")) {
       return;
     }
 
@@ -116,7 +135,12 @@ export default function MyVehiclesPage() {
       setVehicles(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to delete vehicle", error);
-      alert(error.response?.data?.message || "Delete vehicle failed");
+      alert(
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Deactivate vehicle failed"
+      );
     }
   };
 
@@ -183,7 +207,7 @@ export default function MyVehiclesPage() {
                   className="flex-1 py-1.5 text-xs border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors text-destructive"
                   onClick={() => handleDelete(id)}
                 >
-                  Remove
+                  Deactivate
                 </button>
               </div>
             </div>
@@ -234,7 +258,7 @@ export default function MyVehiclesPage() {
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, licensePlate: event.target.value }))
                   }
-                  placeholder="AB-1234-CD"
+                  placeholder="51L-666.66"
                   className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
@@ -249,13 +273,17 @@ export default function MyVehiclesPage() {
                     onChange={(event) =>
                       setForm((prev) => ({
                         ...prev,
-                        vehicleTypeId: Number(event.target.value),
+                        vehicleTypeId: event.target.value,
                       }))
                     }
                     className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
                   >
-                    <option value={1}>Car</option>
-                    <option value={2}>Motorbike</option>
+                    <option value="">Select type</option>
+                    {vehicleTypes.map((item) => (
+                      <option key={getVehicleTypeId(item)} value={getVehicleTypeId(item)}>
+                        {item.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>

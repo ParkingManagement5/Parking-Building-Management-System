@@ -1,12 +1,18 @@
 package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.response.PaymentResponse;
+import com.swp391.parking.entity.Booking;
+import com.swp391.parking.entity.ParkingSession;
+import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Payment;
 import com.swp391.parking.entity.Payment.PaymentMethod;
 import com.swp391.parking.entity.Payment.PaymentStatus;
 import com.swp391.parking.entity.Payment.PaymentType;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.PaymentRepository;
+import com.swp391.parking.repository.BookingRepository;
+import com.swp391.parking.repository.ParkingSessionRepository;
+import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +31,9 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final BookingService bookingService;
+    private final BookingRepository bookingRepository;
+    private final ParkingSessionRepository parkingSessionRepository;
+    private final ParkingSlotRepository parkingSlotRepository;
 
     @Override
     @Transactional
@@ -117,7 +126,10 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaidAt(LocalDateTime.now());
         payment.setTransactionRef(transactionRef);
 
-        return toResponse(paymentRepository.save(payment));
+        Payment saved = paymentRepository.save(payment);
+        completeSessionAfterParkingFee(saved);
+
+        return toResponse(saved);
     }
 
     @Override
@@ -144,6 +156,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<PaymentResponse> getByStatus(PaymentStatus status) {
+        return paymentRepository.findByPaymentStatusOrderByCreatedAtDesc(status)
+            .stream().map(this::toResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PaymentResponse> getMyPayments(Long userId) {
         return paymentRepository.findByUserIdOrderByCreatedAtDesc(userId)
             .stream().map(this::toResponse)
@@ -153,6 +173,33 @@ public class PaymentServiceImpl implements PaymentService {
     private Payment findById(Integer paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Payment not found"));
+    }
+
+    private void completeSessionAfterParkingFee(Payment payment) {
+        if (payment.getSessionId() == null || payment.getPaymentType() != PaymentType.PARKING_FEE) {
+            return;
+        }
+
+        ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue())
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session not found"));
+
+        session.setStatus(ParkingSession.SessionStatus.COMPLETED);
+        if (session.getExitTime() == null) {
+            session.setExitTime(LocalDateTime.now());
+        }
+        parkingSessionRepository.save(session);
+
+        Booking booking = session.getBooking();
+        if (booking != null && booking.getStatus() != Booking.BookingStatus.COMPLETED) {
+            booking.setStatus(Booking.BookingStatus.COMPLETED);
+            bookingRepository.save(booking);
+        }
+
+        ParkingSlot slot = session.getSlot();
+        if (slot != null) {
+            slot.setStatus(ParkingSlot.Status.AVAILABLE);
+            parkingSlotRepository.save(slot);
+        }
     }
 
     private PaymentResponse toResponse(Payment payment) {

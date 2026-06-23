@@ -2,6 +2,8 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.SessionEntryRequest;
 import com.swp391.parking.dto.request.SessionExitRequest;
+import com.swp391.parking.dto.request.SessionQrScanRequest;
+import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.*;
 import com.swp391.parking.exception.AppException;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -31,6 +34,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final ParkingSlotRepository parkingSlotRepository;
     private final GateRepository gateRepository;
     private final VehicleRepository vehicleRepository;
+    private final VehicleTypeRepository vehicleTypeRepository;
+    private final UserRepository userRepository;
     private final QrTokenUtil qrTokenUtil;
     private final SlotAssignmentService slotAssignmentService;
 
@@ -109,7 +114,6 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 //
 //        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
 //                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-//                        "Không tìm thấy xe: " + request.getLicensePlate()));
 //
 //        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
 //                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
@@ -141,9 +145,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
         }
 
-        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Không tìm thấy xe: " + request.getLicensePlate()));
+        Vehicle vehicle = findOrCreateWalkInVehicle(request);
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(
@@ -213,13 +215,79 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     @Override
+    @Transactional
+    public SessionResponse processExitQr(SessionQrScanRequest request) {
+        Long sessionId = parseExitQrSessionId(request.getQrToken());
+
+        SessionExitRequest exitRequest = new SessionExitRequest();
+        exitRequest.setGateId(request.getGateId());
+        exitRequest.setStaffUserId(request.getStaffUserId());
+        return processExit(sessionId, exitRequest);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public QrTokenResponse generateExitQr(Long sessionId, Long currentUserId) {
+        ParkingSession session = getSessionEntity(sessionId);
+        if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi session ACTIVE moi tao duoc Exit QR");
+        }
+        if (!Objects.equals(session.getUserId(), currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Khong the tao Exit QR cho session cua nguoi khac");
+        }
+        if (session.getVehicle() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Session chua co thong tin xe");
+        }
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+        String token = qrTokenUtil.generateExitQrToken(
+                session.getId(),
+                session.getUserId(),
+                session.getVehicle().getLicensePlate(),
+                session.getBooking() != null ? session.getBooking().getId() : null,
+                expiresAt
+        );
+
+        return QrTokenResponse.builder()
+                .qrToken(token)
+                .purpose("EXIT")
+                .expiresAt(expiresAt)
+                .sessionId(session.getId())
+                .licensePlate(session.getVehicle().getLicensePlate())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SessionResponse getSession(Long sessionId) {
         return toResponse(getSessionEntity(sessionId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SessionResponse> getMySessions(Long currentUserId) {
         return sessionRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SessionResponse> getSessions(String status, String keyword) {
+        if (keyword != null && !keyword.isBlank()) {
+            return sessionRepository.searchByPlateOrId(keyword.trim())
+                    .stream().map(this::toResponse).toList();
+        }
+
+        if (status != null && !status.isBlank()) {
+            ParkingSession.SessionStatus sessionStatus = ParkingSession.SessionStatus.valueOf(status.trim().toUpperCase());
+            return sessionRepository.findByStatusOrderByCreatedAtDesc(sessionStatus)
+                    .stream().map(this::toResponse).toList();
+        }
+
+        return sessionRepository.findAllByOrderByCreatedAtDesc()
                 .stream().map(this::toResponse).toList();
     }
 
@@ -240,21 +308,117 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .build());
     }
 
+    private Vehicle findOrCreateWalkInVehicle(SessionEntryRequest request) {
+        String licensePlate = normalizePlate(request.getLicensePlate());
+        return vehicleRepository.findByLicensePlate(licensePlate)
+                .orElseGet(() -> createWalkInGuestVehicle(request, licensePlate));
+    }
+
+    private Vehicle createWalkInGuestVehicle(SessionEntryRequest request, String licensePlate) {
+        VehicleType vehicleType = resolveWalkInVehicleType(request.getVehicleTypeId());
+        Long ownerUserId = resolveWalkInOwnerUserId(request.getStaffUserId());
+
+        Vehicle vehicle = Vehicle.builder()
+                .userId(ownerUserId)
+                .vehicleType(vehicleType)
+                .licensePlate(licensePlate)
+                .brand("Walk-in")
+                .model("Guest")
+                .color("")
+                .isActive(true)
+                .build();
+
+        return vehicleRepository.save(vehicle);
+    }
+
+    private VehicleType resolveWalkInVehicleType(Long vehicleTypeId) {
+        if (vehicleTypeId != null) {
+            return vehicleTypeRepository.findById(vehicleTypeId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                            "Khong tim thay loai xe ID: " + vehicleTypeId));
+        }
+
+        return vehicleTypeRepository.findByIsActiveTrue().stream()
+                .filter(type -> type.getSlotSize() == VehicleType.SlotSize.MEDIUM)
+                .findFirst()
+                .or(() -> vehicleTypeRepository.findByIsActiveTrue().stream().findFirst())
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
+                        "Chua co loai xe active de tao walk-in"));
+    }
+
+    private Long resolveWalkInOwnerUserId(Long staffUserId) {
+        if (staffUserId != null) {
+            return staffUserId;
+        }
+
+        return userRepository.findAll().stream()
+                .findFirst()
+                .map(user -> user.getUserId().longValue())
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
+                        "Khong tim thay user de tao walk-in"));
+    }
+
+    private Long claimLong(Claims claims, String key) {
+        Object value = claims.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Long.parseLong(text);
+        }
+        return null;
+    }
+
+    private Long parseExitQrSessionId(String qrToken) {
+        try {
+            return qrTokenUtil.parseExitSessionId(qrToken);
+        } catch (JwtException | IllegalArgumentException compactError) {
+            try {
+                Claims claims = qrTokenUtil.parseQrToken(qrToken);
+                if (!"QR_SESSION_EXIT".equals(claims.getSubject()) || !"EXIT".equals(claims.get("purpose", String.class))) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "QR nay khong phai Exit QR");
+                }
+                Long sessionId = claimLong(claims, "session_id");
+                if (sessionId == null) {
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thieu session");
+                }
+                return sessionId;
+            } catch (JwtException | IllegalArgumentException jwtError) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR khong hop le hoac da het han");
+            }
+        }
+    }
+
+    private String normalizePlate(String licensePlate) {
+        String normalized = licensePlate.toUpperCase().replace(" ", "");
+        int separatorIndex = normalized.lastIndexOf('-');
+        if (separatorIndex >= 0 && separatorIndex < normalized.length() - 1) {
+            String prefix = normalized.substring(0, separatorIndex + 1);
+            String serial = normalized.substring(separatorIndex + 1).replace(".", "");
+            if (serial.matches("\\d{5}")) {
+                return prefix + serial.substring(0, 3) + "." + serial.substring(3);
+            }
+        }
+        return normalized;
+    }
+
     private SessionResponse toResponse(ParkingSession s) {
         return SessionResponse.builder()
                 .sessionId(s.getId())
                 .bookingId(s.getBooking() != null ? s.getBooking().getId() : null)
-                .slotId(s.getSlot().getId())
-                .slotCode(s.getSlot().getSlotCode())
+                .slotId(s.getSlot() != null ? s.getSlot().getId() : null)
+                .slotCode(s.getSlot() != null ? s.getSlot().getSlotCode() : null)
                 .userId(s.getUserId())
-                .vehicleId(s.getVehicle().getId())
-                .licensePlate(s.getVehicle().getLicensePlate())
+                .vehicleId(s.getVehicle() != null ? s.getVehicle().getId() : null)
+                .licensePlate(s.getVehicle() != null ? s.getVehicle().getLicensePlate() : null)
                 .entryGateId(s.getEntryGate() != null ? s.getEntryGate().getId() : null)
+                .entryGateCode(s.getEntryGate() != null ? s.getEntryGate().getGateCode() : null)
                 .exitGateId(s.getExitGate() != null ? s.getExitGate().getId() : null)
+                .exitGateCode(s.getExitGate() != null ? s.getExitGate().getGateCode() : null)
                 .entryTime(s.getEntryTime())
                 .exitTime(s.getExitTime())
-                .entryMode(s.getEntryMode().name())
-                .status(s.getStatus().name())
+                .entryMode(s.getEntryMode() != null ? s.getEntryMode().name() : null)
+                .status(s.getStatus() != null ? s.getStatus().name() : null)
                 .createdAt(s.getCreatedAt())
                 .build();
     }

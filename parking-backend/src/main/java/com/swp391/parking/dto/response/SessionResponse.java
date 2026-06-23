@@ -14,7 +14,9 @@ public class SessionResponse {
     private Long vehicleId;
     private String licensePlate;
     private Long entryGateId;
+    private String entryGateCode;
     private Long exitGateId;
+    private String exitGateCode;
     private LocalDateTime entryTime;
     private LocalDateTime exitTime;
     private String entryMode;
