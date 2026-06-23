@@ -2,7 +2,9 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.SessionEntryRequest;
 import com.swp391.parking.dto.request.SessionExitRequest;
+import com.swp391.parking.dto.request.SessionQrScanRequest;
 import com.swp391.parking.dto.response.ApiResponse;
+import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
@@ -22,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/sessions")
+@RequestMapping({"/api/sessions", "/api/v1/sessions"})
 @RequiredArgsConstructor
 @Tag(name = "Parking Session", description = "Check-in / Check-out")
 @SecurityRequirement(name = "bearerAuth")
@@ -52,11 +54,42 @@ public class ParkingSessionController {
                 sessionService.processExit(id, request)));
     }
 
+    @PostMapping("/exit/qr")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Scan Exit QR and record gate exit")
+    public ResponseEntity<ApiResponse<SessionResponse>> exitByQr(
+            @Valid @RequestBody SessionQrScanRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Exit QR hop le, xe dang cho thanh toan",
+                sessionService.processExitQr(request)));
+    }
+
+    @PostMapping("/{id}/exit-qr")
+    @PreAuthorize("hasRole('DRIVER')")
+    @Operation(summary = "Driver creates a short-lived Exit QR for an active session")
+    public ResponseEntity<ApiResponse<QrTokenResponse>> createExitQr(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails ud) {
+        Long userId = userRepository.findByUsername(ud.getUsername())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khÃ´ng tá»“n táº¡i"))
+                .getUserId().longValue();
+        return ResponseEntity.ok(ApiResponse.success("Exit QR da duoc tao",
+                sessionService.generateExitQr(id, userId)));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Xem chi tiết session")
     public ResponseEntity<ApiResponse<SessionResponse>> getOne(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(sessionService.getSession(id)));
+    }
+
+    @GetMapping({"", "/"})
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Danh sach session cho staff")
+    public ResponseEntity<ApiResponse<List<SessionResponse>>> getSessions(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(ApiResponse.success(sessionService.getSessions(status, keyword)));
     }
 
     @GetMapping("/my")

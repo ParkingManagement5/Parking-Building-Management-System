@@ -3,6 +3,7 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PaymentResponse;
 import com.swp391.parking.entity.Payment.PaymentMethod;
+import com.swp391.parking.entity.Payment.PaymentStatus;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.PaymentService;
@@ -47,6 +48,35 @@ public class PaymentController {
             ApiResponse.success("Deposit confirmed successfully", response));
     }
 
+    @Operation(summary = "Create parking fee for session")
+    @PostMapping("/parking-fee")
+    public ResponseEntity<ApiResponse<PaymentResponse>> createParkingFee(
+            @RequestParam Integer sessionId,
+            @RequestParam(required = false) Integer bookingId,
+            @RequestParam(required = false) Integer policyId,
+            @RequestParam(required = false) BigDecimal appliedRate,
+            @RequestParam(required = false) BigDecimal baseFee,
+            @RequestParam(required = false) BigDecimal overtimeFee,
+            @RequestParam(required = false) BigDecimal penaltyFee,
+            @RequestParam(required = false) BigDecimal discount,
+            @RequestParam(required = false) BigDecimal depositDeducted,
+            @RequestParam BigDecimal totalAmount,
+            @RequestParam PaymentMethod paymentMethod) {
+        PaymentResponse response = paymentService.createParkingFee(
+                sessionId,
+                bookingId,
+                policyId,
+                appliedRate,
+                baseFee,
+                overtimeFee,
+                penaltyFee,
+                discount,
+                depositDeducted,
+                totalAmount,
+                paymentMethod);
+        return ResponseEntity.ok(ApiResponse.success("Parking fee created successfully", response));
+    }
+
     @Operation(summary = "Confirm parking fee payment")
     @PutMapping("/parking-fee/{paymentId}/confirm")
     public ResponseEntity<ApiResponse<PaymentResponse>> confirmParkingFee(
@@ -74,6 +104,13 @@ public class PaymentController {
             .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay user"))
             .getUserId().longValue();
         return ResponseEntity.ok(ApiResponse.success(paymentService.getMyPayments(userId)));
+    }
+
+    @Operation(summary = "Get payments by booking ID")
+    @GetMapping("/status/{status}")
+    public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByStatus(
+            @PathVariable PaymentStatus status) {
+        return ResponseEntity.ok(ApiResponse.success(paymentService.getByStatus(status)));
     }
 
     @Operation(summary = "Get payments by booking ID")

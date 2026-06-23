@@ -6,15 +6,16 @@ import lombok.Data;
 
 @Data
 public class SessionEntryRequest {
-    @NotNull(message = "gateId không được để trống")
+    @NotNull(message = "gateId khong duoc de trong")
     private Long gateId;
 
-    private String qrToken;       // BOOKING mode
-    private String licensePlate;  // WALK_IN mode
+    private String qrToken;
+    private String licensePlate;
 
-    @NotBlank(message = "entryMode không được để trống")
-    private String entryMode;     // BOOKING / WALK_IN_AUTO / WALK_IN_MANUAL
+    @NotBlank(message = "entryMode khong duoc de trong")
+    private String entryMode;
 
-    private Long slotId;          // walk-in: staff chọn slot
-    private Long staffUserId;     // null nếu fully auto
+    private Long slotId;
+    private Long vehicleTypeId;
+    private Long staffUserId;
 }

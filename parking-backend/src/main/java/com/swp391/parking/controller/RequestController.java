@@ -5,12 +5,16 @@ import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.RequestResponse;
 import com.swp391.parking.entity.Request.RequestStatus;
 import com.swp391.parking.entity.Request.RequestType;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.RequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,15 +26,22 @@ import java.util.List;
 public class RequestController {
 
     private final RequestService requestService;
+    private final UserRepository userRepository;
 
     @Operation(summary = "Create a new request")
     @PostMapping
     public ResponseEntity<ApiResponse<RequestResponse>> createRequest(
-            @RequestParam Integer userId,
+            Authentication authentication,
             @Valid @RequestBody CreateRequestRequest request) {
-        RequestResponse response = requestService.createRequest(userId, request);
+        RequestResponse response = requestService.createRequest(resolveUserId(authentication), request);
         return ResponseEntity.ok(
             ApiResponse.success("Request created successfully", response));
+    }
+
+    @Operation(summary = "Get current user's requests")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<RequestResponse>>> getMyRequests(Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(requestService.getByUserId(resolveUserId(authentication))));
     }
 
     @Operation(summary = "Get request by ID")
@@ -91,5 +102,15 @@ public class RequestController {
         RequestResponse response = requestService.closeRequest(requestId);
         return ResponseEntity.ok(
             ApiResponse.success("Request closed successfully", response));
+    }
+
+    private Integer resolveUserId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "User is not authenticated");
+        }
+
+        return userRepository.findByUsername(authentication.getName())
+            .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+            .getUserId();
     }
 }

@@ -6,7 +6,8 @@ import { formatDateTime, getStatusClasses } from "./driverPortalUtils";
 export default function RequestCenterPage() {
   const [requests, setRequests] = useState([]);
   const [form, setForm] = useState({
-    type: "Booking Support",
+    requestType: "OTHER",
+    subject: "",
     content: "",
   });
 
@@ -44,14 +45,16 @@ export default function RequestCenterPage() {
 
     try {
       await requestApi.create({
-        type: form.type,
-        content: form.content.trim(),
+        requestType: form.requestType,
+        subject: form.subject.trim() || requestTypeLabel(form.requestType),
+        description: form.content.trim(),
       });
       const res = await requestApi.getMyRequests();
       setRequests(unwrapApiData(res.data, []));
 
       setForm({
-        type: "Booking Support",
+        requestType: "OTHER",
+        subject: "",
         content: "",
       });
     } catch (error) {
@@ -70,17 +73,30 @@ export default function RequestCenterPage() {
               Request Type
             </label>
             <select
-              value={form.type}
+              value={form.requestType}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, type: event.target.value }))
+                setForm((prev) => ({ ...prev, requestType: event.target.value }))
               }
               className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
             >
-              <option value="Booking Support">Booking Support</option>
-              <option value="Payment Issue">Payment Issue</option>
-              <option value="Vehicle Issue">Vehicle Issue</option>
-              <option value="Other">Other</option>
+              <option value="LOST_QR">Lost QR</option>
+              <option value="WRONG_FEE">Wrong Fee</option>
+              <option value="CANNOT_FIND_CAR">Cannot Find Car</option>
+              <option value="OTHER">Other</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">
+              Subject
+            </label>
+            <input
+              value={form.subject}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, subject: event.target.value }))
+              }
+              placeholder="Short summary"
+              className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-foreground mb-1.5">
@@ -115,7 +131,7 @@ export default function RequestCenterPage() {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {item.type || item.requestType || "-"}
+                    {item.subject || requestTypeLabel(item.requestType) || "-"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {item.requestId || item.id} - {formatDateTime(item.createdAt)}
@@ -130,7 +146,7 @@ export default function RequestCenterPage() {
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {item.content || item.description || "-"}
+                {item.description || item.content || "-"}
               </p>
             </div>
           ))}
@@ -143,4 +159,14 @@ export default function RequestCenterPage() {
       </div>
     </div>
   );
+}
+
+function requestTypeLabel(value) {
+  const labels = {
+    LOST_QR: "Lost QR",
+    WRONG_FEE: "Wrong Fee",
+    CANNOT_FIND_CAR: "Cannot Find Car",
+    OTHER: "Other",
+  };
+  return labels[value] || value || "Request";
 }

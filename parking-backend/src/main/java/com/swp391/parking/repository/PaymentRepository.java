@@ -24,6 +24,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
 
     List<Payment> findByPaymentStatus(PaymentStatus status);
 
+    List<Payment> findByPaymentStatusOrderByCreatedAtDesc(PaymentStatus status);
+
     @Query(
         value = """
             SELECT p.*

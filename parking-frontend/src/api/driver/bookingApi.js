@@ -38,5 +38,10 @@ export const bookingApi = {
 
   getMyBookings: () => directClient.get(bookingUrl("/my")),
 
+  verifyQr: (qrToken) =>
+    directClient.post(bookingUrl("/verify-qr"), null, {
+      params: { qrToken },
+    }),
+
   cancel: (id) => directClient.put(bookingUrl(`/${id}/cancel`)),
 };
