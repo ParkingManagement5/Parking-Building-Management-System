@@ -20,9 +20,12 @@ function activityTone(type) {
   return "blue";
 }
 
-function settledData(result, fallback = []) {
+const failedWidgets = [];
+
+function settledData(result, fallback = [], widgetName = "widget") {
   if (result.status !== "fulfilled") {
-    console.warn("Dashboard widget failed:", result.reason);
+    console.warn(`Dashboard ${widgetName} failed:`, result.reason);
+    failedWidgets.push(widgetName);
     return fallback;
   }
   return unwrapApiData(result.value.data, fallback);
@@ -71,14 +74,18 @@ export default function StaffDashboard() {
 
         if (cancelled) return;
 
-        setBuildings(settledData(buildingRes));
-        setStaffShifts(settledData(shiftRes));
-        setNotifications(settledData(notificationRes));
-        setActiveSessions(settledData(activeSessionRes));
-        setWaitingPayments(settledData(waitingPaymentRes));
-        setOpenRequests(settledData(requestRes));
-        setOcrReviews(settledData(ocrRes));
-        setOpenExceptions(settledData(exceptionRes));
+        failedWidgets.length = 0;
+        setBuildings(settledData(buildingRes, [], "buildings"));
+        setStaffShifts(settledData(shiftRes, [], "shifts"));
+        setNotifications(settledData(notificationRes, [], "notifications"));
+        setActiveSessions(settledData(activeSessionRes, [], "active sessions"));
+        setWaitingPayments(settledData(waitingPaymentRes, [], "payments"));
+        setOpenRequests(settledData(requestRes, [], "requests"));
+        setOcrReviews(settledData(ocrRes, [], "OCR reviews"));
+        setOpenExceptions(settledData(exceptionRes, [], "exceptions"));
+        if (failedWidgets.length > 0) {
+          setError(`Some widgets failed to load: ${failedWidgets.join(", ")}. Data shown may be incomplete.`);
+        }
       } catch (err) {
         console.error("Load staff dashboard failed:", err);
         if (!cancelled) {

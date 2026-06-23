@@ -1,39 +1,11 @@
-import axios from "axios";
-
-const apiBase = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
-
-const directClient = axios.create({
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-directClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-function sessionUrl(path = "") {
-  const normalizedPath = path ? (path.startsWith("/") ? path : `/${path}`) : "";
-
-  if (/^https?:\/\//i.test(apiBase)) {
-    return `${apiBase.replace(/\/api\/v1\/?$/, "")}/api/sessions${normalizedPath}`;
-  }
-
-  return `/api/sessions${normalizedPath}`;
-}
+import axiosClient from "../axiosClient";
 
 export const sessionApi = {
-  entry: (data) => directClient.post(sessionUrl("/entry"), data),
-  getSessions: (params = {}) => directClient.get(sessionUrl(), { params }),
-  getById: (id) => directClient.get(sessionUrl(`/${id}`)),
-  exit: (id, data) => directClient.post(sessionUrl(`/${id}/exit`), data),
-  exitByQr: (data) => directClient.post(sessionUrl("/exit/qr"), data),
-  createExitQr: (id) => directClient.post(sessionUrl(`/${id}/exit-qr`)),
-  getMySessions: () => directClient.get(sessionUrl("/my")),
+  entry: (data) => axiosClient.post("/sessions/entry", data),
+  getSessions: (params = {}) => axiosClient.get("/sessions", { params }),
+  getById: (id) => axiosClient.get(`/sessions/${id}`),
+  exit: (id, data) => axiosClient.post(`/sessions/${id}/exit`, data),
+  exitByQr: (data) => axiosClient.post("/sessions/exit/qr", data),
+  createExitQr: (id) => axiosClient.post(`/sessions/${id}/exit-qr`),
+  getMySessions: () => axiosClient.get("/sessions/my"),
 };
