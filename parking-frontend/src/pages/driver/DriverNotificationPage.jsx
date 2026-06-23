@@ -22,7 +22,7 @@ export default function DriverNotificationPage() {
       try {
         const res = await notificationApi.getByUser(userId);
         if (!cancelled) {
-          setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
+          setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
         }
       } catch (error) {
         console.error("Failed to load notifications", error);
@@ -48,7 +48,7 @@ export default function DriverNotificationPage() {
         return;
       }
       const res = await notificationApi.getByUser(userId);
-      setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
+      setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
@@ -63,7 +63,7 @@ export default function DriverNotificationPage() {
     try {
       await notificationApi.markAllAsRead(userId);
       const res = await notificationApi.getByUser(userId);
-      setNotifications(Array.isArray(res.data) ? res.data : res.data?.data || []);
+      setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
     } catch (error) {
       console.error("Failed to mark all notifications as read", error);
     }

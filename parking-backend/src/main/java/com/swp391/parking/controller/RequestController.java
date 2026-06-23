@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,6 +31,7 @@ public class RequestController {
 
     @Operation(summary = "Create a new request")
     @PostMapping
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> createRequest(
             Authentication authentication,
             @Valid @RequestBody CreateRequestRequest request) {
@@ -40,12 +42,14 @@ public class RequestController {
 
     @Operation(summary = "Get current user's requests")
     @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getMyRequests(Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(requestService.getByUserId(resolveUserId(authentication))));
     }
 
     @Operation(summary = "Get request by ID")
     @GetMapping("/{requestId}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> getById(
             @PathVariable Integer requestId) {
         RequestResponse response = requestService.getById(requestId);
@@ -54,6 +58,7 @@ public class RequestController {
 
     @Operation(summary = "Get requests by user ID")
     @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByUserId(
             @PathVariable Integer userId) {
         List<RequestResponse> response = requestService.getByUserId(userId);
@@ -62,6 +67,7 @@ public class RequestController {
 
     @Operation(summary = "Get requests by status")
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByStatus(
             @PathVariable RequestStatus status) {
         List<RequestResponse> response = requestService.getByStatus(status);
@@ -70,6 +76,7 @@ public class RequestController {
 
     @Operation(summary = "Get requests by type")
     @GetMapping("/type/{type}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByType(
             @PathVariable RequestType type) {
         List<RequestResponse> response = requestService.getByType(type);
@@ -78,6 +85,7 @@ public class RequestController {
 
     @Operation(summary = "Assign staff to request")
     @PutMapping("/{requestId}/assign")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> assignStaff(
             @PathVariable Integer requestId,
             @RequestParam Integer staffId) {
@@ -88,6 +96,7 @@ public class RequestController {
 
     @Operation(summary = "Resolve request")
     @PutMapping("/{requestId}/resolve")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> resolveRequest(
             @PathVariable Integer requestId) {
         RequestResponse response = requestService.resolveRequest(requestId);
@@ -97,6 +106,7 @@ public class RequestController {
 
     @Operation(summary = "Close request")
     @PutMapping("/{requestId}/close")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> closeRequest(
             @PathVariable Integer requestId) {
         RequestResponse response = requestService.closeRequest(requestId);

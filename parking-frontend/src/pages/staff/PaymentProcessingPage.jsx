@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CreditCard, ReceiptText, Search } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { paymentApi } from "../../api/driver/paymentApi";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
@@ -22,6 +23,7 @@ export default function PaymentProcessingPage() {
   const [receipt, setReceipt] = useState(null);
   const [query, setQuery] = useState("");
   const [methodFilter, setMethodFilter] = useState("ALL");
+  const [pricingPolicies, setPricingPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState("");
@@ -34,10 +36,15 @@ export default function PaymentProcessingPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await sessionApi.getSessions({ status: "WAITING_PAYMENT" });
-      const paidRes = await paymentApi.getByStatus("PAID");
+      const [res, paidRes, pricingRes] = await Promise.all([
+        sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
+        paymentApi.getByStatus("PAID"),
+        pricingPolicyApi.getAll(),
+      ]);
       setSessions(unwrapApiData(res.data, []));
       setRecentPayments(unwrapApiData(paidRes.data, []).slice(0, 6));
+      const policies = unwrapApiData(pricingRes.data, []);
+      setPricingPolicies(policies);
     } catch (err) {
       console.error("Failed to load pending payments", err);
       setError(err.response?.data?.message || "Khong tai duoc danh sach cho thanh toan.");
@@ -58,15 +65,28 @@ export default function PaymentProcessingPage() {
     });
   }
 
+  function resolveHourlyRate(session) {
+    const policy = pricingPolicies.find(
+      (p) => p.isActive && p.vehicleTypeId === session.vehicleTypeId
+    );
+    return Number(policy?.pricePerHour ?? 20000);
+  }
+
   const createMockPaymentQr = async (session) => {
-    const amount = computeSessionFee(session.entryTime);
+    const rate = resolveHourlyRate(session);
+    const amount = computeSessionFee(session.entryTime, session.exitTime, rate);
     const method = methodMap[session.sessionId] || "CASH";
+    const policy = pricingPolicies.find(
+      (p) => p.isActive && p.vehicleTypeId === session.vehicleTypeId
+    );
     setProcessingId(session.sessionId);
     setError("");
     try {
       const paymentRes = await paymentApi.createParkingFee({
         sessionId: Number(session.sessionId),
         bookingId: session.bookingId || undefined,
+        policyId: policy?.policyId || undefined,
+        appliedRate: rate,
         baseFee: amount,
         totalAmount: amount,
         paymentMethod: method,
@@ -189,7 +209,7 @@ export default function PaymentProcessingPage() {
                     <div className="rounded-2xl bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Current Fee</p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
-                        {formatStaffCurrency(computeSessionFee(item.entryTime))}
+                        {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime))}
                       </p>
                     </div>
                     <StaffSelect

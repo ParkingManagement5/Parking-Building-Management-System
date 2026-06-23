@@ -1,6 +1,7 @@
 package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.CreatePricingPolicyRequest;
+import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PricingPolicyResponse;
 import com.swp391.parking.service.PricingPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,40 +24,47 @@ public class PricingPolicyController {
 
     @PostMapping
     @Operation(summary = "Create pricing policy")
-    public ResponseEntity<PricingPolicyResponse> create(
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> create(
             @Valid @RequestBody CreatePricingPolicyRequest request) {
-        return ResponseEntity.ok(pricingPolicyService.createPolicy(request));
+        return ResponseEntity.ok(ApiResponse.success("Policy created", pricingPolicyService.createPolicy(request)));
     }
 
     @GetMapping
     @Operation(summary = "Get all pricing policies")
-    public ResponseEntity<List<PricingPolicyResponse>> getAll() {
-        return ResponseEntity.ok(pricingPolicyService.getAllPolicies());
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<List<PricingPolicyResponse>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getAllPolicies()));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get pricing policy by ID")
-    public ResponseEntity<PricingPolicyResponse> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(pricingPolicyService.getPolicy(id));
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> getOne(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getPolicy(id)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update pricing policy")
-    public ResponseEntity<PricingPolicyResponse> update(
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody CreatePricingPolicyRequest request) {
-        return ResponseEntity.ok(pricingPolicyService.updatePolicy(id, request));
+        return ResponseEntity.ok(ApiResponse.success("Policy updated", pricingPolicyService.updatePolicy(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete pricing policy")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         pricingPolicyService.deletePolicy(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Policy deleted", null));
     }
+
     @PatchMapping("/{id}/activate")
-@Operation(summary = "Activate pricing policy")
-public ResponseEntity<PricingPolicyResponse> activate(@PathVariable Long id) {
-    return ResponseEntity.ok(pricingPolicyService.activatePolicy(id));
-}
+    @Operation(summary = "Activate pricing policy")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> activate(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Policy activated", pricingPolicyService.activatePolicy(id)));
+    }
 }
