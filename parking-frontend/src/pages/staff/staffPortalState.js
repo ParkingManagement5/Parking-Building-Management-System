@@ -94,12 +94,19 @@ export function formatStaffCurrency(value) {
   return new Intl.NumberFormat("vi-VN").format(Number(value || 0)) + " VND";
 }
 
-export function computeSessionFee(entryTime, hourlyRate = 20000) {
+export function computeSessionFee(entryTime, endTimeOrHourlyRate = new Date(), hourlyRate = 20000) {
   const start = new Date(entryTime);
-  const now = new Date();
-  const elapsedMs = Math.max(0, now.getTime() - start.getTime());
+  if (Number.isNaN(start.getTime())) return 0;
+
+  const resolvedHourlyRate =
+    typeof endTimeOrHourlyRate === "number" ? endTimeOrHourlyRate : hourlyRate;
+  const rawEndTime =
+    typeof endTimeOrHourlyRate === "number" ? new Date() : endTimeOrHourlyRate;
+  const end = rawEndTime ? new Date(rawEndTime) : new Date();
+  const effectiveEnd = Number.isNaN(end.getTime()) ? new Date() : end;
+  const elapsedMs = Math.max(0, effectiveEnd.getTime() - start.getTime());
   const hours = Math.max(1, Math.ceil(elapsedMs / (1000 * 60 * 60)));
-  return hours * hourlyRate;
+  return hours * resolvedHourlyRate;
 }
 
 export function createPortalId(prefix) {
