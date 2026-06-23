@@ -67,7 +67,17 @@ public class VehicleController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(
+            @PathVariable Long id, Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            User user = resolveUser(authentication);
+            Vehicle vehicle = vehicleService.getById(id);
+            if (!vehicle.getUser().getUserId().equals(user.getUserId())) {
+                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xoa xe cua nguoi khac");
+            }
+        }
         vehicleService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa xe khoi DB"));
     }
