@@ -33,6 +33,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public BookingResponse createBooking(Long currentUserId, CreateBookingRequest request) {
         LocalDateTime now = LocalDateTime.now();
+        expireStaleOpenBookings(now);
         LocalDateTime startTime = request.getBookingStartTime();
 
         // [BR-03a] Đặt trước ít nhất 10 phút
@@ -76,7 +77,12 @@ public class BookingServiceImpl implements BookingService {
         // [BR-06] 1 xe chỉ có 1 booking active
         bookingRepository.findByVehicle_IdAndStatusIn(
                 vehicle.getId(),
-                List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
+                List.of(
+                        Booking.BookingStatus.PENDING_PAYMENT,
+                        Booking.BookingStatus.CONFIRMED,
+                        Booking.BookingStatus.CHECKED_IN,
+                        Booking.BookingStatus.WAITING_PAYMENT
+                )
         ).ifPresent(b -> {
             throw new AppException(HttpStatus.CONFLICT,
                     "Xe này đang có booking active (#" + b.getId() + ")");
@@ -134,6 +140,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setQrIssuedAt(LocalDateTime.now());
         booking.setDepositPaidAt(LocalDateTime.now());
         booking.setStatus(Booking.BookingStatus.CONFIRMED);
+        booking.setExpiredAt(booking.getBookingEndTime());
 
         // Mark slot RESERVED
         ParkingSlot slot = booking.getSlot();
@@ -209,6 +216,28 @@ public class BookingServiceImpl implements BookingService {
     private Booking getBookingEntity(Long id) {
         return bookingRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking #" + id));
+    }
+
+    private void expireStaleOpenBookings(LocalDateTime now) {
+        List<Booking> stalePending = bookingRepository.findByStatusAndExpiredAtBefore(
+                Booking.BookingStatus.PENDING_PAYMENT, now);
+        if (!stalePending.isEmpty()) {
+            stalePending.forEach(b -> b.setStatus(Booking.BookingStatus.EXPIRED));
+            bookingRepository.saveAll(stalePending);
+        }
+
+        List<Booking> staleConfirmed = bookingRepository.findConfirmedExpired(now.minusMinutes(30));
+        if (!staleConfirmed.isEmpty()) {
+            staleConfirmed.forEach(b -> {
+                b.setStatus(Booking.BookingStatus.EXPIRED);
+                ParkingSlot slot = b.getSlot();
+                if (slot.getStatus() == ParkingSlot.Status.RESERVED) {
+                    slot.setStatus(ParkingSlot.Status.AVAILABLE);
+                    parkingSlotRepository.save(slot);
+                }
+            });
+            bookingRepository.saveAll(staleConfirmed);
+        }
     }
 
     private BigDecimal calculateDeposit(String vehicleTypeName, long minutesUntilStart) {

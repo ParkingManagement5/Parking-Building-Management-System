@@ -197,6 +197,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session không ACTIVE (hiện: " + session.getStatus() + ")");
         }
+        if (!Boolean.TRUE.equals(request.getQrVerified())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Exit requires a valid driver Exit QR");
+        }
 
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
@@ -206,6 +210,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         // [BR-09] Chờ BE4 xử lý payment → mới COMPLETED
         session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
         session = sessionRepository.save(session);
+
+        Booking booking = session.getBooking();
+        if (booking != null && booking.getStatus() == Booking.BookingStatus.CHECKED_IN) {
+            booking.setStatus(Booking.BookingStatus.WAITING_PAYMENT);
+            bookingRepository.save(booking);
+        }
+
+        ParkingSlot slot = session.getSlot();
+        if (slot != null && slot.getStatus() == ParkingSlot.Status.OCCUPIED) {
+            slot.setStatus(ParkingSlot.Status.AVAILABLE);
+            parkingSlotRepository.save(slot);
+        }
 
         saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
                 GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, request.getStaffUserId());
@@ -222,6 +238,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         SessionExitRequest exitRequest = new SessionExitRequest();
         exitRequest.setGateId(request.getGateId());
         exitRequest.setStaffUserId(request.getStaffUserId());
+        exitRequest.setQrVerified(true);
         return processExit(sessionId, exitRequest);
     }
 
@@ -242,7 +259,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     "Session chua co thong tin xe");
         }
 
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(5);
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
         String token = qrTokenUtil.generateExitQrToken(
                 session.getId(),
                 session.getUserId(),
@@ -373,6 +390,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         try {
             return qrTokenUtil.parseExitSessionId(qrToken);
         } catch (JwtException | IllegalArgumentException compactError) {
+            String msg = compactError.getMessage();
+            if (msg != null && msg.toLowerCase().contains("expired")) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Exit QR da het han. Yeu cau driver tao lai Exit QR moi tu Current Session.");
+            }
             try {
                 Claims claims = qrTokenUtil.parseQrToken(qrToken);
                 if (!"QR_SESSION_EXIT".equals(claims.getSubject()) || !"EXIT".equals(claims.get("purpose", String.class))) {
@@ -380,11 +402,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 }
                 Long sessionId = claimLong(claims, "session_id");
                 if (sessionId == null) {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thieu session");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thieu session_id");
                 }
                 return sessionId;
+            } catch (AppException ae) {
+                throw ae;
             } catch (JwtException | IllegalArgumentException jwtError) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR khong hop le hoac da het han");
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Exit QR khong hop le. Kiem tra lai token hoac yeu cau driver tao moi.");
             }
         }
     }
@@ -411,6 +436,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .userId(s.getUserId())
                 .vehicleId(s.getVehicle() != null ? s.getVehicle().getId() : null)
                 .licensePlate(s.getVehicle() != null ? s.getVehicle().getLicensePlate() : null)
+                .vehicleTypeId(s.getVehicle() != null && s.getVehicle().getVehicleType() != null
+                        ? s.getVehicle().getVehicleType().getId() : null)
+                .vehicleTypeName(s.getVehicle() != null && s.getVehicle().getVehicleType() != null
+                        ? s.getVehicle().getVehicleType().getName() : null)
                 .entryGateId(s.getEntryGate() != null ? s.getEntryGate().getId() : null)
                 .entryGateCode(s.getEntryGate() != null ? s.getEntryGate().getGateCode() : null)
                 .exitGateId(s.getExitGate() != null ? s.getExitGate().getId() : null)

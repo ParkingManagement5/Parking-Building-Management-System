@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CreditCard, LoaderCircle, Navigation } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
+import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
@@ -17,6 +18,23 @@ function shortToken(value) {
   return `${value.slice(0, 14)}...${value.slice(-10)}`;
 }
 
+function isOpenBooking(item) {
+  const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
+  const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
+  const expiryValue = item?.expiredAt || item?.bookingEndTime;
+  const expiresAt = expiryValue ? new Date(expiryValue).getTime() : null;
+  const isExpired = Number.isFinite(expiresAt) && expiresAt < Date.now();
+  return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed && !isExpired);
+}
+
+function resolveSessionStart(item) {
+  return item?.entryTime || item?.startTime || item?.checkInTime || item?.createdAt || item?.bookingStartTime;
+}
+
+function resolveSessionEnd(item) {
+  return item?.exitTime || item?.endTime || item?.checkOutTime || null;
+}
+
 export default function CurrentSessionPage() {
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
@@ -30,8 +48,12 @@ export default function CurrentSessionPage() {
     setError("");
     setExitQr(null);
     try {
-      const sessionRes = await driverSessionApi.getMySessions();
+      const [sessionRes, bookingRes] = await Promise.all([
+        driverSessionApi.getMySessions(),
+        bookingApi.getMyBookings(),
+      ]);
       const mySessions = unwrapApiData(sessionRes.data, []);
+      const myBookings = unwrapApiData(bookingRes.data, []);
       const activeSession = mySessions.find((item) => String(item.status || "").toUpperCase() === "ACTIVE");
       if (activeSession) {
         setSession({ ...activeSession, source: "parking-session" });
@@ -40,6 +62,11 @@ export default function CurrentSessionPage() {
       const waitingPaymentSession = mySessions.find((item) => String(item.status || "").toUpperCase() === "WAITING_PAYMENT");
       if (waitingPaymentSession) {
         setSession({ ...waitingPaymentSession, source: "parking-session" });
+        return;
+      }
+      const activeBooking = myBookings.find(isOpenBooking);
+      if (activeBooking) {
+        setSession({ ...activeBooking, source: "booking" });
         return;
       }
       setSession(null);
@@ -93,6 +120,7 @@ export default function CurrentSessionPage() {
   const isParkingSession = session.source === "parking-session" || Boolean(session.sessionId);
   const sessionStatus = String(session.status || "").toUpperCase();
   const isWaitingPayment = sessionStatus === "WAITING_PAYMENT";
+  const isBookingOnly = session.source === "booking" && !session.sessionId;
   const headerLabel = isWaitingPayment ? "WAITING PAYMENT" : isParkingSession ? "ACTIVE SESSION" : "BOOKING";
   const badgeLabel = isWaitingPayment ? "Waiting payment" : isParkingSession ? "Active" : status;
 
@@ -124,8 +152,8 @@ export default function CurrentSessionPage() {
         <div className="text-center mb-6">
           <div className="text-5xl font-bold font-mono mb-1">
             {formatDuration(
-              session.startTime || session.createdAt || session.checkInTime,
-              session.endTime || session.checkOutTime || new Date().toISOString()
+              resolveSessionStart(session),
+              resolveSessionEnd(session) || new Date().toISOString()
             )}
           </div>
           <p className="text-white/60 text-sm">Duration</p>
@@ -134,7 +162,7 @@ export default function CurrentSessionPage() {
           <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
             <p className="text-white/60 text-xs">Entry Time</p>
             <p className="font-semibold mt-0.5">
-              {formatDateTime(session.startTime || session.checkInTime || session.createdAt)}
+              {formatDateTime(resolveSessionStart(session))}
             </p>
           </div>
           <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
@@ -159,8 +187,8 @@ export default function CurrentSessionPage() {
             {[
               ["Plate", session.licensePlate || session.vehiclePlate || "Vehicle linked"],
               ["Status", getBookingStatus(session)],
-              ["Start", formatDateTime(session.startTime || session.createdAt || session.checkInTime)],
-              ["End", formatDateTime(session.endTime || session.checkOutTime)],
+              ["Start", formatDateTime(resolveSessionStart(session))],
+              ["End", formatDateTime(resolveSessionEnd(session))],
             ].map(([key, value]) => (
               <div key={key} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{key}</span>
@@ -194,7 +222,7 @@ export default function CurrentSessionPage() {
           className="mb-5 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-500"
         >
           <Navigation size={16} />
-          Navigate to Slot
+          Open Parking Map
         </button>
 
         {isWaitingPayment ? (
@@ -220,9 +248,17 @@ export default function CurrentSessionPage() {
                 <div className="rounded-2xl bg-white p-5 shadow-sm">
                   <QRCodeSVG value={exitQr.qrToken} size={240} level="H" includeMargin />
                 </div>
-                <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
-                  {shortToken(exitQr.qrToken)}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(exitQr.qrToken);
+                  }}
+                  className="mt-3 w-full rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-muted transition-colors text-left break-all"
+                  title="Click to copy full token"
+                >
+                  {exitQr.qrToken}
+                </button>
+                <p className="text-xs text-muted-foreground mt-1">Click token to copy</p>
                 <p className="text-xs text-muted-foreground mt-3">
                   Show this QR at Gate Exit. It expires at {formatDateTime(exitQr.expiresAt)}.
                 </p>
@@ -250,11 +286,35 @@ export default function CurrentSessionPage() {
               </>
             )}
           </>
+        ) : isBookingOnly ? (
+          <>
+            {session.qrToken ? (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-4">Entry QR Code</p>
+                <div className="rounded-2xl bg-white p-5 shadow-sm">
+                  <QRCodeSVG value={session.qrToken} size={240} level="H" includeMargin />
+                </div>
+                <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
+                  {shortToken(session.qrToken)}
+                </div>
+                <p className="max-w-sm text-center text-xs text-muted-foreground mt-3">
+                  Show this QR at Gate Entry. Exit QR appears here after staff scans Entry and the session becomes ACTIVE.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground mb-2">Exit QR Not Ready</p>
+                <p className="max-w-sm text-center text-xs text-muted-foreground">
+                  This is still a booking, not an active parking session. Pay/confirm the booking and let staff scan Entry first; then the Exit QR button will appear here.
+                </p>
+              </>
+            )}
+          </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-foreground mb-2">QR Not Available</p>
+            <p className="text-sm font-semibold text-foreground mb-2">Exit QR Not Available</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Current Session only shows active parking sessions. Entry QR is available from booking screens before check-in.
+              Exit QR is only available while the parking session is ACTIVE.
             </p>
           </>
         )}
