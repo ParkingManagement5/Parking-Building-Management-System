@@ -10,6 +10,7 @@ export default function RequestCenterPage() {
     subject: "",
     content: "",
   });
+  const [submitStatus, setSubmitStatus] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -37,9 +38,10 @@ export default function RequestCenterPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setSubmitStatus("");
 
     if (!form.content.trim()) {
-      alert("Request content is required");
+      setSubmitStatus("error:Request content is required.");
       return;
     }
 
@@ -57,9 +59,10 @@ export default function RequestCenterPage() {
         subject: "",
         content: "",
       });
+      setSubmitStatus("success:Request submitted successfully!");
     } catch (error) {
       console.error("Failed to create request", error);
-      alert(error.response?.data?.message || "Create request failed");
+      setSubmitStatus(`error:${error.response?.data?.message || "Create request failed."}`);
     }
   };
 
@@ -67,6 +70,15 @@ export default function RequestCenterPage() {
     <div className="grid lg:grid-cols-[400px_1fr] gap-5">
       <div className="bg-card border border-border rounded-2xl p-5">
         <h3 className="font-semibold text-foreground mb-4 text-sm">Submit a Request</h3>
+        {submitStatus && (
+          <div className={`mb-3 rounded-xl px-4 py-3 text-sm ${
+            submitStatus.startsWith("success:")
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200"
+              : "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200"
+          }`}>
+            {submitStatus.replace(/^(success|error):/, "")}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-foreground mb-1.5">

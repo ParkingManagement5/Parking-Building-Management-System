@@ -4,6 +4,7 @@ import { BrowserQRCodeReader } from "@zxing/browser";
 import { Camera, CheckCircle2, CreditCard, QrCode, Search, StopCircle } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
@@ -31,6 +32,7 @@ export default function VehicleExitPage() {
   const [gates, setGates] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [waitingPayments, setWaitingPayments] = useState([]);
+  const [pricingPolicies, setPricingPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
@@ -134,10 +136,12 @@ export default function VehicleExitPage() {
     setLoading(true);
     setError("");
     try {
-      const [sessionRes, buildingRes] = await Promise.all([
+      const [sessionRes, buildingRes, pricingRes] = await Promise.all([
         sessionApi.getSessions({ status: "ACTIVE" }),
         buildingApi.getAll(),
+        pricingPolicyApi.getAll(),
       ]);
+      setPricingPolicies(unwrapApiData(pricingRes.data, []));
       setSessions(unwrapApiData(sessionRes.data, []));
       const waitingRes = await sessionApi.getSessions({ status: "WAITING_PAYMENT" });
       setWaitingPayments(unwrapApiData(waitingRes.data, []));
@@ -181,7 +185,14 @@ export default function VehicleExitPage() {
     );
   }, [activeSessions, query]);
 
-  const totalFee = foundSession ? computeSessionFee(foundSession.entryTime) : 0;
+  function resolveHourlyRate(session) {
+    const policy = pricingPolicies.find(
+      (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
+    );
+    return Number(policy?.pricePerHour ?? 20000);
+  }
+
+  const totalFee = foundSession ? computeSessionFee(foundSession.entryTime, new Date(), resolveHourlyRate(foundSession)) : 0;
 
   const handleConfirmExit = async () => {
     if (!foundSession || !gateId) return;
@@ -191,19 +202,19 @@ export default function VehicleExitPage() {
       const exitRes = await sessionApi.exit(foundSession.sessionId, {
         gateId: Number(gateId),
         staffUserId: Number(localStorage.getItem("userId")) || null,
+        qrVerified: false,
       });
-      const exitedSession = unwrapApiData(exitRes.data, foundSession);
-
+      const exitedSession = unwrapApiData(exitRes.data, null);
       setConfirmed({
         ...exitedSession,
-        amount: computeSessionFee(exitedSession.entryTime || foundSession.entryTime),
-        exitTime: exitedSession.exitTime || new Date().toISOString(),
+        amount: computeSessionFee(exitedSession?.entryTime, exitedSession?.exitTime),
+        exitTime: exitedSession?.exitTime || new Date().toISOString(),
       });
       setQuery("");
       await loadInitialData();
     } catch (err) {
-      console.error("Confirm exit failed", err);
-      setError(err.response?.data?.message || "Khong ghi nhan duoc xe ra.");
+      console.error("Manual exit failed", err);
+      setError(err.response?.data?.message || "Khong ghi nhan duoc xe ra. Thu lai hoac dung Exit QR.");
     } finally {
       setProcessing(false);
     }
@@ -222,7 +233,7 @@ export default function VehicleExitPage() {
       const exitedSession = unwrapApiData(exitRes.data, null);
       setConfirmed({
         ...exitedSession,
-        amount: computeSessionFee(exitedSession?.entryTime),
+        amount: computeSessionFee(exitedSession?.entryTime, exitedSession?.exitTime),
         exitTime: exitedSession?.exitTime || new Date().toISOString(),
       });
       setExitQrToken("");
@@ -347,16 +358,18 @@ export default function VehicleExitPage() {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <StaffPrimaryButton type="button" className="flex items-center justify-center gap-2 sm:w-44">
+                <StaffPrimaryButton
+                  type="button"
+                  onClick={loadInitialData}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 sm:w-44"
+                >
                   <Search size={15} />
-                  Search
+                  {loading ? "Loading..." : "Search / Refresh"}
                 </StaffPrimaryButton>
-                <StaffSecondaryButton type="button" onClick={loadInitialData} disabled={loading}>
-                  Refresh
-                </StaffSecondaryButton>
               </div>
 
-              {error ? (
+              {error && !foundSession ? (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {error}
                 </div>
@@ -397,12 +410,21 @@ export default function VehicleExitPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                    <div className="rounded-2xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                      Payment is handled in the Payments screen after exit is recorded.
+                  {error ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      {error}
                     </div>
-                    <StaffPrimaryButton type="button" onClick={handleConfirmExit} disabled={processing || !gateId}>
-                      {processing ? "Recording..." : "Record Exit & Send to Payment"}
+                  ) : null}
+
+                  <div className="flex gap-3">
+                    <StaffPrimaryButton
+                      type="button"
+                      onClick={handleConfirmExit}
+                      disabled={processing || !gateId}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 size={15} />
+                      {processing ? "Processing..." : "Confirm Exit (Manual)"}
                     </StaffPrimaryButton>
                   </div>
                 </div>
@@ -468,7 +490,9 @@ export default function VehicleExitPage() {
                     <StaffStatusBadge tone="amber">waiting payment</StaffStatusBadge>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime))}</span>
+                    <span className="text-muted-foreground">
+                      {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime, resolveHourlyRate(item)))}
+                    </span>
                     <StaffSecondaryButton type="button" onClick={() => navigate("/staff/payments")} className="flex items-center gap-2">
                       <CreditCard size={14} />
                       Open Payments

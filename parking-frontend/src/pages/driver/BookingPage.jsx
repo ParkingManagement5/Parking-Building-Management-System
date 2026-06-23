@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   Check,
   CheckCircle2,
+  History,
   LoaderCircle,
   MapPin,
+  SquareParking,
 } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
@@ -78,7 +81,13 @@ function isOpenBooking(booking) {
   return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed && !isExpired);
 }
 
+function isVehicleBlockingBooking(booking) {
+  const status = String(booking?.status || booking?.bookingStatus || "").toUpperCase();
+  return isOpenBooking(booking) || status === "CHECKED_IN" || status === "WAITING_PAYMENT";
+}
+
 export default function BookingPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
@@ -88,7 +97,14 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [conflictLock, setConflictLock] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
+  const [bookingStart, setBookingStart] = useState(() => {
+    const d = new Date(Date.now() + 15 * 60 * 1000);
+    d.setSeconds(0, 0);
+    return d;
+  });
+  const [bookingDurationHours, setBookingDurationHours] = useState(2);
   const [selection, setSelection] = useState({
     building: "",
     floor: "",
@@ -135,17 +151,21 @@ export default function BookingPage() {
       const vehicleId = vehicle.vehicleId || vehicle.id;
       const activeBooking = myBookings.find((booking) => {
         const bookingVehicleId = booking.vehicleId || booking.vehicle?.id;
-        return String(bookingVehicleId) === String(vehicleId) && isOpenBooking(booking);
+        return String(bookingVehicleId) === String(vehicleId) && isVehicleBlockingBooking(booking);
       });
+      const conflictBooking =
+        String(conflictLock?.vehicleId || "") === String(vehicleId)
+          ? conflictLock
+          : null;
 
       return {
         ...vehicle,
         vehicleId,
-        activeBooking,
-        isLocked: Boolean(activeBooking),
+        activeBooking: activeBooking || conflictBooking,
+        isLocked: Boolean(activeBooking || conflictBooking),
       };
     });
-  }, [vehicles, myBookings]);
+  }, [conflictLock, vehicles, myBookings]);
 
   useEffect(() => {
     async function loadAvailableSlots() {
@@ -259,17 +279,45 @@ export default function BookingPage() {
   const selectedVehicleBooking = vehiclesWithStatus.find(
     (vehicle) => String(vehicle.vehicleId) === String(selection.vehicleId)
   );
+  const lockedBooking = selectedVehicleBooking?.activeBooking || null;
+  const isSelectedVehicleLocked = Boolean(selectedVehicleBooking?.isLocked);
+  const effectiveStep = isSelectedVehicleLocked ? 0 : step;
+
+  useEffect(() => {
+    if (!isSelectedVehicleLocked) {
+      return;
+    }
+
+    setSelection((prev) => ({
+      ...prev,
+      building: "",
+      floor: "",
+      zone: "",
+      slotCode: "",
+      slotId: "",
+    }));
+    setBackendSlots([]);
+    setSubmitError("");
+    setConfirmation(null);
+    setStep(0);
+  }, [isSelectedVehicleLocked]);
 
   async function handleConfirm() {
-    if (!selection.vehicleId || !selectedSlot) {
+    if (!selection.vehicleId || !selectedSlot || isSelectedVehicleLocked) {
       return;
     }
 
     setSubmitting(true);
     setSubmitError("");
     try {
-      const start = new Date(Date.now() + 20 * 60 * 1000);
-      const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+      const start = bookingStart;
+      const end = new Date(start.getTime() + bookingDurationHours * 60 * 60 * 1000);
+      const minutesUntilStart = (start.getTime() - Date.now()) / 60000;
+      if (minutesUntilStart < 10) {
+        setSubmitError("Thoi gian bat dau phai cach hien tai it nhat 10 phut.");
+        setSubmitting(false);
+        return;
+      }
       const res = await bookingApi.create({
         vehicleId: Number(selection.vehicleId),
         slotId: Number(selectedSlot.slotId),
@@ -293,15 +341,32 @@ export default function BookingPage() {
       setStep(3);
     } catch (error) {
       console.error("Create booking failed", error);
-      setSubmitError(
-        getErrorMessage(error, "Tao booking that bai. Vui long thu lai.")
-      );
+      const message = getErrorMessage(error, "Tao booking that bai. Vui long thu lai.");
+      setSubmitError(message);
+      if (error?.response?.status === 409 && /booking active/i.test(message)) {
+        const bookingId = message.match(/#(\d+)/)?.[1];
+        setConflictLock({
+          bookingId,
+          vehicleId: selection.vehicleId,
+          status: "CONFLICT",
+        });
+        setSelection((prev) => ({
+          ...prev,
+          building: "",
+          floor: "",
+          zone: "",
+          slotCode: "",
+          slotId: "",
+        }));
+        setBackendSlots([]);
+        setStep(0);
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (step === 3 && confirmation) {
+  if (effectiveStep === 3 && confirmation) {
     return (
       <div className="max-w-lg mx-auto">
         <div className="bg-card border border-border rounded-2xl p-8 text-center">
@@ -376,6 +441,35 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => navigate("/driver/parking-slots")}
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-muted/40"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <SquareParking size={18} />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-foreground">Available slots</span>
+            <span className="block text-xs text-muted-foreground">Browse live slot status by vehicle type.</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate("/driver/bookings")}
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-muted/40"
+        >
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <History size={18} />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-foreground">Booking history</span>
+            <span className="block text-xs text-muted-foreground">Review deposits, Entry QR, and booking status.</span>
+          </span>
+        </button>
+      </div>
+
       {loadError ? (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
@@ -390,36 +484,46 @@ export default function BookingPage() {
         </div>
       ) : null}
 
+      {isSelectedVehicleLocked && lockedBooking ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Xe nay dang co booking/phien chua hoan tat (#{lockedBooking.bookingId || lockedBooking.id}).
+            Vui long hoan tat vao/ra cong, thanh toan, hoac huy booking cu truoc khi tao booking moi.
+          </span>
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-0">
         {steps.map((label, index) => (
           <div key={label} className="flex items-center flex-1 last:flex-none">
             <div className="flex items-center gap-2">
               <div
                 className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  index <= step
+                  index <= effectiveStep
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {index < step ? <Check size={12} /> : index + 1}
+                {index < effectiveStep ? <Check size={12} /> : index + 1}
               </div>
               <span
                 className={`text-xs ${
-                  index === step ? "text-foreground font-medium" : "text-muted-foreground"
+                  index === effectiveStep ? "text-foreground font-medium" : "text-muted-foreground"
                 }`}
               >
                 {label}
               </span>
             </div>
             {index < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-3 ${index < step ? "bg-primary" : "bg-border"}`} />
+              <div className={`flex-1 h-px mx-3 ${index < effectiveStep ? "bg-primary" : "bg-border"}`} />
             )}
           </div>
         ))}
       </div>
 
       <div className="bg-card border border-border rounded-2xl p-6">
-        {step === 0 ? (
+        {effectiveStep === 0 ? (
           <div>
             <h3 className="font-semibold text-foreground mb-4">Select Vehicle And Building</h3>
 
@@ -429,7 +533,8 @@ export default function BookingPage() {
               </label>
               <Select
                 value={selection.vehicleId}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  setConflictLock(null);
                   setSelection({
                     building: "",
                     floor: "",
@@ -437,8 +542,8 @@ export default function BookingPage() {
                     slotCode: "",
                     slotId: "",
                     vehicleId: value,
-                  })
-                }
+                  });
+                }}
               >
                 <SelectTrigger
                   className="h-12 rounded-xl border-border bg-background/80 px-4 text-sm text-foreground shadow-sm shadow-black/5 hover:border-primary/40 hover:bg-muted/40"
@@ -458,7 +563,7 @@ export default function BookingPage() {
                     >
                       {vehicle.licensePlate}
                       {vehicle.isLocked
-                        ? ` - already has booking #${vehicle.activeBooking.bookingId}`
+                        ? ` - unfinished #${vehicle.activeBooking.bookingId || vehicle.activeBooking.id}`
                         : ""}
                     </SelectItem>
                   ))}
@@ -467,9 +572,9 @@ export default function BookingPage() {
             </div>
 
             {selection.vehicleId && selectedVehicle ? (
-              selectedVehicleBooking?.isLocked ? (
+              isSelectedVehicleLocked ? (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  Xe nay dang co booking active. Vui long chon xe khac hoac huy booking cu.
+                  Xe nay dang co booking/phien chua hoan tat. Vui long hoan tat thanh toan hoac chon xe khac.
                 </div>
               ) : null
             ) : null}
@@ -532,7 +637,7 @@ export default function BookingPage() {
               disabled={
                 !selection.vehicleId ||
                 !selection.building ||
-                selectedVehicleBooking?.isLocked
+                isSelectedVehicleLocked
               }
               className="mt-5 w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
             >
@@ -541,7 +646,7 @@ export default function BookingPage() {
           </div>
         ) : null}
 
-        {step === 1 ? (
+        {effectiveStep === 1 && !isSelectedVehicleLocked ? (
           <div>
             <h3 className="font-semibold text-foreground mb-4">Floor &amp; Zone</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -619,7 +724,7 @@ export default function BookingPage() {
           </div>
         ) : null}
 
-        {step === 2 ? (
+        {effectiveStep === 2 && !isSelectedVehicleLocked ? (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground">Select a Slot</h3>
@@ -672,6 +777,38 @@ export default function BookingPage() {
               </div>
             ) : null}
 
+            <div className="mb-5 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Start time (min 10 min from now)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formatLocalDateTime(bookingStart).slice(0, 16)}
+                  min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) setBookingStart(new Date(val));
+                  }}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Duration (hours)
+                </label>
+                <select
+                  value={bookingDurationHours}
+                  onChange={(e) => setBookingDurationHours(Number(e.target.value))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                >
+                  {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
+                    <option key={h} value={h}>{h} {h === 1 ? "hour" : "hours"}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(1)}
@@ -681,7 +818,7 @@ export default function BookingPage() {
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={!selection.vehicleId || !selection.slotCode || submitting}
+                disabled={!selection.vehicleId || !selection.slotCode || submitting || isSelectedVehicleLocked}
                 className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
               >
                 {submitting ? "Creating..." : "Confirm Booking"}

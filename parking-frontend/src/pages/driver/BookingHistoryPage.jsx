@@ -66,6 +66,7 @@ export default function BookingHistoryPage() {
   }, []);
 
   async function handlePayDeposit(booking) {
+    let createdPaymentId = null;
     try {
       setProcessingBookingId(booking.bookingId);
       setError("");
@@ -76,16 +77,21 @@ export default function BookingHistoryPage() {
       });
 
       const payment = unwrapApiData(createRes.data, null);
-      if (payment?.paymentId) {
-        await paymentApi.confirmDeposit(payment.paymentId);
+      if (!payment?.paymentId) {
+        setError("Tao payment that bai. Vui long thu lai.");
+        return;
       }
-
+      createdPaymentId = payment.paymentId;
+      await paymentApi.confirmDeposit(createdPaymentId);
       await loadBookings();
     } catch (paymentError) {
       console.error("Failed to pay deposit", paymentError);
-      setError(
-        paymentError.response?.data?.message || "Khong the thanh toan deposit cho booking nay."
-      );
+      const msg = paymentError.response?.data?.message || "Khong the thanh toan deposit cho booking nay.";
+      if (createdPaymentId) {
+        setError(`${msg} Payment #${createdPaymentId} da duoc tao nhung chua confirm. Vui long lien he staff.`);
+      } else {
+        setError(msg);
+      }
     } finally {
       setProcessingBookingId(null);
     }
@@ -212,9 +218,15 @@ export default function BookingHistoryPage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                           Show this QR at the entry gate after deposit is paid.
                         </p>
-                        <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
-                          {shortToken(item.qrToken)}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(item.qrToken)}
+                          className="mt-3 w-full rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-muted transition-colors text-left break-all"
+                          title="Click to copy full token"
+                        >
+                          {item.qrToken}
+                        </button>
+                        <p className="text-xs text-muted-foreground mt-1">Click token to copy</p>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Issued {formatDateTime(item.qrIssuedAt)}
                         </p>

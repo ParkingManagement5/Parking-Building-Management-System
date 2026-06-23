@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/driver/bookingApi";
+import { driverSessionApi } from "../../api/driver/sessionApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { notificationApi } from "../../api/notificationApi";
@@ -40,6 +41,14 @@ function isOpenBooking(item) {
   const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
   const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
   return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
+}
+
+function resolveSessionStart(item) {
+  return item?.entryTime || item?.startTime || item?.checkInTime || item?.createdAt || item?.bookingStartTime;
+}
+
+function resolveSessionEnd(item) {
+  return item?.exitTime || item?.endTime || item?.checkOutTime || null;
 }
 
 export default function DriverDashboard() {
@@ -82,6 +91,7 @@ export default function DriverDashboard() {
     },
   ]);
   const [activeBooking, setActiveBooking] = useState(null);
+  const [currentDriverSession, setCurrentDriverSession] = useState(null);
   const [recentBookings, setRecentBookings] = useState([]);
   const [recentNotifications, setRecentNotifications] = useState([]);
 
@@ -91,10 +101,11 @@ export default function DriverDashboard() {
     async function loadDashboard() {
       try {
         const userId = getUserId();
-        const [vehiclesRes, bookingsRes, paymentsRes, notificationsRes] =
+        const [vehiclesRes, bookingsRes, sessionsRes, paymentsRes, notificationsRes] =
           await Promise.allSettled([
             driverVehicleApi.getMyVehicles(),
             bookingApi.getMyBookings(),
+            driverSessionApi.getMySessions(),
             paymentApi.getMyPayments(),
             userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
           ]);
@@ -107,6 +118,8 @@ export default function DriverDashboard() {
           vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
         const bookings =
           bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
+        const sessions =
+          sessionsRes.status === "fulfilled" ? unwrapApiData(sessionsRes.value.data, []) : [];
         const payments =
           paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
         const notifications =
@@ -115,11 +128,23 @@ export default function DriverDashboard() {
             : [];
 
         const active = bookings.find(isOpenBooking) || null;
+        const activeSession =
+          sessions.find((item) => String(item.status || "").toUpperCase() === "ACTIVE") || null;
+        const waitingPaymentSession =
+          sessions.find((item) => String(item.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
+        const currentSession = activeSession || waitingPaymentSession || null;
 
-        const monthlyExpenses = payments.reduce(
-          (sum, item) => sum + Number(item.amount || item.totalAmount || item.fee || 0),
-          0
-        );
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthlyExpenses = payments
+          .filter((item) => {
+            const paidDate = new Date(item.paidAt || item.createdAt || 0);
+            return paidDate >= monthStart;
+          })
+          .reduce(
+            (sum, item) => sum + Number(item.amount || item.totalAmount || 0),
+            0
+          );
 
         setStats([
           {
@@ -140,10 +165,10 @@ export default function DriverDashboard() {
           },
           {
             label: "Current Session",
-            value: active
+            value: currentSession
               ? formatDuration(
-                  active.checkInTime || active.startTime || active.createdAt,
-                  active.checkOutTime || active.endTime || new Date().toISOString()
+                  resolveSessionStart(currentSession),
+                  resolveSessionEnd(currentSession) || new Date().toISOString()
                 )
               : "--:--",
             icon: Clock,
@@ -167,6 +192,7 @@ export default function DriverDashboard() {
         ]);
 
         setActiveBooking(active);
+        setCurrentDriverSession(currentSession);
         setRecentBookings(bookings.slice(0, 3));
         setRecentNotifications(notifications.slice(0, 4));
       } catch (error) {
@@ -180,6 +206,35 @@ export default function DriverDashboard() {
       cancelled = true;
     };
   }, []);
+
+  const heroRecord = currentDriverSession || activeBooking;
+  const heroStatus = currentDriverSession
+    ? String(currentDriverSession.status || "").toUpperCase()
+    : getBookingStatus(activeBooking);
+  const heroTitle =
+    heroRecord?.buildingName || heroRecord?.parkingBuildingName || "No active session";
+  const heroSubtitle = heroRecord
+    ? `${
+        heroRecord.slotCode ||
+        heroRecord.parkingSlotCode ||
+        "Slot pending"
+      } - ${
+        heroRecord.licensePlate ||
+        heroRecord.vehiclePlate ||
+        "Vehicle linked"
+      }`
+    : "Create a booking to see your current parking session here";
+  const heroDuration = heroRecord
+    ? formatDuration(
+        resolveSessionStart(heroRecord),
+        resolveSessionEnd(heroRecord) || new Date().toISOString()
+      )
+    : "--:--";
+  const heroStatusLabel = currentDriverSession
+    ? heroStatus.toLowerCase()
+    : activeBooking
+      ? getBookingStatus(activeBooking)
+      : "waiting";
 
   return (
     <div className="space-y-5">
@@ -209,39 +264,14 @@ export default function DriverDashboard() {
         <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
           <div>
             <p className="mb-1 text-xs text-white/75 dark:text-slate-300/80">Active Parking Session</p>
-            <h2 className="font-bold mb-0.5 text-xl">
-              {activeBooking?.buildingName ||
-                activeBooking?.parkingBuildingName ||
-                "No active session"}
-            </h2>
+            <h2 className="font-bold mb-0.5 text-xl">{heroTitle}</h2>
             <p className="text-sm text-white/80 dark:text-slate-300/85">
-              {activeBooking
-                ? `${
-                    activeBooking.slotCode ||
-                    activeBooking.parkingSlotCode ||
-                    "Slot pending"
-                  } - ${
-                    activeBooking.licensePlate ||
-                    activeBooking.vehiclePlate ||
-                    "Vehicle linked"
-                  }`
-                : "Create a booking to see your current parking session here"}
+              {heroSubtitle}
             </p>
           </div>
 
           <div className="min-w-[92px] rounded-xl border border-white/20 bg-white/12 px-4 py-2 text-center backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
-            <div className="text-2xl font-bold font-mono">
-              {activeBooking
-                ? formatDuration(
-                    activeBooking.checkInTime ||
-                      activeBooking.startTime ||
-                      activeBooking.createdAt,
-                    activeBooking.checkOutTime ||
-                      activeBooking.endTime ||
-                      new Date().toISOString()
-                  )
-                : "--:--"}
-            </div>
+            <div className="text-2xl font-bold font-mono">{heroDuration}</div>
             <div className="text-xs text-white/70 dark:text-slate-400">Duration</div>
           </div>
         </div>
@@ -250,16 +280,16 @@ export default function DriverDashboard() {
           <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
             <p className="text-xs text-white/70 dark:text-slate-400">Booking Status</p>
             <p className="font-semibold text-sm mt-0.5 capitalize">
-              {activeBooking ? getBookingStatus(activeBooking) : "waiting"}
+              {heroStatusLabel}
             </p>
           </div>
           <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
             <p className="text-xs text-white/70 dark:text-slate-400">Estimated Fee</p>
             <p className="font-semibold text-sm mt-0.5">
               {formatCurrency(
-                activeBooking?.amount ||
-                  activeBooking?.estimatedFee ||
-                  activeBooking?.totalAmount ||
+                heroRecord?.amount ||
+                  heroRecord?.estimatedFee ||
+                  heroRecord?.totalAmount ||
                   0
               )}
             </p>
@@ -267,7 +297,7 @@ export default function DriverDashboard() {
           <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
             <p className="text-xs text-white/70 dark:text-slate-400">Vehicle</p>
             <p className="font-semibold text-sm mt-0.5">
-              {activeBooking?.licensePlate || activeBooking?.vehiclePlate || "Not assigned"}
+              {heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Not assigned"}
             </p>
           </div>
         </div>
