@@ -23,7 +23,7 @@ spring:
       mode: never
 
   mail:
-    host: ${MAIL_HOST:}
+    host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
@@ -33,6 +33,9 @@ spring:
           auth: true
           starttls:
             enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   port: 8080
@@ -43,6 +46,11 @@ jwt:
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:1035279450306-nv8sjrtdev50chrsmrsetmin25o516he.apps.googleusercontent.com}
+
+ocr:
+  confidence-threshold: 0.85
+  upload-dir: uploads/ocr
+  engine-url: ${OCR_ENGINE_URL:http://localhost:8000/recognize}
 
 springdoc:
   swagger-ui:

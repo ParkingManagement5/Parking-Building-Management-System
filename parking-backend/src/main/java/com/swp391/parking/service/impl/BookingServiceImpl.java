@@ -153,6 +153,31 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public BookingResponse verifyQrToken(String qrToken) {
+        if (qrToken == null || qrToken.isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu QR token");
+        }
+
+        Long bookingId;
+        try {
+            bookingId = qrTokenUtil.parseQrToken(qrToken).get("booking_id", Long.class);
+        } catch (Exception ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR không hợp lệ hoặc đã hết hạn");
+        }
+
+        Booking booking = getBookingEntity(bookingId);
+        if (booking.getQrUsedAt() != null) {
+            throw new AppException(HttpStatus.CONFLICT, "QR đã được dùng rồi");
+        }
+        if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
+        }
+
+        return toResponse(booking);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(Long currentUserId) {
         return bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream().map(this::toResponse).toList();
@@ -222,8 +247,11 @@ public class BookingServiceImpl implements BookingService {
                 .bookingEndTime(b.getBookingEndTime())
                 .reservedAt(b.getReservedAt())
                 .expiredAt(b.getExpiredAt())
-                .qrToken(List.of(Booking.BookingStatus.CONFIRMED, Booking.BookingStatus.CHECKED_IN)
-                        .contains(b.getStatus()) ? b.getQrToken() : null)
+                .qrToken(b.getStatus() == Booking.BookingStatus.CONFIRMED
+                        && b.getQrUsedAt() == null
+                        && (b.getExpiredAt() == null || b.getExpiredAt().isAfter(LocalDateTime.now()))
+                        ? b.getQrToken()
+                        : null)
                 .qrIssuedAt(b.getQrIssuedAt())
                 .qrUsed(b.getQrUsedAt() != null)
                 .depositAmount(b.getDepositAmount())

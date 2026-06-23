@@ -36,6 +36,12 @@ function StatusBadge({ status }) {
   );
 }
 
+function isOpenBooking(item) {
+  const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
+  const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
+  return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
+}
+
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState([
@@ -108,14 +114,7 @@ export default function DriverDashboard() {
             ? unwrapApiData(notificationsRes.value.data, [])
             : [];
 
-        const active = bookings.find((item) => {
-          const status = getBookingStatus(item);
-          return (
-            status.includes("active") ||
-            status.includes("confirmed") ||
-            status.includes("pending")
-          );
-        }) || null;
+        const active = bookings.find(isOpenBooking) || null;
 
         const monthlyExpenses = payments.reduce(
           (sum, item) => sum + Number(item.amount || item.totalAmount || item.fee || 0),
@@ -133,14 +132,7 @@ export default function DriverDashboard() {
           {
             label: "Active Booking",
             value: String(
-              bookings.filter((item) => {
-                const status = getBookingStatus(item);
-                return (
-                  status.includes("active") ||
-                  status.includes("confirmed") ||
-                  status.includes("pending")
-                );
-              }).length
+              bookings.filter(isOpenBooking).length
             ),
             icon: BookOpen,
             color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",

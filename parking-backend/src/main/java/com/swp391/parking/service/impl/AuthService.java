@@ -26,8 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +40,9 @@ public class AuthService {
     private static final SecureRandom OTP_RANDOM = new SecureRandom();
     private static final int OTP_MIN = 100000;
     private static final int OTP_RANGE = 900000;
+    private static final int LOCK_THRESHOLD = 5;
+    private static final int PERMANENT_LOCK_THRESHOLD = 20;
+    private final Map<String, LoginAttemptState> loginAttempts = new ConcurrentHashMap<>();
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -81,6 +87,7 @@ public class AuthService {
         return buildAuthResponse(user, null);
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest req) {
         User user = findByUsernameOrEmail(req.getUsername());
 
@@ -90,14 +97,16 @@ public class AuthService {
         if (User.UserStatus.LOCKED.equals(user.getStatus())) {
             throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
         }
+        enforceTemporaryLoginLock(user);
 
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(user.getUsername(), req.getPassword()));
         } catch (AuthenticationException e) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Username hoac password khong dung");
+            handleFailedPasswordLogin(user);
         }
 
+        resetLoginLock(user);
         String token = jwtUtil.generateToken(user.getUsername());
         return buildAuthResponse(user, token);
     }
@@ -153,6 +162,7 @@ public class AuthService {
         if (User.UserStatus.LOCKED.equals(user.getStatus())) {
             throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
         }
+        enforceTemporaryLoginLock(user);
         if (User.UserStatus.PENDING.equals(user.getStatus())) {
             user.setStatus(User.UserStatus.ACTIVE);
             user.setEmailVerificationCode(null);
@@ -168,6 +178,77 @@ public class AuthService {
         return userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmail(login))
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"));
+    }
+
+    private void enforceTemporaryLoginLock(User user) {
+        LoginAttemptState state = loginAttempts.get(loginAttemptKey(user));
+        if (state == null || state.lockedUntil == null) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (state.lockedUntil.isAfter(now)) {
+            long remainingMinutes = Math.max(1, Duration.between(now, state.lockedUntil).toMinutes() + 1);
+            throw new AppException(
+                    HttpStatus.LOCKED,
+                    "Tai khoan tam khoa do nhap sai mat khau qua nhieu lan. Thu lai sau "
+                            + remainingMinutes + " phut");
+        }
+
+        state.lockedUntil = null;
+    }
+
+    private void handleFailedPasswordLogin(User user) {
+        String key = loginAttemptKey(user);
+        LoginAttemptState state = loginAttempts.computeIfAbsent(key, ignored -> new LoginAttemptState());
+        int failedAttempts = state.failedAttempts + 1;
+        state.failedAttempts = failedAttempts;
+
+        if (failedAttempts >= PERMANENT_LOCK_THRESHOLD) {
+            user.setStatus(User.UserStatus.LOCKED);
+            userRepository.save(user);
+            loginAttempts.remove(key);
+            throw new AppException(
+                    HttpStatus.FORBIDDEN,
+                    "Tai khoan da bi khoa do nhap sai mat khau qua nhieu lan");
+        }
+
+        if (failedAttempts % LOCK_THRESHOLD == 0) {
+            int lockMinutes = lockMinutesForFailedAttempts(failedAttempts);
+            state.lockedUntil = LocalDateTime.now().plusMinutes(lockMinutes);
+            throw new AppException(
+                    HttpStatus.LOCKED,
+                    "Nhap sai mat khau " + failedAttempts + " lan. Tai khoan tam khoa "
+                            + lockMinutes + " phut");
+        }
+
+        int remainingAttempts = LOCK_THRESHOLD - (failedAttempts % LOCK_THRESHOLD);
+        throw new AppException(
+                HttpStatus.UNAUTHORIZED,
+                "Username hoac password khong dung. Con " + remainingAttempts
+                        + " lan truoc khi tam khoa tai khoan");
+    }
+
+    private int lockMinutesForFailedAttempts(int failedAttempts) {
+        int lockLevel = failedAttempts / LOCK_THRESHOLD;
+        return switch (lockLevel) {
+            case 1 -> 5;
+            case 2 -> 15;
+            default -> 30;
+        };
+    }
+
+    private void resetLoginLock(User user) {
+        loginAttempts.remove(loginAttemptKey(user));
+    }
+
+    private String loginAttemptKey(User user) {
+        return user.getUsername().toLowerCase();
+    }
+
+    private static class LoginAttemptState {
+        private int failedAttempts;
+        private LocalDateTime lockedUntil;
     }
 
     private GoogleTokenInfo verifyGoogleCredential(String credential) {

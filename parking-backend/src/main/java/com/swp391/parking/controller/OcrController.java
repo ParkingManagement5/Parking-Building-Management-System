@@ -9,14 +9,16 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/ocr")
+@RequestMapping({"/api/ocr", "/api/v1/ocr"})
 @RequiredArgsConstructor
 @Tag(name = "OCR", description = "Nhận diện biển số xe")
 @SecurityRequirement(name = "bearerAuth")
@@ -31,6 +33,19 @@ public class OcrController {
     public ResponseEntity<ApiResponse<OcrScanResponse>> scan(
             @Valid @RequestBody OcrScanRequest request) {
         return ResponseEntity.ok(ApiResponse.success(ocrService.createScan(request)));
+    }
+
+    @PostMapping(value = "/scan-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Upload anh bien so va tao OCR scan")
+    public ResponseEntity<ApiResponse<OcrScanResponse>> scanImage(
+            @RequestPart("image") MultipartFile image,
+            @RequestParam Long gateId,
+            @RequestParam String triggerType,
+            @RequestParam(required = false) Long sessionId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "OCR scan thanh cong",
+                ocrService.scanImage(image, gateId, triggerType, sessionId)));
     }
 
     @GetMapping("/pending-reviews")

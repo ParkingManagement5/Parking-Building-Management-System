@@ -58,18 +58,6 @@ function OccupancyMap() {
   );
 }
 
-function SocialButton({ children, icon }) {
-  return (
-    <button
-      type="button"
-      className="flex items-center justify-center gap-2 rounded-xl border border-slate-300/80 bg-white/92 px-4 py-3 text-sm font-medium text-slate-700 transition duration-200 hover:border-slate-400 hover:bg-white hover:shadow-sm active:scale-[0.98] dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
 function routeForRole(rawRole) {
   const role = rawRole.toString().replace("ROLE_", "").toUpperCase();
 
