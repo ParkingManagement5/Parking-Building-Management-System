@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class Booking extends BaseEntity {
 
     public enum BookingStatus {
-        PENDING_PAYMENT, CONFIRMED, CHECKED_IN, EXPIRED, CANCELLED, COMPLETED
+        PENDING_PAYMENT, CONFIRMED, CHECKED_IN, WAITING_PAYMENT, EXPIRED, CANCELLED, COMPLETED
     }
 
     @Id

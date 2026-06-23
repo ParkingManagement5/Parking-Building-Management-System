@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
+import { driverSessionApi } from "../../api/driver/sessionApi";
 import { floorApi } from "../../api/manager/floorApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { zoneApi } from "../../api/manager/zoneApi";
@@ -55,8 +56,48 @@ function getActiveBooking(bookings) {
   return bookings.find((item) => {
     const status = getBookingStatus(item).toUpperCase();
     const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
-    return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
+    const expiryValue = item?.expiredAt || item?.bookingEndTime;
+    const expiresAt = expiryValue ? new Date(expiryValue).getTime() : null;
+    const isExpired = Number.isFinite(expiresAt) && expiresAt < Date.now();
+    return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed && !isExpired);
   });
+}
+
+function getCurrentSession(sessions) {
+  return (
+    sessions.find((item) => String(item?.status || "").toUpperCase() === "ACTIVE") ||
+    sessions.find((item) => String(item?.status || "").toUpperCase() === "WAITING_PAYMENT") ||
+    null
+  );
+}
+
+function enrichSessionRecord(session, bookings) {
+  if (!session) return null;
+
+  const matchedBooking =
+    bookings.find((item) => String(item.bookingId) === String(session.bookingId)) ||
+    bookings.find((item) => String(item.slotId) === String(session.slotId)) ||
+    bookings.find((item) => String(item.licensePlate || "").toLowerCase() === String(session.licensePlate || "").toLowerCase());
+
+  if (!matchedBooking) {
+    return session;
+  }
+
+  return {
+    ...matchedBooking,
+    ...session,
+    bookingId: session.bookingId || matchedBooking.bookingId,
+    slotId: session.slotId || matchedBooking.slotId,
+    slotCode: session.slotCode || matchedBooking.slotCode,
+    licensePlate: session.licensePlate || matchedBooking.licensePlate,
+    zoneId: session.zoneId || matchedBooking.zoneId,
+    zoneName: session.zoneName || matchedBooking.zoneName,
+    floorId: session.floorId || matchedBooking.floorId,
+    floorName: session.floorName || matchedBooking.floorName,
+    buildingId: session.buildingId || matchedBooking.buildingId,
+    buildingName: session.buildingName || matchedBooking.buildingName,
+    qrToken: session.qrToken || matchedBooking.qrToken,
+  };
 }
 
 function normalizeSlotCode(session) {
@@ -533,8 +574,17 @@ export default function DriverParkingMapPage() {
     async function load() {
       setLoading(true);
       try {
-        const bookingRes = await bookingApi.getMyBookings();
-        const active = getActiveBooking(unwrapApiData(bookingRes.data, []));
+        const [bookingRes, sessionRes] = await Promise.all([
+          bookingApi.getMyBookings(),
+          driverSessionApi.getMySessions(),
+        ]);
+        const bookings = unwrapApiData(bookingRes.data, []);
+        const sessions = unwrapApiData(sessionRes.data, []);
+        const activeSession = getCurrentSession(sessions);
+        const activeBooking = getActiveBooking(bookings);
+        const active = activeSession
+          ? enrichSessionRecord(activeSession, bookings)
+          : activeBooking || null;
         if (cancelled) return;
         setSession(active || null);
 
