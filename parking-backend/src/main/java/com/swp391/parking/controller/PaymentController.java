@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ public class PaymentController {
 
     @Operation(summary = "Create deposit for booking")
     @PostMapping("/deposit")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> createDeposit(
             @RequestParam Integer bookingId,
             @RequestParam BigDecimal depositAmount,
@@ -41,6 +43,7 @@ public class PaymentController {
 
     @Operation(summary = "Confirm deposit payment")
     @PutMapping("/deposit/{paymentId}/confirm")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> confirmDeposit(
             @PathVariable Integer paymentId) {
         PaymentResponse response = paymentService.confirmDeposit(paymentId);
@@ -50,6 +53,7 @@ public class PaymentController {
 
     @Operation(summary = "Create parking fee for session")
     @PostMapping("/parking-fee")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> createParkingFee(
             @RequestParam Integer sessionId,
             @RequestParam(required = false) Integer bookingId,
@@ -79,6 +83,7 @@ public class PaymentController {
 
     @Operation(summary = "Confirm parking fee payment")
     @PutMapping("/parking-fee/{paymentId}/confirm")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> confirmParkingFee(
             @PathVariable Integer paymentId,
             @RequestParam(required = false) String transactionRef) {
@@ -90,6 +95,7 @@ public class PaymentController {
 
     @Operation(summary = "Get payment by ID")
     @GetMapping("/{paymentId}")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> getById(
             @PathVariable Integer paymentId) {
         PaymentResponse response = paymentService.getById(paymentId);
@@ -98,6 +104,7 @@ public class PaymentController {
 
     @Operation(summary = "Get current user's payments")
     @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getMyPayments(
             Authentication authentication) {
         Long userId = userRepository.findByUsername(authentication.getName())
@@ -106,8 +113,9 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.success(paymentService.getMyPayments(userId)));
     }
 
-    @Operation(summary = "Get payments by booking ID")
+    @Operation(summary = "Get payments by status")
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByStatus(
             @PathVariable PaymentStatus status) {
         return ResponseEntity.ok(ApiResponse.success(paymentService.getByStatus(status)));
@@ -115,6 +123,7 @@ public class PaymentController {
 
     @Operation(summary = "Get payments by booking ID")
     @GetMapping("/booking/{bookingId}")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByBookingId(
             @PathVariable Integer bookingId) {
         List<PaymentResponse> response = paymentService.getByBookingId(bookingId);
@@ -123,6 +132,7 @@ public class PaymentController {
 
     @Operation(summary = "Get payments by session ID")
     @GetMapping("/session/{sessionId}")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getBySessionId(
             @PathVariable Integer sessionId) {
         List<PaymentResponse> response = paymentService.getBySessionId(sessionId);

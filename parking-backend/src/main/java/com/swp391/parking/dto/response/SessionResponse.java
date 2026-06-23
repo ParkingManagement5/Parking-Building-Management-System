@@ -13,6 +13,8 @@ public class SessionResponse {
     private Long userId;
     private Long vehicleId;
     private String licensePlate;
+    private Long vehicleTypeId;
+    private String vehicleTypeName;
     private Long entryGateId;
     private String entryGateCode;
     private Long exitGateId;

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/bookings")
+@RequestMapping({"/api/bookings", "/api/v1/bookings"})
 @RequiredArgsConstructor
 @Tag(name = "Booking", description = "Quản lý đặt chỗ")
 @SecurityRequirement(name = "bearerAuth")
@@ -45,8 +45,16 @@ public class BookingController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Xem chi tiết booking")
-    public ResponseEntity<ApiResponse<BookingResponse>> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(bookingService.getBooking(id)));
+    public ResponseEntity<ApiResponse<BookingResponse>> getOne(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails ud) {
+        BookingResponse booking = bookingService.getBooking(id);
+        boolean isDriver = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
+        if (isDriver && !booking.getUserId().equals(getCurrentUserId(ud))) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking nay");
+        }
+        return ResponseEntity.ok(ApiResponse.success(booking));
     }
 
     @GetMapping("/my")

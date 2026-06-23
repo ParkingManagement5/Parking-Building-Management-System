@@ -14,6 +14,7 @@ export default function MyVehiclesPage() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     licensePlate: "",
     vehicleTypeId: "",
@@ -71,6 +72,7 @@ export default function MyVehiclesPage() {
 
   const openCreate = () => {
     resetForm();
+    setFormError("");
     setShowModal(true);
   };
 
@@ -84,18 +86,20 @@ export default function MyVehiclesPage() {
       model: item.model || "",
       year: item.year || "",
     });
+    setFormError("");
     setShowModal(true);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setFormError("");
 
     if (!form.licensePlate.trim()) {
-      alert("License plate is required");
+      setFormError("License plate is required.");
       return;
     }
     if (!form.vehicleTypeId) {
-      alert("Vehicle type is required. Please ask a manager to create vehicle types first.");
+      setFormError("Vehicle type is required. Please ask a manager to create vehicle types first.");
       return;
     }
 
@@ -120,7 +124,7 @@ export default function MyVehiclesPage() {
       resetForm();
     } catch (error) {
       console.error("Failed to save vehicle", error);
-      alert(error.response?.data?.message || "Save vehicle failed");
+      setFormError(error.response?.data?.message || "Save vehicle failed.");
     }
   };
 
@@ -248,6 +252,11 @@ export default function MyVehiclesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {formError}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1.5">
                   License Plate *
