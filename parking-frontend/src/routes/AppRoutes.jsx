@@ -8,6 +8,7 @@ import PublicSlotListPage from "../pages/public/PublicSlotListPage";
 import LoginPage from "../ui/components/LoginPage";
 import RegisterPage from "../ui/components/RegisterPage";
 import VerifyEmailPage from "../ui/components/VerifyEmailPage";
+import ForgotPasswordPage from "../ui/components/ForgotPasswordPage";
 import UnauthorizedPage from "../pages/auth/UnauthorizedPage";
 import RolePortalLayout from "../ui/components/RolePortalLayout";
 import DriverDashboard from "../pages/driver/DriverDashboard";
@@ -61,6 +62,7 @@ export default function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={["DRIVER"]} />}>

@@ -6,6 +6,7 @@ import com.swp391.parking.dto.request.SessionQrScanRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
+import com.swp391.parking.entity.Role;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ParkingSessionService;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -79,8 +81,19 @@ public class ParkingSessionController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Xem chi tiết session")
-    public ResponseEntity<ApiResponse<SessionResponse>> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(sessionService.getSession(id)));
+    public ResponseEntity<ApiResponse<SessionResponse>> getOne(
+            @PathVariable Long id,
+            Authentication authentication) {
+        SessionResponse response = sessionService.getSession(id);
+        if (authentication != null && hasRole(authentication, Role.RoleName.DRIVER)) {
+            Long currentUserId = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"))
+                    .getUserId().longValue();
+            if (!currentUserId.equals(response.getUserId())) {
+                throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay session #" + id);
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping({"", "/"})
@@ -101,5 +114,10 @@ public class ParkingSessionController {
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
                 .getUserId().longValue();
         return ResponseEntity.ok(ApiResponse.success(sessionService.getMySessions(userId)));
+    }
+    private boolean hasRole(Authentication authentication, Role.RoleName roleName) {
+        String authority = "ROLE_" + roleName.name();
+        return authentication.getAuthorities().stream()
+                .anyMatch(grantedAuthority -> authority.equals(grantedAuthority.getAuthority()));
     }
 }

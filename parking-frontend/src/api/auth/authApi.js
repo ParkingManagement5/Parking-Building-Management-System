@@ -10,4 +10,8 @@ export const authApi = {
   verifyEmail: (data) => axiosClient.post("/auth/verify-email", data),
 
   resendVerification: (data) => axiosClient.post("/auth/resend-verification", data),
+
+  forgotPassword: (data) => axiosClient.post("/auth/forgot-password", data),
+
+  resetPassword: (data) => axiosClient.post("/auth/reset-password", data),
 };
