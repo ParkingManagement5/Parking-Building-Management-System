@@ -3,12 +3,12 @@ spring:
     name: parking-backend
 
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   datasource:
-    url: jdbc:mysql://localhost:3306/parking_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: 12345
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/parking_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:12345}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -20,7 +20,7 @@ spring:
 
   sql:
     init:
-      mode: never
+      mode: ${SPRING_SQL_INIT_MODE:never}
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
@@ -41,8 +41,8 @@ server:
   port: 8080
 
 jwt:
-  secret: swp391-parking-dev-secret-key-must-be-at-least-256-bits-long-string
-  expiration: 86400000
+  secret: ${JWT_SECRET:swp391-parking-dev-secret-key-must-be-at-least-256-bits-long-string}
+  expiration: ${JWT_EXPIRATION:86400000}
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:1035279450306-nv8sjrtdev50chrsmrsetmin25o516he.apps.googleusercontent.com}
