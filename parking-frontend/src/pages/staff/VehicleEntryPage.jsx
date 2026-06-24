@@ -413,6 +413,12 @@ export default function VehicleEntryPage() {
 
   const handleLookup = async (event) => {
     event?.preventDefault?.();
+
+    // Nếu có QR code → chuyển sang luồng booking entry thay vì lookup walk-in
+    if (form.qrCode.trim()) {
+      return handleQrEntry();
+    }
+
     if (!form.licensePlate.trim()) {
       setLookup({ loading: false, error: "Enter a license plate to continue.", notice: "", vehicle: null });
       return;
@@ -452,6 +458,11 @@ export default function VehicleEntryPage() {
         notice: "",
       }));
       return;
+    }
+
+    // Nếu có QR code → dùng BOOKING mode thay vì WALK_IN_AUTO
+    if (form.qrCode.trim()) {
+      return handleQrEntry();
     }
 
     setLookup((prev) => ({ ...prev, loading: true, error: "", notice: "" }));
@@ -926,14 +937,17 @@ export default function VehicleEntryPage() {
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <StaffPrimaryButton type="submit" disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
-                  <Search size={15} />
-                  {lookup.loading ? "Checking..." : "Lookup Vehicle"}
-                </StaffPrimaryButton>
-                <StaffSecondaryButton type="button" onClick={handleQrEntry} disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
-                  <CheckCircle2 size={15} />
-                  Process QR Entry
-                </StaffSecondaryButton>
+                {form.qrCode.trim() ? (
+                  <StaffPrimaryButton type="button" onClick={handleQrEntry} disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
+                    <CheckCircle2 size={15} />
+                    {lookup.loading ? "Processing..." : "Process QR Entry"}
+                  </StaffPrimaryButton>
+                ) : (
+                  <StaffPrimaryButton type="submit" disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
+                    <Search size={15} />
+                    {lookup.loading ? "Checking..." : "Lookup Vehicle"}
+                  </StaffPrimaryButton>
+                )}
                 <StaffSecondaryButton type="button" onClick={handleDirectWalkInEntry} disabled={lookup.loading} className="flex items-center justify-center gap-2 sm:flex-1">
                   <ArrowRight size={15} />
                   Direct Walk-in Entry

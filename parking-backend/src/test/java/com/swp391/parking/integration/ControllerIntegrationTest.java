@@ -189,11 +189,11 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.licensePlate").value("59A-12345"));
+            .andExpect(jsonPath("$.data.licensePlate").value("59A-123.45"));
 
         mockMvc.perform(get("/api/v1/vehicles/my"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].licensePlate").value("59A-12345"));
+            .andExpect(jsonPath("$.data[0].licensePlate").value("59A-123.45"));
     }
 
     @Test
@@ -241,14 +241,14 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.title").value("Ping"))
-            .andExpect(jsonPath("$.isRead").value(false));
+            .andExpect(jsonPath("$.data.title").value("Ping"))
+            .andExpect(jsonPath("$.data.isRead").value(false));
 
         Long notificationId = notificationRepository.findAll().get(0).getNotificationId();
 
         mockMvc.perform(get("/api/v1/notifications/user/{userId}", user.getUserId()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].title").value("Ping"));
+            .andExpect(jsonPath("$.data[0].title").value("Ping"));
 
         mockMvc.perform(patch("/api/v1/notifications/{id}/read", notificationId))
             .andExpect(status().isNoContent());
@@ -270,14 +270,14 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.vehicleTypeId").value(vehicleType.getId()))
-            .andExpect(jsonPath("$.isActive").value(false));
+            .andExpect(jsonPath("$.data.vehicleTypeId").value(vehicleType.getId()))
+            .andExpect(jsonPath("$.data.isActive").value(false));
 
         Long policyId = pricingPolicyRepository.findAll().get(0).getPolicyId();
 
         mockMvc.perform(patch("/api/v1/pricing/{id}/activate", policyId))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.isActive").value(true));
+            .andExpect(jsonPath("$.data.isActive").value(true));
     }
 
     @Test
