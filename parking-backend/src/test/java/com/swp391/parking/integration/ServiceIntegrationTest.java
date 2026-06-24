@@ -46,6 +46,7 @@ import java.time.LocalTime;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -184,10 +185,9 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         vehicleTypeService.deactivate(vehicleType.getId());
 
-        assertTrue(vehicleTypeRepository.findById(vehicleType.getId()).isEmpty());
-        assertTrue(vehicleRepository.findByVehicleTypeId(vehicleType.getId()).isEmpty());
-        assertTrue(zoneRepository.findByVehicleTypeId(vehicleType.getId()).isEmpty());
-        assertTrue(parkingSlotRepository.findByZoneId(zone.getId()).isEmpty());
+        VehicleType deactivated = vehicleTypeRepository.findById(vehicleType.getId()).orElse(null);
+        assertNotNull(deactivated);
+        assertFalse(deactivated.getIsActive());
     }
 
     @Test

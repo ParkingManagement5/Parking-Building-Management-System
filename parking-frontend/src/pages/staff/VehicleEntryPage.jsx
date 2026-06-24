@@ -842,17 +842,17 @@ export default function VehicleEntryPage() {
           title="Entry Workflow"
           subtitle="Process QR bookings, registered vehicles, direct walk-ins, or exceptions"
         >
-          <div className="mb-5 flex items-center gap-3">
+          <div className="mb-5 flex items-center gap-1.5">
             {[1, 2, 3].map((item) => (
-              <div key={item} className="flex items-center gap-3">
+              <div key={item} className="flex items-center gap-1.5">
                 <div
-                  className={`flex size-8 items-center justify-center rounded-full text-xs font-bold ${
-                    step >= item ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                  className={`flex size-6 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+                    step >= item ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {item}
                 </div>
-                {item < 3 ? <div className={`h-px w-10 ${step > item ? "bg-primary" : "bg-border"}`} /> : null}
+                {item < 3 ? <div className={`h-px w-6 ${step > item ? "bg-primary" : "bg-border"}`} /> : null}
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
@@ -284,78 +284,63 @@ function SlotModal({ slot, onClose }) {
 
 function TableView({ slots, onSelect }) {
   const [page, setPage] = useState(1);
-  const perPage = 12;
+  const tableRef = useRef(null);
+  const perPage = 15;
   const totalPages = Math.max(1, Math.ceil(slots.length / perPage));
   const currentPage = Math.min(page, totalPages);
   const visibleSlots = slots.slice((currentPage - 1) * perPage, currentPage * perPage);
 
+  const goPage = (p) => {
+    setPage(p);
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card">
+    <div ref={tableRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card scroll-mt-4">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px]">
-          <thead className="bg-slate-50/80 dark:bg-white/[0.03]">
+        <table className="w-full min-w-[700px]">
+          <thead className="bg-slate-50/80 dark:bg-white/[0.03] sticky top-0 z-10">
             <tr className="border-b border-slate-100 dark:border-white/10">
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Slot Code</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Status</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Building</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Floor</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Zone</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Vehicle</th>
-              <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Source</th>
-              <th className="px-4 py-3" />
+              {["Slot","Status","Tang","Zone","Loai xe"].map(h=>(
+                <th key={h} className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{h}</th>
+              ))}
+              <th className="px-3 py-2.5 w-16"/>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/10">
             {visibleSlots.map((slot) => (
-              <tr key={slot.id} className="group transition hover:bg-blue-50/30 dark:hover:bg-white/[0.03]">
-                <td className="px-4 py-3">
-                  <span className="font-mono text-sm font-bold tracking-wide text-slate-900 dark:text-slate-100">{slot.code}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={slot.status} />
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{slot.building}</td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{slot.floor}</td>
-                <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{slot.zone}</td>
-                <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{slot.vehicleType}</td>
-                <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{slot.updatedAt}</td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => onSelect(slot)}
-                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
-                  >
-                    <Eye size={12} />
-                    View
-                  </button>
-                </td>
+              <tr key={slot.id} onClick={() => onSelect(slot)} className="cursor-pointer transition hover:bg-blue-50/40 dark:hover:bg-white/[0.03] h-[33px]">
+                <td className="px-3 py-2"><span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{slot.code}</span></td>
+                <td className="px-3 py-2"><StatusBadge status={slot.status} size="sm"/></td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{slot.floor}</td>
+                <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{slot.zone}</td>
+                <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{slot.vehicleType}</td>
+                <td className="px-3 py-2"><Eye size={13} className="text-slate-400"/></td>
               </tr>
+            ))}
+            {visibleSlots.length < perPage && Array.from({length: perPage - visibleSlots.length}).map((_,i) => (
+              <tr key={`empty-${i}`} className="h-[33px] border-b border-transparent"><td colSpan={6} className="px-3 py-2">&nbsp;</td></tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Showing {(currentPage - 1) * perPage + (slots.length > 0 ? 1 : 0)}-{Math.min(currentPage * perPage, slots.length)} of {slots.length} slots
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 w-20">
+          {(currentPage-1)*perPage+(slots.length>0?1:0)}-{Math.min(currentPage*perPage,slots.length)} / {slots.length}
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-            disabled={currentPage === 1}
-            className="inline-flex h-9 min-w-[76px] items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
-          >
-            Prev
-          </button>
-          <span className="inline-flex h-9 items-center text-xs font-medium text-slate-500 dark:text-slate-400">
-            Page {currentPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-            disabled={currentPage === totalPages}
-            className="inline-flex h-9 min-w-[76px] items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
-          >
-            Next
-          </button>
+        <div className="flex items-center gap-0.5">
+          <button onClick={() => goPage(Math.max(1,currentPage-1))} disabled={currentPage===1}
+            className="w-12 rounded-lg py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/5 text-center">Prev</button>
+          {(() => {
+            let start = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+            return [start, start + 1, start + 2].filter(p => p <= totalPages).map(p => (
+              <button key={p} onClick={() => goPage(p)}
+                className={`w-7 rounded-lg py-1 text-xs font-medium transition text-center ${p===currentPage?"bg-blue-600 text-white":"text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"}`}>{p}</button>
+            ));
+          })()}
+          <button onClick={() => goPage(Math.min(totalPages,currentPage+1))} disabled={currentPage===totalPages}
+            className="w-12 rounded-lg py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/5 text-center">Next</button>
         </div>
       </div>
     </div>
@@ -363,147 +348,205 @@ function TableView({ slots, onSelect }) {
 }
 
 function CardView({ slots, onSelect }) {
+  const [page, setPage] = useState(1);
+  const cardRef = useRef(null);
+  const perPage = 12;
+  const totalPages = Math.max(1, Math.ceil(slots.length / perPage));
+  const cur = Math.min(page, totalPages);
+  const visible = slots.slice((cur - 1) * perPage, cur * perPage);
+
+  const go = (p) => { setPage(p); cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {slots.map((slot) => (
-        <button
-          key={slot.id}
-          onClick={() => onSelect(slot)}
-          className="rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:border-white/10 dark:bg-card dark:hover:border-blue-500/30"
-        >
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Slot</p>
-              <h3 className="mt-2 font-mono text-xl font-bold text-slate-900 dark:text-slate-100">{slot.code}</h3>
+    <div ref={cardRef} className="scroll-mt-4 space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" style={{ minHeight: 3 * 72 }}>
+        {visible.map((slot) => (
+          <button key={slot.id} onClick={() => onSelect(slot)}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5 text-left transition hover:border-blue-300 hover:shadow-md dark:border-white/10 dark:bg-card dark:hover:border-blue-500/30 h-[68px]">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">{slot.code}</span>
+              <StatusBadge status={slot.status} size="sm"/>
             </div>
-            <StatusBadge status={slot.status} size="sm" />
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 dark:text-slate-400">{slot.floor} - {slot.zone}</span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{slot.vehicleType}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-card">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 w-20">
+            {(cur-1)*perPage+(slots.length>0?1:0)}-{Math.min(cur*perPage,slots.length)} / {slots.length}
+          </p>
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => go(Math.max(1,cur-1))} disabled={cur===1}
+              className="w-12 rounded-lg py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/5 text-center">Prev</button>
+            {(() => {
+              let start = Math.max(1, Math.min(cur - 1, totalPages - 2));
+              return [start, start+1, start+2].filter(p => p <= totalPages).map(p => (
+                <button key={p} onClick={() => go(p)}
+                  className={`w-7 rounded-lg py-1 text-xs font-medium transition text-center ${p===cur?"bg-blue-600 text-white":"text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5"}`}>{p}</button>
+              ));
+            })()}
+            <button onClick={() => go(Math.min(totalPages,cur+1))} disabled={cur===totalPages}
+              className="w-12 rounded-lg py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/5 text-center">Next</button>
           </div>
-
-          <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <div className="flex items-start gap-3">
-              <Building2 size={16} className="mt-0.5 shrink-0 text-blue-600" />
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Building</p>
-                <p className="font-medium text-slate-800 dark:text-slate-100">{slot.building}</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <MapPin size={16} className="mt-0.5 shrink-0 text-blue-600" />
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Floor and Zone</p>
-                <p className="font-medium text-slate-800 dark:text-slate-100">
-                  {slot.floor} / {slot.zone}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Car size={16} className="mt-0.5 shrink-0 text-blue-600" />
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Vehicle Type</p>
-                <p className="font-medium text-slate-800 dark:text-slate-100">{slot.vehicleType}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-            <span className="text-xs text-slate-500 dark:text-slate-400">{slot.updatedAt}</span>
-            <span className="text-xs font-semibold text-blue-600">View details</span>
-          </div>
-        </button>
-      ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function MapView({ slots, onSelect }) {
-  const groupedSlots = useMemo(() => {
-    return slots.reduce((accumulator, slot) => {
-      const key = `${slot.building}__${slot.floor}`;
-
-      if (!accumulator[key]) {
-        accumulator[key] = {
-          id: key,
-          building: slot.building,
-          floor: slot.floor,
-          slots: [],
-        };
-      }
-
-      accumulator[key].slots.push(slot);
-      return accumulator;
-    }, {});
+  const floors = useMemo(() => {
+    const map = {};
+    slots.forEach((s) => {
+      const key = `${s.building}__${s.floor}`;
+      if (!map[key]) map[key] = { id: key, building: s.building, floor: s.floor, zones: {} };
+      const zk = s.zone;
+      if (!map[key].zones[zk]) map[key].zones[zk] = { name: zk, vehicleType: s.vehicleType, slots: [] };
+      map[key].zones[zk].slots.push(s);
+    });
+    return Object.values(map).map((f) => ({ ...f, zones: Object.values(f.zones) }));
   }, [slots]);
 
-  const groups = Object.values(groupedSlots);
+  const COLS = 3, PAD = 8, GAP = 10, ROAD = 24;
 
   return (
     <div className="space-y-4">
-      {groups.map((group) => (
-        <div key={group.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-card">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{group.building}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{group.floor}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-              {Object.keys(MAP_COLOR).map((status) => (
-                <div key={status} className="flex items-center gap-1.5">
-                  <div className="size-3 rounded-sm" style={{ backgroundColor: MAP_COLOR[status] }} />
-                  <span>{status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      {floors.map((floor) => {
+        const zones = floor.zones;
+        const rows = Math.ceil(zones.length / COLS);
+        const vbW = 700;
+        const zw = (vbW - PAD * 2 - (COLS - 1) * GAP) / COLS;
+        const zh = 120;
+        const totalH = PAD + 24 + rows * zh + Math.max(0, rows - 1) * (ROAD + GAP) + PAD;
+        const startX = PAD;
+        const startY = PAD + 24;
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
-            {group.slots.map((slot) => (
-              <button
-                key={slot.id}
-                onClick={() => onSelect(slot)}
-                className="rounded-2xl border border-slate-100 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50/30 dark:border-white/10 dark:hover:border-blue-500/30 dark:hover:bg-white/[0.03]"
-              >
-                <div
-                  className="mb-3 rounded-xl px-3 py-2 text-center font-mono text-sm font-bold text-white"
-                  style={{ backgroundColor: MAP_COLOR[slot.status] }}
-                >
-                  {slot.code}
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{slot.zone}</p>
-                <p className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-200">{slot.vehicleType}</p>
-              </button>
-            ))}
+        return (
+          <div key={floor.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/10">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{floor.building}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{floor.floor}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {Object.entries(MAP_COLOR).map(([st, color]) => (
+                  <div key={st} className="flex items-center gap-1"><div className="size-2.5 rounded-sm" style={{ backgroundColor: color }}/><span className="text-[10px] text-slate-500 dark:text-slate-400">{st}</span></div>
+                ))}
+              </div>
+            </div>
+            <div className="overflow-auto bg-slate-50 dark:bg-slate-800/30 p-2">
+              <svg viewBox={`0 0 ${vbW} ${totalH}`} className="block w-full h-auto" style={{ minHeight: 200 }}>
+                <rect width={vbW} height={totalH} rx={10} fill="#e2e8f0" className="dark:fill-slate-800"/>
+                <rect x={4} y={4} width={vbW - 8} height={totalH - 8} rx={8} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.6} className="dark:fill-slate-900"/>
+
+                {Array.from({ length: rows }).map((_, row) => {
+                  const ry = startY + row * (zh + ROAD + GAP);
+                  const zonesInRow = zones.slice(row * COLS, (row + 1) * COLS);
+
+                  return (
+                    <g key={row}>
+                      {zonesInRow.map((zone, col) => {
+                        const zx = startX + col * (zw + GAP);
+                        const hH = 20;
+                        const sortedSlots = [...zone.slots].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+                        const pairs = [];
+                        for (let i = 0; i < sortedSlots.length; i += 2) pairs.push(sortedSlots.slice(i, i + 2));
+                        const slotW = (zw - 20) / 2 - 4;
+                        const slotH = Math.min(22, (zh - hH - 12) / Math.max(pairs.length, 1) - 4);
+                        const avail = zone.slots.filter((s) => s.rawStatus === "AVAILABLE").length;
+
+                        return (
+                          <g key={zone.name}>
+                            <rect x={zx} y={ry} width={zw} height={zh} rx={6} fill="#f8fafc" stroke="#cbd5e1" strokeWidth={0.6}/>
+                            <rect x={zx} y={ry} width={zw} height={hH} rx={6} fill="#475569"/>
+                            <rect x={zx} y={ry + hH - 3} width={zw} height={3} fill="#475569"/>
+                            <text x={zx + 6} y={ry + hH / 2 + 1} dominantBaseline="central" fontSize={9} fontWeight="700" fill="#fff" fontFamily="system-ui" className="select-none">{zone.name}</text>
+                            <text x={zx + zw - 6} y={ry + hH / 2 + 1} textAnchor="end" dominantBaseline="central" fontSize={7} fill="rgba(255,255,255,0.6)" fontFamily="system-ui" className="select-none">{avail} trong</text>
+
+                            {pairs.map((pair, ri) => {
+                              const sy = ry + hH + 6 + ri * (slotH + 4);
+                              return (
+                                <g key={ri}>
+                                  {pair[0] && <g className="cursor-pointer" onClick={() => onSelect(pair[0])}>
+                                    <rect x={zx + 6} y={sy} width={slotW} height={slotH} rx={3} fill={MAP_COLOR[pair[0].status]} opacity={0.9}/>
+                                    <text x={zx + 6 + slotW / 2} y={sy + slotH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={8} fontWeight="700" fill="#fff" fontFamily="system-ui" className="select-none pointer-events-none">{pair[0].code}</text>
+                                  </g>}
+                                  {pair[1] && <g className="cursor-pointer" onClick={() => onSelect(pair[1])}>
+                                    <rect x={zx + zw - 6 - slotW} y={sy} width={slotW} height={slotH} rx={3} fill={MAP_COLOR[pair[1].status]} opacity={0.9}/>
+                                    <text x={zx + zw - 6 - slotW / 2} y={sy + slotH / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={8} fontWeight="700" fill="#fff" fontFamily="system-ui" className="select-none pointer-events-none">{pair[1].code}</text>
+                                  </g>}
+                                </g>
+                              );
+                            })}
+                          </g>
+                        );
+                      })}
+
+                      {row < rows - 1 && (() => {
+                        const rw = COLS * zw + (COLS - 1) * GAP;
+                        const roadY = ry + zh + (GAP - ROAD) / 2 + ROAD / 2;
+                        return <g>
+                          <rect x={startX} y={ry + zh + (GAP - ROAD) / 2} width={rw} height={ROAD} rx={3} fill="#94a3b8" opacity={0.1}/>
+                          <line x1={startX + 10} y1={roadY} x2={startX + rw - 10} y2={roadY} stroke="#94a3b8" strokeWidth={0.6} strokeDasharray="6 4" opacity={0.3}/>
+                          {[0.3, 0.5, 0.7].map((p) => <polygon key={p} points={`${startX + rw * p - 3},${roadY - 2} ${startX + rw * p + 3},${roadY} ${startX + rw * p - 3},${roadY + 2}`} fill="#94a3b8" opacity={0.25}/>)}
+                          <text x={startX + rw / 2} y={roadY + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={7} fontWeight="700" fill="#94a3b8" letterSpacing={1.5} fontFamily="system-ui" className="select-none">LOI DI</text>
+                        </g>;
+                      })()}
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function SelectField({ label, value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
   return (
-    <div>
+    <div ref={ref} className="relative">
       <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{label}</label>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={`w-full appearance-none rounded-2xl border px-3 py-2.5 pr-9 text-sm outline-none transition ${
-            value
-              ? "border-blue-200 bg-blue-50/60 text-slate-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-slate-100"
-              : "border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
-          } focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10`}
-        >
-          <option value="">All {label}</option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-sm outline-none transition ${
+          value
+            ? "border-blue-200 bg-blue-50/60 text-slate-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-slate-100"
+            : "border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+        }`}>
+        <span className="truncate">{selected?.label || `All ${label}`}</span>
+        <ChevronDown size={13} className={`shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-slate-900">
+          <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+            className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-white/5 ${!value ? "font-semibold text-blue-600" : "text-slate-600 dark:text-slate-300"}`}>
+            All {label}
+          </button>
+          {options.map((o) => (
+            <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+              className={`w-full px-3 py-2 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-white/5 ${o.value === value ? "font-semibold text-blue-600" : "text-slate-600 dark:text-slate-300"}`}>
+              {o.label}
+            </button>
           ))}
-        </select>
-        <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -526,7 +569,7 @@ function FilterSidebar({
   }
 
   return (
-    <aside className="w-full shrink-0 xl:sticky xl:top-20 xl:w-80">
+    <aside className="w-full shrink-0 xl:sticky xl:top-20 xl:w-80 xl:z-20">
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-card">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
           <div className="flex items-center gap-2">
@@ -898,14 +941,6 @@ export default function PublicSlotListPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => window.location.reload()}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-card dark:text-slate-200 dark:hover:bg-white/5"
-                >
-                  <RefreshCw size={14} />
-                  Reload
-                </button>
-
                 <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-card">
                   {[
                     { mode: "table", label: "Table", icon: List },

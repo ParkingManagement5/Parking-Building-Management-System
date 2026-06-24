@@ -14,6 +14,7 @@ import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.service.BookingService;
+import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final BookingRepository bookingRepository;
     private final ParkingSessionRepository parkingSessionRepository;
     private final ParkingSlotRepository parkingSlotRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -200,6 +202,11 @@ public class PaymentServiceImpl implements PaymentService {
             slot.setStatus(ParkingSlot.Status.AVAILABLE);
             parkingSlotRepository.save(slot);
         }
+
+        notificationService.notify(session.getUserId(),
+                "Thanh toan hoan tat",
+                "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
+                "success", "PAYMENT", payment.getPaymentId());
     }
 
     private PaymentResponse toResponse(Payment payment) {
