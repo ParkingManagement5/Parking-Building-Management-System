@@ -345,7 +345,7 @@ export default function LoginPage() {
                 <label htmlFor="password" className="text-sm font-medium text-slate-600 dark:text-slate-200">
                     Password
                   </label>
-                  <button type="button" className="text-sm font-medium text-[#2563eb] transition-colors hover:text-blue-700 dark:text-blue-200 dark:hover:text-blue-100">
+                  <button type="button" onClick={() => navigate("/forgot-password")} className="text-sm font-medium text-[#2563eb] transition-colors hover:text-blue-700 dark:text-blue-200 dark:hover:text-blue-100">
                     Forgot?
                   </button>
                 </div>

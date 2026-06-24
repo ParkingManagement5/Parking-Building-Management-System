@@ -80,6 +80,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
         }
 
+        // [BR-06b] Xe đang có session chưa hoàn tất → không cho check-in
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                booking.getVehicle().getId(),
+                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT)
+        );
+        if (hasOpenSession) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất, không thể check-in");
+        }
+
         booking.setQrUsedAt(LocalDateTime.now());
         booking.setStatus(Booking.BookingStatus.CHECKED_IN);
         bookingRepository.save(booking);
@@ -146,6 +156,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
 
         Vehicle vehicle = findOrCreateWalkInVehicle(request);
+
+        // [BR-06] Xe đang có session chưa hoàn tất → không cho vào
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(
@@ -153,13 +165,24 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                         ParkingSession.SessionStatus.WAITING_PAYMENT
                 )
         );
-
         if (hasOpenSession) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "Xe đang có phiên đỗ xe chưa hoàn tất"
-            );
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất");
         }
+
+        // [BR-06b] Xe đang có booking active → không cho walk-in
+        bookingRepository.findByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(
+                        Booking.BookingStatus.PENDING_PAYMENT,
+                        Booking.BookingStatus.CONFIRMED,
+                        Booking.BookingStatus.CHECKED_IN,
+                        Booking.BookingStatus.WAITING_PAYMENT
+                )
+        ).ifPresent(b -> {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe đang có booking active (#" + b.getId() + "), không thể walk-in");
+        });
         ParkingSlot slot;
         if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
             // Tự động tìm slot theo slotSize của loại xe [BR-02]
@@ -211,17 +234,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
         session = sessionRepository.save(session);
 
+        // Cập nhật booking gắn với session (nếu có)
         Booking booking = session.getBooking();
         if (booking != null && booking.getStatus() == Booking.BookingStatus.CHECKED_IN) {
             booking.setStatus(Booking.BookingStatus.WAITING_PAYMENT);
             bookingRepository.save(booking);
         }
 
-        ParkingSlot slot = session.getSlot();
-        if (slot != null && slot.getStatus() == ParkingSlot.Status.OCCUPIED) {
-            slot.setStatus(ParkingSlot.Status.AVAILABLE);
-            parkingSlotRepository.save(slot);
-        }
+        // Cancel booking mồ côi: xe walk-in exit nhưng có booking riêng chưa dùng
+        cancelOrphanedBookings(session);
 
         saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
                 GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, request.getStaffUserId());
@@ -313,6 +334,33 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return sessionRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy session #" + id));
+    }
+
+    private void cancelOrphanedBookings(ParkingSession session) {
+        Vehicle vehicle = session.getVehicle();
+        if (vehicle == null) return;
+
+        Long linkedBookingId = session.getBooking() != null ? session.getBooking().getId() : null;
+
+        bookingRepository.findByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(
+                        Booking.BookingStatus.PENDING_PAYMENT,
+                        Booking.BookingStatus.CONFIRMED
+                )
+        ).ifPresent(orphan -> {
+            if (linkedBookingId == null || !orphan.getId().equals(linkedBookingId)) {
+                orphan.setStatus(Booking.BookingStatus.CANCELLED);
+                ParkingSlot bookingSlot = orphan.getSlot();
+                if (bookingSlot != null && bookingSlot.getStatus() == ParkingSlot.Status.RESERVED) {
+                    bookingSlot.setStatus(ParkingSlot.Status.AVAILABLE);
+                    parkingSlotRepository.save(bookingSlot);
+                }
+                bookingRepository.save(orphan);
+                log.info("Cancelled orphaned booking #{} for vehicle plate {}",
+                        orphan.getId(), vehicle.getLicensePlate());
+            }
+        });
     }
 
     private void saveGateLog(Gate gate, ParkingSession session, String plate,

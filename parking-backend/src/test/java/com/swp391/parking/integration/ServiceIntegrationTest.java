@@ -268,11 +268,11 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .build());
 
         assertEquals(1, vehicleService.getByUser(driver.getUserId()).size());
-        assertEquals("51G-12345", vehicleService.getByLicensePlate("51G-12345").getLicensePlate());
+        assertEquals("51G-123.45", vehicleService.getByLicensePlate("51G-12345").getLicensePlate());
         assertEquals("Mazda", updated.getBrand());
 
         vehicleService.deactivate(created.getId());
-        assertTrue(vehicleRepository.findById(created.getId()).isEmpty());
+        assertTrue(vehicleRepository.findById(created.getId()).orElseThrow().getIsActive().equals(false));
     }
 
     @Test

@@ -20,6 +20,31 @@ public class EmailService {
     @Value("${spring.mail.username:}")
     private String mailUsername;
 
+    public void sendPasswordResetOtp(String to, String username, String otp) {
+        if (!StringUtils.hasText(mailUsername)) {
+            log.warn("Email not configured. Password reset OTP for {} ({}) is {}", username, to, otp);
+            return;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailUsername);
+            message.setTo(to);
+            message.setSubject("ParkSmart - Reset mat khau");
+            message.setText("""
+                    Hello %s,
+
+                    Ma OTP de dat lai mat khau cua ban la: %s
+
+                    Ma nay het han sau 10 phut.
+                    Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.
+                    """.formatted(username, otp));
+            mailSender.send(message);
+        } catch (Exception ex) {
+            log.warn("Failed to send password reset email to {}. OTP is {}", to, otp, ex);
+        }
+    }
+
     public void sendVerificationOtp(String to, String username, String otp) {
         if (!StringUtils.hasText(mailUsername)) {
             log.warn("Email is not configured. Verification OTP for {} ({}) is {}", username, to, otp);

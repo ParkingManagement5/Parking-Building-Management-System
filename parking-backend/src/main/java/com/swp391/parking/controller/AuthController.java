@@ -1,8 +1,10 @@
 package com.swp391.parking.controller;
 
+import com.swp391.parking.dto.request.ForgotPasswordRequest;
 import com.swp391.parking.dto.request.GoogleLoginRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
+import com.swp391.parking.dto.request.ResetPasswordRequest;
 import com.swp391.parking.dto.request.ResendVerificationRequest;
 import com.swp391.parking.dto.request.VerifyEmailRequest;
 import com.swp391.parking.dto.response.ApiResponse;
@@ -44,6 +46,22 @@ public class AuthController {
             @Valid @RequestBody ResendVerificationRequest request) {
         authService.resendVerification(request);
         return ResponseEntity.ok(ApiResponse.success("Da gui lai ma OTP", null));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Da gui ma OTP dat lai mat khau qua email", null));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Dat lai mat khau thanh cong", null));
     }
 
     @PostMapping("/login")
