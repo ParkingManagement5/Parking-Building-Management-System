@@ -74,12 +74,12 @@ public class VehicleController {
         if (!isAdmin) {
             User user = resolveUser(authentication);
             Vehicle vehicle = vehicleService.getById(id);
-            if (!vehicle.getUser().getUserId().equals(user.getUserId())) {
+            if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
                 throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xoa xe cua nguoi khac");
             }
         }
         vehicleService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa xe khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Da vo hieu hoa xe"));
     }
 
     private User resolveUser(Authentication authentication) {

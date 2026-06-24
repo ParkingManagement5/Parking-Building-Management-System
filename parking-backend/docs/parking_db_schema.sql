@@ -89,6 +89,10 @@ CREATE TABLE `users` (
                          `email` varchar(100) UNIQUE NOT NULL,
                          `phone` varchar(20),
                          `password_hash` varchar(255) NOT NULL,
+                         `email_verification_code` varchar(10),
+                         `email_verification_expires_at` datetime,
+                         `password_reset_otp` varchar(10),
+                         `password_reset_otp_expires_at` datetime,
                          `status` varchar(20) NOT NULL,
                          `created_at` datetime,
                          `updated_at` datetime
