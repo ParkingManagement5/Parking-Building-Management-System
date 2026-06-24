@@ -422,58 +422,71 @@ INSERT INTO `parking_building`
  NOW(),
  NOW());
 
--- 6. Floors
+-- 6. Floors (Tầng 1 = xe máy, Tầng 2 = ô tô)
 INSERT INTO `floor`
 (`building_id`, `floor_number`, `floor_name`, `capacity`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 1, 'Tầng 1', 13, true, NOW(), NOW()),
-(1, 2, 'Tầng 2', 10, true, NOW(), NOW()),
-(1, 3, 'Tầng 3',  6, true, NOW(), NOW());
+(1, 1, 'Tầng 1', 36, true, NOW(), NOW()),
+(1, 2, 'Tầng 2', 36, true, NOW(), NOW());
 
--- 7. Zones
+-- 7. Zones (6 zones/tầng)
+-- Tầng 1: 6 zones MOTORBIKE
 INSERT INTO `zone`
 (`floor_id`, `vehicle_type_id`, `zone_name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 1, 'T1-MOTO', 'Khu xe máy tầng 1', true, NOW(), NOW()),
-(1, 2, 'T1-CAR',  'Khu ô tô tầng 1', true, NOW(), NOW()),
-(1, 3, 'T1-ECAR', 'Khu ô tô điện tầng 1', true, NOW(), NOW()),
-(2, 1, 'T2-MOTO', 'Khu xe máy tầng 2', true, NOW(), NOW()),
-(2, 2, 'T2-CAR',  'Khu ô tô tầng 2', true, NOW(), NOW()),
-(2, 3, 'T2-ECAR', 'Khu ô tô điện tầng 2', true, NOW(), NOW()),
-(3, 1, 'T3-MOTO', 'Khu xe máy tầng 3', true, NOW(), NOW()),
-(3, 2, 'T3-CAR',  'Khu ô tô tầng 3', true, NOW(), NOW()),
-(3, 3, 'T3-ECAR', 'Khu ô tô điện tầng 3', true, NOW(), NOW());
+(1, 1, 'T1-A', 'Khu A - Xe máy tầng 1', true, NOW(), NOW()),
+(1, 1, 'T1-B', 'Khu B - Xe máy tầng 1', true, NOW(), NOW()),
+(1, 1, 'T1-C', 'Khu C - Xe máy tầng 1', true, NOW(), NOW()),
+(1, 1, 'T1-D', 'Khu D - Xe máy tầng 1', true, NOW(), NOW()),
+(1, 1, 'T1-E', 'Khu E - Xe máy tầng 1', true, NOW(), NOW()),
+(1, 1, 'T1-F', 'Khu F - Xe máy tầng 1', true, NOW(), NOW()),
+-- Tầng 2: 6 zones CAR
+(2, 2, 'T2-A', 'Khu A - Ô tô tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-B', 'Khu B - Ô tô tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-C', 'Khu C - Ô tô tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-D', 'Khu D - Ô tô tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-E', 'Khu E - Ô tô tầng 2', true, NOW(), NOW()),
+(2, 2, 'T2-F', 'Khu F - Ô tô tầng 2', true, NOW(), NOW());
 
--- 8. Parking Slots
+-- 8. Parking Slots (6 slots/zone, zone_id tự tính từ AUTO_INCREMENT)
+-- Tầng 1: zones 1-6 (SMALL)
 INSERT INTO `parking_slot`
 (`zone_id`, `slot_code`, `slot_size`, `priority`, `distance_to_gate`, `status`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'T1-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(1, 'T1-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(1, 'T1-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
-(1, 'T1-M-04', 'SMALL', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
-(1, 'T1-M-05', 'SMALL', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
-(2, 'T1-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(2, 'T1-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(2, 'T1-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
-(2, 'T1-C-04', 'LARGE', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
-(2, 'T1-C-05', 'LARGE', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
-(3, 'T1-E-01', 'LARGE', 1, 8, 'AVAILABLE', true, NOW(), NOW()),
-(3, 'T1-E-02', 'LARGE', 2, 12, 'AVAILABLE', true, NOW(), NOW()),
-(3, 'T1-E-03', 'LARGE', 3, 16, 'AVAILABLE', true, NOW(), NOW()),
-(4, 'T2-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(4, 'T2-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(4, 'T2-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
-(4, 'T2-M-04', 'SMALL', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
-(4, 'T2-M-05', 'SMALL', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
-(5, 'T2-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(5, 'T2-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(5, 'T2-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
-(5, 'T2-C-04', 'LARGE', 4, 20, 'AVAILABLE', true, NOW(), NOW()),
-(5, 'T2-C-05', 'LARGE', 5, 25, 'AVAILABLE', true, NOW(), NOW()),
-(7, 'T3-M-01', 'SMALL', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(7, 'T3-M-02', 'SMALL', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(7, 'T3-M-03', 'SMALL', 3, 15, 'AVAILABLE', true, NOW(), NOW()),
-(8, 'T3-C-01', 'LARGE', 1, 5, 'AVAILABLE', true, NOW(), NOW()),
-(8, 'T3-C-02', 'LARGE', 2, 10, 'AVAILABLE', true, NOW(), NOW()),
-(8, 'T3-C-03', 'LARGE', 3, 15, 'AVAILABLE', true, NOW(), NOW());
+(1,'T1-A-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(1,'T1-A-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(1,'T1-A-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(1,'T1-A-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(1,'T1-A-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(1,'T1-A-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+(2,'T1-B-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(2,'T1-B-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(2,'T1-B-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(2,'T1-B-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(2,'T1-B-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(2,'T1-B-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+(3,'T1-C-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(3,'T1-C-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(3,'T1-C-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(3,'T1-C-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(3,'T1-C-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(3,'T1-C-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+(4,'T1-D-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(4,'T1-D-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(4,'T1-D-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(4,'T1-D-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(4,'T1-D-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(4,'T1-D-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+(5,'T1-E-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(5,'T1-E-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(5,'T1-E-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(5,'T1-E-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(5,'T1-E-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(5,'T1-E-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+(6,'T1-F-01','SMALL',1,5,'AVAILABLE',true,NOW(),NOW()),(6,'T1-F-02','SMALL',2,10,'AVAILABLE',true,NOW(),NOW()),
+(6,'T1-F-03','SMALL',3,15,'AVAILABLE',true,NOW(),NOW()),(6,'T1-F-04','SMALL',4,20,'AVAILABLE',true,NOW(),NOW()),
+(6,'T1-F-05','SMALL',5,25,'AVAILABLE',true,NOW(),NOW()),(6,'T1-F-06','SMALL',6,30,'AVAILABLE',true,NOW(),NOW()),
+-- Tầng 2: zones 7-12 (LARGE)
+(7,'T2-A-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(7,'T2-A-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(7,'T2-A-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(7,'T2-A-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(7,'T2-A-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(7,'T2-A-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(8,'T2-B-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(8,'T2-B-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(8,'T2-B-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(8,'T2-B-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(8,'T2-B-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(8,'T2-B-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(9,'T2-C-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(9,'T2-C-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(9,'T2-C-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(9,'T2-C-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(9,'T2-C-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(9,'T2-C-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(10,'T2-D-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(10,'T2-D-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(10,'T2-D-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(10,'T2-D-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(10,'T2-D-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(10,'T2-D-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(11,'T2-E-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(11,'T2-E-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(11,'T2-E-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(11,'T2-E-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(11,'T2-E-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(11,'T2-E-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(12,'T2-F-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(12,'T2-F-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(12,'T2-F-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(12,'T2-F-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(12,'T2-F-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(12,'T2-F-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW());
 
 -- 9. Gates
 INSERT INTO `gate`

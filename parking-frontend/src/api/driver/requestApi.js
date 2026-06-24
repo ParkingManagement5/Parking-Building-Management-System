@@ -17,7 +17,4 @@ export const requestApi = {
   resolve: (id) => axiosClient.put(`/requests/${id}/resolve`),
 
   close: (id) => axiosClient.put(`/requests/${id}/close`),
-
-  updateStatus: (id, status) =>
-    axiosClient.put(`/requests/${id}/status`, { status }),
 };
