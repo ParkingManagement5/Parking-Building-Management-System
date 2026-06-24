@@ -1,9 +1,11 @@
 package com.swp391.parking.service.impl;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.swp391.parking.dto.request.ForgotPasswordRequest;
 import com.swp391.parking.dto.request.GoogleLoginRequest;
 import com.swp391.parking.dto.request.LoginRequest;
 import com.swp391.parking.dto.request.RegisterRequest;
+import com.swp391.parking.dto.request.ResetPasswordRequest;
 import com.swp391.parking.dto.request.ResendVerificationRequest;
 import com.swp391.parking.dto.request.VerifyEmailRequest;
 import com.swp391.parking.dto.response.AuthResponse;
@@ -150,6 +152,51 @@ public class AuthService {
         user.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
         userRepository.save(user);
         emailService.sendVerificationOtp(user.getEmail(), user.getUsername(), otp);
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest req) {
+        User user = userRepository.findByEmail(req.getEmail())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Khong tim thay tai khoan voi email nay"));
+
+        if (User.UserStatus.LOCKED.equals(user.getStatus())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
+        }
+
+        String otp = generateOtp();
+        user.setPasswordResetOtp(otp);
+        user.setPasswordResetOtpExpiresAt(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+
+        emailService.sendPasswordResetOtp(user.getEmail(), user.getUsername(), otp);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest req) {
+        User user = userRepository.findByEmail(req.getEmail())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Khong tim thay tai khoan voi email nay"));
+
+        if (user.getPasswordResetOtp() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chua yeu cau dat lai mat khau. Vui long goi forgot-password truoc");
+        }
+        if (!req.getOtp().equals(user.getPasswordResetOtp())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP khong dung");
+        }
+        if (user.getPasswordResetOtpExpiresAt() == null
+                || user.getPasswordResetOtpExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP da het han");
+        }
+        if (!req.getNewPassword().equals(req.getConfirmPassword())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mat khau xac nhan khong khop");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        user.setPasswordResetOtp(null);
+        user.setPasswordResetOtpExpiresAt(null);
+        userRepository.save(user);
     }
 
     @Transactional

@@ -24,6 +24,7 @@ import java.util.List;
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
+    private final ParkingSessionRepository sessionRepository;
     // BE2 repositories — inject khi Du merge
     private final VehicleRepository vehicleRepository;
     private final ParkingSlotRepository parkingSlotRepository;
@@ -87,6 +88,16 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.CONFLICT,
                     "Xe này đang có booking active (#" + b.getId() + ")");
         });
+
+        // [BR-06b] Xe đang có session chưa hoàn tất (walk-in hoặc booking) → không cho đặt thêm
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT)
+        );
+        if (hasOpenSession) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe đang có phiên đỗ xe chưa hoàn tất, không thể đặt booking mới");
+        }
 
         // [BR-01] Kiểm tra slot bị double-book
         LocalDateTime endTime = request.getBookingEndTime() != null
@@ -184,8 +195,9 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<BookingResponse> getMyBookings(Long currentUserId) {
+        expireStaleOpenBookings(LocalDateTime.now());
         return bookingRepository.findByUserIdOrderByCreatedAtDesc(currentUserId)
                 .stream().map(this::toResponse).toList();
     }

@@ -6,7 +6,9 @@ import com.swp391.parking.entity.Floor;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.Notification;
 import com.swp391.parking.entity.ParkingBuilding;
+import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.entity.Payment;
 import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Shift;
@@ -21,7 +23,9 @@ import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.NotificationRepository;
 import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.BookingRepository;
+import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.PaymentRepository;
 import com.swp391.parking.repository.PricingPolicyRepository;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.ShiftRepository;
@@ -79,6 +83,12 @@ public abstract class AbstractIntegrationTestSupport {
     protected ParkingSlotRepository parkingSlotRepository;
 
     @Autowired
+    protected ParkingSessionRepository parkingSessionRepository;
+
+    @Autowired
+    protected PaymentRepository paymentRepository;
+
+    @Autowired
     protected VehicleTypeRepository vehicleTypeRepository;
 
     @Autowired
@@ -115,13 +125,17 @@ public abstract class AbstractIntegrationTestSupport {
     }
 
     protected User createUser(String username, Role.RoleName roleName) {
+        return createUser(username, "password", roleName);
+    }
+
+    protected User createUser(String username, String rawPassword, Role.RoleName roleName) {
         Role role = createRole(roleName);
         User user = User.builder()
             .username(username)
             .fullName(username + " Fullname")
             .email(username + "@example.com")
             .phone("0900000000")
-            .passwordHash(passwordEncoder.encode("password"))
+            .passwordHash(passwordEncoder.encode(rawPassword))
             .status(User.UserStatus.ACTIVE)
             .roles(Set.of(role))
             .build();
@@ -211,6 +225,36 @@ public abstract class AbstractIntegrationTestSupport {
             .isActive(true)
             .build();
         return vehicleRepository.save(vehicle);
+    }
+
+    protected ParkingSession createSession(
+            User user,
+            Vehicle vehicle,
+            ParkingSlot slot,
+            Gate entryGate,
+            ParkingSession.EntryMode entryMode,
+            ParkingSession.SessionStatus status) {
+        ParkingSession session = ParkingSession.builder()
+            .slot(slot)
+            .userId(user.getUserId().longValue())
+            .vehicle(vehicle)
+            .entryGate(entryGate)
+            .entryTime(LocalDateTime.now().minusHours(1))
+            .entryMode(entryMode)
+            .status(status)
+            .build();
+        return parkingSessionRepository.save(session);
+    }
+
+    protected Payment createParkingFeePayment(ParkingSession session, Payment.PaymentMethod paymentMethod) {
+        Payment payment = Payment.builder()
+            .sessionId(session.getId().intValue())
+            .paymentType(Payment.PaymentType.PARKING_FEE)
+            .paymentMethod(paymentMethod)
+            .paymentStatus(Payment.PaymentStatus.PENDING)
+            .totalAmount(new BigDecimal("10000"))
+            .build();
+        return paymentRepository.save(payment);
     }
 
     protected Notification createNotification(User user, String title, boolean isRead) {
