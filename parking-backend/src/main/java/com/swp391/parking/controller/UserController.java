@@ -34,7 +34,7 @@ public class UserController {
     private final UserProfileService userProfileService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getUsers(
             @RequestParam(required = false) String role) {
         return ResponseEntity.ok(ApiResponse.success(userQueryService.getUsers(role)));

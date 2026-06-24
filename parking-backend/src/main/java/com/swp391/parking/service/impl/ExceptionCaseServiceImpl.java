@@ -8,6 +8,7 @@ import com.swp391.parking.entity.ExceptionCase.ExceptionType;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ExceptionCaseRepository;
 import com.swp391.parking.service.ExceptionCaseService;
+import com.swp391.parking.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
     private final ExceptionCaseRepository exceptionCaseRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -34,7 +36,13 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
             .status(ExceptionStatus.OPEN)
             .build();
 
-        return toResponse(exceptionCaseRepository.save(exceptionCase));
+        ExceptionCase saved = exceptionCaseRepository.save(exceptionCase);
+
+        notificationService.notifyAllStaff("Exception moi",
+                "Loai: " + req.getExceptionType() + ". " + (req.getDescription() != null ? req.getDescription() : ""),
+                "warning", "EXCEPTION", saved.getExceptionId());
+
+        return toResponse(saved);
     }
 
     @Override

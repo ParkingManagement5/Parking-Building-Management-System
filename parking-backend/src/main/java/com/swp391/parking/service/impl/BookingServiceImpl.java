@@ -6,6 +6,7 @@ import com.swp391.parking.entity.*;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.*;
 import com.swp391.parking.service.BookingService;
+import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.util.QrTokenUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,10 +26,10 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final ParkingSessionRepository sessionRepository;
-    // BE2 repositories — inject khi Du merge
     private final VehicleRepository vehicleRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final QrTokenUtil qrTokenUtil;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -128,6 +129,12 @@ public class BookingServiceImpl implements BookingService {
 
         booking = bookingRepository.save(booking);
         log.info("Booking #{} tạo bởi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
+
+        notificationService.notify(currentUserId,
+                "Dat cho thanh cong",
+                "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " da duoc tao. Vui long thanh toan de nhan QR.",
+                "info", "BOOKING", booking.getId().intValue());
+
         return toResponse(booking);
     }
 
@@ -158,9 +165,16 @@ public class BookingServiceImpl implements BookingService {
         slot.setStatus(ParkingSlot.Status.RESERVED);
         parkingSlotRepository.save(slot);
 
+        booking = bookingRepository.save(booking);
         log.info("Booking #{} CONFIRMED, QR issued, slot {} RESERVED",
                 bookingId, slot.getSlotCode());
-        return toResponse(bookingRepository.save(booking));
+
+        notificationService.notify(booking.getUserId(),
+                "QR da duoc tao",
+                "Booking #" + bookingId + " da xac nhan. Dua QR cho staff tai cong vao.",
+                "success", "BOOKING", bookingId.intValue());
+
+        return toResponse(booking);
     }
 
     @Override
