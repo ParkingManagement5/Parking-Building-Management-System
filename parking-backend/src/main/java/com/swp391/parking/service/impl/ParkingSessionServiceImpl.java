@@ -8,6 +8,7 @@ import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.*;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.*;
+import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.ParkingSessionService;
 import com.swp391.parking.util.QrTokenUtil;
 import io.jsonwebtoken.Claims;
@@ -38,6 +39,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final UserRepository userRepository;
     private final QrTokenUtil qrTokenUtil;
     private final SlotAssignmentService slotAssignmentService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -52,6 +54,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         saveGateLog(gate, session, request.getLicensePlate(),
                 GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
+
+        notificationService.notify(session.getUserId(),
+                "Xe da vao bai",
+                "Xe " + session.getVehicle().getLicensePlate() + " da vao slot " + session.getSlot().getSlotCode() + ".",
+                "success", "SESSION", session.getId().intValue());
+
+        notificationService.notifyAllStaff("Xe vao bai",
+                "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
+                "info", "SESSION", session.getId().intValue());
 
         return toResponse(session);
     }
@@ -220,7 +231,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session không ACTIVE (hiện: " + session.getStatus() + ")");
         }
-        if (!Boolean.TRUE.equals(request.getQrVerified())) {
+        boolean isWalkIn = session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_AUTO
+                || session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_MANUAL;
+        if (!isWalkIn && !Boolean.TRUE.equals(request.getQrVerified())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Exit requires a valid driver Exit QR");
         }
@@ -248,6 +261,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 GateLog.EventType.EXIT, GateLog.ResultStatus.MANUAL_CHECK, request.getStaffUserId());
 
         log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
+
+        notificationService.notify(session.getUserId(),
+                "Xe da ra bai",
+                "Xe " + session.getVehicle().getLicensePlate() + " da ra khoi bai. Vui long cho thanh toan.",
+                "warning", "SESSION", session.getId().intValue());
+
+        notificationService.notifyAllStaff("Xe ra bai",
+                "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
+                "warning", "SESSION", session.getId().intValue());
+
         return toResponse(session);
     }
 
