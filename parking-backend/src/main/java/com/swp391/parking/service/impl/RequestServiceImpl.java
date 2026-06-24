@@ -9,6 +9,7 @@ import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.RequestRepository;
 import com.swp391.parking.repository.UserRepository;
+import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.RequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ public class RequestServiceImpl implements RequestService {
 
     private final RequestRepository requestRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -39,7 +41,13 @@ public class RequestServiceImpl implements RequestService {
             .status(RequestStatus.OPEN)
             .build();
 
-        return toResponse(requestRepository.save(request));
+        Request saved = requestRepository.save(request);
+
+        notificationService.notifyAllStaff("Request moi tu driver",
+                (req.getSubject() != null ? req.getSubject() : req.getRequestType().name()),
+                "info", "REQUEST", saved.getRequestId());
+
+        return toResponse(saved);
     }
 
     @Override

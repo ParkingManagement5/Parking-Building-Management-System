@@ -98,6 +98,7 @@ const CONFIG = {
       { id: "payments", label: "Payments", icon: CreditCard },
       { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
       { id: "requests", label: "Requests", icon: MessageSquare },
+      { id: "notifications", label: "Notifications", icon: Bell },
     ],
     titles: {
       overview: {
@@ -127,6 +128,10 @@ const CONFIG = {
       exceptions: {
         title: "Exceptions",
         subtitle: "Review OCR corrections, unregistered vehicles, lost QR, and payment issues",
+      },
+      notifications: {
+        title: "Notifications",
+        subtitle: "Keep up with operational notices, events and escalations",
       },
       settings: {
         title: "Settings",
@@ -295,9 +300,11 @@ export default function RolePortalLayout({ portal }) {
     }
 
     void loadNotifications();
+    const interval = setInterval(loadNotifications, 15000);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [config.navItems, userId, location.pathname]);
 
