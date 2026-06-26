@@ -40,6 +40,16 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(userQueryService.getUsers(role)));
     }
 
+    @PutMapping("/{userId}/assign-building")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<UserSummaryResponse>> assignBuilding(
+            @PathVariable Integer userId,
+            @RequestParam Long buildingId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Gan building thanh cong",
+                userAdminService.assignBuilding(userId, buildingId)));
+    }
+
     @PutMapping("/{userId}/role")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<UserSummaryResponse>> changeUserRole(
