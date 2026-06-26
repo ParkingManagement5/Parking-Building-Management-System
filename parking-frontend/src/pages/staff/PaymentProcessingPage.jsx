@@ -209,7 +209,7 @@ export default function PaymentProcessingPage() {
                     <div className="rounded-2xl bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Current Fee</p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
-                        {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime))}
+                        {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime, resolveHourlyRate(item)))}
                       </p>
                     </div>
                     <StaffSelect

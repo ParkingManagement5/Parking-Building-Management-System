@@ -2,6 +2,7 @@ package com.swp391.parking.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data @Builder
@@ -24,4 +25,7 @@ public class SessionResponse {
     private String entryMode;
     private String status;
     private LocalDateTime createdAt;
+    private BigDecimal calculatedFee;
+    private BigDecimal hourlyRate;
+    private BigDecimal depositAmount;
 }

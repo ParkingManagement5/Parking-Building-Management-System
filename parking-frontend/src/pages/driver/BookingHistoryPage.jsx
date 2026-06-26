@@ -171,13 +171,13 @@ export default function BookingHistoryPage() {
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Clock3 size={14} />
-                    <span>Schedule</span>
+                    <span>Hen den</span>
                   </div>
                   <p className="font-medium text-foreground">
                     {formatDateTime(item.bookingStartTime)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    to {formatDateTime(item.bookingEndTime)}
+                    Du kien {formatDateTime(item.bookingEndTime)}
                   </p>
                 </div>
 
@@ -200,6 +200,22 @@ export default function BookingHistoryPage() {
                       ) : (
                         "Pay Deposit"
                       )}
+                    </button>
+                  ) : null}
+                  {String(item.status || "").toUpperCase() === "CONFIRMED" && !item.qrToken && !item.qrUsed ? (
+                    <button
+                      onClick={async () => {
+                        try {
+                          setError("");
+                          await bookingApi.regenerateQr(item.bookingId);
+                          await loadBookings();
+                        } catch (e) {
+                          setError(e.response?.data?.message || "Không thể tạo lại QR.");
+                        }
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                    >
+                      Tao lai QR
                     </button>
                   ) : null}
                 </div>

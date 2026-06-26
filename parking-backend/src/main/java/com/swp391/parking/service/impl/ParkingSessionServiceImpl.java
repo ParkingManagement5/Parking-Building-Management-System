@@ -7,9 +7,11 @@ import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.*;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.repository.*;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.ParkingSessionService;
+import com.swp391.parking.util.FeeCalculatorUtil;
 import com.swp391.parking.util.QrTokenUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -37,6 +40,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final VehicleRepository vehicleRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
     private final UserRepository userRepository;
+    private final PricingPolicyRepository pricingPolicyRepository;
     private final QrTokenUtil qrTokenUtil;
     private final SlotAssignmentService slotAssignmentService;
     private final NotificationService notificationService;
@@ -498,7 +502,27 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return normalized;
     }
 
+    private BigDecimal resolveHourlyRate(ParkingSession s) {
+        BigDecimal defaultRate = new BigDecimal("20000");
+        if (s.getVehicle() == null || s.getVehicle().getVehicleType() == null) {
+            return defaultRate;
+        }
+        Long vehicleTypeId = s.getVehicle().getVehicleType().getId();
+        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vehicleTypeId);
+        if (policies.isEmpty()) {
+            return defaultRate;
+        }
+        return policies.get(0).getPricePerHour();
+    }
+
     private SessionResponse toResponse(ParkingSession s) {
+        BigDecimal hourlyRate = resolveHourlyRate(s);
+        LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
+        BigDecimal calculatedFee = s.getEntryTime() != null
+                ? FeeCalculatorUtil.calculateSessionFee(s.getEntryTime(), endTime, hourlyRate)
+                : BigDecimal.ZERO;
+        BigDecimal depositAmount = s.getBooking() != null ? s.getBooking().getDepositAmount() : BigDecimal.ZERO;
+
         return SessionResponse.builder()
                 .sessionId(s.getId())
                 .bookingId(s.getBooking() != null ? s.getBooking().getId() : null)
@@ -520,6 +544,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .entryMode(s.getEntryMode() != null ? s.getEntryMode().name() : null)
                 .status(s.getStatus() != null ? s.getStatus().name() : null)
                 .createdAt(s.getCreatedAt())
+                .calculatedFee(calculatedFee)
+                .hourlyRate(hourlyRate)
+                .depositAmount(depositAmount)
                 .build();
     }
 }

@@ -11,4 +11,5 @@ public interface BookingService {
     BookingResponse cancelBooking(Long bookingId, Long currentUserId);
     BookingResponse confirmBookingAfterPayment(Long bookingId);
     BookingResponse verifyQrToken(String qrToken);
+    BookingResponse regenerateQr(Long bookingId, Long currentUserId);
 }

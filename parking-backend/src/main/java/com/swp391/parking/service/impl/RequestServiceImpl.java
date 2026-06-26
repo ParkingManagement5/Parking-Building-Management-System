@@ -51,11 +51,13 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public RequestResponse getById(Integer requestId) {
         return toResponse(findById(requestId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RequestResponse> getByUserId(Integer userId) {
         return requestRepository.findByUser_UserId(userId)
             .stream().map(this::toResponse)
@@ -63,6 +65,7 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RequestResponse> getByStatus(RequestStatus status) {
         return requestRepository.findByStatus(status)
             .stream().map(this::toResponse)
@@ -70,6 +73,7 @@ public class RequestServiceImpl implements RequestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RequestResponse> getByType(RequestType requestType) {
         return requestRepository.findByRequestType(requestType)
             .stream().map(this::toResponse)

@@ -10,6 +10,7 @@ import { exceptionApi } from "../../api/staff/exceptionApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { StaffEmptyState, StaffPageSection, StaffStatCard, StaffStatusBadge } from "./StaffUi";
 
@@ -20,12 +21,10 @@ function activityTone(type) {
   return "blue";
 }
 
-const failedWidgets = [];
-
-function settledData(result, fallback = [], widgetName = "widget") {
+function settledData(result, failures, fallback = [], widgetName = "widget") {
   if (result.status !== "fulfilled") {
     console.warn(`Dashboard ${widgetName} failed:`, result.reason);
-    failedWidgets.push(widgetName);
+    failures.push(widgetName);
     return fallback;
   }
   return unwrapApiData(result.value.data, fallback);
@@ -44,6 +43,7 @@ export default function StaffDashboard() {
   const [openRequests, setOpenRequests] = useState([]);
   const [ocrReviews, setOcrReviews] = useState([]);
   const [openExceptions, setOpenExceptions] = useState([]);
+  const [pricingPolicies, setPricingPolicies] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +61,7 @@ export default function StaffDashboard() {
           requestRes,
           ocrRes,
           exceptionRes,
+          pricingRes,
         ] = await Promise.allSettled([
           buildingApi.getAll(),
           userId ? staffShiftApi.getByUser(userId) : Promise.resolve({ data: [] }),
@@ -70,21 +71,23 @@ export default function StaffDashboard() {
           requestApi.getByStatus("OPEN"),
           ocrApi.getPendingReviews(),
           exceptionApi.getByStatus("OPEN"),
+          pricingPolicyApi.getAll(),
         ]);
 
         if (cancelled) return;
 
-        failedWidgets.length = 0;
-        setBuildings(settledData(buildingRes, [], "buildings"));
-        setStaffShifts(settledData(shiftRes, [], "shifts"));
-        setNotifications(settledData(notificationRes, [], "notifications"));
-        setActiveSessions(settledData(activeSessionRes, [], "active sessions"));
-        setWaitingPayments(settledData(waitingPaymentRes, [], "payments"));
-        setOpenRequests(settledData(requestRes, [], "requests"));
-        setOcrReviews(settledData(ocrRes, [], "OCR reviews"));
-        setOpenExceptions(settledData(exceptionRes, [], "exceptions"));
-        if (failedWidgets.length > 0) {
-          setError(`Some widgets failed to load: ${failedWidgets.join(", ")}. Data shown may be incomplete.`);
+        const failures = [];
+        setBuildings(settledData(buildingRes, failures, [], "buildings"));
+        setStaffShifts(settledData(shiftRes, failures, [], "shifts"));
+        setNotifications(settledData(notificationRes, failures, [], "notifications"));
+        setActiveSessions(settledData(activeSessionRes, failures, [], "active sessions"));
+        setWaitingPayments(settledData(waitingPaymentRes, failures, [], "payments"));
+        setOpenRequests(settledData(requestRes, failures, [], "requests"));
+        setOcrReviews(settledData(ocrRes, failures, [], "OCR reviews"));
+        setOpenExceptions(settledData(exceptionRes, failures, [], "exceptions"));
+        setPricingPolicies(settledData(pricingRes, failures, [], "pricing"));
+        if (failures.length > 0) {
+          setError(`Some widgets failed to load: ${failures.join(", ")}. Data shown may be incomplete.`);
         }
       } catch (err) {
         console.error("Load staff dashboard failed:", err);
@@ -105,9 +108,16 @@ export default function StaffDashboard() {
     };
   }, [userId]);
 
+  function resolveHourlyRate(session) {
+    const policy = pricingPolicies.find(
+      (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
+    );
+    return Number(policy?.pricePerHour ?? 20000);
+  }
+
   const pendingAmount = useMemo(
-    () => waitingPayments.reduce((sum, item) => sum + computeSessionFee(item.entryTime), 0),
-    [waitingPayments]
+    () => waitingPayments.reduce((sum, item) => sum + computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)), 0),
+    [waitingPayments, pricingPolicies]
   );
 
   const upcomingShifts = useMemo(() => {
@@ -129,7 +139,7 @@ export default function StaffDashboard() {
     const paymentActivities = waitingPayments.slice(0, 3).map((item) => ({
       id: `payment-${item.sessionId}`,
       plate: item.licensePlate,
-      action: `Waiting payment ${formatStaffCurrency(computeSessionFee(item.entryTime))}`,
+      action: `Waiting payment ${formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}`,
       type: "payment",
       time: item.exitTime || item.entryTime,
     }));
@@ -144,7 +154,7 @@ export default function StaffDashboard() {
     return [...sessionActivities, ...paymentActivities, ...ocrActivities]
       .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
       .slice(0, 6);
-  }, [activeSessions, waitingPayments, ocrReviews]);
+  }, [activeSessions, waitingPayments, ocrReviews, pricingPolicies]);
 
   return (
     <div className="space-y-5">
@@ -258,7 +268,7 @@ export default function StaffDashboard() {
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{formatStaffDateTime(item.entryTime)}</span>
-                    <span className="font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime))}</span>
+                    <span className="font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}</span>
                   </div>
                 </div>
               ))}
@@ -308,7 +318,7 @@ export default function StaffDashboard() {
                     </div>
                     <StaffStatusBadge tone="amber">payment</StaffStatusBadge>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime))}</p>
+                  <p className="mt-2 text-sm font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}</p>
                 </button>
               ))}
             </div>
