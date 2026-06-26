@@ -84,6 +84,13 @@ function saveAuthData(data) {
   if (data.username || data.user?.username) {
     localStorage.setItem("username", data.username || data.user?.username);
   }
+  if (data.assignedBuildingId) {
+    localStorage.setItem("assignedBuildingId", data.assignedBuildingId);
+    localStorage.setItem("assignedBuildingName", data.assignedBuildingName || "");
+  } else {
+    localStorage.removeItem("assignedBuildingId");
+    localStorage.removeItem("assignedBuildingName");
+  }
 
   return routeForRole(role);
 }

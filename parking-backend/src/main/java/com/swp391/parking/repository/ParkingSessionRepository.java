@@ -25,4 +25,16 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
         order by s.createdAt desc
         """)
     List<ParkingSession> searchByPlateOrId(@Param("keyword") String keyword);
+
+    @Query("""
+        select s
+        from ParkingSession s
+        join s.vehicle v
+        where s.status = :status
+          and (lower(v.licensePlate) like lower(concat('%', :keyword, '%'))
+               or cast(s.id as string) like concat('%', :keyword, '%'))
+        order by s.createdAt desc
+        """)
+    List<ParkingSession> searchByPlateOrIdAndStatus(@Param("keyword") String keyword,
+                                                     @Param("status") ParkingSession.SessionStatus status);
 }

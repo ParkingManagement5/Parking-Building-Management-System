@@ -18,4 +18,6 @@ public class AuthResponse {
     private String fullName;
     private String email;
     private Set<String> roles;   // ["ROLE_DRIVER"] hoặc ["ROLE_STAFF"]
+    private Integer assignedBuildingId;
+    private String assignedBuildingName;
 }

@@ -341,6 +341,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     @Override
     @Transactional(readOnly = true)
     public List<SessionResponse> getSessions(String status, String keyword) {
+        if (keyword != null && !keyword.isBlank() && status != null && !status.isBlank()) {
+            ParkingSession.SessionStatus sessionStatus = ParkingSession.SessionStatus.valueOf(status.trim().toUpperCase());
+            return sessionRepository.searchByPlateOrIdAndStatus(keyword.trim(), sessionStatus)
+                    .stream().map(this::toResponse).toList();
+        }
+
         if (keyword != null && !keyword.isBlank()) {
             return sessionRepository.searchByPlateOrId(keyword.trim())
                     .stream().map(this::toResponse).toList();

@@ -26,6 +26,8 @@ import StaffDashboard from "../pages/staff/StaffDashboard";
 import StaffNotificationPage from "../pages/staff/StaffNotificationPage";
 import VehicleEntryPage from "../pages/staff/VehicleEntryPage";
 import VehicleExitPage from "../pages/staff/VehicleExitPage";
+import UnifiedQrScanPage from "../pages/staff/UnifiedQrScanPage";
+import StaffGatePage from "../pages/staff/GatePage";
 import ParkingSessionPage from "../pages/staff/ParkingSessionPage";
 import PaymentProcessingPage from "../pages/staff/PaymentProcessingPage";
 import RequestProcessingPage from "../pages/staff/RequestProcessingPage";
@@ -85,8 +87,10 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute allowedRoles={["STAFF", "MANAGER", "ADMIN"]} />}>
           <Route path="/staff" element={<RolePortalLayout portal="staff" />}>
             <Route index element={<StaffDashboard />} />
-            <Route path="entry" element={<VehicleEntryPage />} />
-            <Route path="exit" element={<VehicleExitPage />} />
+            <Route path="gate" element={<StaffGatePage />} />
+            <Route path="scan" element={<UnifiedQrScanPage />} />
+            <Route path="entry" element={<StaffGatePage />} />
+            <Route path="exit" element={<StaffGatePage />} />
             <Route path="qr" element={<Navigate to="/staff/entry" replace />} />
             <Route path="ocr" element={<Navigate to="/staff/entry" replace />} />
             <Route path="ocr-correction" element={<Navigate to="/staff/exceptions" replace />} />

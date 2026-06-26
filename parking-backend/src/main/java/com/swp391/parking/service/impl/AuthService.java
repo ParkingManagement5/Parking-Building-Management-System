@@ -368,14 +368,20 @@ public class AuthService {
                 .map(r -> "ROLE_" + r.getRoleName().name())
                 .collect(Collectors.toSet());
 
-        return AuthResponse.builder()
+        AuthResponse.AuthResponseBuilder builder = AuthResponse.builder()
                 .token(token)
                 .userId(user.getUserId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
-                .roles(roles)
-                .build();
+                .roles(roles);
+
+        if (user.getAssignedBuilding() != null) {
+            builder.assignedBuildingId(user.getAssignedBuilding().getId().intValue())
+                   .assignedBuildingName(user.getAssignedBuilding().getName());
+        }
+
+        return builder.build();
     }
 
     private String generateOtp() {
