@@ -17,4 +17,6 @@ public class UserSummaryResponse {
     private String phone;
     private String role;
     private String status;
+    private Integer assignedBuildingId;
+    private String assignedBuildingName;
 }
