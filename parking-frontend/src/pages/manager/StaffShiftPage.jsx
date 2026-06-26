@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarRange, Clock3, ShieldCheck, Users, Plus, X } from "lucide-react";
+import { Building2, CalendarRange, Clock3, ShieldCheck, Users, Plus, X } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { staffShiftApi } from "../../api/manager/staffShiftApi";
+import { buildingApi } from "../../api/manager/buildingApi";
 import {
   ManagerCell,
   ManagerDataTable,
@@ -25,8 +26,11 @@ export default function StaffShiftPage() {
   const [staffUsers, setStaffUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [staffShifts, setStaffShifts] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showBuildingModal, setShowBuildingModal] = useState(false);
+  const [buildingForm, setBuildingForm] = useState({ userId: "", buildingId: "" });
   const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState({
     userId: "",
@@ -40,15 +44,17 @@ export default function StaffShiftPage() {
 
   async function loadInitialData() {
     try {
-      const [usersRes, shiftsRes, staffShiftsRes] = await Promise.all([
+      const [usersRes, shiftsRes, staffShiftsRes, buildingsRes] = await Promise.all([
         axiosClient.get("/users?role=STAFF"),
         axiosClient.get("/shifts"),
         staffShiftApi.getAll(),
+        buildingApi.getAll(),
       ]);
       setLoadError("");
       setStaffUsers(unwrapApiData(usersRes.data, []));
       setShifts(unwrapApiData(shiftsRes.data, []));
       setStaffShifts(unwrapApiData(staffShiftsRes.data, []));
+      setBuildings(unwrapApiData(buildingsRes.data, []));
     } catch (error) {
       console.error("Failed to load staff shift data", error);
       setLoadError("Cannot load staff shift data from backend.");
@@ -143,8 +149,39 @@ export default function StaffShiftPage() {
         <ManagerStatCard icon={Users} label="Staff Users" value={staffUsers.length} hint="Staff accounts available for assignment" tone="violet" />
         <ManagerStatCard icon={Clock3} label="Shift Templates" value={shifts.length} hint="Shift definitions from backend" tone="blue" />
         <ManagerStatCard icon={CalendarRange} label="Assignments" value={staffShifts.length} hint="Saved staff shift records" tone="emerald" />
-        <ManagerStatCard icon={ShieldCheck} label="Ready to Assign" value={canAssign ? "Yes" : "No"} hint="Depends on staff users and shift templates" tone="amber" />
+        <ManagerStatCard icon={Building2} label="Buildings" value={buildings.length} hint="Available buildings for staff assignment" tone="amber" />
       </ManagerStatsRow>
+
+      {/* Staff - Building Assignment */}
+      <ManagerPanel title="Staff Building Assignment" subtitle="Gan staff vao building — staff chi thao tac trong building duoc gan">
+        {staffUsers.length === 0 ? (
+          <ManagerEmptyState title="Chua co staff" description="Tao tai khoan staff truoc." />
+        ) : (
+          <ManagerDataTable columns={["Staff", "Email", "Building", "Actions"]}>
+            {staffUsers.map((staff) => (
+              <ManagerRow key={staff.userId}>
+                <ManagerCell className="font-medium">{staff.fullName}</ManagerCell>
+                <ManagerCell>{staff.email}</ManagerCell>
+                <ManagerCell>
+                  {staff.assignedBuildingName ? (
+                    <ManagerStatusBadge tone="emerald">{staff.assignedBuildingName}</ManagerStatusBadge>
+                  ) : (
+                    <ManagerStatusBadge tone="amber">Chua gan</ManagerStatusBadge>
+                  )}
+                </ManagerCell>
+                <ManagerCell>
+                  <ManagerSecondaryButton type="button" onClick={() => {
+                    setBuildingForm({ userId: staff.userId, buildingId: staff.assignedBuildingId || "" });
+                    setShowBuildingModal(true);
+                  }}>
+                    {staff.assignedBuildingName ? "Doi building" : "Gan building"}
+                  </ManagerSecondaryButton>
+                </ManagerCell>
+              </ManagerRow>
+            ))}
+          </ManagerDataTable>
+        )}
+      </ManagerPanel>
 
       <ManagerPanel title="Staff Shift Directory" subtitle={`${staffShifts.length} assignment records available`}>
         {staffShifts.length === 0 ? (
@@ -172,6 +209,46 @@ export default function StaffShiftPage() {
           </ManagerDataTable>
         )}
       </ManagerPanel>
+
+      {showBuildingModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Gan Building cho Staff</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Staff se chi thao tac trong building duoc gan.</p>
+              </div>
+              <button type="button" onClick={() => setShowBuildingModal(false)} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <ManagerForm onSubmit={async (e) => {
+              e.preventDefault();
+              if (!buildingForm.userId || !buildingForm.buildingId) return;
+              try {
+                await axiosClient.put(`/users/${buildingForm.userId}/assign-building?buildingId=${buildingForm.buildingId}`);
+                setShowBuildingModal(false);
+                await loadInitialData();
+              } catch (err) {
+                alert(err.response?.data?.message || "Gan building that bai");
+              }
+            }}>
+              <ManagerField label="Building">
+                <ManagerSelect value={buildingForm.buildingId} onChange={(e) => setBuildingForm((p) => ({ ...p, buildingId: e.target.value }))}>
+                  <option value="">Chon building</option>
+                  {buildings.map((b) => (
+                    <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>
+                  ))}
+                </ManagerSelect>
+              </ManagerField>
+              <div className="flex gap-3">
+                <ManagerPrimaryButton type="submit" className="flex-1" disabled={!buildingForm.buildingId}>Gan Building</ManagerPrimaryButton>
+                <ManagerSecondaryButton type="button" className="flex-1" onClick={() => setShowBuildingModal(false)}>Huy</ManagerSecondaryButton>
+              </div>
+            </ManagerForm>
+          </div>
+        </div>
+      ) : null}
 
       {showModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">

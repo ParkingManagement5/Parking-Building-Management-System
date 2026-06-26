@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Comparator;
 import java.util.List;
 
@@ -20,6 +22,7 @@ public class UserQueryServiceImpl implements UserQueryService {
     private final UserRepository userRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUsers(String role) {
         List<User> users = (role == null || role.isBlank())
             ? userRepository.findAll()
@@ -45,14 +48,20 @@ public class UserQueryServiceImpl implements UserQueryService {
             .map(r -> r.getRoleName().name())
             .orElse("UNKNOWN");
 
-        return UserSummaryResponse.builder()
+        UserSummaryResponse.UserSummaryResponseBuilder builder = UserSummaryResponse.builder()
             .userId(user.getUserId())
             .username(user.getUsername())
             .fullName(user.getFullName())
             .email(user.getEmail())
             .phone(user.getPhone())
             .role(primaryRole)
-            .status(user.getStatus().name())
-            .build();
+            .status(user.getStatus().name());
+
+        if (user.getAssignedBuilding() != null) {
+            builder.assignedBuildingId(user.getAssignedBuilding().getId().intValue())
+                   .assignedBuildingName(user.getAssignedBuilding().getName());
+        }
+
+        return builder.build();
     }
 }

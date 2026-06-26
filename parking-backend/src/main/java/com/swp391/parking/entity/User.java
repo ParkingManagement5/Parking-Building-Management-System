@@ -56,6 +56,10 @@ public class User extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private UserStatus status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_building_id")
+    private ParkingBuilding assignedBuilding;
+
     // ── Relationship ─────────────────────────────────────────────────────────
     // Fetch EAGER để Spring Security load được roles ngay
     @ManyToMany(fetch = FetchType.EAGER)
