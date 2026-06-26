@@ -2,9 +2,11 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.ChangeUserRoleRequest;
 import com.swp391.parking.dto.response.UserSummaryResponse;
+import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.UserAdminService;
@@ -19,6 +21,7 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final ParkingBuildingRepository buildingRepository;
 
     @Override
     @Transactional
@@ -41,6 +44,19 @@ public class UserAdminServiceImpl implements UserAdminService {
         return toResponse(savedUser);
     }
 
+    @Override
+    @Transactional
+    public UserSummaryResponse assignBuilding(Integer userId, Long buildingId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay user"));
+
+        ParkingBuilding building = buildingRepository.findById(buildingId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay building"));
+
+        user.setAssignedBuilding(building);
+        return toResponse(userRepository.save(user));
+    }
+
     private Role.RoleName parseRole(String role) {
         try {
             return Role.RoleName.valueOf(role.trim().toUpperCase());
@@ -55,14 +71,20 @@ public class UserAdminServiceImpl implements UserAdminService {
                 .map(item -> item.getRoleName().name())
                 .orElse("UNKNOWN");
 
-        return UserSummaryResponse.builder()
+        UserSummaryResponse.UserSummaryResponseBuilder builder = UserSummaryResponse.builder()
                 .userId(user.getUserId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .role(primaryRole)
-                .status(user.getStatus().name())
-                .build();
+                .status(user.getStatus().name());
+
+        if (user.getAssignedBuilding() != null) {
+            builder.assignedBuildingId(user.getAssignedBuilding().getId().intValue())
+                   .assignedBuildingName(user.getAssignedBuilding().getName());
+        }
+
+        return builder.build();
     }
 }
