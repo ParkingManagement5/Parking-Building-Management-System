@@ -4,6 +4,12 @@ import com.swp391.parking.entity.PricingPolicy;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface PricingPolicyRepository extends JpaRepository<PricingPolicy, Long> {
+
+    List<PricingPolicy> findByVehicleType_IdAndIsActiveTrue(Long vehicleTypeId);
+
+    List<PricingPolicy> findByIsActiveTrue();
 }
