@@ -30,9 +30,19 @@ export const getUsername = () => {
   return localStorage.getItem("username");
 };
 
+export const getAssignedBuildingId = () => {
+  return localStorage.getItem("assignedBuildingId");
+};
+
+export const getAssignedBuildingName = () => {
+  return localStorage.getItem("assignedBuildingName");
+};
+
 export const logout = () => {
   localStorage.removeItem("token");
   localStorage.removeItem("role");
   localStorage.removeItem("userId");
   localStorage.removeItem("username");
+  localStorage.removeItem("assignedBuildingId");
+  localStorage.removeItem("assignedBuildingName");
 };

@@ -15,6 +15,7 @@ import {
   LogOut,
   MessageSquare,
   Settings,
+  ScanLine,
   Shield,
   SquareParking,
   Clock,
@@ -92,8 +93,8 @@ const CONFIG = {
     role: "staff",
     navItems: [
       { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "entry", label: "Gate Entry", icon: LogIn },
-      { id: "exit", label: "Gate Exit", icon: LogOut },
+      { id: "scan", label: "Scan", icon: ScanLine },
+      { id: "gate", label: "Gate", icon: DoorOpen },
       { id: "sessions", label: "Sessions", icon: Clock },
       { id: "payments", label: "Payments", icon: CreditCard },
       { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
@@ -105,13 +106,13 @@ const CONFIG = {
         title: "Staff Dashboard",
         subtitle: "Monitor daily processing, queue status and incoming alerts",
       },
-      entry: {
-        title: "Gate Entry",
-        subtitle: "Scan plates, process QR bookings, registered vehicles, and direct walk-ins",
+      scan: {
+        title: "Scan",
+        subtitle: "OCR bien so hoac QR code — tu dong phan loai Entry / Exit va chon cong phu hop",
       },
-      exit: {
-        title: "Gate Exit",
-        subtitle: "Find active sessions, record exit, and move vehicles to payment",
+      gate: {
+        title: "Gate",
+        subtitle: "Xu ly xe vao / ra — walk-in, tra cuu xe, exception, xac nhan exit",
       },
       sessions: {
         title: "Sessions",

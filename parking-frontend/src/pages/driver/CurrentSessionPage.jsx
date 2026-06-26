@@ -176,6 +176,15 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
 
       {/* Action card */}
       <div className="bg-card border border-border rounded-2xl p-5 flex flex-col items-center">
+        <button
+          type="button"
+          onClick={() => navigate("/driver/parking-map")}
+          className="mb-5 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-500"
+        >
+          <Navigation size={16} />
+          Open Parking Map
+        </button>
+
         {displayMode === "WAITING_PAYMENT" ? (
           <>
             <p className="text-sm font-semibold text-foreground mb-2">Cho thanh toan</p>
