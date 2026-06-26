@@ -55,7 +55,8 @@ public CorsConfigurationSource corsConfigurationSource() {
     config.setAllowedOriginPatterns(List.of(
             "http://localhost:*",
             "https://localhost:*",
-            "https://*.ngrok-free.app"
+            "https://*.ngrok-free.app",
+            "https://*.ngrok-free.dev"
     ));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
