@@ -17,5 +17,5 @@ public class CreateBookingRequest {
     @Future(message = "bookingStartTime phải là thời gian tương lai")
     private LocalDateTime bookingStartTime;
 
-    private LocalDateTime bookingEndTime; // null = mặc định +2h
+    private LocalDateTime bookingEndTime;
 }

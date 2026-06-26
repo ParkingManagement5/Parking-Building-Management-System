@@ -43,6 +43,12 @@ export default function OcrScanPage() {
 
   const startCamera = async () => {
     setError("");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError("Trinh duyet khong ho tro camera. Can chay tren HTTPS hoac localhost. Hay upload anh thay the.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -53,8 +59,16 @@ export default function OcrScanPage() {
         videoRef.current.srcObject = stream;
       }
       setCameraOn(true);
-    } catch {
-      setError("Khong mo duoc camera. Hay kiem tra quyen camera hoac upload anh bien so.");
+    } catch (err) {
+      const msg =
+        err.name === "NotAllowedError"
+          ? "Quyen camera bi tu choi. Vao Settings trinh duyet > cho phep camera cho trang nay."
+          : err.name === "NotFoundError"
+            ? "Khong tim thay camera tren thiet bi nay. Hay upload anh bien so thay the."
+            : err.name === "NotReadableError"
+              ? "Camera dang duoc ung dung khac su dung. Dong ung dung do roi thu lai."
+              : `Khong mo duoc camera (${err.name || err.message}). Hay upload anh bien so thay the.`;
+      setError(msg);
     }
   };
 

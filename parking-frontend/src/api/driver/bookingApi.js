@@ -16,4 +16,6 @@ export const bookingApi = {
     }),
 
   cancel: (id) => axiosClient.put(`/bookings/${id}/cancel`),
+
+  regenerateQr: (id) => axiosClient.put(`/bookings/${id}/regenerate-qr`),
 };

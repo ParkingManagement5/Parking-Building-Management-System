@@ -103,6 +103,8 @@ public List<StaffShiftResponse> getByUser(Long userId) {
                 .shiftId(staffShift.getShift().getShiftId())
                 .shiftName(staffShift.getShift().getShiftName())
                 .workingDate(staffShift.getWorkingDate())
+                .startTime(staffShift.getShift().getStartTime())
+                .endTime(staffShift.getShift().getEndTime())
                 .build();
     }
 }

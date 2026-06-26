@@ -10,6 +10,7 @@ import {
   SquareParking,
 } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
+import { paymentApi } from "../../api/driver/paymentApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
 import {
   Select,
@@ -331,6 +332,8 @@ export default function BookingPage() {
         status: payload.status,
         depositAmount: payload.depositAmount,
         expiredAt: payload.expiredAt,
+        bookingStartTime: payload.bookingStartTime || formatLocalDateTime(start),
+        bookingEndTime: payload.bookingEndTime || formatLocalDateTime(end),
         building: selectedSlot.building,
         floor: selectedSlot.floor,
         zone: selectedSlot.zone,
@@ -366,16 +369,48 @@ export default function BookingPage() {
     }
   }
 
+  const [payingDeposit, setPayingDeposit] = useState(false);
+  const [depositPaid, setDepositPaid] = useState(false);
+  const [payError, setPayError] = useState("");
+
+  async function handlePayDeposit() {
+    if (!confirmation?.bookingId) return;
+    setPayingDeposit(true);
+    setPayError("");
+    try {
+      const depositRes = await paymentApi.createDeposit({
+        bookingId: Number(confirmation.bookingId),
+        depositAmount: Number(confirmation.depositAmount || 0),
+        paymentMethod: "CASH",
+      });
+      const deposit = unwrapApiData(depositRes.data, null);
+      if (deposit?.paymentId) {
+        await paymentApi.confirmDeposit(deposit.paymentId);
+      }
+      setDepositPaid(true);
+      setConfirmation((prev) => ({ ...prev, status: "CONFIRMED" }));
+    } catch (err) {
+      console.error("Deposit payment failed", err);
+      setPayError(getErrorMessage(err, "Thanh toan coc that bai."));
+    } finally {
+      setPayingDeposit(false);
+    }
+  }
+
   if (effectiveStep === 3 && confirmation) {
     return (
       <div className="max-w-lg mx-auto">
         <div className="bg-card border border-border rounded-2xl p-8 text-center">
-          <div className="size-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-500/15">
-            <CheckCircle2 size={30} className="text-emerald-600 dark:text-emerald-300" />
+          <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-4 ${depositPaid ? "bg-emerald-100 dark:bg-emerald-500/15" : "bg-amber-100 dark:bg-amber-500/15"}`}>
+            <CheckCircle2 size={30} className={depositPaid ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"} />
           </div>
-          <h3 className="font-bold text-foreground mb-1 text-[1.25rem]">Booking Created</h3>
+          <h3 className="font-bold text-foreground mb-1 text-[1.25rem]">
+            {depositPaid ? "Booking Confirmed - QR Ready" : "Booking Created - Can thanh toan coc"}
+          </h3>
           <p className="text-muted-foreground text-sm mb-6">
-            Booking da duoc tao tren backend that. Hien tai booking dang cho thanh toan coc.
+            {depositPaid
+              ? "Da thanh toan coc. Vao Booking History de xem QR code check-in."
+              : "Booking da tao. Thanh toan coc de giu cho. Phi do xe se tinh tu luc entry den exit, tru tien coc."}
           </p>
           <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2 mb-6">
             <div className="flex justify-between text-sm">
@@ -384,7 +419,9 @@ export default function BookingPage() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Status</span>
-              <span className="font-medium text-foreground">{confirmation.status}</span>
+              <span className={`font-medium ${depositPaid ? "text-emerald-600" : "text-amber-600"}`}>
+                {confirmation.status}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Building</span>
@@ -401,39 +438,81 @@ export default function BookingPage() {
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Deposit</span>
-              <span className="font-medium text-foreground">{confirmation.depositAmount ?? 0}</span>
+              <span className="text-muted-foreground">Hen den bai</span>
+              <span className="font-medium text-foreground">{formatDateTime(confirmation.bookingStartTime)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Pay before</span>
+              <span className="text-muted-foreground">Du kien ket thuc</span>
+              <span className="font-medium text-foreground">{formatDateTime(confirmation.bookingEndTime)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Tien coc (giu cho)</span>
+              <span className="font-medium text-foreground">
+                {new Intl.NumberFormat("vi-VN").format(confirmation.depositAmount ?? 0)} VND
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Tinh phi</span>
+              <span className="font-medium text-emerald-600">Entry → Exit (tru coc)</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Han thanh toan coc</span>
               <span className="font-medium text-foreground">
                 {formatDateTime(confirmation.expiredAt)}
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Vehicle</span>
+              <span className="text-muted-foreground">Xe</span>
               <span className="font-medium text-foreground">{confirmation.vehiclePlate}</span>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setSelection({
-                building: "",
-                floor: "",
-                zone: "",
-                slotCode: "",
-                slotId: "",
-                vehicleId: "",
-              });
-              setBackendSlots([]);
-              setConfirmation(null);
-              setSubmitError("");
-              setStep(0);
-            }}
-            className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors"
-          >
-            New Booking
-          </button>
+
+          {payError ? (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{payError}</span>
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            {!depositPaid ? (
+              <button
+                onClick={handlePayDeposit}
+                disabled={payingDeposit}
+                className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60"
+              >
+                {payingDeposit ? "Dang thanh toan..." : `Thanh toan coc ${new Intl.NumberFormat("vi-VN").format(confirmation.depositAmount ?? 0)} VND`}
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/driver/bookings")}
+                className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-colors"
+              >
+                Xem QR Check-in
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSelection({
+                  building: "",
+                  floor: "",
+                  zone: "",
+                  slotCode: "",
+                  slotId: "",
+                  vehicleId: "",
+                });
+                setBackendSlots([]);
+                setConfirmation(null);
+                setSubmitError("");
+                setPayError("");
+                setDepositPaid(false);
+                setStep(0);
+              }}
+              className="w-full border border-border text-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-muted transition-colors"
+            >
+              Tao Booking Moi
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -577,6 +656,46 @@ export default function BookingPage() {
                   Xe nay dang co booking/phien chua hoan tat. Vui long hoan tat thanh toan hoac chon xe khac.
                 </div>
               ) : null
+            ) : null}
+
+            {selection.vehicleId && !isSelectedVehicleLocked ? (
+              <>
+                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-foreground">
+                      Thoi gian den bai do
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={formatLocalDateTime(bookingStart).slice(0, 16)}
+                      min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) setBookingStart(new Date(val));
+                      }}
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Phai cach hien tai it nhat 10 phut</p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-foreground">
+                      Du kien gui xe
+                    </label>
+                    <select
+                      value={bookingDurationHours}
+                      onChange={(e) => setBookingDurationHours(Number(e.target.value))}
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
+                    >
+                      {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
+                        <option key={h} value={h}>{h} gio</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  Phi do xe se tinh tu luc xe vao bai (entry) den khi ra bai (exit). Tien coc se duoc tru vao tong phi.
+                </div>
+              </>
             ) : null}
 
             {selection.vehicleId && loadingSlots ? (
@@ -776,38 +895,6 @@ export default function BookingPage() {
                 Khong co slot nao khop voi building, floor, zone da chon.
               </div>
             ) : null}
-
-            <div className="mb-5 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Start time (min 10 min from now)
-                </label>
-                <input
-                  type="datetime-local"
-                  value={formatLocalDateTime(bookingStart).slice(0, 16)}
-                  min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) setBookingStart(new Date(val));
-                  }}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Duration (hours)
-                </label>
-                <select
-                  value={bookingDurationHours}
-                  onChange={(e) => setBookingDurationHours(Number(e.target.value))}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
-                >
-                  {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => (
-                    <option key={h} value={h}>{h} {h === 1 ? "hour" : "hours"}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
             <div className="flex gap-3">
               <button
