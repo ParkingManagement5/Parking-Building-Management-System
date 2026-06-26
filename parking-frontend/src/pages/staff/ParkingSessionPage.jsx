@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3 } from "lucide-react";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
@@ -14,17 +15,29 @@ export default function ParkingSessionPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pricingPolicies, setPricingPolicies] = useState([]);
+
+  function resolveHourlyRate(session) {
+    const policy = pricingPolicies.find(
+      (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
+    );
+    return Number(policy?.pricePerHour ?? 20000);
+  }
 
   async function loadSessions() {
     setLoading(true);
     setError("");
     try {
-      const responses = await Promise.all([
-        sessionApi.getSessions({ status: "ACTIVE" }),
-        sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
-        sessionApi.getSessions({ status: "COMPLETED" }),
+      const [sessionResponses, pricingRes] = await Promise.all([
+        Promise.all([
+          sessionApi.getSessions({ status: "ACTIVE" }),
+          sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
+          sessionApi.getSessions({ status: "COMPLETED" }),
+        ]),
+        pricingPolicyApi.getAll(),
       ]);
-      setSessions(responses.flatMap((res) => unwrapApiData(res.data, [])));
+      setSessions(sessionResponses.flatMap((res) => unwrapApiData(res.data, [])));
+      setPricingPolicies(unwrapApiData(pricingRes.data, []));
     } catch (err) {
       console.error("Failed to load parking sessions", err);
       setError(err.response?.data?.message || "Khong tai duoc danh sach session.");
@@ -95,7 +108,7 @@ export default function ParkingSessionPage() {
                     <div className="rounded-2xl bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Current Fee</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
-                        {formatStaffCurrency(item.status === "ACTIVE" || item.status === "WAITING_PAYMENT" ? computeSessionFee(item.entryTime) : 0)}
+                        {formatStaffCurrency(item.status === "ACTIVE" || item.status === "WAITING_PAYMENT" ? computeSessionFee(item.entryTime, item.exitTime || new Date(), resolveHourlyRate(item)) : 0)}
                       </p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">

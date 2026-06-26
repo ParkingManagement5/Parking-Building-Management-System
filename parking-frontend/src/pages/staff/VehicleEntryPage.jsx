@@ -8,6 +8,7 @@ import { gateApi } from "../../api/manager/gateApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
+  computeSessionFee,
   createPortalId,
   formatStaffCurrency,
   formatStaffDateTime,
@@ -223,6 +224,17 @@ export default function VehicleEntryPage() {
 
   const startCamera = async () => {
     setOcrState((prev) => ({ ...prev, error: "", notice: "" }));
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setOcrState({
+        loading: false,
+        error: "Trinh duyet khong ho tro camera. Can chay tren HTTPS hoac localhost. Hay upload anh thay the.",
+        notice: "",
+        result: null,
+      });
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -233,10 +245,18 @@ export default function VehicleEntryPage() {
         videoRef.current.srcObject = stream;
       }
       setCameraOn(true);
-    } catch {
+    } catch (err) {
+      const msg =
+        err.name === "NotAllowedError"
+          ? "Quyen camera bi tu choi. Vao Settings trinh duyet > cho phep camera cho trang nay."
+          : err.name === "NotFoundError"
+            ? "Khong tim thay camera tren thiet bi nay. Hay upload anh bien so thay the."
+            : err.name === "NotReadableError"
+              ? "Camera dang duoc ung dung khac su dung. Dong ung dung do roi thu lai."
+              : `Khong mo duoc camera (${err.name || err.message}). Hay upload anh bien so thay the.`;
       setOcrState({
         loading: false,
-        error: "Khong mo duoc camera. Hay kiem tra quyen camera hoac upload anh bien so.",
+        error: msg,
         notice: "",
         result: null,
       });
@@ -1076,7 +1096,7 @@ export default function VehicleEntryPage() {
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{formatStaffDateTime(item.entryTime)}</span>
                     <span className="font-semibold text-foreground">
-                      {formatStaffCurrency(item.feeAmount || 0)}
+                      {formatStaffCurrency(computeSessionFee(item.entryTime))}
                     </span>
                   </div>
                 </div>

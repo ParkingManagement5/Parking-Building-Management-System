@@ -32,10 +32,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // Scheduler: PENDING_PAYMENT hết expired_at
     List<Booking> findByStatusAndExpiredAtBefore(Booking.BookingStatus status, LocalDateTime now);
 
-    // Scheduler: CONFIRMED quá 30p sau booking_start_time [BR-03c]
-    @Query("SELECT b FROM Booking b WHERE b.status = 'CONFIRMED' AND b.bookingStartTime < :threshold")
-    List<Booking> findConfirmedExpired(@Param("threshold") LocalDateTime threshold);
+    // Session-based: CONFIRMED quá hạn expiredAt
+    @Query("SELECT b FROM Booking b WHERE b.status = 'CONFIRMED' AND b.expiredAt < :now")
+    List<Booking> findConfirmedExpired(@Param("now") LocalDateTime now);
 
     // Verify QR khi check-in
     Optional<Booking> findByQrToken(String qrToken);
+
+    // Kiểm tra slot đã có booking active chưa (session-based, không cần time range)
+    Optional<Booking> findBySlot_IdAndStatusIn(Long slotId, List<Booking.BookingStatus> statuses);
 }
