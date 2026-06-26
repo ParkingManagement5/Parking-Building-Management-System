@@ -82,6 +82,17 @@ public class BookingController {
                 bookingService.cancelBooking(id, getCurrentUserId(ud))));
     }
 
+    @PutMapping("/{id}/regenerate-qr")
+    @PreAuthorize("hasRole('DRIVER')")
+    @Operation(summary = "Tạo lại QR khi hết hạn",
+            description = "Driver tạo lại QR cho booking CONFIRMED khi QR cũ hết hạn. QR mới có hạn 2 giờ.")
+    public ResponseEntity<ApiResponse<BookingResponse>> regenerateQr(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails ud) {
+        return ResponseEntity.ok(ApiResponse.success("QR đã được tạo lại",
+                bookingService.regenerateQr(id, getCurrentUserId(ud))));
+    }
+
     @PutMapping("/{id}/confirm-payment")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     @Operation(summary = "[Internal] Xác nhận thanh toán deposit → sinh QR",

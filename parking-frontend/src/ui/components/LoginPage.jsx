@@ -127,9 +127,12 @@ export default function LoginPage() {
     };
   }, []);
 
+  const isLocalhost = typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
+    if (!clientId || !isLocalhost) return;
 
     const initializeGoogle = () => {
       if (!window.google?.accounts?.id) return;
@@ -174,9 +177,11 @@ export default function LoginPage() {
     script.async = true;
     script.defer = true;
     script.onload = initializeGoogle;
-    script.onerror = () => setError("Could not load Google login.");
+    script.onerror = () => {
+      console.warn("Google login script failed to load");
+    };
     document.head.appendChild(script);
-  }, [navigate]);
+  }, [navigate, isLocalhost]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -379,11 +384,23 @@ export default function LoginPage() {
 
             <button
               type="button"
-              disabled={!googleReady || googleLoading}
+              disabled={(!googleReady && isLocalhost) || googleLoading}
               onClick={() => {
+                if (!isLocalhost) {
+                  setError("Google login chi ho tro tren localhost. Hay dang nhap bang username/password.");
+                  return;
+                }
                 if (window.google?.accounts?.id) {
+                  setError("");
                   window.google.accounts.id.prompt((notification) => {
-                    if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
+                    if (notification.isNotDisplayed()) {
+                      const reason = notification.getNotDisplayedReason();
+                      if (reason === "opt_out_or_no_session") {
+                        setError("Chua dang nhap Google tren trinh duyet. Hay dang nhap Google truoc hoac dung username/password.");
+                      } else {
+                        setError("Google login khong kha dung. Hay dang nhap bang username/password.");
+                      }
+                    } else if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
                       setError("Google login bi huy. Vui long thu lai.");
                     }
                   });

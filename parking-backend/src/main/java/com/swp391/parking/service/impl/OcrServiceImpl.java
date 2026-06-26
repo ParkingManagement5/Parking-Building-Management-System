@@ -268,13 +268,13 @@ public class OcrServiceImpl implements OcrService {
         OcrRecognitionResult recognize(Path imagePath, String originalFilename) {
             if (engineUrl == null || engineUrl.isBlank()) {
                 throw new AppException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "OCR engine chua chay. Hay bat ocr-service va cau hinh OCR_ENGINE_URL=http://localhost:8000/recognize");
+                        "OCR engine chua duoc cau hinh. Chay: cd ocr-service && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000");
             }
 
             OcrRecognitionResult result = callEngine(imagePath);
             if (result == null) {
                 throw new AppException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Khong ket noi duoc OCR engine. Kiem tra ocr-service cong 8000");
+                        "Khong ket noi duoc OCR engine tai " + engineUrl + ". Chay: cd ocr-service && uvicorn main:app --host 0.0.0.0 --port 8000");
             }
 
             return result;
