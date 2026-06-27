@@ -12,5 +12,7 @@ public class SessionQrScanRequest {
     @NotNull
     private Long gateId;
 
+    private String licensePlate;
+
     private Long staffUserId;
 }
