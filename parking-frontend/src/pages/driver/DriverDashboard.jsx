@@ -1,14 +1,4 @@
 import { useEffect, useState } from "react";
-import {
-  Bell,
-  BookOpen,
-  Car,
-  ChevronRight,
-  Clock,
-  CreditCard,
-  MapPin,
-  Wallet,
-} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
@@ -28,9 +18,7 @@ import {
 function StatusBadge({ status }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(
-        status
-      )}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(status)}`}
     >
       {String(status || "pending").toLowerCase()}
     </span>
@@ -54,41 +42,11 @@ function resolveSessionEnd(item) {
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState([
-    {
-      label: "Registered Vehicles",
-      value: "0",
-      icon: Car,
-      color: "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200",
-      action: "/driver/vehicles",
-    },
-    {
-      label: "Active Booking",
-      value: "0",
-      icon: BookOpen,
-      color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
-      action: "/driver/booking",
-    },
-    {
-      label: "Current Session",
-      value: "--:--",
-      icon: Clock,
-      color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
-      action: "/driver/current-session",
-    },
-    {
-      label: "Notifications",
-      value: "0",
-      icon: Bell,
-      color: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
-      action: "/driver/notifications",
-    },
-    {
-      label: "Monthly Expenses",
-      value: "$0",
-      icon: Wallet,
-      color: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
-      action: "/driver/payments",
-    },
+    { label: "Xe đã đăng ký", value: "0", action: "/driver/vehicles" },
+    { label: "Booking đang mở", value: "0", action: "/driver/booking" },
+    { label: "Phiên hiện tại", value: "--:--", action: "/driver/current-session" },
+    { label: "Thông báo", value: "0", action: "/driver/notifications" },
+    { label: "Chi tiêu tháng", value: "$0", action: "/driver/payments" },
   ]);
   const [activeBooking, setActiveBooking] = useState(null);
   const [currentDriverSession, setCurrentDriverSession] = useState(null);
@@ -110,85 +68,37 @@ export default function DriverDashboard() {
             userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
           ]);
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        const vehicles =
-          vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
-        const bookings =
-          bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
-        const sessions =
-          sessionsRes.status === "fulfilled" ? unwrapApiData(sessionsRes.value.data, []) : [];
-        const payments =
-          paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
-        const notifications =
-          notificationsRes.status === "fulfilled"
-            ? unwrapApiData(notificationsRes.value.data, [])
-            : [];
+        const vehicles = vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
+        const bookings = bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
+        const sessions = sessionsRes.status === "fulfilled" ? unwrapApiData(sessionsRes.value.data, []) : [];
+        const payments = paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
+        const notifications = notificationsRes.status === "fulfilled" ? unwrapApiData(notificationsRes.value.data, []) : [];
 
         const active = bookings.find(isOpenBooking) || null;
-        const activeSession =
-          sessions.find((item) => String(item.status || "").toUpperCase() === "ACTIVE") || null;
-        const waitingPaymentSession =
-          sessions.find((item) => String(item.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
+        const activeSession = sessions.find((s) => String(s.status || "").toUpperCase() === "ACTIVE") || null;
+        const waitingPaymentSession = sessions.find((s) => String(s.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
         const currentSession = activeSession || waitingPaymentSession || null;
 
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const monthlyExpenses = payments
-          .filter((item) => {
-            const paidDate = new Date(item.paidAt || item.createdAt || 0);
-            return paidDate >= monthStart;
-          })
-          .reduce(
-            (sum, item) => sum + Number(item.amount || item.totalAmount || 0),
-            0
-          );
+          .filter((p) => new Date(p.paidAt || p.createdAt || 0) >= monthStart)
+          .reduce((sum, p) => sum + Number(p.amount || p.totalAmount || 0), 0);
 
         setStats([
+          { label: "Xe đã đăng ký", value: String(vehicles.length), action: "/driver/vehicles" },
+          { label: "Booking đang mở", value: String(bookings.filter(isOpenBooking).length), action: "/driver/booking" },
           {
-            label: "Registered Vehicles",
-            value: String(vehicles.length),
-            icon: Car,
-            color: "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200",
-            action: "/driver/vehicles",
-          },
-          {
-            label: "Active Booking",
-            value: String(
-              bookings.filter(isOpenBooking).length
-            ),
-            icon: BookOpen,
-            color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200",
-            action: "/driver/booking",
-          },
-          {
-            label: "Current Session",
+            label: "Phiên hiện tại",
             value: currentSession
-              ? formatDuration(
-                  resolveSessionStart(currentSession),
-                  resolveSessionEnd(currentSession) || new Date().toISOString()
-                )
+              ? formatDuration(resolveSessionStart(currentSession), resolveSessionEnd(currentSession) || new Date().toISOString())
               : "--:--",
-            icon: Clock,
-            color: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-200",
             action: "/driver/current-session",
           },
-          {
-            label: "Notifications",
-            value: String(notifications.filter((item) => !item.isRead).length),
-            icon: Bell,
-            color: "bg-amber-50 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
-            action: "/driver/notifications",
-          },
-          {
-            label: "Monthly Expenses",
-            value: formatCurrency(monthlyExpenses),
-            icon: CreditCard,
-            color: "bg-violet-50 text-violet-600 dark:bg-violet-500/20 dark:text-violet-200",
-            action: "/driver/payments",
-          },
+          { label: "Thông báo", value: String(notifications.filter((n) => !n.isRead).length), action: "/driver/notifications" },
+          { label: "Chi tiêu tháng", value: formatCurrency(monthlyExpenses), action: "/driver/payments" },
         ]);
 
         setActiveBooking(active);
@@ -201,140 +111,89 @@ export default function DriverDashboard() {
     }
 
     void loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const heroRecord = currentDriverSession || activeBooking;
   const heroStatus = currentDriverSession
     ? String(currentDriverSession.status || "").toUpperCase()
     : getBookingStatus(activeBooking);
-  const heroTitle =
-    heroRecord?.buildingName || heroRecord?.parkingBuildingName || "No active session";
+  const heroTitle = heroRecord?.buildingName || heroRecord?.parkingBuildingName || "Chưa có phiên đỗ xe";
   const heroSubtitle = heroRecord
-    ? `${
-        heroRecord.slotCode ||
-        heroRecord.parkingSlotCode ||
-        "Slot pending"
-      } - ${
-        heroRecord.licensePlate ||
-        heroRecord.vehiclePlate ||
-        "Vehicle linked"
-      }`
-    : "Create a booking to see your current parking session here";
+    ? `${heroRecord.slotCode || heroRecord.parkingSlotCode || "Chỗ chờ xác nhận"} - ${heroRecord.licensePlate || heroRecord.vehiclePlate || "Xe đã liên kết"}`
+    : "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
   const heroDuration = heroRecord
-    ? formatDuration(
-        resolveSessionStart(heroRecord),
-        resolveSessionEnd(heroRecord) || new Date().toISOString()
-      )
+    ? formatDuration(resolveSessionStart(heroRecord), resolveSessionEnd(heroRecord) || new Date().toISOString())
     : "--:--";
   const heroStatusLabel = currentDriverSession
     ? heroStatus.toLowerCase()
-    : activeBooking
-      ? getBookingStatus(activeBooking)
-      : "waiting";
+    : activeBooking ? getBookingStatus(activeBooking) : "waiting";
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {stats.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              onClick={() => navigate(item.action)}
-              className="rounded-2xl border border-border/80 bg-card p-4 text-left shadow-sm shadow-slate-950/5 transition-all hover:border-primary/20 hover:shadow-md hover:shadow-primary/10 dark:bg-slate-900/70 dark:shadow-black/10"
-            >
-              <div
-                className={`size-9 rounded-xl flex items-center justify-center ${item.color} mb-3`}
-              >
-                <Icon size={16} />
-              </div>
-              <div className="text-xl font-bold text-foreground">{item.value}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{item.label}</div>
-            </button>
-          );
-        })}
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {stats.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => navigate(item.action)}
+            className="rounded-2xl border border-border bg-card p-4 text-left transition hover:border-emerald-300 hover:shadow-sm"
+          >
+            <div className="text-2xl font-bold text-foreground">{item.value}</div>
+            <div className="text-xs text-muted-foreground mt-1">{item.label}</div>
+          </button>
+        ))}
       </div>
 
-      <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-600 p-6 text-white shadow-lg shadow-indigo-500/15 dark:border-indigo-500/20 dark:bg-gradient-to-r dark:from-[#161b33] dark:via-[#1d2450] dark:to-[#2a2160] dark:shadow-black/20">
-        <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
+      {/* Hero active session */}
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-600 p-6 text-white dark:border-emerald-500/20 dark:bg-emerald-900">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
           <div>
-            <p className="mb-1 text-xs text-white/75 dark:text-slate-300/80">Active Parking Session</p>
-            <h2 className="font-bold mb-0.5 text-xl">{heroTitle}</h2>
-            <p className="text-sm text-white/80 dark:text-slate-300/85">
-              {heroSubtitle}
-            </p>
+            <p className="text-xs text-white/70 mb-1">Phiên đỗ xe hiện tại</p>
+            <h2 className="text-xl font-bold">{heroTitle}</h2>
+            <p className="text-sm text-white/80 mt-0.5">{heroSubtitle}</p>
           </div>
-
-          <div className="min-w-[92px] rounded-xl border border-white/20 bg-white/12 px-4 py-2 text-center backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
+          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center">
             <div className="text-2xl font-bold font-mono">{heroDuration}</div>
-            <div className="text-xs text-white/70 dark:text-slate-400">Duration</div>
+            <div className="text-xs text-white/60">Thời gian</div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
-            <p className="text-xs text-white/70 dark:text-slate-400">Booking Status</p>
-            <p className="font-semibold text-sm mt-0.5 capitalize">
-              {heroStatusLabel}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
-            <p className="text-xs text-white/70 dark:text-slate-400">Estimated Fee</p>
-            <p className="font-semibold text-sm mt-0.5">
-              {formatCurrency(
-                heroRecord?.amount ||
-                  heroRecord?.estimatedFee ||
-                  heroRecord?.totalAmount ||
-                  0
-              )}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06]">
-            <p className="text-xs text-white/70 dark:text-slate-400">Vehicle</p>
-            <p className="font-semibold text-sm mt-0.5">
-              {heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Not assigned"}
-            </p>
-          </div>
+          {[
+            ["Trạng thái", heroStatusLabel],
+            ["Phí ước tính", formatCurrency(heroRecord?.amount || heroRecord?.estimatedFee || heroRecord?.totalAmount || 0)],
+            ["Biển số xe", heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Chưa gán"],
+          ].map(([label, val]) => (
+            <div key={label} className="rounded-xl bg-white/10 p-3">
+              <p className="text-xs text-white/60">{label}</p>
+              <p className="text-sm font-semibold mt-0.5 capitalize">{val}</p>
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* Recent bookings + notifications */}
       <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-5">
-        <div className="rounded-2xl border border-border/80 bg-card shadow-sm shadow-slate-950/5 dark:bg-slate-900/70 dark:shadow-black/10">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border/80">
-            <h3 className="font-semibold text-foreground text-sm">Recent Bookings</h3>
-            <button
-              onClick={() => navigate("/driver/bookings")}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              View all <ChevronRight size={12} />
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground text-sm">Booking gần đây</h3>
+            <button onClick={() => navigate("/driver/bookings")} className="text-xs text-emerald-600 hover:underline">
+              Xem tất cả
             </button>
           </div>
           <div className="divide-y divide-border">
             {recentBookings.map((item, index) => (
-              <div
-                key={item.bookingId || item.id || index}
-                className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-primary/[0.04]"
-              >
-                <div className="size-9 rounded-xl bg-muted/70 flex items-center justify-center shrink-0 dark:bg-white/5">
-                  <MapPin size={14} className="text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    {item.buildingName ||
-                      item.parkingBuildingName ||
-                      "Parking Building"}{" "}
-                    - {item.slotCode || item.parkingSlotCode || "Slot"}
+              <div key={item.bookingId || item.id || index} className="flex items-center justify-between py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {item.buildingName || item.parkingBuildingName || "Parking Building"} - {item.slotCode || item.parkingSlotCode || "Slot"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.bookingDate || item.createdAt || "Recently created"}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {item.bookingDate || item.createdAt || "Vừa tạo"}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0 ml-3">
                   <p className="text-sm font-semibold text-foreground">
                     {formatCurrency(item.amount || item.totalAmount || item.estimatedFee || 0)}
                   </p>
@@ -343,63 +202,37 @@ export default function DriverDashboard() {
               </div>
             ))}
             {recentBookings.length === 0 && (
-              <div className="px-5 py-8 text-sm text-muted-foreground">
-                No bookings returned from the backend yet.
-              </div>
+              <p className="py-6 text-sm text-muted-foreground">Chưa có booking nào.</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-card shadow-sm shadow-slate-950/5 dark:bg-slate-900/70 dark:shadow-black/10">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border/80">
-            <h3 className="font-semibold text-foreground text-sm">Recent Notifications</h3>
-            <button
-              onClick={() => navigate("/driver/notifications")}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              View all <ChevronRight size={12} />
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground text-sm">Thông báo gần đây</h3>
+            <button onClick={() => navigate("/driver/notifications")} className="text-xs text-emerald-600 hover:underline">
+              Xem tất cả
             </button>
           </div>
           <div className="divide-y divide-border">
             {recentNotifications.map((item, index) => (
-              <div
-                key={item.notificationId || index}
-                className="px-5 py-4 transition-colors hover:bg-primary/[0.04]"
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`size-8 rounded-full flex items-center justify-center shrink-0 ${
-                      item.isRead
-                        ? "bg-slate-100 text-slate-500 dark:bg-slate-500/15 dark:text-slate-300"
-                        : "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"
-                    }`}
-                  >
-                    <Bell size={14} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {item.title || "Notification"}
-                      </p>
-                      {!item.isRead && (
-                        <span className="inline-block size-2 rounded-full bg-primary shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {item.body || item.message || item.content || "No details"}
-                    </p>
-                    <div className="flex items-center gap-1 mt-2 text-[11px] text-muted-foreground">
-                      <Clock size={11} />
-                      {formatRelativeTime(item.createdAt || item.sentAt)}
-                    </div>
-                  </div>
+              <div key={item.notificationId || index} className="py-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {item.title || "Thông báo"}
+                  </p>
+                  {!item.isRead && <span className="size-2 rounded-full bg-emerald-500 shrink-0" />}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {item.body || item.message || item.content || "Không có chi tiết"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {formatRelativeTime(item.createdAt || item.sentAt)}
+                </p>
               </div>
             ))}
             {recentNotifications.length === 0 && (
-              <div className="px-5 py-8 text-sm text-muted-foreground">
-                No notifications returned from the backend yet.
-              </div>
+              <p className="py-6 text-sm text-muted-foreground">Chưa có thông báo nào.</p>
             )}
           </div>
         </div>
