@@ -174,7 +174,7 @@ export default function RolePortalLayout({ portal }) {
       <nav className="dash-nav" ref={navRef}>
         <div className="dash-nav-inner">
           {/* Logo */}
-          <a href="/" className="dash-nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+          <a href={config.basePath} className="dash-nav-logo" onClick={(e) => { e.preventDefault(); navigate(config.basePath); }}>
             <span className="nav-logo-mark">P</span>
             <span>ParkSmart</span>
           </a>
