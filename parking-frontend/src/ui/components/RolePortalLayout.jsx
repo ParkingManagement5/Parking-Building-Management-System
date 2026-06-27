@@ -1,247 +1,116 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Bell,
-  Building2,
-  BookOpen,
-  Car,
-  CreditCard,
-  DoorOpen,
-  Grid3x3,
-  LayoutDashboard,
-  Layers,
-  LogIn,
-  LogOut,
-  MessageSquare,
-  Settings,
-  ScanLine,
-  Shield,
-  SquareParking,
-  Clock,
-  User,
-  Users,
-} from "lucide-react";
-import DashboardLayout from "./DashboardLayout";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { notificationApi } from "../../api/notificationApi";
 import { getRole, getUserId, getUsername } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
+import "../../assets/css/landing.css";
+import "../../assets/css/dashboard.css";
 
 const CONFIG = {
   driver: {
     basePath: "/driver",
     role: "driver",
-    navItems: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Today", description: "Snapshot" },
-      { id: "booking", label: "Book a Slot", icon: BookOpen, group: "Parking", description: "Reserve and view slots" },
-      { id: "current-session", label: "Current Session", icon: Clock, group: "Parking", description: "Entry, exit QR, route" },
-      { id: "payments", label: "Payment History", icon: CreditCard, group: "Records", description: "Receipts and fees" },
-      { id: "vehicles", label: "My Vehicles", icon: Car, group: "Account", description: "Registered plates" },
-      { id: "requests", label: "Request Center", icon: MessageSquare, group: "Account", description: "Support tickets" },
-      { id: "notifications", label: "Notifications", icon: Bell, group: "Account", description: "Alerts" },
-      { id: "profile", label: "My Profile", icon: User, group: "Account", description: "Driver details" },
+    label: "Driver Portal",
+    menuGroups: [
+      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      {
+        label: "Đỗ xe", items: [
+          { id: "booking", label: "Đặt chỗ" },
+          { id: "current-session", label: "Phiên hiện tại" },
+          { id: "parking-map", label: "Bản đồ bãi" },
+        ],
+      },
+      {
+        label: "Hồ sơ", items: [
+          { id: "bookings", label: "Lịch sử đặt" },
+          { id: "payments", label: "Thanh toán" },
+          { id: "vehicles", label: "Xe của tôi" },
+        ],
+      },
+      {
+        label: "Tài khoản", items: [
+          { id: "requests", label: "Yêu cầu hỗ trợ" },
+          { id: "notifications", label: "Thông báo" },
+          { id: "profile", label: "Hồ sơ" },
+        ],
+      },
     ],
-    titles: {
-      overview: {
-        title: "Driver Dashboard",
-        subtitle: "Track your vehicles, parking activity and alerts in one place",
-      },
-      vehicles: {
-        title: "My Vehicles",
-        subtitle: "Manage your registered vehicles and linked parking details",
-      },
-      "parking-slots": {
-        title: "Available Parking Slots",
-        subtitle: "Browse live slot availability across buildings and zones",
-      },
-      booking: {
-        title: "Book a Parking Slot",
-        subtitle: "Create a new booking from your vehicles and available slots",
-      },
-      "current-session": {
-        title: "Current Session",
-        subtitle: "Check your active parking session and real-time details",
-      },
-      "parking-map": {
-        title: "Parking Map",
-        subtitle: "Visual route from entry gate to your booked slot",
-      },
-      payments: {
-        title: "Payment History",
-        subtitle: "Review your completed parking payments from the backend",
-      },
-      requests: {
-        title: "Request Center",
-        subtitle: "Send support requests and track their latest status",
-      },
-      notifications: {
-        title: "Notifications",
-        subtitle: "Stay updated with your latest parking alerts and messages",
-      },
-      profile: {
-        title: "My Profile",
-        subtitle: "View your account details for the driver portal",
-      },
-      settings: {
-        title: "Settings",
-        subtitle: "Adjust portal preferences and account actions",
-      },
-    },
   },
   staff: {
     basePath: "/staff",
     role: "staff",
-    navItems: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "scan", label: "Scan", icon: ScanLine },
-      { id: "gate", label: "Map", icon: Grid3x3 },
-      { id: "sessions", label: "Sessions", icon: Clock },
-      { id: "payments", label: "Payments", icon: CreditCard },
-      { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
-      { id: "requests", label: "Requests", icon: MessageSquare },
-      { id: "notifications", label: "Notifications", icon: Bell },
+    label: "Staff Portal",
+    menuGroups: [
+      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      {
+        label: "Vận hành", items: [
+          { id: "scan", label: "Scan" },
+          { id: "gate", label: "Bản đồ bãi" },
+          { id: "sessions", label: "Sessions" },
+          { id: "payments", label: "Thanh toán" },
+        ],
+      },
+      {
+        label: "Xử lý", items: [
+          { id: "exceptions", label: "Ngoại lệ" },
+          { id: "requests", label: "Yêu cầu" },
+          { id: "notifications", label: "Thông báo" },
+        ],
+      },
     ],
-    titles: {
-      overview: {
-        title: "Staff Dashboard",
-        subtitle: "Monitor daily processing, queue status and incoming alerts",
-      },
-      scan: {
-        title: "Scan",
-        subtitle: "OCR bien so hoac QR code — tu dong phan loai Entry / Exit va chon cong phu hop",
-      },
-      gate: {
-        title: "Parking Map",
-        subtitle: "Giam sat bai xe realtime — slot, xe trong bai, cho thanh toan",
-      },
-      sessions: {
-        title: "Sessions",
-        subtitle: "Search and monitor active, payment, completed, and exception sessions",
-      },
-      payments: {
-        title: "Payments",
-        subtitle: "Collect and review sessions waiting for payment",
-      },
-      requests: {
-        title: "Requests",
-        subtitle: "Handle driver support requests and staff assignments",
-      },
-      exceptions: {
-        title: "Exceptions",
-        subtitle: "Review OCR corrections, unregistered vehicles, lost QR, and payment issues",
-      },
-      notifications: {
-        title: "Notifications",
-        subtitle: "Keep up with operational notices, events and escalations",
-      },
-      settings: {
-        title: "Settings",
-        subtitle: "",
-      },
-    },
   },
   manager: {
     basePath: "/manager",
     role: "manager",
-    navItems: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "buildings", label: "Buildings", icon: Building2 },
-      { id: "floors", label: "Floors", icon: Layers },
-      { id: "zones", label: "Zones", icon: Grid3x3 },
-      { id: "parking-slots", label: "Parking Slots", icon: SquareParking },
-      { id: "gates", label: "Gates", icon: DoorOpen },
-      { id: "vehicle-types", label: "Vehicle Types", icon: Car },
-      { id: "pricing-policies", label: "Pricing Policy", icon: CreditCard },
-      { id: "staff-shifts", label: "Staff Shifts", icon: Users },
-      { id: "notifications", label: "Notifications", icon: Bell },
+    label: "Manager Portal",
+    menuGroups: [
+      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      {
+        label: "Cơ sở hạ tầng", items: [
+          { id: "buildings", label: "Tòa nhà" },
+          { id: "floors", label: "Tầng" },
+          { id: "zones", label: "Zone" },
+          { id: "parking-slots", label: "Slot" },
+          { id: "gates", label: "Cổng" },
+        ],
+      },
+      {
+        label: "Cấu hình", items: [
+          { id: "vehicle-types", label: "Loại xe" },
+          { id: "pricing-policies", label: "Bảng giá" },
+          { id: "staff-shifts", label: "Ca làm việc" },
+          { id: "notifications", label: "Thông báo" },
+        ],
+      },
     ],
-    titles: {
-      overview: {
-        title: "Manager Dashboard",
-        subtitle: "A complete view of operations, inventory and performance",
-      },
-      buildings: {
-        title: "Building Management",
-        subtitle: "Configure parking buildings, access details and operating hours",
-      },
-      floors: {
-        title: "Floor Management",
-        subtitle: "Organize each building floor for accurate capacity planning",
-      },
-      zones: {
-        title: "Zone Management",
-        subtitle: "Set up vehicle zones by floor and parking rules",
-      },
-      "parking-slots": {
-        title: "Parking Slot Management",
-        subtitle: "Manage slot inventory, status and zone allocation",
-      },
-      gates: {
-        title: "Gate Management",
-        subtitle: "Control entry and exit points for each parking building",
-      },
-      "vehicle-types": {
-        title: "Vehicle Type Management",
-        subtitle: "Define supported vehicle categories, sizes and rates",
-      },
-      "pricing-policies": {
-        title: "Pricing Policies",
-        subtitle: "Set flexible parking rates by time, day and vehicle type",
-      },
-      "staff-shifts": {
-        title: "Staff Shifts",
-        subtitle: "Plan staff assignments and shift coverage across operations",
-      },
-      notifications: {
-        title: "Notifications",
-        subtitle: "Keep up with operational notices, events and escalations",
-      },
-      settings: {
-        title: "Settings",
-        subtitle: "Adjust portal preferences and account actions",
-      },
-    },
   },
   admin: {
     basePath: "/admin",
     role: "admin",
-    navItems: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "users", label: "Users", icon: Users },
-      { id: "roles", label: "Roles", icon: Shield },
-      { id: "system-config", label: "System Config", icon: Settings },
+    label: "Admin Portal",
+    menuGroups: [
+      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      {
+        label: "Hệ thống", items: [
+          { id: "users", label: "Người dùng" },
+          { id: "roles", label: "Vai trò" },
+          { id: "system-config", label: "Cấu hình" },
+        ],
+      },
     ],
-    titles: {
-      overview: {
-        title: "Admin Dashboard",
-        subtitle: "See users, roles and system health at a glance",
-      },
-      users: {
-        title: "User Management",
-        subtitle: "Review accounts, roles and access status across the platform",
-      },
-      roles: {
-        title: "Role Management",
-        subtitle: "Inspect role definitions and platform access structure",
-      },
-      "system-config": {
-        title: "System Configuration",
-        subtitle: "Control global settings that power the parking platform",
-      },
-      settings: {
-        title: "Settings",
-        subtitle: "Adjust portal preferences and account actions",
-      },
-    },
   },
 };
 
+const ROLE_COLORS = {
+  driver: "#3b82f6",
+  staff: "#10b981",
+  manager: "#8b5cf6",
+  admin: "#ef4444",
+};
+
 function initialsFromName(name) {
-  const parts = String(name || "User").trim().split(/\s+/);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || "U";
+  const parts = String(name || "U").trim().split(/\s+/);
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "U";
 }
 
 export default function RolePortalLayout({ portal }) {
@@ -251,113 +120,135 @@ export default function RolePortalLayout({ portal }) {
   const username = getUsername() || "User";
   const role = getRole() || portal.toUpperCase();
   const userId = getUserId();
+
   const [notifications, setNotifications] = useState([]);
-  const currentPage =
-    location.pathname.replace(`${config.basePath}/`, "").replace(config.basePath, "") ||
-    "overview";
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const navRef = useRef(null);
+
+  const currentPage = location.pathname.replace(`${config.basePath}/`, "").replace(config.basePath, "") || "overview";
   const pageKey = currentPage === "/" || currentPage === "" ? "overview" : currentPage;
-  const titleMeta = config.titles[pageKey] || config.titles.overview;
-  const notificationItems = useMemo(
-    () =>
-      notifications
-        .slice()
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-        .slice(0, 8),
-    [notifications]
-  );
-  const unreadCount = notifications.filter((item) => !item.isRead).length;
-  const navItems = useMemo(
-    () =>
-      config.navItems.map((item) =>
-        item.id === "notifications"
-          ? { ...item, badge: unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount) : undefined }
-          : item
-      ),
-    [config.navItems, unreadCount]
-  );
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   useEffect(() => {
     let cancelled = false;
-
-    async function loadNotifications() {
-      if (!userId || !config.navItems.some((item) => item.id === "notifications")) {
-        if (!cancelled) {
-          setNotifications([]);
-        }
-        return;
-      }
-
+    async function load() {
+      if (!userId) return;
       try {
         const res = await notificationApi.getByUser(userId);
-        if (!cancelled) {
-          setNotifications(unwrapApiData(res.data, []));
-        }
-      } catch (error) {
-        console.error("Failed to load portal notifications", error);
-        if (!cancelled) {
-          setNotifications([]);
-        }
-      }
+        if (!cancelled) setNotifications(unwrapApiData(res.data, []));
+      } catch { if (!cancelled) setNotifications([]); }
     }
+    load();
+    const iv = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [userId, location.pathname]);
 
-    void loadNotifications();
-    const interval = setInterval(loadNotifications, 15000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
+  useEffect(() => {
+    const handler = (e) => {
+      if (!navRef.current?.contains(e.target)) {
+        setOpenDropdown(null);
+        setUserMenuOpen(false);
+      }
     };
-  }, [config.navItems, userId, location.pathname]);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
 
-  const handleMarkNotificationRead = async (id) => {
-    try {
-      await notificationApi.markAsRead(id);
-      if (!userId) {
-        return;
-      }
-      const res = await notificationApi.getByUser(userId);
-      setNotifications(unwrapApiData(res.data, []));
-    } catch (error) {
-      console.error("Failed to mark notification as read", error);
-    }
-  };
+  function goTo(id) {
+    setOpenDropdown(null);
+    navigate(id === "overview" ? config.basePath : `${config.basePath}/${id}`);
+  }
 
-  const handleMarkAllNotificationsRead = async () => {
-    if (!userId) {
-      return;
-    }
-    try {
-      await notificationApi.markAllAsRead(userId);
-      const res = await notificationApi.getByUser(userId);
-      setNotifications(unwrapApiData(res.data, []));
-    } catch (error) {
-      console.error("Failed to mark all notifications as read", error);
-    }
-  };
+  function handleLogout() {
+    localStorage.clear();
+    navigate("/login");
+  }
+
+  const accentColor = ROLE_COLORS[portal] || "var(--accent)";
 
   return (
-    <DashboardLayout
-      role={config.role}
-      navItems={navItems}
-      currentPage={pageKey}
-      setCurrentPage={(page) =>
-        navigate(page === "overview" ? config.basePath : `${config.basePath}/${page}`)
-      }
-      title={titleMeta.title}
-      subtitle={titleMeta.subtitle}
-      userName={username}
-      userInitials={initialsFromName(username)}
-      userEmail={`${role.toLowerCase()} portal`}
-      notificationCount={unreadCount}
-      notificationItems={notificationItems}
-      onMarkNotificationRead={handleMarkNotificationRead}
-      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
-      notificationPath={`${config.basePath}/notifications`}
-      settingsPath={`${config.basePath}/settings`}
-    >
-      <div className="portal-screen">
+    <div className="ps-landing" style={{ minHeight: "100dvh", background: "var(--bg)" }}>
+      {/* TOP NAVBAR */}
+      <nav className="dash-nav" ref={navRef}>
+        <div className="dash-nav-inner">
+          {/* Logo */}
+          <a href="/" className="dash-nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+            <span className="nav-logo-mark">P</span>
+            <span>ParkSmart</span>
+          </a>
+
+          {/* Menu items with dropdowns */}
+          <div className="dash-nav-menu">
+            {config.menuGroups.map((group, gi) => {
+              if (group.items.length === 1) {
+                const item = group.items[0];
+                const isActive = pageKey === item.id;
+                return (
+                  <button key={gi} className={`dash-nav-item ${isActive ? "active" : ""}`} onClick={() => goTo(item.id)}>
+                    {item.label}
+                  </button>
+                );
+              }
+              const isOpen = openDropdown === gi;
+              const hasActive = group.items.some((it) => pageKey === it.id);
+              return (
+                <button key={gi} className={`dash-nav-item ${isOpen ? "open" : ""} ${hasActive ? "active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setOpenDropdown(isOpen ? null : gi); setUserMenuOpen(false); }}>
+                  {group.label}
+                  <svg className="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                  <div className="dash-dropdown">
+                    {group.items.map((item) => (
+                      <a key={item.id} href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); goTo(item.id); }}
+                        style={pageKey === item.id ? { color: "var(--accent)", fontWeight: 600 } : {}}>
+                        {item.label}
+                        {item.id === "notifications" && unreadCount > 0 && (
+                          <span style={{ marginLeft: "auto", background: "var(--danger)", color: "#fff", fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 100 }}>
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right: notification + user */}
+          <div className="dash-nav-right">
+            {unreadCount > 0 && (
+              <button className="dash-notif-btn" onClick={() => goTo("notifications")} title="Thông báo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>
+                <span className="dash-notif-dot" />
+              </button>
+            )}
+
+            <div className="dash-user" style={{ position: "relative" }}
+              onClick={(e) => { e.stopPropagation(); setUserMenuOpen(!userMenuOpen); setOpenDropdown(null); }}>
+              <div className="dash-user-avatar" style={{ background: accentColor }}>{initialsFromName(username)}</div>
+              <div>
+                <span className="dash-user-name">{username}</span>
+                <span className="dash-user-role">{config.label}</span>
+              </div>
+              {userMenuOpen && (
+                <div className="dash-dropdown" style={{ opacity: 1, visibility: "visible", transform: "translateY(0)", top: "calc(100% + 8px)", right: 0, left: "auto" }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); goTo("profile"); }} style={portal !== "driver" ? { display: "none" } : {}}>Hồ sơ</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); goTo("settings"); }}>Cài đặt</a>
+                  <div className="dash-dropdown-divider" />
+                  <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }} style={{ color: "var(--danger)" }}>Đăng xuất</a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* CONTENT */}
+      <div className="dashboard-content">
         <Outlet />
       </div>
-    </DashboardLayout>
+    </div>
   );
 }
