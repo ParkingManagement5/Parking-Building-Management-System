@@ -64,6 +64,7 @@ export default function PublicSlotListPage() {
   const [filterBuilding, setFilterBuilding] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedFloor, setSelectedFloor] = useState(0);
   const timerRef = useRef(null);
 
   const loadData = async () => {
@@ -244,9 +245,35 @@ export default function PublicSlotListPage() {
           </div>
         )}
 
-        {/* Building Floor Blueprint */}
+        {/* Floor tabs */}
+        {grouped.length > 1 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {grouped.map((floor, fi) => {
+              const floorAvail = floor.zones.reduce((n, z) => n + z.slots.filter((s) => s.rawStatus === "AVAILABLE").length, 0);
+              const floorTotal = floor.zones.reduce((n, z) => n + z.slots.length, 0);
+              const isActive = selectedFloor === fi;
+              return (
+                <button key={fi} onClick={() => setSelectedFloor(fi)} style={{
+                  padding: "10px 20px", borderRadius: "var(--radius-sm)", border: "1.5px solid",
+                  borderColor: isActive ? "var(--accent)" : "var(--border)",
+                  background: isActive ? "var(--accent-dim)" : "var(--bg-elevated)",
+                  color: isActive ? "var(--accent)" : "var(--text-secondary)",
+                  fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+                  transition: "all 0.2s", fontFamily: "inherit",
+                }}>
+                  {floor.floor}
+                  <span style={{ marginLeft: 8, fontSize: "0.72rem", opacity: 0.7, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {floorAvail}/{floorTotal}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Building Floor Blueprint — show selected floor only */}
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          {grouped.map((floor, fi) => {
+          {grouped.filter((_, fi) => fi === selectedFloor).map((floor, fi) => {
             const floorAvail = floor.zones.reduce((n, z) => n + z.slots.filter((s) => s.rawStatus === "AVAILABLE").length, 0);
             const floorTotal = floor.zones.reduce((n, z) => n + z.slots.length, 0);
             const topZones = floor.zones.slice(0, 3);
