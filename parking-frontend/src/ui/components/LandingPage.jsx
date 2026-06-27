@@ -5,10 +5,12 @@ import { floorApi } from "../../api/manager/floorApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { unwrapApiData } from "../../utils/api";
+import { usePublicTheme } from "../../utils/publicTheme";
 import "../../assets/css/landing.css";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { dark, toggle, className: themeClass } = usePublicTheme();
   const navRef = useRef(null);
   const navLinksRef = useRef(null);
   const mobileBtnRef = useRef(null);
@@ -279,7 +281,7 @@ export default function LandingPage() {
   const handleDashboard = useCallback(() => navigate("/login"), [navigate]);
 
   return (
-    <div className="ps-landing">
+    <div className={`ps-landing ${themeClass}`}>
       {/* NAV */}
       <nav className="nav" id="nav" ref={navRef}>
         <div className="container nav-inner">
@@ -295,6 +297,13 @@ export default function LandingPage() {
             <a href="#pricing">Bang gia</a>
           </div>
           <div className="nav-actions">
+            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+              {dark ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+              )}
+            </button>
             <button className="btn btn-ghost" onClick={handleLogin}>
               Dang nhap
             </button>
