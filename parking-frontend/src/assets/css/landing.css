@@ -134,7 +134,7 @@
 html { scroll-behavior: smooth; }
 
 .ps-landing, .auth-layout {
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: Arial, Helvetica, -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
