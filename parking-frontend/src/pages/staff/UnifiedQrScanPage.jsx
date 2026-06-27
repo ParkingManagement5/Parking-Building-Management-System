@@ -75,6 +75,7 @@ export default function UnifiedQrScanPage() {
   const qrControlsRef = useRef(null);
   const [qrCameraActive, setQrCameraActive] = useState(false);
   const [qrToken, setQrToken] = useState("");
+  const [qrEntryPlate, setQrEntryPlate] = useState("");
   const [qrScanStatus, setQrScanStatus] = useState("Camera off");
   const [qrError, setQrError] = useState("");
 
@@ -416,10 +417,16 @@ export default function UnifiedQrScanPage() {
           staffUserId: Number(localStorage.getItem("userId")) || null,
         });
       } else {
+        if (!qrEntryPlate.trim()) {
+          setError("Nhap bien so xe de xac minh truoc khi xu ly Entry QR.");
+          setProcessing(false);
+          return;
+        }
         res = await sessionApi.entry({
           gateId: Number(gateId),
           entryMode: "BOOKING",
           qrToken: token,
+          licensePlate: qrEntryPlate.trim(),
           staffUserId: Number(localStorage.getItem("userId")) || null,
         });
       }
@@ -645,6 +652,16 @@ export default function UnifiedQrScanPage() {
                   )}
                 </div>
 
+                {qrTokenType === "ENTRY" && (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+                    <p className="text-sm font-semibold text-foreground mb-2">Xac minh bien so xe</p>
+                    <p className="text-xs text-muted-foreground mb-3">Nhap bien so xe thuc te (OCR hoac thu cong) de xac nhan dung xe trong booking.</p>
+                    <StaffInput value={qrEntryPlate}
+                      onChange={(e) => setQrEntryPlate(e.target.value)}
+                      placeholder="Nhap bien so xe (VD: 59F1-12345)" />
+                  </div>
+                )}
+
                 <div className="grid gap-3 md:grid-cols-2">
                   <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
                     <option value="">Chon toa nha</option>
@@ -663,12 +680,12 @@ export default function UnifiedQrScanPage() {
                 </div>
 
                 <StaffPrimaryButton type="button" onClick={handleProcessQr}
-                  disabled={processing || !qrToken.trim() || !gateId}
+                  disabled={processing || !qrToken.trim() || !gateId || (qrTokenType === "ENTRY" && !qrEntryPlate.trim())}
                   className="flex w-full items-center justify-center gap-2">
                   {processing ? "Dang xu ly..." : qrTokenType === "EXIT" ? (
                     <><LogOut size={15} /> Xu ly Exit QR</>
                   ) : qrTokenType === "ENTRY" ? (
-                    <><LogIn size={15} /> Xu ly Entry QR</>
+                    <><LogIn size={15} /> Xu ly Entry QR + Xac minh bien</>
                   ) : (
                     <><QrCode size={15} /> Scan QR de xu ly</>
                   )}
