@@ -95,11 +95,11 @@ export default function MyVehiclesPage() {
     setFormError("");
 
     if (!form.licensePlate.trim()) {
-      setFormError("License plate is required.");
+      setFormError("Biển số xe là bắt buộc.");
       return;
     }
     if (!form.vehicleTypeId) {
-      setFormError("Vehicle type is required. Please ask a manager to create vehicle types first.");
+      setFormError("Loại xe là bắt buộc. Vui lòng liên hệ quản lý để tạo loại xe trước.");
       return;
     }
 
@@ -124,12 +124,12 @@ export default function MyVehiclesPage() {
       resetForm();
     } catch (error) {
       console.error("Failed to save vehicle", error);
-      setFormError(error.response?.data?.message || "Save vehicle failed.");
+      setFormError(error.response?.data?.message || "Lưu xe thất bại.");
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Deactivate this vehicle? It will be hidden from new bookings but history is kept.")) {
+    if (!window.confirm("Vô hiệu hóa xe này? Xe sẽ bị ẩn khỏi các booking mới nhưng lịch sử vẫn được giữ lại.")) {
       return;
     }
 
@@ -143,109 +143,114 @@ export default function MyVehiclesPage() {
         error.response?.data?.message ||
         error.response?.data?.error ||
         error.message ||
-        "Deactivate vehicle failed"
+        "Vô hiệu hóa xe thất bại"
       );
     }
   };
 
+  const inputClass =
+    "w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10";
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold text-foreground">My Vehicles</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {vehicles.length} registered vehicles
+          <h2 className="text-lg font-semibold text-foreground">Xe của tôi</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {vehicles.length} xe đã đăng ký
           </p>
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          <Plus size={14} /> Add Vehicle
+          <Plus size={14} /> Thêm xe
         </button>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Vehicle grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {vehicles.map((item) => {
           const id = item.vehicleId || item.id;
           const status =
             item.isActive !== false && item.status !== "INACTIVE" ? "active" : "inactive";
           const typeName =
-            item.vehicleType?.name || item.vehicleTypeName || item.vehicleType || "Vehicle";
-          const displayName = [item.brand, item.model].filter(Boolean).join(" ") || "Vehicle";
+            item.vehicleType?.name || item.vehicleTypeName || item.vehicleType || "Xe";
+          const displayName = [item.brand, item.model].filter(Boolean).join(" ") || "Xe";
 
           return (
             <div
               key={id}
-              className="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-all"
+              className="rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="size-10 bg-muted rounded-xl flex items-center justify-center">
+              {/* Top: icon + status */}
+              <div className="mb-4 flex items-start justify-between">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
                   <Car size={18} className="text-muted-foreground" />
                 </div>
                 <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(
-                    status
-                  )}`}
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${getStatusClasses(status)}`}
                 >
-                  {status}
+                  {status === "active" ? "Hoạt động" : "Ngưng"}
                 </span>
               </div>
 
-              <div className="font-mono text-lg font-bold text-foreground mb-1">
-                {item.licensePlate}
-              </div>
-              <p className="text-sm text-foreground">{displayName}</p>
+              {/* Info */}
+              <p className="font-mono text-lg font-bold text-foreground">{item.licensePlate}</p>
+              <p className="mt-0.5 text-sm text-foreground">{displayName}</p>
               <p className="text-xs text-muted-foreground">
-                {typeName} - {item.color || "No color"} {item.year ? `- ${item.year}` : ""}
+                {typeName}{item.color ? ` · ${item.color}` : ""}{item.year ? ` · ${item.year}` : ""}
               </p>
 
-              <div className="flex items-center gap-2 mt-4">
+              {/* Actions */}
+              <div className="mt-4 flex gap-2">
                 <button
-                  className="flex-1 py-1.5 text-xs border border-border rounded-lg hover:bg-muted transition-colors text-muted-foreground"
                   onClick={() => openEdit(item)}
+                  className="flex-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted"
                 >
-                  Edit
+                  Chỉnh sửa
                 </button>
                 <button
-                  className="flex-1 py-1.5 text-xs border border-destructive/30 rounded-lg hover:bg-destructive/10 transition-colors text-destructive"
                   onClick={() => handleDelete(id)}
+                  className="flex-1 rounded-lg border border-destructive/30 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10"
                 >
-                  Deactivate
+                  Vô hiệu hóa
                 </button>
               </div>
             </div>
           );
         })}
 
+        {/* Add new card */}
         <button
           onClick={openCreate}
-          className="border-2 border-dashed border-border rounded-2xl p-5 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary min-h-[220px]"
+          className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-5 text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
         >
           <Plus size={24} />
-          <span className="text-sm font-medium">Add new vehicle</span>
+          <span className="text-sm font-medium">Thêm xe mới</span>
         </button>
       </div>
 
+      {/* Empty state */}
       {vehicles.length === 0 && (
-        <div className="bg-card border border-border rounded-2xl p-6 text-sm text-muted-foreground">
-          No vehicles returned from the backend yet.
+        <div className="rounded-2xl border border-border bg-card p-5 text-center text-sm text-muted-foreground">
+          Chưa có xe nào được đăng ký.
         </div>
       )}
 
+      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            {/* Modal header */}
+            <div className="mb-5 flex items-center justify-between">
               <h3 className="font-semibold text-foreground">
-                {editingId ? "Update Vehicle" : "Add New Vehicle"}
+                {editingId ? "Cập nhật xe" : "Thêm xe mới"}
               </h3>
               <button
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-                className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+                onClick={() => { setShowModal(false); resetForm(); }}
+                className="rounded-lg p-1.5 transition-colors hover:bg-muted"
               >
                 <X size={16} className="text-muted-foreground" />
               </button>
@@ -257,37 +262,27 @@ export default function MyVehiclesPage() {
                   {formError}
                 </div>
               )}
+
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">
-                  License Plate *
-                </label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">Biển số xe *</label>
                 <input
                   required
                   value={form.licensePlate}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, licensePlate: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, licensePlate: event.target.value }))}
                   placeholder="51L-666.66"
-                  className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  className={inputClass}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1.5">
-                    Vehicle Type
-                  </label>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">Loại xe</label>
                   <select
                     value={form.vehicleTypeId}
-                    onChange={(event) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        vehicleTypeId: event.target.value,
-                      }))
-                    }
-                    className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
+                    onChange={(event) => setForm((prev) => ({ ...prev, vehicleTypeId: event.target.value }))}
+                    className={inputClass}
                   >
-                    <option value="">Select type</option>
+                    <option value="">Chọn loại</option>
                     {vehicleTypes.map((item) => (
                       <option key={getVehicleTypeId(item)} value={getVehicleTypeId(item)}>
                         {item.name}
@@ -296,78 +291,59 @@ export default function MyVehiclesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1.5">
-                    Year
-                  </label>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">Năm SX</label>
                   <input
                     value={form.year}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, year: event.target.value }))
-                    }
+                    onChange={(event) => setForm((prev) => ({ ...prev, year: event.target.value }))}
                     placeholder="2024"
-                    className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                    className={inputClass}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">
-                  Make
-                </label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">Hãng xe</label>
                 <input
                   value={form.brand}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, brand: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, brand: event.target.value }))}
                   placeholder="Toyota"
-                  className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">
-                  Model
-                </label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">Mẫu xe</label>
                 <input
                   value={form.model}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, model: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
                   placeholder="Camry"
-                  className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">
-                  Color
-                </label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">Màu sắc</label>
                 <input
                   value={form.color}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, color: event.target.value }))
-                  }
-                  placeholder="Silver"
-                  className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  onChange={(event) => setForm((prev) => ({ ...prev, color: event.target.value }))}
+                  placeholder="Bạc"
+                  className={inputClass}
                 />
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  className="flex-1 py-2.5 border border-border rounded-xl text-sm hover:bg-muted transition-colors"
+                  onClick={() => { setShowModal(false); resetForm(); }}
+                  className="flex-1 rounded-xl border border-border py-2.5 text-sm transition-colors hover:bg-muted"
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                  className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  {editingId ? "Update Vehicle" : "Add Vehicle"}
+                  {editingId ? "Cập nhật" : "Thêm xe"}
                 </button>
               </div>
             </form>

@@ -27,35 +27,38 @@ export default function PaymentHistoryPage() {
   const averagePerVisit = payments.length ? totalSpent / payments.length : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { label: "Total Spent", value: formatCurrency(totalSpent), sub: "From backend" },
-          { label: "Transactions", value: String(payments.length), sub: "Loaded records" },
-          { label: "Avg per Visit", value: formatCurrency(averagePerVisit), sub: "Computed live" },
+          { label: "Tổng chi tiêu", value: formatCurrency(totalSpent), sub: "Từ hệ thống" },
+          { label: "Giao dịch", value: String(payments.length), sub: "Bản ghi đã tải" },
+          { label: "Trung bình / lần", value: formatCurrency(averagePerVisit), sub: "Tính trực tiếp" },
         ].map((item) => (
-          <div key={item.label} className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-            <p className="text-2xl font-bold text-foreground">{item.value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
+          <div key={item.label} className="rounded-2xl border border-border bg-card p-5">
+            <p className="text-xs text-muted-foreground">{item.label}</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{item.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{item.sub}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-foreground text-sm">Transaction History</h3>
-          <button className="text-xs text-primary hover:underline">Download CSV</button>
+      {/* Transaction table */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="text-sm font-semibold text-foreground">Lịch sử giao dịch</h3>
+          <button className="text-xs text-primary hover:underline">Tải CSV</button>
         </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px]">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="bg-muted/40">
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Transaction</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Description</th>
-                <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground">Method</th>
-                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Amount</th>
-                <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Giao dịch</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Mô tả</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Phương thức</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Số tiền</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -70,7 +73,7 @@ export default function PaymentHistoryPage() {
                     </p>
                   </td>
                   <td className="px-5 py-3.5 text-sm text-muted-foreground">
-                    {item.bookingCode || item.bookingId || "Linked payment"}
+                    {item.bookingCode || item.bookingId || "Thanh toán liên kết"}
                   </td>
                   <td className="px-5 py-3.5 text-sm text-foreground">
                     {item.method || item.paymentMethod || "-"}
@@ -80,7 +83,7 @@ export default function PaymentHistoryPage() {
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusClasses(
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusClasses(
                         item.status || item.paymentStatus || "paid"
                       )}`}
                     >
@@ -91,11 +94,8 @@ export default function PaymentHistoryPage() {
               ))}
               {payments.length === 0 && (
                 <tr>
-                  <td
-                    colSpan="5"
-                    className="px-5 py-10 text-center text-sm text-muted-foreground"
-                  >
-                    No payment history returned from the backend.
+                  <td colSpan="5" className="px-5 py-10 text-center text-sm text-muted-foreground">
+                    Chưa có lịch sử thanh toán nào từ hệ thống.
                   </td>
                 </tr>
               )}
