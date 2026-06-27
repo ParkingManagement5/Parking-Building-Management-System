@@ -106,6 +106,9 @@ public class BookingServiceImpl implements BookingService {
         });
 
         LocalDateTime startTime = request.getBookingStartTime();
+        if (startTime == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thieu bookingStartTime");
+        }
 
         // Đặt trước ít nhất 10 phút
         long minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime);
@@ -116,6 +119,11 @@ public class BookingServiceImpl implements BookingService {
 
         LocalDateTime endTime = request.getBookingEndTime() != null
                 ? request.getBookingEndTime() : startTime.plusHours(2);
+
+        if (!endTime.isAfter(startTime)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "bookingEndTime phai sau bookingStartTime");
+        }
 
         // expired_at = MIN(now+15p, start-5p)
         LocalDateTime expiredAt = now.plusMinutes(15).isBefore(startTime.minusMinutes(5))

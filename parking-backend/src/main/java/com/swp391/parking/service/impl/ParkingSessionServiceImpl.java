@@ -51,7 +51,23 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
-        ParkingSession.EntryMode mode = ParkingSession.EntryMode.valueOf(request.getEntryMode());
+        if (!Boolean.TRUE.equals(gate.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " dang inactive");
+        }
+        if (gate.getGateType() != null
+                && gate.getGateType() != Gate.GateType.ENTRY
+                && gate.getGateType() != Gate.GateType.BOTH) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Gate " + gate.getGateCode() + " khong phai cong vao (type: " + gate.getGateType() + ")");
+        }
+
+        ParkingSession.EntryMode mode;
+        try {
+            mode = ParkingSession.EntryMode.valueOf(request.getEntryMode());
+        } catch (IllegalArgumentException e) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "entryMode khong hop le: " + request.getEntryMode() + ". Dung: BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL");
+        }
         ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
                 ? processBookingEntry(request, gate)
                 : processWalkInEntry(request, gate, mode);
@@ -93,6 +109,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
+        }
+        // QR phải match token hiện tại trong DB (revoke QR cũ sau regenerate)
+        if (booking.getQrToken() == null || !booking.getQrToken().equals(request.getQrToken())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR da bi thay the boi token moi. Dung QR moi nhat.");
         }
 
         // [BR-06b] Xe đang có session chưa hoàn tất → không cho check-in
@@ -244,6 +264,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
+
+        if (!Boolean.TRUE.equals(gate.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " dang inactive");
+        }
+        if (gate.getGateType() != null
+                && gate.getGateType() != Gate.GateType.EXIT
+                && gate.getGateType() != Gate.GateType.BOTH) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Gate " + gate.getGateCode() + " khong phai cong ra (type: " + gate.getGateType() + ")");
+        }
 
         session.setExitGate(gate);
         session.setExitTime(LocalDateTime.now());
@@ -509,16 +539,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     private BigDecimal resolveHourlyRate(ParkingSession s) {
-        BigDecimal defaultRate = new BigDecimal("20000");
         if (s.getVehicle() == null || s.getVehicle().getVehicleType() == null) {
-            return defaultRate;
+            return new BigDecimal("20000");
         }
         Long vehicleTypeId = s.getVehicle().getVehicleType().getId();
         List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vehicleTypeId);
-        if (policies.isEmpty()) {
-            return defaultRate;
-        }
-        return policies.get(0).getPricePerHour();
+        LocalDateTime refTime = s.getEntryTime() != null ? s.getEntryTime() : LocalDateTime.now();
+        return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }
 
     private SessionResponse toResponse(ParkingSession s) {
