@@ -45,7 +45,7 @@ function normalizeSlot(item) {
 }
 
 const SLOT_COLORS = { Available: "#10b981", Occupied: "#ef4444", Reserved: "#f59e0b", Maintenance: "#6b7280" };
-const SLOT_LABELS = { Available: "Trong", Occupied: "Co xe", Reserved: "Da dat", Maintenance: "Bao tri" };
+const SLOT_LABELS = { Available: "Trong", Occupied: "Có xe", Reserved: "Đã đặt", Maintenance: "Bảo trì" };
 
 const card = { background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "20px" };
 const inputStyle = {
@@ -126,11 +126,48 @@ export default function PublicSlotListPage() {
   }, [filtered]);
 
   const statCards = [
-    { label: "Tong slot", value: stats.total, color: "var(--accent)" },
+    { label: "Tổng slot", value: stats.total, color: "var(--accent)" },
     { label: "Trong", value: stats.available, color: "#10b981" },
-    { label: "Co xe", value: stats.occupied, color: "#ef4444" },
-    { label: "Da dat", value: stats.reserved, color: "#f59e0b" },
+    { label: "Có xe", value: stats.occupied, color: "#ef4444" },
+    { label: "Đã đặt", value: stats.reserved, color: "#f59e0b" },
   ];
+
+  function renderZoneBlock(zone, zi) {
+    const sortedSlots = [...zone.slots].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    const zoneAvail = sortedSlots.filter((s) => s.rawStatus === "AVAILABLE").length;
+    return (
+      <div key={zi} style={{
+        background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+        padding: 14, transition: "border-color 0.2s",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--text)" }}>{zone.name}</span>
+          <span style={{ fontSize: "0.65rem", color: "var(--accent)", fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
+            {zoneAvail}/{sortedSlots.length}
+          </span>
+        </div>
+        <div style={{ fontSize: "0.62rem", color: "var(--text-muted)", marginBottom: 10, fontWeight: 500 }}>{zone.vehicleType}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {sortedSlots.map((slot) => (
+            <div key={slot.id} title={`${slot.code} — ${slot.status}`}
+              style={{
+                background: SLOT_COLORS[slot.status], borderRadius: 7,
+                padding: "12px 6px", textAlign: "center", cursor: "default",
+                transition: "transform 0.15s ease",
+                border: slot.rawStatus === "OCCUPIED" ? "2px solid rgba(255,255,255,0.2)" : "2px solid transparent",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.05)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+            >
+              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#fff", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+                {slot.code.split("-").pop()}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100vh", background: "var(--bg)" }}>
@@ -138,10 +175,10 @@ export default function PublicSlotListPage() {
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <h1 style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
-            Ban do bai do xe
+            Bản đồ bãi đỗ xe
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 6 }}>
-            Thong tin slot thoi gian thuc -- tu dong cap nhat moi 15 giay
+            Thông tin slot thời gian thực — tự động cập nhật mỗi 15 giây
           </p>
         </div>
 
@@ -164,15 +201,15 @@ export default function PublicSlotListPage() {
         <div style={{ ...card, display: "flex", gap: 12, alignItems: "center", marginBottom: 24, flexWrap: "wrap" }}>
           <select value={filterBuilding} onChange={(e) => setFilterBuilding(e.target.value)}
             style={{ ...inputStyle, width: 200, cursor: "pointer", appearance: "auto" }}>
-            <option value="">-- Toa nha --</option>
+            <option value="">-- Tòa nhà --</option>
             {buildings.map((b) => <option key={getBuildingId(b)} value={String(getBuildingId(b))}>{b.name}</option>)}
           </select>
           <select value={filterVehicle} onChange={(e) => setFilterVehicle(e.target.value)}
             style={{ ...inputStyle, width: 200, cursor: "pointer", appearance: "auto" }}>
-            <option value="">-- Loai xe --</option>
+            <option value="">-- Loại xe --</option>
             {vehicleTypes.map((v) => <option key={getVehicleTypeId(v)} value={String(getVehicleTypeId(v))}>{v.name}</option>)}
           </select>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tim kiem slot..."
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm kiếm slot..."
             style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
           {/* Legend */}
           <div style={{ display: "flex", gap: 14, marginLeft: "auto", flexShrink: 0 }}>
@@ -189,7 +226,7 @@ export default function PublicSlotListPage() {
         {loading && slots.length === 0 && (
           <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: "1.5rem", marginBottom: 12 }}>...</div>
-            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>Dang tai du lieu bai do...</p>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>Đang tải dữ liệu bãi đỗ...</p>
           </div>
         )}
 
@@ -203,68 +240,77 @@ export default function PublicSlotListPage() {
         {/* No results */}
         {!loading && filtered.length === 0 && !error && (
           <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Khong tim thay slot nao phu hop.</p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Không tìm thấy slot nào phù hợp.</p>
           </div>
         )}
 
-        {/* Slot Grid grouped by Floor -> Zone */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {grouped.map((floor, fi) => (
-            <div key={fi} style={{ ...card, padding: 0, overflow: "hidden" }}>
-              {/* Floor header */}
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <span style={{ fontWeight: 700, color: "var(--text)", fontSize: "0.95rem" }}>{floor.building}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginLeft: 10 }}>{floor.floor}</span>
-                </div>
-                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                  {floor.zones.reduce((n, z) => n + z.slots.filter((s) => s.rawStatus === "AVAILABLE").length, 0)} slot trong
-                </span>
-              </div>
-              {/* Zones */}
-              <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-                {floor.zones.map((zone, zi) => (
-                  <div key={zi}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <span style={{ fontWeight: 600, color: "var(--text-secondary)", fontSize: "0.85rem" }}>
-                        {zone.name}
-                        <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 8, fontSize: "0.78rem" }}>{zone.vehicleType}</span>
-                      </span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--accent)" }}>
-                        {zone.slots.filter((s) => s.rawStatus === "AVAILABLE").length}/{zone.slots.length} trong
-                      </span>
-                    </div>
-                    {/* Slot boxes grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 6 }}>
-                      {[...zone.slots].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true })).map((slot) => (
-                        <div key={slot.id} title={`${slot.code} - ${slot.status}`}
-                          style={{
-                            background: SLOT_COLORS[slot.status], borderRadius: "var(--radius-sm)",
-                            padding: "8px 4px", textAlign: "center", cursor: "default",
-                            transition: "transform 0.15s ease, opacity 0.15s ease",
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.opacity = "0.85"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.opacity = "1"; }}
-                        >
-                          <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#fff", lineHeight: 1.2, fontFamily: "monospace" }}>
-                            {slot.code}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+        {/* Building Floor Blueprint */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+          {grouped.map((floor, fi) => {
+            const floorAvail = floor.zones.reduce((n, z) => n + z.slots.filter((s) => s.rawStatus === "AVAILABLE").length, 0);
+            const floorTotal = floor.zones.reduce((n, z) => n + z.slots.length, 0);
+            const topZones = floor.zones.slice(0, 3);
+            const bottomZones = floor.zones.slice(3, 6);
+            return (
+              <div key={fi} style={{ ...card, padding: 0, overflow: "hidden" }}>
+                {/* Floor header */}
+                <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span style={{ fontWeight: 800, color: "var(--text)", fontSize: "1.1rem" }}>{floor.building}</span>
+                    <span style={{ color: "var(--accent)", fontSize: "0.88rem", marginLeft: 14, fontWeight: 600 }}>{floor.floor}</span>
                   </div>
-                ))}
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                    {floorAvail}/{floorTotal} trống
+                  </span>
+                </div>
+
+                {/* Blueprint area */}
+                <div style={{ padding: "28px 24px", background: "var(--bg-section)", position: "relative" }}>
+                  {/* Entry gate */}
+                  <div style={{ textAlign: "center", marginBottom: 18 }}>
+                    <span style={{ display: "inline-block", padding: "5px 28px", background: "var(--accent)", color: "#000", borderRadius: "0 0 10px 10px", fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em" }}>
+                      ▼ CỔNG VÀO
+                    </span>
+                  </div>
+
+                  {/* Top row: 3 zones */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                    {topZones.map((zone, zi) => renderZoneBlock(zone, zi))}
+                  </div>
+
+                  {/* Aisle */}
+                  <div style={{ textAlign: "center", margin: "14px 0", position: "relative" }}>
+                    <div style={{ height: 1, background: "var(--border)", position: "absolute", top: "50%", left: "5%", right: "5%" }} />
+                    <span style={{ position: "relative", display: "inline-block", padding: "3px 20px", background: "var(--bg-section)", color: "var(--text-muted)", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.15em" }}>
+                      ĐƯỜNG ĐI
+                    </span>
+                  </div>
+
+                  {/* Bottom row: 3 zones */}
+                  {bottomZones.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                      {bottomZones.map((zone, zi) => renderZoneBlock(zone, zi + 3))}
+                    </div>
+                  )}
+
+                  {/* Exit gate */}
+                  <div style={{ textAlign: "center", marginTop: 18 }}>
+                    <span style={{ display: "inline-block", padding: "5px 28px", background: "rgba(255,77,77,0.15)", color: "var(--danger)", borderRadius: "10px 10px 0 0", fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em" }}>
+                      ▲ CỔNG RA
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Footer hint */}
+        {/* Footer */}
         {!loading && filtered.length > 0 && (
           <div style={{ marginTop: 24, textAlign: "center" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
-              Hien thi {filtered.length} / {slots.length} slot --
-              <Link to="/login" style={{ color: "var(--accent)", fontWeight: 600, marginLeft: 4 }}>Dang nhap de dat cho</Link>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+              Hiển thị {filtered.length} / {slots.length} slot —
+              <Link to="/login" style={{ color: "var(--accent)", fontWeight: 600, marginLeft: 4 }}>Đăng nhập để đặt chỗ</Link>
             </p>
           </div>
         )}
