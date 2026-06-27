@@ -250,6 +250,27 @@
   color: rgba(255,255,255,0.4);
 }
 
+/* ========== AUTH LIGHT MODE ========== */
+.ps-light .auth-right {
+  background: linear-gradient(160deg, #e8f5e9, #c8e6c9, #e0f2f1);
+}
+.ps-light .auth-right::before {
+  background: radial-gradient(circle, rgba(0,184,94,0.08), transparent 70%);
+}
+.ps-light .float-card {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  color: #1a1a1a;
+}
+.ps-light .auth-quote {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+}
+.ps-light .auth-quote p { color: rgba(0,0,0,0.75); }
+.ps-light .auth-quote span { color: rgba(0,0,0,0.4); }
+.ps-light .auth-divider::before { background: var(--border); }
+.ps-light .auth-divider span { background: var(--bg); }
+
 @media (max-width: 1024px) {
   .auth-layout { grid-template-columns: 1fr; }
   .auth-right { display: none; }
