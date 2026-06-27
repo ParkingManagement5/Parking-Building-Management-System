@@ -286,18 +286,17 @@ export default function UnifiedQrScanPage() {
 
         // Check if has booking CONFIRMED → need QR
         try {
-          const bRes = await axiosClient.get(`/bookings/my`);
+          const bRes = await axiosClient.get(`/bookings/search?licensePlate=${encodeURIComponent(plate)}`);
           const bookings = unwrapApiData(bRes.data, []);
           const activeBooking = bookings.find((b) =>
-            String(b.licensePlate || "").toUpperCase() === plate.toUpperCase() &&
-            String(b.status || "").toUpperCase() === "CONFIRMED"
+            ["CONFIRMED", "PENDING_PAYMENT"].includes(String(b.status || "").toUpperCase())
           );
           if (activeBooking) {
             setLookupResult({ type: "ENTRY_BOOKING", plate, vehicle, booking: activeBooking });
             setDetectedDirection("ENTRY");
             return;
           }
-        } catch { /* bookings not accessible from staff token, skip */ }
+        } catch { /* no bookings found */ }
 
         // Registered vehicle, no booking → walk-in entry
         setLookupResult({ type: "ENTRY_WALKIN", plate, vehicle });
