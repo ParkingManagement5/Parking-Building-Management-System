@@ -52,8 +52,9 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
+
         <Route element={<MainPublicLayout />}>
-          <Route path="/" element={<LandingPage />} />
           <Route path="/parking-info" element={<ParkingInfoPage />} />
         </Route>
 
