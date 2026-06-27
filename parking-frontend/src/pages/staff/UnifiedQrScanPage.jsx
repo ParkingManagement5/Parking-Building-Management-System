@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrowserQRCodeReader } from "@zxing/browser";
 import {
+  AlertTriangle,
   Camera,
   CheckCircle2,
   ImageUp,
@@ -262,6 +263,7 @@ export default function UnifiedQrScanPage() {
   async function autoLookupPlate(plate) {
     setLookupLoading(true);
     try {
+      // 1. Check active session → EXIT
       const sessRes = await sessionApi.getSessions({ status: "ACTIVE", keyword: plate });
       const activeSessions = unwrapApiData(sessRes.data, []);
       const match = activeSessions.find((s) =>
@@ -273,11 +275,47 @@ export default function UnifiedQrScanPage() {
         return;
       }
 
-      setLookupResult({ type: "ENTRY", plate });
-      setDetectedDirection("ENTRY");
+      // 2. Check vehicle registered
+      let vehicle = null;
+      try {
+        const vRes = await axiosClient.get(`/vehicles/plate/${encodeURIComponent(plate)}`);
+        vehicle = unwrapApiData(vRes.data, null);
+      } catch { /* not registered */ }
+
+      if (vehicle) {
+        // Vehicle found — check if active
+        if (vehicle.isActive === false) {
+          setLookupResult({ type: "ENTRY_BLOCKED", plate, reason: `Xe ${plate} da bi vo hieu hoa (inactive). Lien he admin.` });
+          setDetectedDirection(null);
+          return;
+        }
+
+        // Check if has booking CONFIRMED → need QR
+        try {
+          const bRes = await axiosClient.get(`/bookings/my`);
+          const bookings = unwrapApiData(bRes.data, []);
+          const activeBooking = bookings.find((b) =>
+            String(b.licensePlate || "").toUpperCase() === plate.toUpperCase() &&
+            String(b.status || "").toUpperCase() === "CONFIRMED"
+          );
+          if (activeBooking) {
+            setLookupResult({ type: "ENTRY_BOOKING", plate, vehicle, booking: activeBooking });
+            setDetectedDirection("ENTRY");
+            return;
+          }
+        } catch { /* bookings not accessible from staff token, skip */ }
+
+        // Registered vehicle, no booking → walk-in entry
+        setLookupResult({ type: "ENTRY_WALKIN", plate, vehicle });
+        setDetectedDirection("ENTRY");
+      } else {
+        // Not registered → walk-in (backend will auto-create vehicle)
+        setLookupResult({ type: "ENTRY_UNREGISTERED", plate });
+        setDetectedDirection("ENTRY");
+      }
     } catch (err) {
       console.error("Auto-lookup failed", err);
-      setLookupResult({ type: "ENTRY", plate });
+      setLookupResult({ type: "ENTRY_WALKIN", plate });
       setDetectedDirection("ENTRY");
     } finally {
       setLookupLoading(false);
@@ -611,56 +649,127 @@ export default function UnifiedQrScanPage() {
                       <Search size={16} className="inline mr-2 animate-pulse" /> Dang kiem tra bien so trong he thong...
                     </div>
                   ) : lookupResult ? (
-                    <div className={`rounded-2xl border p-4 ${lookupResult.type === "EXIT" ? "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10" : "border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10"}`}>
-                      <div className="flex items-center gap-3">
-                        <div className={`flex size-10 items-center justify-center rounded-full ${lookupResult.type === "EXIT" ? "bg-amber-100 dark:bg-amber-500/20" : "bg-blue-100 dark:bg-blue-500/20"}`}>
-                          {lookupResult.type === "EXIT" ? <LogOut size={18} className="text-amber-600" /> : <LogIn size={18} className="text-blue-600" />}
+                    <>
+                      {/* EXIT */}
+                      {lookupResult.type === "EXIT" && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+                              <LogOut size={18} className="text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-foreground">EXIT — Xe dang trong bai</p>
+                              <p className="text-sm text-muted-foreground">
+                                Session #{lookupResult.session?.sessionId} • Slot {lookupResult.session?.slotCode || "N/A"} • Vao luc {formatStaffDateTime(lookupResult.session?.entryTime)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-foreground">
-                            {lookupResult.type === "EXIT" ? "EXIT — Xe dang trong bai" : "ENTRY — Xe chua vao bai"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {lookupResult.type === "EXIT"
-                              ? `Session #${lookupResult.session?.sessionId} • Slot ${lookupResult.session?.slotCode || "N/A"} • Vao luc ${formatStaffDateTime(lookupResult.session?.entryTime)}`
-                              : `Bien ${ocrPlate} — san sang cho vao bai`}
-                          </p>
+                      )}
+
+                      {/* ENTRY — has booking → need QR */}
+                      {lookupResult.type === "ENTRY_BOOKING" && (
+                        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20">
+                              <QrCode size={18} className="text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-foreground">BOOKING — Xe co booking, can QR</p>
+                              <p className="text-sm text-muted-foreground">
+                                Booking #{lookupResult.booking?.bookingId} • Slot {lookupResult.booking?.slotCode || "N/A"} • Chuyen sang tab QR Scan de xu ly
+                              </p>
+                            </div>
+                          </div>
+                          <StaffSecondaryButton type="button" onClick={() => { setMode("qr"); stopOcrCamera(); }}
+                            className="mt-3 flex w-full items-center justify-center gap-2">
+                            <QrCode size={15} /> Chuyen sang QR Scan
+                          </StaffSecondaryButton>
                         </div>
-                      </div>
-                    </div>
+                      )}
+
+                      {/* ENTRY — registered walk-in */}
+                      {lookupResult.type === "ENTRY_WALKIN" && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+                              <LogIn size={18} className="text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-foreground">WALK-IN — Xe da dang ky, khong co booking</p>
+                              <p className="text-sm text-muted-foreground">Bien {ocrPlate} — cho vao bai truc tiep</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ENTRY — unregistered */}
+                      {lookupResult.type === "ENTRY_UNREGISTERED" && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+                              <AlertTriangle size={18} className="text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-foreground">WALK-IN — Xe chua dang ky</p>
+                              <p className="text-sm text-muted-foreground">Bien {ocrPlate} chua co trong he thong. Backend se tu tao vehicle khi entry.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* BLOCKED — inactive vehicle */}
+                      {lookupResult.type === "ENTRY_BLOCKED" && (
+                        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/20 dark:bg-rose-500/10">
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-500/20">
+                              <XCircle size={18} className="text-rose-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-foreground">BLOCKED — Xe bi vo hieu hoa</p>
+                              <p className="text-sm text-muted-foreground">{lookupResult.reason}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : null}
 
-                  {/* Gate select */}
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {assignedId ? (
-                      <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedBuildingLabel || `Building #${assignedId}`}</div>
-                    ) : (
-                      <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
-                        <option value="">Chon toa nha</option>
-                        {buildings.map((b) => (
-                          <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>
-                        ))}
-                      </StaffSelect>
-                    )}
-                    <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
-                      <option value="">Chon cong {detectedDirection ? `(${detectedDirection})` : ""}</option>
-                      {filteredGates.map((g) => (
-                        <option key={g.gateId || g.id} value={g.gateId || g.id}>
-                          {g.gateName || g.gateCode || g.name || `Gate ${g.gateId || g.id}`} ({g.gateType})
-                        </option>
-                      ))}
-                    </StaffSelect>
-                  </div>
+                  {/* Gate select + action — only for actionable types */}
+                  {lookupResult && lookupResult.type !== "ENTRY_BLOCKED" && lookupResult.type !== "ENTRY_BOOKING" && (
+                    <>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {assignedId ? (
+                          <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedBuildingLabel || `Building #${assignedId}`}</div>
+                        ) : (
+                          <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
+                            <option value="">Chon toa nha</option>
+                            {buildings.map((b) => (
+                              <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>
+                            ))}
+                          </StaffSelect>
+                        )}
+                        <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
+                          <option value="">Chon cong {detectedDirection ? `(${detectedDirection})` : ""}</option>
+                          {filteredGates.map((g) => (
+                            <option key={g.gateId || g.id} value={g.gateId || g.id}>
+                              {g.gateName || g.gateCode || g.name || `Gate ${g.gateId || g.id}`} ({g.gateType})
+                            </option>
+                          ))}
+                        </StaffSelect>
+                      </div>
 
-                  <StaffPrimaryButton type="button" onClick={handleProcessOcr}
-                    disabled={processing || !lookupResult || !gateId}
-                    className="flex w-full items-center justify-center gap-2">
-                    {processing ? "Dang xu ly..." : lookupResult?.type === "EXIT" ? (
-                      <><LogOut size={15} /> Xac nhan xe ra (Exit)</>
-                    ) : (
-                      <><LogIn size={15} /> Xac nhan xe vao (Entry)</>
-                    )}
-                  </StaffPrimaryButton>
+                      <StaffPrimaryButton type="button" onClick={handleProcessOcr}
+                        disabled={processing || !gateId}
+                        className="flex w-full items-center justify-center gap-2">
+                        {processing ? "Dang xu ly..." : lookupResult?.type === "EXIT" ? (
+                          <><LogOut size={15} /> Xac nhan xe ra (Exit)</>
+                        ) : (
+                          <><LogIn size={15} /> Xac nhan xe vao (Walk-in Entry)</>
+                        )}
+                      </StaffPrimaryButton>
+                    </>
+                  )}
                 </div>
               )}
             </StaffPageSection>
