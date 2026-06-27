@@ -126,7 +126,7 @@ export default function LoginPage() {
       const data = res.data?.data || res.data || {};
       navigate(saveAuthData(data));
     } catch (err) {
-      setError(err.response?.data?.message || "Dang nhap that bai. Vui long kiem tra tai khoan hoac mat khau.");
+      setError(err.response?.data?.message || "Đăng nhập that bai. Vui long kiem tra tai khoan hoac mat khau.");
     } finally {
       setLoading(false);
     }
@@ -173,8 +173,8 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-form-wrapper">
-          <h1>Chao mung tro lai</h1>
-          <p className="auth-subtitle">Dang nhap de quan ly bai do xe cua ban</p>
+          <h1>Chào mừng trở lại</h1>
+          <p className="auth-subtitle">Đăng nhập để quản lý bãi đỗ xe của bạn</p>
 
           {error && (
             <div style={{
@@ -205,14 +205,14 @@ export default function LoginPage() {
 
             <div className="form-group">
               <label htmlFor="password">
-                Mat khau
+                Mật khẩu
                 <button
                   type="button"
                   className="form-link"
                   onClick={() => navigate("/forgot-password")}
                   style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                 >
-                  Quen mat khau?
+                  Quên mật khẩu?
                 </button>
               </label>
               <div className="input-password">
@@ -222,7 +222,7 @@ export default function LoginPage() {
                   required
                   value={form.password}
                   onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                  placeholder="Nhap mat khau"
+                  placeholder="Nhập mật khẩu"
                 />
                 <button
                   type="button"
@@ -253,11 +253,11 @@ export default function LoginPage() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <label htmlFor="remember">Ghi nho dang nhap</label>
+              <label htmlFor="remember">Ghi nhớ đăng nhập</label>
             </div>
 
             <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading}>
-              {loading ? "Dang dang nhap..." : "Dang nhap"}
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </form>
 
@@ -270,7 +270,7 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
           >
             {googleLoading ? (
-              "Dang dang nhap..."
+              "Đang đăng nhập..."
             ) : (
               <>
                 <svg width="20" height="20" viewBox="0 0 24 24">
@@ -279,20 +279,20 @@ export default function LoginPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
-                Dang nhap voi Google
+                Đăng nhập với Google
               </>
             )}
           </button>
 
           <p className="auth-footer-text">
-            Chua co tai khoan?{" "}
+            Chưa có tài khoản?{" "}
             <button
               type="button"
               className="text-link"
               onClick={() => navigate("/register")}
               style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}
             >
-              Dang ky ngay
+              Đăng ký ngay
             </button>
           </p>
         </div>
@@ -313,7 +313,7 @@ export default function LoginPage() {
             <div className="auth-stat-grid">
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "var(--accent)" }}>72</span>
-                <span className="auth-stat-label">Tong slot</span>
+                <span className="auth-stat-label">Tổng slot</span>
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#60a5fa" }}>71</span>
@@ -321,7 +321,7 @@ export default function LoginPage() {
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#f97316" }}>1</span>
-                <span className="auth-stat-label">Dang do</span>
+                <span className="auth-stat-label">Đang đỗ</span>
               </div>
             </div>
             <div className="auth-stat-bars">
@@ -334,13 +334,13 @@ export default function LoginPage() {
           {/* Activity block */}
           <div className="auth-stat-block" style={{ marginTop: 16 }}>
             <div className="auth-stat-header">
-              <h3>Hoat dong gan day</h3>
+              <h3>Hoạt động gần đây</h3>
             </div>
             <div className="auth-activity-list">
               {[
-                { icon: "✓", color: "var(--accent)", text: "Xe 59F1-12345 vao bai", time: "Vua xong" },
-                { icon: "P", color: "#60a5fa", text: "Slot T1-A-01 da dat", time: "2 phut truoc" },
-                { icon: "$", color: "#a78bfa", text: "Thanh toan 15,000 VND", time: "5 phut truoc" },
+                { icon: "✓", color: "var(--accent)", text: "Xe 59F1-12345 vào bãi", time: "Vừa xong" },
+                { icon: "P", color: "#60a5fa", text: "Slot T1-A-01 đã đặt", time: "2 phút trước" },
+                { icon: "$", color: "#a78bfa", text: "Thanh toán 15,000 VND", time: "5 phút trước" },
               ].map((item, i) => (
                 <div key={i} className="auth-activity-item">
                   <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
