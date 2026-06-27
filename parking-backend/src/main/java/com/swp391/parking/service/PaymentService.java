@@ -38,4 +38,8 @@ public interface PaymentService {
     List<PaymentResponse> getByStatus(PaymentStatus status);
 
     List<PaymentResponse> getMyPayments(Long userId);
+
+    void enforcePaymentOwnership(Integer paymentId, Long userId);
+
+    void enforceBookingOwnership(Integer bookingId, Long userId);
 }

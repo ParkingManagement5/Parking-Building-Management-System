@@ -67,7 +67,7 @@ List<ParkingSlot> searchAvailableSlots(
     """, nativeQuery = true)
 List<ParkingSlot> findAvailableByBuildingAndSlotSize(
         @Param("buildingId") Long buildingId,
-        @Param("slotSize") ParkingSlot.SlotSize slotSize
+        @Param("slotSize") String slotSize
 );
 
 @Query(value = """
@@ -82,5 +82,5 @@ List<ParkingSlot> findAvailableByBuildingAndSlotSize(
       AND f.is_active = true
     ORDER BY f.floor_number, ps.slot_code
     """, nativeQuery = true)
-List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") ParkingSlot.SlotSize slotSize);
+List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
 }
