@@ -183,16 +183,7 @@ export default function RolePortalLayout({ portal }) {
 
           {/* Menu items with dropdowns */}
           <div className="dash-nav-menu">
-            {config.menuGroups.map((group, gi) => {
-              if (group.items.length === 1) {
-                const item = group.items[0];
-                const isActive = pageKey === item.id;
-                return (
-                  <button key={gi} className={`dash-nav-item ${isActive ? "active" : ""}`} onClick={() => goTo(item.id)}>
-                    {item.label}
-                  </button>
-                );
-              }
+            {config.menuGroups.filter((g) => !(g.items.length === 1 && g.items[0].id === "overview")).map((group, gi) => {
               const isOpen = openDropdown === gi;
               const hasActive = group.items.some((it) => pageKey === it.id);
               return (
