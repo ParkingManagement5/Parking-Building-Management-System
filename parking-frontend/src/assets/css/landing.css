@@ -6,15 +6,15 @@
    ========================================================== */
 
 :root {
-  --bg:          #000000;
-  --bg-elevated: #0a0a0a;
-  --bg-card:     #111111;
-  --bg-section:  #060606;
-  --border:      rgba(255,255,255,0.07);
-  --border-hover:rgba(255,255,255,0.14);
-  --text:        #f0f0f0;
-  --text-secondary: #a0a0a0;
-  --text-muted:  #606060;
+  --bg:          #080808;
+  --bg-elevated: #141414;
+  --bg-card:     #181818;
+  --bg-section:  #0c0c0c;
+  --border:      rgba(255,255,255,0.1);
+  --border-hover:rgba(255,255,255,0.18);
+  --text:        #f2f2f2;
+  --text-secondary: #b0b0b0;
+  --text-muted:  #707070;
   --accent:      #00e676;
   --accent-hover:#00c965;
   --accent-dim:  rgba(0,230,118,0.08);

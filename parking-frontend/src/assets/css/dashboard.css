@@ -503,13 +503,13 @@ td strong { color: var(--text); font-family: 'JetBrains Mono', monospace; font-s
 
 /* ========== TAILWIND THEME VARS OVERRIDE (dark) ========== */
 .ps-landing {
-  --background: #0a0a0a;
-  --foreground: #f0f0f0;
-  --card: #111111;
-  --card-foreground: #f0f0f0;
-  --muted: #1a1a1a;
-  --muted-foreground: #9a9a9a;
-  --border: rgba(255,255,255,0.1);
+  --background: #080808;
+  --foreground: #f2f2f2;
+  --card: #141414;
+  --card-foreground: #f2f2f2;
+  --muted: #1c1c1c;
+  --muted-foreground: #a0a0a0;
+  --border: rgba(255,255,255,0.12);
   --primary: #00e676;
   --primary-foreground: #000;
   --destructive: #ff4d4d;
@@ -582,6 +582,14 @@ td strong { color: var(--text); font-family: 'JetBrains Mono', monospace; font-s
 .ps-light .dash-user-role {
   color: var(--text-muted);
 }
+/* Dark mode card glow */
+.ps-landing .stat-card {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.ps-landing .stat-card:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
 .ps-light .stat-card {
   background: var(--bg-card);
   border-color: var(--border);
