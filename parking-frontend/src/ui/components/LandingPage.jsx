@@ -290,11 +290,10 @@ export default function LandingPage() {
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links" id="navLinks" ref={navLinksRef}>
-            <a href="#features">Tinh nang</a>
-            <a href="#how-it-works">Cach hoat dong</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bai do xe</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trong</a>
-            <a href="#pricing">Bang gia</a>
+            <a href="#features">Tính năng</a>
+            <a href="#how-it-works">Cách hoạt động</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
@@ -305,10 +304,10 @@ export default function LandingPage() {
               )}
             </button>
             <button className="btn btn-ghost" onClick={handleLogin}>
-              Dang nhap
+              Đăng nhập
             </button>
             <button className="btn btn-accent" onClick={handleRegister}>
-              Bat dau mien phi
+              Bắt đầu miễn phí
             </button>
           </div>
           <button
@@ -337,17 +336,16 @@ export default function LandingPage() {
         <div className="container hero-grid">
           <div className="hero-content">
             <h1 className="hero-title reveal-up">
-              Quan ly bai do xe,
+              Quản lý bãi đỗ xe,
               <br />
-              <span className="hero-title-accent">khong con dau dau.</span>
+              <span className="hero-title-accent">không còn đau đầu.</span>
             </h1>
             <p className="hero-sub reveal-up delay-1">
-              Theo doi trang thai, tu dong nhan dien bien so, thanh toan online. Tat ca trong mot
-              nen tang duy nhat.
+              Theo dõi trạng thái, tự động nhận diện biển số, thanh toán online. Tất cả trong một nền tảng duy nhất.
             </p>
             <div className="hero-ctas reveal-up delay-2">
               <button className="btn btn-accent btn-lg" onClick={handleDashboard}>
-                Vao Dashboard
+                Vào Dashboard
                 <svg
                   width="18"
                   height="18"
@@ -362,26 +360,26 @@ export default function LandingPage() {
                 </svg>
               </button>
               <button className="btn btn-outline btn-lg" onClick={() => navigate("/public-slots")}>
-                Xem slot trong
+                Xem slot trống
               </button>
             </div>
             <div className="hero-metrics reveal-up delay-3">
               <div className="hero-metric">
                 <span className="hero-metric-num" data-count={liveStats.total || 72}>0</span>
                 <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Tong slot</span>
+                <span className="hero-metric-label">Tổng slot</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
                 <span className="hero-metric-num" data-count={liveStats.available || 72}>0</span>
                 <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Slot trong</span>
+                <span className="hero-metric-label">Slot trống</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
                 <span className="hero-metric-num" data-count={liveStats.occupied || 0}>0</span>
                 <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Xe dang do</span>
+                <span className="hero-metric-label">Xe đang đỗ</span>
               </div>
             </div>
           </div>
@@ -389,7 +387,7 @@ export default function LandingPage() {
             <div className="hero-img-wrapper">
               <img
                 src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=640&q=80&auto=format"
-                alt="He thong bai do xe thong minh"
+                alt="Hệ thống bãi đỗ xe thông minh"
                 className="hero-img"
                 loading="eager"
               />
@@ -411,7 +409,7 @@ export default function LandingPage() {
               </span>
               <div>
                 <span className="pill-num">{liveStats.available || 0}</span>
-                <span className="pill-label">cho trong</span>
+                <span className="pill-label">chỗ trống</span>
               </div>
             </div>
             <div className="hero-float-pill pill-2 reveal-up delay-4">
@@ -430,7 +428,7 @@ export default function LandingPage() {
               </span>
               <div>
                 <span className="pill-num">12.5M</span>
-                <span className="pill-label">doanh thu hom nay</span>
+                <span className="pill-label">doanh thu hôm nay</span>
               </div>
             </div>
             <div className="hero-float-pill pill-3 reveal-up delay-4">
@@ -451,18 +449,18 @@ export default function LandingPage() {
               </span>
               <div>
                 <span className="pill-num">{liveStats.occupied || 0}</span>
-                <span className="pill-label">xe dang do</span>
+                <span className="pill-label">xe đang đỗ</span>
               </div>
             </div>
           </div>
         </div>
         <div className="container trusted-strip reveal-up delay-3">
-          <span className="trusted-label">Truy cap nhanh</span>
+          <span className="trusted-label">Truy cập nhanh</span>
           <div className="trusted-logos">
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/parking-info")}>Bai do xe</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/public-slots")}>Xem slot trong</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/login")}>Dang nhap</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/register")}>Dang ky</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/parking-info")}>Bãi đỗ xe</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/public-slots")}>Xem slot trống</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/login")}>Đăng nhập</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/register")}>Đăng ký</span>
           </div>
         </div>
       </section>
@@ -478,7 +476,7 @@ export default function LandingPage() {
         </div>
         <div className="container">
           <h2 className="section-title reveal-up">
-            Moi thu ban can de van hanh hieu qua
+            Mọi thứ bạn cần để vận hành hiệu quả
           </h2>
           <div className="bento reveal-up delay-1">
             <div className="bento-cell bento-wide bento-has-img" data-tilt="">
@@ -498,15 +496,15 @@ export default function LandingPage() {
                     <rect x="14" y="14" width="7" height="7" rx="1.5" />
                   </svg>
                 </div>
-                <h3>Quan ly cho do realtime</h3>
+                <h3>Quản lý chỗ đỗ realtime</h3>
                 <p>
-                  Theo doi trang thai tung vi tri do xe theo thoi gian thuc voi ban do truc quan.
+                  Theo dõi trạng thái từng vị trí đỗ xe theo thời gian thực với bản đồ trực quan.
                 </p>
               </div>
               <div className="bento-img-box">
                 <img
                   src="https://images.unsplash.com/photo-1611348586804-61bf6c080437?w=480&q=80&auto=format"
-                  alt="Ban do bai do xe"
+                  alt="Bản đồ bãi đỗ xe"
                   loading="lazy"
                 />
               </div>
@@ -526,12 +524,12 @@ export default function LandingPage() {
                   <path d="M2 12l10 5 10-5" />
                 </svg>
               </div>
-              <h3>Nhan dien bien so AI</h3>
-              <p>Tu dong doc bien so xe bang AI, giam thao tac thu cong.</p>
+              <h3>Nhận diện biển số AI</h3>
+              <p>Tự động đọc biển số xe bằng AI, giảm thao tác thủ công.</p>
               <div className="bento-img-small">
                 <img
                   src="https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=320&q=80&auto=format"
-                  alt="Camera nhan dien bien so"
+                  alt="Camera nhận diện biển số"
                   loading="lazy"
                 />
               </div>
@@ -551,8 +549,8 @@ export default function LandingPage() {
                   <path d="M18 12a2 2 0 000 4h4v-4h-4z" />
                 </svg>
               </div>
-              <h3>Thanh toan online</h3>
-              <p>VNPay, MoMo, ZaloPay tich hop san.</p>
+              <h3>Thanh toán online</h3>
+              <p>VNPay, MoMo, ZaloPay tích hợp sẵn.</p>
             </div>
             <div className="bento-cell" data-tilt="">
               <div className="bento-icon orange">
@@ -567,8 +565,8 @@ export default function LandingPage() {
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
               </div>
-              <h3>Bao cao thong minh</h3>
-              <p>Dashboard truc quan voi bieu do doanh thu va hieu suat.</p>
+              <h3>Báo cáo thông minh</h3>
+              <p>Dashboard trực quan với biểu đồ doanh thu và hiệu suất.</p>
             </div>
             <div className="bento-cell bento-wide bento-has-img" data-tilt="">
               <div className="bento-text">
@@ -585,9 +583,9 @@ export default function LandingPage() {
                     <path d="M13.73 21a2 2 0 01-3.46 0" />
                   </svg>
                 </div>
-                <h3>Thong bao va canh bao</h3>
+                <h3>Thông báo và cảnh báo</h3>
                 <p>
-                  Canh bao tuc thi khi bai sap day, xe qua han, hoac phat sinh su co.
+                  Cảnh báo tức thì khi bãi sắp đầy, xe quá hạn, hoặc phát sinh sự cố.
                 </p>
               </div>
               <div className="bento-img-box">
@@ -612,40 +610,40 @@ export default function LandingPage() {
           />
         </div>
         <div className="container">
-          <h2 className="section-title reveal-up">Don gian chi voi 3 buoc</h2>
+          <h2 className="section-title reveal-up">Đơn giản chỉ với 3 bước</h2>
           <div className="steps-track reveal-up delay-1">
             <div className="step-card">
               <div className="step-num">01</div>
-              <h3>Dang ky tai khoan</h3>
-              <p>Tao tai khoan mien phi trong 2 phut, khong can the tin dung.</p>
+              <h3>Đăng ký tài khoản</h3>
+              <p>Tạo tài khoản miễn phí trong 2 phút, không cần thẻ tín dụng.</p>
               <div className="step-img">
                 <img
                   src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&q=80&auto=format"
-                  alt="Dang ky tai khoan"
+                  alt="Đăng ký tài khoản"
                   loading="lazy"
                 />
               </div>
             </div>
             <div className="step-card">
               <div className="step-num">02</div>
-              <h3>Cai dat bai do xe</h3>
-              <p>Nhap so do bai, so tang, so cho. He thong tu tao ban do.</p>
+              <h3>Cài đặt bãi đỗ xe</h3>
+              <p>Nhập sơ đồ bãi, số tầng, số chỗ. Hệ thống tự tạo bản đồ.</p>
               <div className="step-img">
                 <img
                   src="https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=400&q=80&auto=format"
-                  alt="Cai dat bai do xe"
+                  alt="Cài đặt bãi đỗ xe"
                   loading="lazy"
                 />
               </div>
             </div>
             <div className="step-card">
               <div className="step-num">03</div>
-              <h3>Bat dau van hanh</h3>
-              <p>Moi thu tu dong. Xe vao, xe ra, thanh toan, bao cao.</p>
+              <h3>Bắt đầu vận hành</h3>
+              <p>Mọi thứ tự động. Xe vào, xe ra, thanh toán, báo cáo.</p>
               <div className="step-img">
                 <img
                   src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80&auto=format"
-                  alt="Dashboard van hanh"
+                  alt="Dashboard vận hành"
                   loading="lazy"
                 />
               </div>
@@ -660,7 +658,7 @@ export default function LandingPage() {
           <div className="showcase-inner reveal-up">
             <img
               src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1400&q=80&auto=format"
-              alt="Bai do xe hien dai"
+              alt="Bãi đỗ xe hiện đại"
               loading="lazy"
               className="showcase-img"
             />
@@ -668,7 +666,7 @@ export default function LandingPage() {
               <div className="showcase-stat">
                 <span className="showcase-stat-num">500+</span>
                 <span className="showcase-stat-label">
-                  Bai do xe dang su dung ParkSmart tren toan quoc
+                  Bãi đỗ xe đang sử dụng ParkSmart trên toàn quốc
                 </span>
               </div>
             </div>
@@ -676,141 +674,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING */}
-      <section className="pricing" id="pricing">
-        <div className="container">
-          <h2 className="section-title reveal-up">Bang gia minh bach</h2>
-          <p className="section-sub reveal-up delay-1">
-            Bat dau mien phi, nang cap khi can.
-          </p>
-          <div className="pricing-grid reveal-up delay-2">
-            <div className="price-card">
-              <div className="price-head">
-                <h3>Starter</h3>
-                <p>Cho bai nho duoi 50 cho</p>
-              </div>
-              <div className="price-amount">
-                <span className="price-currency">990K</span>
-                <span className="price-period">/thang</span>
-              </div>
-              <ul className="price-list">
-                <li className="yes">Toi da 50 cho do</li>
-                <li className="yes">Dashboard co ban</li>
-                <li className="yes">Bao cao hang tuan</li>
-                <li className="no">Nhan dien bien so AI</li>
-                <li className="no">API tich hop</li>
-              </ul>
-              <button className="btn btn-outline btn-full" onClick={handleRegister}>
-                Bat dau mien phi
-              </button>
-            </div>
-            <div className="price-card popular">
-              <div className="price-popular-tag">Pho bien nhat</div>
-              <div className="price-head">
-                <h3>Professional</h3>
-                <p>Cho bai trung binh 50-200 cho</p>
-              </div>
-              <div className="price-amount">
-                <span className="price-currency">2.5M</span>
-                <span className="price-period">/thang</span>
-              </div>
-              <ul className="price-list">
-                <li className="yes">Toi da 200 cho do</li>
-                <li className="yes">Dashboard nang cao</li>
-                <li className="yes">Bao cao realtime</li>
-                <li className="yes">Nhan dien bien so AI</li>
-                <li className="no">API tich hop</li>
-              </ul>
-              <button className="btn btn-accent btn-full" onClick={handleRegister}>
-                Chon goi nay
-              </button>
-            </div>
-            <div className="price-card">
-              <div className="price-head">
-                <h3>Enterprise</h3>
-                <p>Cho chuoi bai do xe lon</p>
-              </div>
-              <div className="price-amount">
-                <span className="price-currency">Lien he</span>
-                <span className="price-period"></span>
-              </div>
-              <ul className="price-list">
-                <li className="yes">Khong gioi han cho do</li>
-                <li className="yes">Dashboard tuy chinh</li>
-                <li className="yes">Bao cao realtime</li>
-                <li className="yes">Nhan dien bien so AI</li>
-                <li className="yes">API tich hop day du</li>
-              </ul>
-              <button className="btn btn-outline btn-full" onClick={handleRegister}>
-                Lien he tu van
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* TESTIMONIALS */}
-      <section className="testimonials" id="testimonials">
-        <div className="container">
-          <h2 className="section-title reveal-up">Khach hang noi gi</h2>
-          <div className="testimonials-grid reveal-up delay-1">
-            <div className="testi-card">
-              <p>
-                &ldquo;ParkSmart giup chung toi tang 40% hieu suat van hanh trong 3 thang dau
-                tien.&rdquo;
-              </p>
-              <div className="testi-author">
-                <img
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&q=80&auto=format"
-                  alt="Nguyen Thanh"
-                  className="testi-avatar-img"
-                  loading="lazy"
-                />
-                <div>
-                  <strong>Nguyen Thanh</strong>
-                  <span>Quan ly bai xe Times City</span>
-                </div>
-              </div>
-            </div>
-            <div className="testi-card">
-              <p>
-                &ldquo;Giao dien de su dung, nhan vien chi can 30 phut de lam quen. Thanh toan
-                online rat tien.&rdquo;
-              </p>
-              <div className="testi-author">
-                <img
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&q=80&auto=format"
-                  alt="Le Hoang"
-                  className="testi-avatar-img"
-                  loading="lazy"
-                />
-                <div>
-                  <strong>Le Hoang</strong>
-                  <span>CEO ParkingVN</span>
-                </div>
-              </div>
-            </div>
-            <div className="testi-card">
-              <p>
-                &ldquo;Tu khi dung ParkSmart, so luong khieu nai cua khach giam 70%. He thong on
-                dinh, support tot.&rdquo;
-              </p>
-              <div className="testi-author">
-                <img
-                  src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&q=80&auto=format"
-                  alt="Pham Trang"
-                  className="testi-avatar-img"
-                  loading="lazy"
-                />
-                <div>
-                  <strong>Pham Trang</strong>
-                  <span>Giam doc Van hanh, Vinhomes</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* CTA */}
       <section className="cta-section">
@@ -822,10 +686,10 @@ export default function LandingPage() {
           />
         </div>
         <div className="container cta-inner reveal-up">
-          <h2>San sang nang cap bai do xe cua ban?</h2>
-          <p>Dung thu mien phi 14 ngay, khong can the tin dung.</p>
+          <h2>Sẵn sàng nâng cấp bãi đỗ xe của bạn?</h2>
+          <p>Dùng thử miễn phí 14 ngày, không cần thẻ tín dụng.</p>
           <button className="btn btn-accent btn-lg" onClick={handleRegister}>
-            Bat dau ngay
+            Bắt đầu ngay
             <svg
               width="18"
               height="18"
@@ -850,23 +714,22 @@ export default function LandingPage() {
               <span className="nav-logo-mark">P</span>
               <span className="nav-logo-text">ParkSmart</span>
             </a>
-            <p>Giai phap quan ly bai do xe thong minh hang dau Viet Nam.</p>
+            <p>Giải pháp quản lý bãi đỗ xe thông minh hàng đầu Việt Nam.</p>
           </div>
           <div className="footer-col">
-            <h4>San pham</h4>
-            <a href="#features">Tinh nang</a>
-            <a href="#pricing">Bang gia</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Thong tin bai do</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trong</a>
+            <h4>Sản phẩm</h4>
+            <a href="#features">Tính năng</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Thông tin bãi đỗ</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
           </div>
           <div className="footer-col">
-            <h4>Tai khoan</h4>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>Dang nhap</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/register"); }}>Dang ky</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/forgot-password"); }}>Quen mat khau</a>
+            <h4>Tài khoản</h4>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>Đăng nhập</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/register"); }}>Đăng ký</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/forgot-password"); }}>Quên mật khẩu</a>
           </div>
           <div className="footer-col">
-            <h4>Lien he</h4>
+            <h4>Liên hệ</h4>
             <a href="#">parking@fpt.edu.vn</a>
             <a href="#">0900 000 010</a>
             <a href="#">FPT University HCM</a>
