@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, Mail, MailCheck, RefreshCw } from "lucide-react";
 import { authApi } from "../../api/auth/authApi";
-import BrandLogo from "./BrandLogo";
-import PublicBackLink from "./PublicBackLink";
+import { usePublicTheme } from "../../utils/publicTheme";
+import "../../assets/css/landing.css";
+import "../../assets/css/auth.css";
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
+  const { dark, toggle, className: themeClass } = usePublicTheme();
   const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -18,299 +19,182 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const handleSendOtp = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-    setMessage("");
-
+  const handleSendOtp = async (e) => {
+    e.preventDefault(); setLoading(true); setError(""); setMessage("");
     try {
       await authApi.forgotPassword({ email });
-      setMessage("Ma OTP da duoc gui qua email cua ban.");
+      setMessage("Mã OTP đã được gửi qua email của bạn.");
       setStep("reset");
-    } catch (err) {
-      setError(err.response?.data?.message || "Khong gui duoc OTP. Vui long kiem tra email.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || "Không gửi được OTP."); }
+    finally { setLoading(false); }
   };
 
   const handleResendOtp = async () => {
-    setResending(true);
-    setError("");
-
+    setResending(true); setError("");
     try {
       await authApi.forgotPassword({ email });
-      setMessage("Da gui lai ma OTP moi. Vui long kiem tra email.");
-    } catch (err) {
-      setError(err.response?.data?.message || "Khong gui lai duoc OTP.");
-    } finally {
-      setResending(false);
-    }
+      setMessage("Đã gửi lại mã OTP mới.");
+    } catch (err) { setError(err.response?.data?.message || "Không gửi lại được OTP."); }
+    finally { setResending(false); }
   };
 
-  const handleResetPassword = async (event) => {
-    event.preventDefault();
-    setLoading(true);
-    setError("");
-
-    if (newPassword !== confirmPassword) {
-      setError("Mat khau xac nhan khong khop.");
-      setLoading(false);
-      return;
-    }
-
+  const handleResetPassword = async (e) => {
+    e.preventDefault(); setLoading(true); setError("");
+    if (newPassword !== confirmPassword) { setError("Mật khẩu xác nhận không khớp."); setLoading(false); return; }
     try {
-      await authApi.resetPassword({
-        email,
-        otp,
-        newPassword,
-        confirmPassword,
-      });
+      await authApi.resetPassword({ email, otp, newPassword, confirmPassword });
       setStep("success");
-    } catch (err) {
-      setError(err.response?.data?.message || "Dat lai mat khau that bai.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.response?.data?.message || "Đặt lại mật khẩu thất bại."); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#f8fafc] px-6 py-10 text-[#1b1b1d] dark:bg-[#0b1120] dark:text-[#e5eef9]">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-[1120px] flex-col">
-        <div className="flex items-center justify-between gap-4">
-          <BrandLogo size="hero" />
-          <PublicBackLink />
+    <div className={`auth-layout ${themeClass}`}>
+      {/* LEFT */}
+      <div className="auth-left">
+        <div className="auth-brand" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <a href="/" className="nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+            <span className="nav-logo-mark">P</span>
+            <span className="nav-logo-text">ParkSmart</span>
+          </a>
+          <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+            {dark ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            )}
+          </button>
         </div>
 
-        <div className="grid flex-1 items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
-          {/* Left panel */}
-          <section className="hidden lg:block">
-            <div className="rounded-[28px] border border-slate-200 bg-white/90 p-8 shadow-[0_26px_60px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
-              <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
-                <KeyRound size={34} />
-              </div>
-              <h1 className="text-4xl font-bold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
-                {step === "success" ? "Hoan tat!" : "Quen mat khau?"}
-              </h1>
-              <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-200">
-                {step === "email"
-                  ? "Nhap email da dang ky. Chung toi se gui ma OTP 6 so de dat lai mat khau."
-                  : step === "reset"
-                    ? "Nhap ma OTP tu email va mat khau moi cua ban."
-                    : "Mat khau da duoc dat lai. Ban co the dang nhap ngay."}
-              </p>
-              <div className="mt-8 space-y-3">
-                {["1. Nhap email da dang ky", "2. Nhan ma OTP qua email", "3. Nhap OTP va mat khau moi"].map(
-                  (text, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-center gap-3 rounded-xl p-3 text-sm font-medium transition-colors ${
-                        (step === "email" && i === 0) ||
-                        (step === "reset" && i === 1) ||
-                        (step === "success" && i === 2)
-                          ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200"
-                          : "text-slate-500 dark:text-slate-400"
-                      }`}
-                    >
-                      {text}
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          </section>
+        <div className="auth-form-wrapper">
+          {/* STEP: EMAIL */}
+          {step === "email" && (
+            <>
+              <h1>Quên mật khẩu?</h1>
+              <p className="auth-subtitle">Nhập email đã đăng ký để nhận mã OTP đặt lại mật khẩu.</p>
 
-          {/* Right panel */}
-          <section className="mx-auto w-full max-w-[560px]">
-            {/* Step 1: Enter email */}
-            {step === "email" && (
-              <form
-                onSubmit={handleSendOtp}
-                className="space-y-6 rounded-[28px] border border-slate-200 bg-white/96 p-8 shadow-[0_26px_60px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/5 dark:shadow-none sm:p-10"
-              >
-                <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">
-                    Buoc 1/2
-                  </p>
-                  <h2 className="text-3xl font-bold text-slate-950 dark:text-white">Nhap email cua ban</h2>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
-                    Chung toi se gui ma OTP 6 so qua email da dang ky.
-                  </p>
+              {error && <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "rgba(255,77,77,0.1)", border: "1px solid rgba(255,77,77,0.25)", color: "var(--danger)", fontSize: "0.85rem" }}>{error}</div>}
+
+              <form className="auth-form" onSubmit={handleSendOtp}>
+                <div className="form-group">
+                  <label htmlFor="email">Email</label>
+                  <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" />
                 </div>
-
-                {error && (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label htmlFor="forgot-email" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="forgot-email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 text-base text-slate-900 outline-none transition-all focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || !email}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#4f46e5] text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? "Dang gui..." : "Gui ma OTP"}
-                  {!loading && <ArrowRight size={16} />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate("/login")}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
-                >
-                  <ArrowLeft size={16} />
-                  Quay lai dang nhap
+                <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading || !email}>
+                  {loading ? "Đang gửi..." : "Gửi mã OTP"}
                 </button>
               </form>
-            )}
 
-            {/* Step 2: Enter OTP + new password */}
-            {step === "reset" && (
-              <form
-                onSubmit={handleResetPassword}
-                className="space-y-6 rounded-[28px] border border-slate-200 bg-white/96 p-8 shadow-[0_26px_60px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/5 dark:shadow-none sm:p-10"
-              >
-                <div>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">
-                    Buoc 2/2
-                  </p>
-                  <h2 className="text-3xl font-bold text-slate-950 dark:text-white">Dat lai mat khau</h2>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
-                    {message || "Nhap ma OTP da gui qua email va mat khau moi."}
-                  </p>
+              <p className="auth-footer-text" style={{ marginTop: 20 }}>
+                <button type="button" className="text-link" onClick={() => navigate("/login")}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}>
+                  ← Quay lại đăng nhập
+                </button>
+              </p>
+            </>
+          )}
+
+          {/* STEP: RESET */}
+          {step === "reset" && (
+            <>
+              <h1>Đặt lại mật khẩu</h1>
+              <p className="auth-subtitle">{message || "Nhập mã OTP từ email và mật khẩu mới."}</p>
+
+              {error && <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "rgba(255,77,77,0.1)", border: "1px solid rgba(255,77,77,0.25)", color: "var(--danger)", fontSize: "0.85rem" }}>{error}</div>}
+
+              <form className="auth-form" onSubmit={handleResetPassword}>
+                <div className="form-group">
+                  <label htmlFor="otp">Mã OTP</label>
+                  <input id="otp" required inputMode="numeric" maxLength={6} value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="123456" style={{ textAlign: "center", fontSize: "1.4rem", fontWeight: 700, letterSpacing: "0.3em", fontFamily: "'JetBrains Mono', monospace" }} />
                 </div>
-
-                {error && (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label htmlFor="reset-otp" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Ma OTP
-                  </label>
-                  <div className="relative">
-                    <MailCheck size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="reset-otp"
-                      required
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      placeholder="123456"
-                      className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 text-center text-2xl font-bold tracking-[0.35em] text-slate-900 outline-none transition-all focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="reset-new-pw" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Mat khau moi
-                  </label>
-                  <div className="relative">
-                    <LockKeyhole size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="reset-new-pw"
-                      type={showPw ? "text" : "password"}
-                      required
-                      minLength={6}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Mat khau moi (it nhat 6 ky tu)"
-                      className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 pr-12 text-base text-slate-900 outline-none transition-all focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPw((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-                    >
-                      {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
+                <div className="form-group">
+                  <label htmlFor="newPw">Mật khẩu mới</label>
+                  <div className="input-password">
+                    <input id="newPw" type={showPw ? "text" : "password"} required minLength={6} value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)} placeholder="Ít nhất 6 ký tự" />
+                    <button type="button" className="toggle-pw" onClick={() => setShowPw((v) => !v)}>
+                      {showPw ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
                     </button>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="reset-confirm-pw" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                    Xac nhan mat khau
-                  </label>
-                  <div className="relative">
-                    <LockKeyhole size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      id="reset-confirm-pw"
-                      type={showPw ? "text" : "password"}
-                      required
-                      minLength={6}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Nhap lai mat khau moi"
-                      className="h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pl-11 text-base text-slate-900 outline-none transition-all focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/10 dark:border-white/10 dark:bg-slate-900/60 dark:text-white dark:placeholder:text-slate-400"
-                    />
-                  </div>
+                <div className="form-group">
+                  <label htmlFor="confirmPw">Xác nhận mật khẩu</label>
+                  <input id="confirmPw" type={showPw ? "text" : "password"} required minLength={6} value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu mới"
+                    style={confirmPassword && confirmPassword !== newPassword ? { borderColor: "var(--danger)" } : {}} />
+                  {confirmPassword && confirmPassword !== newPassword && (
+                    <p style={{ fontSize: "0.78rem", color: "var(--danger)", marginTop: 4 }}>Mật khẩu không khớp.</p>
+                  )}
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || otp.length !== 6 || !newPassword || !confirmPassword}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#4f46e5] text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? "Dang xu ly..." : "Dat lai mat khau"}
-                  {!loading && <ArrowRight size={16} />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={resending}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
-                >
-                  <RefreshCw size={16} className={resending ? "animate-spin" : ""} />
-                  {resending ? "Dang gui..." : "Gui lai ma OTP"}
+                <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading || otp.length !== 6 || !newPassword || !confirmPassword}>
+                  {loading ? "Đang xử lý..." : "Đặt lại mật khẩu"}
                 </button>
               </form>
-            )}
 
-            {/* Step 3: Success */}
-            {step === "success" && (
-              <div className="space-y-6 rounded-[28px] border border-slate-200 bg-white/96 p-8 shadow-[0_26px_60px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/5 dark:shadow-none sm:p-10 text-center">
-                <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-                  <LockKeyhole size={36} />
-                </div>
-                <h2 className="text-3xl font-bold text-slate-950 dark:text-white">Dat lai mat khau thanh cong!</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-200">
-                  Ban co the dang nhap bang mat khau moi.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/login")}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#4f46e5] text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:opacity-95"
-                >
-                  Dang nhap ngay
-                  <ArrowRight size={16} />
+              <p className="auth-footer-text" style={{ marginTop: 16 }}>
+                <button type="button" className="text-link" onClick={handleResendOtp} disabled={resending}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}>
+                  {resending ? "Đang gửi..." : "Gửi lại mã OTP"}
                 </button>
+              </p>
+            </>
+          )}
+
+          {/* STEP: SUCCESS */}
+          {step === "success" && (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--accent-dim)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "1.5rem" }}>✓</div>
+              <h1>Đặt lại thành công!</h1>
+              <p className="auth-subtitle">Mật khẩu đã được đổi. Bạn có thể đăng nhập ngay.</p>
+              <button className="btn btn-accent btn-full btn-lg" onClick={() => navigate("/login")} style={{ marginTop: 20 }}>
+                Đăng nhập ngay
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT */}
+      <div className="auth-right">
+        <div className="auth-illustration">
+          <div className="auth-stat-block">
+            <div className="auth-stat-header"><h3>Hướng dẫn</h3></div>
+            <div className="auth-activity-list">
+              {[
+                { icon: "1", color: step === "email" ? "var(--accent)" : "#60a5fa", text: "Nhập email đã đăng ký", time: "Bước 1" },
+                { icon: "2", color: step === "reset" ? "var(--accent)" : "#60a5fa", text: "Nhận mã OTP qua email", time: "Bước 2" },
+                { icon: "3", color: step === "success" ? "var(--accent)" : "#60a5fa", text: "Nhập OTP và mật khẩu mới", time: "Bước 3" },
+              ].map((item, i) => (
+                <div key={i} className="auth-activity-item" style={
+                  (step === "email" && i === 0) || (step === "reset" && i === 1) || (step === "success" && i === 2)
+                    ? { borderColor: "var(--accent)", borderWidth: 1, borderStyle: "solid" } : {}
+                }>
+                  <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
+                  <div><strong>{item.text}</strong><small>{item.time}</small></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="auth-stat-block" style={{ marginTop: 16 }}>
+            <div className="auth-stat-header"><h3>Bảo mật</h3></div>
+            <div className="auth-activity-list">
+              <div className="auth-activity-item">
+                <span className="auth-activity-icon" style={{ background: "rgba(0,230,118,0.12)", color: "var(--accent)" }}>🔒</span>
+                <div><strong>Mã OTP hết hạn sau 10 phút</strong><small>An toàn</small></div>
               </div>
-            )}
-          </section>
+              <div className="auth-activity-item">
+                <span className="auth-activity-icon" style={{ background: "rgba(96,165,250,0.12)", color: "#60a5fa" }}>🛡</span>
+                <div><strong>Mật khẩu mã hóa BCrypt</strong><small>Bảo mật</small></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
