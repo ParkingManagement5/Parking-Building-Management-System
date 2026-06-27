@@ -348,11 +348,13 @@ export default function GatePage() {
 
   async function handleQrEntry() {
     if (!entryForm.qrCode.trim()) return;
+    if (!entryForm.licensePlate.trim()) { setLookup({ loading: false, error: "Nhap bien so xe de xac minh truoc khi xu ly QR.", notice: "", vehicle: null }); return; }
     if (!selectedEntryGate) { setLookup({ loading: false, error: "Chon cong vao.", notice: "", vehicle: null }); return; }
     setLookup((p) => ({ ...p, loading: true, error: "" }));
     try {
       const res = await sessionApi.entry({
         gateId: Number(entryGateId), entryMode: "BOOKING", qrToken: entryForm.qrCode.trim(),
+        licensePlate: entryForm.licensePlate.trim(),
         staffUserId: Number(localStorage.getItem("userId")) || null,
       });
       const p = unwrapApiData(res.data, null);

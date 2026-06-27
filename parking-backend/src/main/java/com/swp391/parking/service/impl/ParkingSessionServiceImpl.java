@@ -115,6 +115,19 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "QR da bi thay the boi token moi. Dung QR moi nhat.");
         }
 
+        // Verify biển số xe khớp với booking
+        String bookingPlate = booking.getVehicle().getLicensePlate();
+        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Thieu bien so xe. Staff can xac minh bien so xe khop voi booking (bien dang ky: " + bookingPlate + ")");
+        }
+        String requestPlate = normalizePlate(request.getLicensePlate());
+        String normalizedBookingPlate = normalizePlate(bookingPlate);
+        if (!requestPlate.equals(normalizedBookingPlate)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Bien so xe khong khop. QR booking cho xe " + bookingPlate + " nhung bien scan la " + request.getLicensePlate());
+        }
+
         // [BR-06b] Xe đang có session chưa hoàn tất → không cho check-in
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 booking.getVehicle().getId(),
