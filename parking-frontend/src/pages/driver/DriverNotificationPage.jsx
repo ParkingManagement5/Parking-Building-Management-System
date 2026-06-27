@@ -111,7 +111,7 @@ export default function DriverNotificationPage() {
           Đánh dấu tất cả đã đọc
         </button>
       </div>
-      <div className="bg-card border border-border rounded-2xl divide-y divide-border">
+      <div className="bg-card border border-border rounded-2xl divide-y divide-border" style={{ minHeight: PAGE_SIZE * 72 }}>
         {paged.map((item) => (
           <div
             key={item.notificationId}
