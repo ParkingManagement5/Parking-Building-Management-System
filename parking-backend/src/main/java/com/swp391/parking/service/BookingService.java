@@ -12,4 +12,5 @@ public interface BookingService {
     BookingResponse confirmBookingAfterPayment(Long bookingId);
     BookingResponse verifyQrToken(String qrToken);
     BookingResponse regenerateQr(Long bookingId, Long currentUserId);
+    List<BookingResponse> searchByPlate(String licensePlate);
 }
