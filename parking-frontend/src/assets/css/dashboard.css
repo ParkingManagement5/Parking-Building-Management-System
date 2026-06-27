@@ -501,6 +501,108 @@ td strong { color: var(--text); font-family: 'JetBrains Mono', monospace; font-s
   color: var(--warning);
 }
 
+/* ========== DASHBOARD LIGHT MODE ========== */
+.ps-light .dash-nav {
+  background: rgba(240,242,245,0.92);
+}
+.ps-light .dash-nav-item {
+  color: var(--text-secondary);
+}
+.ps-light .dash-nav-item:hover {
+  color: var(--text);
+  background: rgba(0,0,0,0.04);
+}
+.ps-light .dash-nav-item.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.ps-light .dash-dropdown {
+  background: var(--bg-card);
+  border-color: var(--border-hover);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.1);
+}
+.ps-light .dash-dropdown a {
+  color: var(--text-secondary);
+}
+.ps-light .dash-dropdown a:hover {
+  background: rgba(0,0,0,0.04);
+  color: var(--text);
+}
+.ps-light .dash-nav-logo {
+  color: var(--text);
+}
+.ps-light .dash-search {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+.ps-light .dash-search input {
+  color: var(--text);
+}
+.ps-light .dash-notif-btn {
+  color: var(--text-muted);
+}
+.ps-light .dash-notif-btn:hover {
+  background: rgba(0,0,0,0.04);
+  color: var(--text);
+}
+.ps-light .dash-user:hover {
+  background: rgba(0,0,0,0.03);
+}
+.ps-light .dash-user-name {
+  color: var(--text);
+}
+.ps-light .dash-user-role {
+  color: var(--text-muted);
+}
+.ps-light .stat-card {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.ps-light .stat-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+.ps-light .chart-card,
+.ps-light .table-card {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+.ps-light th {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.ps-light td {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+.ps-light tr:hover td {
+  background: rgba(0,0,0,0.02);
+}
+.ps-light td strong {
+  color: var(--text);
+}
+.ps-light .chart-tab {
+  color: var(--text-muted);
+}
+.ps-light .chart-tab.active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.ps-light .chart-tabs {
+  background: var(--bg-elevated);
+}
+.ps-light .dash-dropdown-divider {
+  background: var(--border);
+}
+.ps-light .page-header h1 {
+  color: var(--text);
+}
+.ps-light .page-header p {
+  color: var(--text-muted);
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1200px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
