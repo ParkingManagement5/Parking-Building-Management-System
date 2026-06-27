@@ -77,12 +77,6 @@ export default function UnifiedQrScanPage() {
   const [qrCameraActive, setQrCameraActive] = useState(false);
   const [qrToken, setQrToken] = useState("");
   const [qrEntryPlate, setQrEntryPlate] = useState("");
-  const [qrEntryPlatePreview, setQrEntryPlatePreview] = useState("");
-  const [qrEntryOcrScanning, setQrEntryOcrScanning] = useState(false);
-  const [qrEntryOcrConfidence, setQrEntryOcrConfidence] = useState(null);
-  const qrPlateVideoRef = useRef(null);
-  const qrPlateStreamRef = useRef(null);
-  const [qrPlateCameraOn, setQrPlateCameraOn] = useState(false);
   const [qrScanStatus, setQrScanStatus] = useState("Camera off");
   const [qrError, setQrError] = useState("");
 
@@ -394,72 +388,6 @@ export default function UnifiedQrScanPage() {
       } else setQrError("Khong doc duoc QR.");
     } catch { setQrError("Khong doc duoc QR. Thu anh ro hon."); }
     finally { event.target.value = ""; }
-  }
-
-  // ==================== QR PLATE OCR ====================
-  function stopQrPlateCamera() {
-    qrPlateStreamRef.current?.getTracks().forEach((t) => t.stop());
-    qrPlateStreamRef.current = null;
-    setQrPlateCameraOn(false);
-  }
-
-  async function startQrPlateCamera() {
-    if (!navigator.mediaDevices?.getUserMedia) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-      qrPlateStreamRef.current = stream;
-      if (qrPlateVideoRef.current) qrPlateVideoRef.current.srcObject = stream;
-      setQrPlateCameraOn(true);
-    } catch { /* ignore */ }
-  }
-
-  async function captureQrPlate() {
-    const v = qrPlateVideoRef.current;
-    if (!v || v.readyState < 2) return;
-    const sw = v.videoWidth || 1280, sh = v.videoHeight || 720;
-    const cw = Math.round(sw * 0.68), ch = Math.round(sh * 0.36);
-    const cx = Math.round((sw - cw) / 2), cy = Math.round((sh - ch) / 2);
-    const canvas = document.createElement("canvas");
-    canvas.width = cw; canvas.height = ch;
-    canvas.getContext("2d").drawImage(v, cx, cy, cw, ch, 0, 0, cw, ch);
-    const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.92));
-    if (blob) await uploadQrPlateOcr(blob, "qr-plate.jpg");
-  }
-
-  async function handleQrPlateFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadQrPlateOcr(file, file.name);
-    e.target.value = "";
-  }
-
-  async function uploadQrPlateOcr(file, filename) {
-    if (!gateId) return;
-    const url = URL.createObjectURL(file);
-    setQrEntryPlatePreview((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
-    setQrEntryOcrScanning(true);
-    setQrEntryPlate("");
-    setQrEntryOcrConfidence(null);
-    try {
-      const formData = new FormData();
-      formData.append("image", file, filename);
-      formData.append("gateId", gateId);
-      formData.append("triggerType", "ENTRY");
-      const response = await axiosClient.post("/ocr/scan-image", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      const data = response.data?.data || {};
-      const plate = data.effectivePlate || data.detectedPlate || "";
-      const confidence = Math.round((data.plateConfidenceScore || 0) * 100);
-      if (!plate || plate === "UNKNOWN") {
-        setError("OCR khong doc duoc bien so. Thu lai.");
-        return;
-      }
-      setQrEntryPlate(plate);
-      setQrEntryOcrConfidence(confidence);
-    } catch (err) {
-      setError(err.response?.data?.message || "OCR scan that bai.");
-    } finally {
-      setQrEntryOcrScanning(false);
-    }
   }
 
   // ==================== PROCESS ====================
@@ -835,50 +763,22 @@ export default function UnifiedQrScanPage() {
 
                 {qrTokenType === "ENTRY" && (
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
-                    <p className="text-sm font-semibold text-foreground mb-2">Scan bien so xe xac minh</p>
-                    <p className="text-xs text-muted-foreground mb-3">Chup bien so xe thuc te de xac nhan dung xe trong booking.</p>
-
-                    <div className="rounded-2xl bg-slate-950 p-3">
-                      <div className="relative flex min-h-36 items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-slate-900">
-                        <video ref={qrPlateVideoRef} autoPlay playsInline muted
-                          className={`absolute inset-0 size-full object-cover ${qrPlateCameraOn ? "opacity-100" : "opacity-0"}`} />
-                        {qrPlateCameraOn && <div className="pointer-events-none absolute inset-x-[18%] top-1/2 h-14 -translate-y-1/2 rounded-lg border-2 border-emerald-400/80 shadow-[0_0_0_999px_rgba(2,6,23,0.35)]" />}
-                        {qrEntryPlatePreview && !qrPlateCameraOn && <img src={qrEntryPlatePreview} alt="Plate" className="absolute inset-0 size-full object-contain opacity-60" />}
-                        {qrEntryOcrScanning ? (
-                          <div className="relative z-10 text-center">
-                            <div className="mx-auto size-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
-                            <p className="mt-2 text-xs text-emerald-300">Dang nhan dien...</p>
-                          </div>
-                        ) : qrEntryPlate ? (
-                          <div className="relative z-10 rounded-xl border border-emerald-400/30 bg-slate-950/75 px-4 py-3 text-center">
-                            <CheckCircle2 size={20} className="mx-auto text-emerald-300" />
-                            <p className="mt-1 font-mono text-xl font-bold text-white">{qrEntryPlate}</p>
-                            {qrEntryOcrConfidence != null && <p className="text-[11px] text-slate-300">{qrEntryOcrConfidence}%</p>}
-                          </div>
-                        ) : (
-                          <div className="relative z-10 text-center">
-                            <Camera size={28} className="mx-auto text-white/30" />
-                            <p className="mt-1 text-xs text-white/50">Chup bien so xe</p>
-                          </div>
-                        )}
+                    <p className="text-sm font-semibold text-foreground mb-2">Xac minh bien so xe</p>
+                    {ocrPlate ? (
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                        <p className="text-sm text-foreground">Bien so tu OCR: <span className="font-mono font-bold">{ocrPlate}</span></p>
+                        <StaffSecondaryButton type="button" onClick={() => setQrEntryPlate(ocrPlate)} className="text-xs px-2.5 py-1">
+                          Dung bien nay
+                        </StaffSecondaryButton>
                       </div>
-                    </div>
-
-                    <div className="mt-3 grid gap-2 grid-cols-4">
-                      <StaffSecondaryButton type="button" onClick={qrPlateCameraOn ? stopQrPlateCamera : startQrPlateCamera} className="flex items-center justify-center gap-1.5 text-xs">
-                        {qrPlateCameraOn ? <VideoOff size={13} /> : <Video size={13} />} {qrPlateCameraOn ? "Stop" : "Camera"}
-                      </StaffSecondaryButton>
-                      <StaffPrimaryButton type="button" onClick={captureQrPlate} disabled={!qrPlateCameraOn || qrEntryOcrScanning} className="flex items-center justify-center gap-1.5 text-xs">
-                        <Camera size={13} /> Chup
-                      </StaffPrimaryButton>
-                      <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition hover:bg-muted">
-                        <ImageUp size={13} /> Upload
-                        <input type="file" accept="image/*" className="sr-only" onChange={handleQrPlateFile} />
-                      </label>
-                      <StaffSecondaryButton type="button" onClick={() => { setQrEntryPlate(""); setQrEntryPlatePreview((p) => { if (p) URL.revokeObjectURL(p); return ""; }); setQrEntryOcrConfidence(null); stopQrPlateCamera(); }} className="flex items-center justify-center gap-1.5 text-xs">
-                        <RefreshCw size={13} /> Reset
-                      </StaffSecondaryButton>
-                    </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mb-2">Scan OCR truoc (tab OCR Scan) hoac nhap thu cong.</p>
+                    )}
+                    <StaffInput value={qrEntryPlate}
+                      onChange={(e) => setQrEntryPlate(e.target.value)}
+                      placeholder="Bien so xe (scan OCR truoc hoac nhap tay)"
+                      className="mt-2" />
                   </div>
                 )}
 
