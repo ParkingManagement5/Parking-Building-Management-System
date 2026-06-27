@@ -306,7 +306,7 @@ export default function LandingPage() {
               Đăng nhập
             </button>
             <button className="btn btn-accent" onClick={handleRegister}>
-              Bắt đầu miễn phí
+              Đăng ký
             </button>
           </div>
           <button
