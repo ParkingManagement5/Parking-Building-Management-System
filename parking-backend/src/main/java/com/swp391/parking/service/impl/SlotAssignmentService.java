@@ -30,8 +30,7 @@ public class SlotAssignmentService {
      * @param slotSize   VehicleType.SlotSize (SMALL/MEDIUM/LARGE)
      */
     public ParkingSlot assignBestSlot(Long buildingId, VehicleType.SlotSize slotSize) {
-        // Map VehicleType.SlotSize → ParkingSlot.SlotSize (cùng tên enum, khác class)
-        ParkingSlot.SlotSize targetSize = ParkingSlot.SlotSize.valueOf(slotSize.name());
+        String targetSize = slotSize.name();
 
         List<ParkingSlot> candidates;
         if (buildingId != null) {
