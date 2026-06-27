@@ -31,10 +31,10 @@
 
 /* ========== LIGHT MODE ========== */
 .ps-light {
-  --bg:          #fafafa;
-  --bg-elevated: #ffffff;
+  --bg:          #f0f2f5;
+  --bg-elevated: #f8f9fb;
   --bg-card:     #ffffff;
-  --bg-section:  #f5f5f5;
+  --bg-section:  #e8ebef;
   --border:      rgba(0,0,0,0.1);
   --border-hover:rgba(0,0,0,0.18);
   --text:        #111111;
