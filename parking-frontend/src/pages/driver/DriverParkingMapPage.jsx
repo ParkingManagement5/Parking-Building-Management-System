@@ -228,7 +228,7 @@ function EmptyState(){
       <SquareParking className="mx-auto size-10 text-muted-foreground"/>
       <h2 className="mt-4 text-lg font-bold text-foreground">Chua co phien do xe</h2>
       <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">Ban do bai xe se hien thi khi ban dat cho hoac xe vao bai.</p>
-      <button type="button" onClick={()=>navigate("/driver/book-slot")}
+      <button type="button" onClick={()=>navigate("/driver/booking")}
         className="mt-5 inline-flex items-center gap-2 rounded-xl bg-foreground px-5 py-2.5 text-sm font-bold text-background transition hover:opacity-90 active:scale-[0.98]">Dat cho ngay</button>
     </div>
   );
@@ -257,7 +257,7 @@ function DetailPanel({slot,st,session,zone,floor}){
             </div>
           ))}
         </div>
-        {st==="available"&&<button type="button" onClick={()=>navigate("/driver/book-slot")}
+        {st==="available"&&<button type="button" onClick={()=>navigate("/driver/booking")}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]">
           Dat cho nay<ChevronRight size={14}/></button>}
         {mine&&<div className="mt-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 p-3 text-center">
