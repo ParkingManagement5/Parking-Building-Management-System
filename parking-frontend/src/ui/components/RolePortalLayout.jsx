@@ -94,7 +94,7 @@ const CONFIG = {
     navItems: [
       { id: "overview", label: "Overview", icon: LayoutDashboard },
       { id: "scan", label: "Scan", icon: ScanLine },
-      { id: "gate", label: "Gate", icon: DoorOpen },
+      { id: "gate", label: "Map", icon: Grid3x3 },
       { id: "sessions", label: "Sessions", icon: Clock },
       { id: "payments", label: "Payments", icon: CreditCard },
       { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
@@ -111,8 +111,8 @@ const CONFIG = {
         subtitle: "OCR bien so hoac QR code — tu dong phan loai Entry / Exit va chon cong phu hop",
       },
       gate: {
-        title: "Gate",
-        subtitle: "Xu ly xe vao / ra — walk-in, tra cuu xe, exception, xac nhan exit",
+        title: "Parking Map",
+        subtitle: "Giam sat bai xe realtime — slot, xe trong bai, cho thanh toan",
       },
       sessions: {
         title: "Sessions",
