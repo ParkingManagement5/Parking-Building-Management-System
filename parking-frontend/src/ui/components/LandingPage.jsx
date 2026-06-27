@@ -344,7 +344,7 @@ export default function LandingPage() {
             </p>
             <div className="hero-ctas reveal-up delay-2">
               <button className="btn btn-accent btn-lg" onClick={handleDashboard}>
-                Vào Dashboard
+                Đăng nhập
                 <svg
                   width="18"
                   height="18"
