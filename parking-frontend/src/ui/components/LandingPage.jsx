@@ -293,7 +293,6 @@ export default function LandingPage() {
             <a href="#features">Tính năng</a>
             <a href="#how-it-works">Cách hoạt động</a>
             <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
