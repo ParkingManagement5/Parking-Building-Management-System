@@ -97,8 +97,16 @@ public class PaymentController {
     @GetMapping("/{paymentId}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PaymentResponse>> getById(
-            @PathVariable Integer paymentId) {
+            @PathVariable Integer paymentId, Authentication authentication) {
         PaymentResponse response = paymentService.getById(paymentId);
+        boolean isDriver = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
+        if (isDriver) {
+            Long userId = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                    .getUserId().longValue();
+            paymentService.enforcePaymentOwnership(paymentId, userId);
+        }
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -125,7 +133,15 @@ public class PaymentController {
     @GetMapping("/booking/{bookingId}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> getByBookingId(
-            @PathVariable Integer bookingId) {
+            @PathVariable Integer bookingId, Authentication authentication) {
+        boolean isDriver = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
+        if (isDriver) {
+            Long userId = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                    .getUserId().longValue();
+            paymentService.enforceBookingOwnership(bookingId, userId);
+        }
         List<PaymentResponse> response = paymentService.getByBookingId(bookingId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

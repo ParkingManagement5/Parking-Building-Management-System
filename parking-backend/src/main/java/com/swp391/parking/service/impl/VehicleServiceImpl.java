@@ -2,11 +2,13 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.VehicleRequest;
 import com.swp391.parking.entity.Booking;
+import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.BookingRepository;
+import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.repository.VehicleTypeRepository;
@@ -31,6 +33,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleTypeRepository vehicleTypeRepo;
     private final BookingRepository bookingRepo;
     private final ParkingSlotRepository parkingSlotRepo;
+    private final ParkingSessionRepository sessionRepo;
 
     @Override
     public List<Vehicle> getByUser(Integer userId) {
@@ -113,6 +116,15 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional
     public void deactivate(Long id) {
         Vehicle vehicle = getById(id);
+
+        boolean hasActiveSession = sessionRepo.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT));
+        if (hasActiveSession) {
+            throw new AppException(HttpStatus.CONFLICT,
+                    "Xe dang co session chua hoan tat, khong the vo hieu hoa");
+        }
+
         vehicle.setIsActive(false);
         vehicleRepo.save(vehicle);
 
