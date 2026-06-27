@@ -1,5 +1,10 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { buildingApi } from "../../api/manager/buildingApi";
+import { floorApi } from "../../api/manager/floorApi";
+import { zoneApi } from "../../api/manager/zoneApi";
+import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
+import { unwrapApiData } from "../../utils/api";
 import "../../assets/css/landing.css";
 
 export default function LandingPage() {
@@ -7,6 +12,35 @@ export default function LandingPage() {
   const navRef = useRef(null);
   const navLinksRef = useRef(null);
   const mobileBtnRef = useRef(null);
+
+  const [liveStats, setLiveStats] = useState({ available: 0, occupied: 0, total: 0 });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const bRes = await buildingApi.getAll();
+        const buildings = unwrapApiData(bRes.data, []);
+        if (!buildings.length) return;
+        const bid = buildings[0].buildingId || buildings[0].id;
+        const fRes = await floorApi.getByBuilding(bid);
+        const floors = unwrapApiData(fRes.data, []);
+        let allSlots = [];
+        for (const f of floors) {
+          const zRes = await zoneApi.getByFloor(f.floorId || f.id);
+          const zones = unwrapApiData(zRes.data, []);
+          for (const z of zones) {
+            const sRes = await parkingSlotApi.getByZone(z.zoneId || z.id);
+            allSlots = allSlots.concat(unwrapApiData(sRes.data, []));
+          }
+        }
+        setLiveStats({
+          total: allSlots.length,
+          available: allSlots.filter((s) => s.status === "AVAILABLE").length,
+          occupied: allSlots.filter((s) => s.status === "OCCUPIED").length,
+        });
+      } catch {}
+    })();
+  }, []);
 
   // Scroll reveal, nav scroll state, counter animations, tilt, spotlight, parallax
   useEffect(() => {
@@ -256,8 +290,9 @@ export default function LandingPage() {
           <div className="nav-links" id="navLinks" ref={navLinksRef}>
             <a href="#features">Tinh nang</a>
             <a href="#how-it-works">Cach hoat dong</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bai do xe</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trong</a>
             <a href="#pricing">Bang gia</a>
-            <a href="#testimonials">Danh gia</a>
           </div>
           <div className="nav-actions">
             <button className="btn btn-ghost" onClick={handleLogin}>
@@ -317,33 +352,27 @@ export default function LandingPage() {
                   <path d="m12 5 7 7-7 7" />
                 </svg>
               </button>
-              <a href="#how-it-works" className="btn btn-outline btn-lg">
-                Tim hieu them
-              </a>
+              <button className="btn btn-outline btn-lg" onClick={() => navigate("/public-slots")}>
+                Xem slot trong
+              </button>
             </div>
             <div className="hero-metrics reveal-up delay-3">
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count="500">
-                  0
-                </span>
-                <span className="hero-metric-suffix">+</span>
-                <span className="hero-metric-label">Bai do xe</span>
+                <span className="hero-metric-num" data-count={liveStats.total || 72}>0</span>
+                <span className="hero-metric-suffix"></span>
+                <span className="hero-metric-label">Tong slot</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count="50000">
-                  0
-                </span>
-                <span className="hero-metric-suffix">+</span>
-                <span className="hero-metric-label">Xe moi ngay</span>
+                <span className="hero-metric-num" data-count={liveStats.available || 72}>0</span>
+                <span className="hero-metric-suffix"></span>
+                <span className="hero-metric-label">Slot trong</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count="99">
-                  0
-                </span>
-                <span className="hero-metric-suffix">.8%</span>
-                <span className="hero-metric-label">Uptime</span>
+                <span className="hero-metric-num" data-count={liveStats.occupied || 0}>0</span>
+                <span className="hero-metric-suffix"></span>
+                <span className="hero-metric-label">Xe dang do</span>
               </div>
             </div>
           </div>
@@ -372,7 +401,7 @@ export default function LandingPage() {
                 </svg>
               </span>
               <div>
-                <span className="pill-num">128</span>
+                <span className="pill-num">{liveStats.available || 0}</span>
                 <span className="pill-label">cho trong</span>
               </div>
             </div>
@@ -412,20 +441,19 @@ export default function LandingPage() {
                 </svg>
               </span>
               <div>
-                <span className="pill-num">214</span>
+                <span className="pill-num">{liveStats.occupied || 0}</span>
                 <span className="pill-label">xe dang do</span>
               </div>
             </div>
           </div>
         </div>
         <div className="container trusted-strip reveal-up delay-3">
-          <span className="trusted-label">Duoc tin dung boi</span>
+          <span className="trusted-label">Truy cap nhanh</span>
           <div className="trusted-logos">
-            <span className="trust-logo">VinGroup</span>
-            <span className="trust-logo">Sun Group</span>
-            <span className="trust-logo">Novaland</span>
-            <span className="trust-logo">FLC</span>
-            <span className="trust-logo">Masterise</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/parking-info")}>Bai do xe</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/public-slots")}>Xem slot trong</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/login")}>Dang nhap</span>
+            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/register")}>Dang ky</span>
           </div>
         </div>
       </section>
@@ -819,19 +847,20 @@ export default function LandingPage() {
             <h4>San pham</h4>
             <a href="#features">Tinh nang</a>
             <a href="#pricing">Bang gia</a>
-            <a href="#">API Docs</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Thong tin bai do</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trong</a>
           </div>
           <div className="footer-col">
-            <h4>Ho tro</h4>
-            <a href="#">Huong dan</a>
-            <a href="#">FAQ</a>
-            <a href="#">Lien he</a>
+            <h4>Tai khoan</h4>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>Dang nhap</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/register"); }}>Dang ky</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/forgot-password"); }}>Quen mat khau</a>
           </div>
           <div className="footer-col">
             <h4>Lien he</h4>
-            <a href="#">contact@parksmart.vn</a>
-            <a href="#">0909 123 456</a>
-            <a href="#">Ha Noi, Viet Nam</a>
+            <a href="#">parking@fpt.edu.vn</a>
+            <a href="#">0900 000 010</a>
+            <a href="#">FPT University HCM</a>
           </div>
         </div>
         <div className="container footer-bottom">
