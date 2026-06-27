@@ -33,7 +33,7 @@ export default function RegisterPage() {
       await authApi.register({ username: form.username, fullName: form.fullName, email: form.email, phone: form.phone, password: form.password });
       navigate("/verify-email", { state: { username: form.username, email: form.email } });
     } catch (err) {
-      setError(err.response?.data?.message || "Dang ky that bai. Vui long thu lai.");
+      setError(err.response?.data?.message || "Đăng ký that bai. Vui long thu lai.");
     } finally { setLoading(false); }
   };
 
@@ -56,8 +56,8 @@ export default function RegisterPage() {
         </div>
 
         <div className="auth-form-wrapper">
-          <h1>Tao tai khoan</h1>
-          <p className="auth-subtitle">Dang ky de bat dau su dung ParkSmart</p>
+          <h1>Tạo tài khoản</h1>
+          <p className="auth-subtitle">Đăng ký để bắt đầu sử dụng ParkSmart</p>
 
           {error && (
             <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "rgba(255,77,77,0.1)", border: "1px solid rgba(255,77,77,0.25)", color: "var(--danger)", fontSize: "0.85rem" }}>
@@ -72,7 +72,7 @@ export default function RegisterPage() {
                 <input id="username" required value={form.username} onChange={update("username")} placeholder="username" />
               </div>
               <div className="form-group">
-                <label htmlFor="fullName">Ho ten *</label>
+                <label htmlFor="fullName">Họ tên *</label>
                 <input id="fullName" required value={form.fullName} onChange={update("fullName")} placeholder="Nguyen Van A" />
               </div>
             </div>
@@ -83,14 +83,14 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone">So dien thoai</label>
+              <label htmlFor="phone">Số điện thoại</label>
               <input id="phone" value={form.phone} onChange={update("phone")} placeholder="0909 123 456" />
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Mat khau *</label>
+              <label htmlFor="password">Mật khẩu *</label>
               <div className="input-password">
-                <input id="password" type={showPw ? "text" : "password"} required value={form.password} onChange={update("password")} placeholder="Toi thieu 8 ky tu" />
+                <input id="password" type={showPw ? "text" : "password"} required value={form.password} onChange={update("password")} placeholder="Tối thiểu 8 ký tự" />
                 <button type="button" className="toggle-pw" onClick={() => setShowPw((v) => !v)}>
                   {showPw ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -115,9 +115,9 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="confirm">Xac nhan mat khau *</label>
+              <label htmlFor="confirm">Xác nhận mật khẩu *</label>
               <div className="input-password">
-                <input id="confirm" type={showConfirm ? "text" : "password"} required value={form.confirm} onChange={update("confirm")} placeholder="Nhap lai mat khau"
+                <input id="confirm" type={showConfirm ? "text" : "password"} required value={form.confirm} onChange={update("confirm")} placeholder="Nhập lại mật khẩu"
                   style={form.confirm && form.confirm !== form.password ? { borderColor: "var(--danger)" } : {}} />
                 <button type="button" className="toggle-pw" onClick={() => setShowConfirm((v) => !v)}>
                   {showConfirm ? (
@@ -128,20 +128,20 @@ export default function RegisterPage() {
                 </button>
               </div>
               {form.confirm && form.confirm !== form.password && (
-                <p style={{ fontSize: "0.78rem", color: "var(--danger)", marginTop: 4 }}>Mat khau khong khop.</p>
+                <p style={{ fontSize: "0.78rem", color: "var(--danger)", marginTop: 4 }}>Mật khẩu không khớp.</p>
               )}
             </div>
 
             <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading || (!!form.confirm && form.confirm !== form.password)}>
-              {loading ? "Dang tao tai khoan..." : "Dang ky"}
+              {loading ? "Đang tạo tài khoản..." : "Đăng ký"}
             </button>
           </form>
 
           <p className="auth-footer-text">
-            Da co tai khoan?{" "}
+            Đã có tài khoản?{" "}
             <button type="button" className="text-link" onClick={() => navigate("/login")}
               style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}>
-              Dang nhap
+              Đăng nhập
             </button>
           </p>
         </div>
@@ -152,14 +152,14 @@ export default function RegisterPage() {
         <div className="auth-illustration">
           <div className="auth-stat-block">
             <div className="auth-stat-header">
-              <h3>Quyen loi thanh vien</h3>
+              <h3>Quyền lợi thành viên</h3>
             </div>
             <div className="auth-activity-list">
               {[
-                { icon: "✓", color: "var(--accent)", text: "Dat cho truoc, giu slot", time: "Booking" },
-                { icon: "⚡", color: "#60a5fa", text: "Scan QR vao/ra nhanh", time: "QR Code" },
-                { icon: "📱", color: "#a78bfa", text: "Theo doi xe realtime", time: "Tracking" },
-                { icon: "$", color: "#f59e0b", text: "Thanh toan online tien loi", time: "Payment" },
+                { icon: "✓", color: "var(--accent)", text: "Đặt chỗ trước, giữ slot", time: "Booking" },
+                { icon: "⚡", color: "#60a5fa", text: "Scan QR vào/ra nhanh", time: "QR Code" },
+                { icon: "📱", color: "#a78bfa", text: "Theo dõi xe realtime", time: "Tracking" },
+                { icon: "$", color: "#f59e0b", text: "Thanh toán online tiện lợi", time: "Payment" },
               ].map((item, i) => (
                 <div key={i} className="auth-activity-item">
                   <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
@@ -174,7 +174,7 @@ export default function RegisterPage() {
 
           <div className="auth-stat-block" style={{ marginTop: 16 }}>
             <div className="auth-stat-header">
-              <h3>Thong ke</h3>
+              <h3>Thống kê</h3>
               <span className="auth-live-badge"><span className="auth-live-dot" /> Live</span>
             </div>
             <div className="auth-stat-grid">
@@ -184,7 +184,7 @@ export default function RegisterPage() {
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#60a5fa" }}>5</span>
-                <span className="auth-stat-label">Tai khoan</span>
+                <span className="auth-stat-label">Tài khoản</span>
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#f97316" }}>99%</span>
