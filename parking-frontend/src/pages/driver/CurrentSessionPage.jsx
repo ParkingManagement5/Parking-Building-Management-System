@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { AlertCircle, CreditCard, LoaderCircle, Navigation, RefreshCw } from "lucide-react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
@@ -56,238 +56,167 @@ function buildDisplayItems(mySessions, myBookings) {
   return items;
 }
 
-function getHeaderLabel(mode) {
-  if (mode === "EXIT_QR") return "ACTIVE SESSION";
-  if (mode === "WAITING_PAYMENT") return "WAITING PAYMENT";
-  if (mode === "ENTRY_QR") return "BOOKING - CONFIRMED";
-  if (mode === "PENDING_DEPOSIT") return "BOOKING - PENDING PAYMENT";
-  if (mode === "QR_EXPIRED") return "BOOKING - QR EXPIRED";
-  if (mode === "SYNCING") return "SYNCING...";
-  return "BOOKING";
-}
-
-function getBadge(mode) {
-  const map = {
-    EXIT_QR: { color: "bg-emerald-400", label: "Active" },
-    WAITING_PAYMENT: { color: "bg-amber-400", label: "Waiting payment" },
-    ENTRY_QR: { color: "bg-blue-400", label: "Confirmed" },
-    PENDING_DEPOSIT: { color: "bg-amber-400", label: "Pending payment" },
-    QR_EXPIRED: { color: "bg-slate-400", label: "QR Expired" },
-    SYNCING: { color: "bg-slate-400", label: "Syncing" },
-  };
-  return map[mode] || { color: "bg-slate-400", label: "unknown" };
-}
+const BADGE_MAP = {
+  EXIT_QR: { bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Đang đỗ" },
+  WAITING_PAYMENT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
+  ENTRY_QR: { bg: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300", label: "Đã xác nhận" },
+  PENDING_DEPOSIT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ đặt cọc" },
+  QR_EXPIRED: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "QR hết hạn" },
+  SYNCING: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "Đang đồng bộ" },
+};
 
 function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigate, generatingId }) {
   const { displayMode } = item;
   const isSession = item.source === "session";
-  const badge = getBadge(displayMode);
+  const badge = BADGE_MAP[displayMode] || BADGE_MAP.SYNCING;
   const exitQr = exitQrs[item.sessionId] || null;
 
   return (
     <div className="space-y-4">
       {/* Header card */}
-      <div className="rounded-2xl bg-gradient-to-r from-primary to-[#4338CA] p-7 text-white dark:to-[#312E81]">
-        <div className="flex items-start justify-between mb-6">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-600 p-6 text-white dark:border-emerald-500/20 dark:bg-emerald-900">
+        <div className="flex items-start justify-between mb-4 gap-3">
           <div>
-            <p className="text-white/60 text-xs mb-1">{getHeaderLabel(displayMode)}</p>
-            <h2 className="font-bold mb-1 text-[1.375rem]">
-              {item.buildingName || item.parkingBuildingName || "Parking Building"}
-            </h2>
-            <p className="text-white/70 text-sm">
-              {item.zoneName || "Zone"} - {item.slotCode || item.parkingSlotCode || "Slot"}
-            </p>
+            <h2 className="text-lg font-bold">{item.buildingName || item.parkingBuildingName || "Parking Building"}</h2>
+            <p className="text-sm text-white/75 mt-0.5">{item.zoneName || "Zone"} - {item.slotCode || item.parkingSlotCode || "Slot"}</p>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-xs text-white dark:bg-white/10">
-            <span className={`size-1.5 ${badge.color} rounded-full animate-pulse`} />
-            {badge.label}
-          </span>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.bg}`}>{badge.label}</span>
         </div>
-        <div className="text-center mb-6">
+
+        <div className="text-center mb-5">
           {isSession && item.entryTime ? (
             <>
-              <div className="text-5xl font-bold font-mono mb-1">
+              <div className="text-4xl font-bold font-mono">
                 {formatDuration(item.entryTime, item.exitTime || new Date().toISOString())}
               </div>
-              <p className="text-white/60 text-sm">Thoi gian do xe (tu luc vao bai)</p>
+              <p className="text-sm text-white/60 mt-1">Thời gian đỗ xe</p>
             </>
           ) : (
             <>
-              <div className="text-3xl font-bold mb-1">Cho xe vao bai</div>
-              <p className="text-white/60 text-sm">Thoi gian se tinh khi xe vao cong</p>
+              <div className="text-2xl font-bold">Chờ xe vào bãi</div>
+              <p className="text-sm text-white/60 mt-1">Thời gian sẽ tính khi xe vào cổng</p>
             </>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
-            <p className="text-white/60 text-xs">{isSession ? "Entry Time" : "Hen den"}</p>
-            <p className="font-semibold mt-0.5">
-              {isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)}
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
-            <p className="text-white/60 text-xs">{isSession ? "Phi tam tinh" : "Tinh phi"}</p>
-            <p className="font-semibold mt-0.5">
-              {isSession && item.calculatedFee != null ? formatCurrency(item.calculatedFee) : "Tinh khi ra bai"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/10 p-3 dark:bg-white/5">
-            <p className="text-white/60 text-xs">Don gia</p>
-            <p className="font-semibold mt-0.5">
-              {item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/h` : "Theo loai xe"}
-            </p>
-          </div>
+
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          {[
+            [isSession ? "Giờ vào" : "Hẹn đến", isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)],
+            [isSession ? "Phí tạm tính" : "Tính phí", isSession && item.calculatedFee != null ? formatCurrency(item.calculatedFee) : "Tính khi ra bãi"],
+            ["Đơn giá", item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/h` : "Theo loại xe"],
+          ].map(([label, val]) => (
+            <div key={label} className="rounded-xl bg-white/10 p-3">
+              <p className="text-xs text-white/60">{label}</p>
+              <p className="font-semibold mt-0.5">{val}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Vehicle + Slot info */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Vehicle Info</h3>
-          <div className="space-y-2">
-            {[
-              ["Plate", item.licensePlate || item.vehiclePlate || "Vehicle linked"],
-              ["Status", badge.label],
-            ].map(([key, value]) => (
-              <div key={key} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{key}</span>
-                <span className="font-medium text-foreground">{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Slot Info</h3>
-          <div className="space-y-2">
-            {[
-              ["Building", item.buildingName || item.parkingBuildingName || "Parking Building"],
-              ["Floor", item.floorName || "Floor pending"],
-              ["Zone", item.zoneName || "Zone pending"],
-              ["Slot", item.slotCode || item.parkingSlotCode || "Slot pending"],
-            ].map(([key, value]) => (
-              <div key={key} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{key}</span>
-                <span className="font-medium text-foreground">{value}</span>
-              </div>
-            ))}
-          </div>
+      {/* Vehicle + Slot details */}
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
+          {[
+            ["Biển số", item.licensePlate || item.vehiclePlate || "Xe đã liên kết"],
+            ["Tòa nhà", item.buildingName || item.parkingBuildingName || "Parking Building"],
+            ["Trạng thái", badge.label],
+            ["Tầng", item.floorName || "Chờ xác nhận"],
+            ["Khu vực", item.zoneName || "Chờ xác nhận"],
+            ["Chỗ", item.slotCode || item.parkingSlotCode || "Chờ xác nhận"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex justify-between py-1">
+              <span className="text-muted-foreground">{k}</span>
+              <span className="font-medium text-foreground">{v}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Action card */}
-      <div className="bg-card border border-border rounded-2xl p-5 flex flex-col items-center">
+      {/* Action area */}
+      <div className="rounded-2xl border border-border bg-card p-5 flex flex-col items-center">
         <button
           type="button"
           onClick={() => navigate("/driver/parking-map")}
-          className="mb-5 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_26px_rgba(37,99,235,0.28)] transition hover:bg-blue-500"
+          className="mb-5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
         >
-          <Navigation size={16} />
-          Open Parking Map
+          Mở bản đồ bãi xe
         </button>
 
         {displayMode === "WAITING_PAYMENT" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-2">Cho thanh toan</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Xe da ra khoi bai. Staff dang xu ly thanh toan phi do xe.
-            </p>
+            <p className="text-sm font-semibold text-foreground">Chờ thanh toán</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Xe đã ra khỏi bãi. Staff đang xử lý thanh toán.</p>
             <button type="button" onClick={() => navigate("/driver/payments")}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-              <CreditCard size={14} /> Xem lich su thanh toan
-            </button>
+              className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Xem lịch sử thanh toán</button>
           </>
         ) : displayMode === "EXIT_QR" ? (
-          <>
-            <p className="text-sm font-semibold text-foreground mb-4">Exit QR Code</p>
-            {exitQr?.qrToken ? (
-              <>
-                <div className="rounded-2xl bg-white p-5 shadow-sm">
-                  <QRCodeSVG value={exitQr.qrToken} size={240} level="H" includeMargin />
-                </div>
-                <button type="button" onClick={() => navigator.clipboard.writeText(exitQr.qrToken)}
-                  className="mt-3 w-full rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-muted transition-colors text-left break-all"
-                  title="Click to copy full token">
-                  {exitQr.qrToken}
-                </button>
-                <p className="text-xs text-muted-foreground mt-1">Click token to copy</p>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Dua QR nay cho staff o cong ra. Het han luc {formatDateTime(exitQr.expiresAt)}.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="max-w-sm text-center text-xs text-muted-foreground">
-                  Tao QR khi ban san sang ra cong. Staff quet QR de xac nhan xe ra bai.
-                </p>
-                <button type="button" onClick={() => onCreateExitQr(item.sessionId)}
-                  disabled={generatingId === item.sessionId}
-                  className="mt-4 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-                  {generatingId === item.sessionId ? (
-                    <><LoaderCircle size={14} className="mr-2 animate-spin" /> Dang tao...</>
-                  ) : "Tao Exit QR"}
-                </button>
-              </>
-            )}
-          </>
+          exitQr?.qrToken ? (
+            <>
+              <p className="text-sm font-semibold text-foreground mb-3">Exit QR Code</p>
+              <div className="rounded-2xl bg-white p-4 shadow-sm">
+                <QRCodeSVG value={exitQr.qrToken} size={200} level="H" includeMargin />
+              </div>
+              <button type="button" onClick={() => navigator.clipboard.writeText(exitQr.qrToken)}
+                className="mt-3 w-full rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-muted text-left break-all">
+                {exitQr.qrToken}
+              </button>
+              <p className="text-xs text-muted-foreground mt-2">Đưa QR cho staff ở cổng ra. Hết hạn lúc {formatDateTime(exitQr.expiresAt)}.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-foreground">Exit QR Code</p>
+              <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Tạo QR khi bạn sẵn sàng ra cổng.</p>
+              <button type="button" onClick={() => onCreateExitQr(item.sessionId)} disabled={generatingId === item.sessionId}
+                className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
+                {generatingId === item.sessionId
+                  ? <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Đang tạo...</span>
+                  : "Tạo Exit QR"}
+              </button>
+            </>
+          )
         ) : displayMode === "ENTRY_QR" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-4">Entry QR Code</p>
-            <div className="rounded-2xl bg-white p-5 shadow-sm">
-              <QRCodeSVG value={item.qrToken} size={240} level="H" includeMargin />
+            <p className="text-sm font-semibold text-foreground mb-3">Entry QR Code</p>
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <QRCodeSVG value={item.qrToken} size={200} level="H" includeMargin />
             </div>
-            <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {shortToken(item.qrToken)}
-            </div>
-            <p className="max-w-sm text-center text-xs text-muted-foreground mt-3">
-              Dua QR nay cho staff o cong vao. Sau khi staff quet xong, session se chuyen sang ACTIVE.
-            </p>
+            <p className="mt-3 font-mono text-xs text-muted-foreground">{shortToken(item.qrToken)}</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-2">Đưa QR cho staff ở cổng vào. Sau khi quét, phiên chuyển sang ACTIVE.</p>
           </>
         ) : displayMode === "PENDING_DEPOSIT" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-2">Cho thanh toan coc</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Booking da tao nhung chua thanh toan coc. Vui long thanh toan de nhan Entry QR.
-              {item.depositAmount > 0 && (
-                <span className="block mt-1 font-medium text-foreground">
-                  So tien coc: {formatCurrency(item.depositAmount)}
-                </span>
-              )}
+            <p className="text-sm font-semibold text-foreground">Chờ thanh toán đặt cọc</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+              Chưa thanh toán cọc. Vui lòng thanh toán để nhận Entry QR.
+              {item.depositAmount > 0 && <span className="block mt-1 font-medium text-foreground">Số tiền cọc: {formatCurrency(item.depositAmount)}</span>}
             </p>
             <button type="button" onClick={() => navigate("/driver/bookings")}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-              <CreditCard size={14} /> Thanh toan coc
-            </button>
+              className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Thanh toán đặt cọc</button>
           </>
         ) : displayMode === "QR_EXPIRED" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-2">QR da het han</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Entry QR cua booking nay da het han. Tao lai QR moi (co han 2 gio) hoac huy booking.
-            </p>
-            <div className="mt-4 flex gap-3">
+            <p className="text-sm font-semibold text-foreground">QR đã hết hạn</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Tạo lại QR mới (có hạn 2 giờ) hoặc huỷ booking.</p>
+            <div className="mt-3 flex gap-3">
               <button type="button" onClick={async () => {
                 try { onError(""); await bookingApi.regenerateQr(item.bookingId); onReload(); }
-                catch (e) { onError(e.response?.data?.message || "Khong the tao lai QR."); }
-              }} className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-                Tao lai QR
-              </button>
+                catch (e) { onError(e.response?.data?.message || "Không thể tạo lại QR."); }
+              }} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Tạo lại QR</button>
               <button type="button" onClick={async () => {
                 try { await bookingApi.cancel(item.bookingId); onReload(); }
-                catch (e) { onError(e.response?.data?.message || "Khong the huy booking."); }
-              }} className="inline-flex items-center justify-center rounded-xl border border-rose-300 text-rose-600 px-4 py-2 text-sm font-medium transition-colors hover:bg-rose-50">
-                Huy booking
-              </button>
+                catch (e) { onError(e.response?.data?.message || "Không thể huỷ booking."); }
+              }} className="rounded-xl border border-rose-300 text-rose-600 px-4 py-2 text-sm font-medium hover:bg-rose-50">Huỷ booking</button>
             </div>
           </>
         ) : displayMode === "SYNCING" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-2">Dang dong bo...</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground">
-              Booking dang o trang thai {String(item.status || "").toUpperCase()} nhung chua thay session tuong ung. Trang se tu cap nhat.
+            <p className="text-sm font-semibold text-foreground">Đang đồng bộ...</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+              Trạng thái {String(item.status || "").toUpperCase()} nhưng chưa thấy session tương ứng. Trang sẽ tự cập nhật.
             </p>
             <button type="button" onClick={onReload}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-              <RefreshCw size={14} /> Tai lai
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
+              <RefreshCw size={14} /> Tải lại
             </button>
           </>
         ) : null}
@@ -312,13 +241,11 @@ export default function CurrentSessionPage() {
         driverSessionApi.getMySessions(),
         bookingApi.getMyBookings(),
       ]);
-      const mySessions = unwrapApiData(sessionRes.data, []);
-      const myBookings = unwrapApiData(bookingRes.data, []);
-      setItems(buildDisplayItems(mySessions, myBookings));
+      setItems(buildDisplayItems(unwrapApiData(sessionRes.data, []), unwrapApiData(bookingRes.data, [])));
     } catch (loadError) {
       console.error("Failed to load current session", loadError);
       setItems([]);
-      setError(loadError.response?.data?.message || "Khong tai duoc session hien tai.");
+      setError(loadError.response?.data?.message || "Không tải được session hiện tại.");
     } finally {
       setLoading(false);
     }
@@ -335,11 +262,10 @@ export default function CurrentSessionPage() {
     setError("");
     try {
       const res = await driverSessionApi.createExitQr(sessionId);
-      const qr = unwrapApiData(res.data, null);
-      setExitQrs((prev) => ({ ...prev, [sessionId]: qr }));
+      setExitQrs((prev) => ({ ...prev, [sessionId]: unwrapApiData(res.data, null) }));
     } catch (qrError) {
       console.error("Failed to create exit QR", qrError);
-      setError(qrError.response?.data?.message || "Khong tao duoc Exit QR.");
+      setError(qrError.response?.data?.message || "Không tạo được Exit QR.");
     } finally {
       setGeneratingId(null);
     }
@@ -347,21 +273,21 @@ export default function CurrentSessionPage() {
 
   if (loading) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-6 text-sm text-muted-foreground">
-        Dang tai session hien tai...
+      <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        Đang tải session hiện tại...
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-2xl p-6 text-center">
+      <div className="rounded-2xl border border-border bg-card p-5 text-center">
         <p className="text-sm text-muted-foreground mb-3">
-          Khong co phien do xe hoac booking nao dang active.
+          Không có phiên đỗ xe hoặc booking nào đang active.
         </p>
         <button type="button" onClick={() => navigate("/driver/booking")}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-          Dat cho moi
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500">
+          Đặt chỗ mới
         </button>
       </div>
     );
@@ -369,18 +295,17 @@ export default function CurrentSessionPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+          {error}
         </div>
-      ) : null}
+      )}
 
-      {items.length > 1 ? (
-        <div className="text-sm text-muted-foreground">
-          Ban dang co {items.length} xe/booking active:
-        </div>
-      ) : null}
+      {items.length > 1 && (
+        <p className="text-sm text-muted-foreground">
+          Bạn đang có {items.length} xe/booking active:
+        </p>
+      )}
 
       {items.map((item) => (
         <SessionCard
