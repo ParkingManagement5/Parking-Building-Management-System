@@ -28,9 +28,9 @@ export default function PublicLayout() {
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links">
-            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>Trang chu</a>
-            <a href="/parking-info" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bai do xe</a>
-            <a href="/public-slots" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trong</a>
+            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>Trang chủ</a>
+            <a href="/parking-info" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
+            <a href="/public-slots" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
@@ -40,8 +40,8 @@ export default function PublicLayout() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
               )}
             </button>
-            <button className="btn btn-ghost" onClick={() => navigate("/login")}>Dang nhap</button>
-            <button className="btn btn-accent" onClick={() => navigate("/register")}>Dang ky</button>
+            <button className="btn btn-ghost" onClick={() => navigate("/login")}>Đăng nhập</button>
+            <button className="btn btn-accent" onClick={() => navigate("/register")}>Đăng ký</button>
           </div>
         </div>
       </nav>
