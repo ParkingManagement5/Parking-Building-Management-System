@@ -359,7 +359,7 @@ export default function CurrentSessionPage() {
         <p className="text-sm text-muted-foreground mb-3">
           Khong co phien do xe hoac booking nao dang active.
         </p>
-        <button type="button" onClick={() => navigate("/driver/book-slot")}
+        <button type="button" onClick={() => navigate("/driver/booking")}
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
           Dat cho moi
         </button>
