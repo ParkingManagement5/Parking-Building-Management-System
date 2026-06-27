@@ -8,14 +8,17 @@ import com.swp391.parking.entity.Payment;
 import com.swp391.parking.entity.Payment.PaymentMethod;
 import com.swp391.parking.entity.Payment.PaymentStatus;
 import com.swp391.parking.entity.Payment.PaymentType;
+import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.PaymentRepository;
 import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.PricingPolicyRepository;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.PaymentService;
+import com.swp391.parking.util.FeeCalculatorUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -35,6 +38,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final BookingRepository bookingRepository;
     private final ParkingSessionRepository parkingSessionRepository;
     private final ParkingSlotRepository parkingSlotRepository;
+    private final PricingPolicyRepository pricingPolicyRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -65,8 +69,22 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse confirmDeposit(Integer paymentId) {
         Payment payment = findById(paymentId);
 
+        if (payment.getPaymentType() != PaymentType.DEPOSIT) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Payment #" + paymentId + " khong phai DEPOSIT (hien: " + payment.getPaymentType() + ")");
+        }
+
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
+        }
+
+        if (payment.getBookingId() != null) {
+            Booking booking = bookingRepository.findById(payment.getBookingId().longValue()).orElse(null);
+            if (booking != null && booking.getExpiredAt() != null
+                    && booking.getExpiredAt().isBefore(LocalDateTime.now())
+                    && booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han, khong the confirm deposit");
+            }
         }
 
         payment.setPaymentStatus(PaymentStatus.PAID);
@@ -96,20 +114,54 @@ public class PaymentServiceImpl implements PaymentService {
         BigDecimal totalAmount,
         PaymentMethod paymentMethod
     ) {
+        ParkingSession session = parkingSessionRepository.findById(sessionId.longValue())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Session khong ton tai"));
+
+        if (session.getStatus() != ParkingSession.SessionStatus.WAITING_PAYMENT) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi tao Parking Fee cho session WAITING_PAYMENT (hien: " + session.getStatus() + ")");
+        }
+
+        boolean hasActiveFee = paymentRepository.findBySessionId(sessionId).stream()
+                .anyMatch(p -> p.getPaymentType() == PaymentType.PARKING_FEE
+                        && (p.getPaymentStatus() == PaymentStatus.PENDING || p.getPaymentStatus() == PaymentStatus.PAID));
+        if (hasActiveFee) {
+            throw new AppException(HttpStatus.CONFLICT, "Session da co Parking Fee, khong tao them");
+        }
+
+        BigDecimal serverRate = resolveHourlyRate(session);
+        BigDecimal serverBaseFee = FeeCalculatorUtil.calculateSessionFee(
+                session.getEntryTime(), session.getExitTime(), serverRate);
+
+        BigDecimal serverDeposit = BigDecimal.ZERO;
+        if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
+            serverDeposit = session.getBooking().getDepositAmount();
+        }
+
+        BigDecimal serverTotal = FeeCalculatorUtil.calculateTotal(
+                serverBaseFee, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, serverDeposit);
+
+        Integer resolvedBookingId = bookingId;
+        try {
+            if (session.getBooking() != null && session.getBooking().getId() != null) {
+                resolvedBookingId = session.getBooking().getId().intValue();
+            }
+        } catch (Exception ignored) {}
+
         Payment payment = Payment.builder()
             .sessionId(sessionId)
-            .bookingId(bookingId)
+            .bookingId(resolvedBookingId)
             .policyId(policyId)
             .paymentType(PaymentType.PARKING_FEE)
             .paymentMethod(paymentMethod)
             .paymentStatus(PaymentStatus.PENDING)
-            .appliedRate(appliedRate)
-            .baseFee(baseFee)
-            .overtimeFee(overtimeFee)
-            .penaltyFee(penaltyFee)
-            .discount(discount)
-            .depositDeducted(depositDeducted)
-            .totalAmount(totalAmount)
+            .appliedRate(serverRate)
+            .baseFee(serverBaseFee)
+            .overtimeFee(BigDecimal.ZERO)
+            .penaltyFee(BigDecimal.ZERO)
+            .discount(BigDecimal.ZERO)
+            .depositDeducted(serverDeposit)
+            .totalAmount(serverTotal)
             .build();
 
         return toResponse(paymentRepository.save(payment));
@@ -120,8 +172,21 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse confirmParkingFee(Integer paymentId, String transactionRef) {
         Payment payment = findById(paymentId);
 
+        if (payment.getPaymentType() != PaymentType.PARKING_FEE) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Payment #" + paymentId + " khong phai PARKING_FEE (hien: " + payment.getPaymentType() + ")");
+        }
+
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
+        }
+
+        if (payment.getSessionId() != null) {
+            ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue()).orElse(null);
+            if (session != null && session.getStatus() != ParkingSession.SessionStatus.WAITING_PAYMENT) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Session khong o trang thai WAITING_PAYMENT (hien: " + session.getStatus() + ")");
+            }
         }
 
         payment.setPaymentStatus(PaymentStatus.PAID);
@@ -172,9 +237,45 @@ public class PaymentServiceImpl implements PaymentService {
             .collect(Collectors.toList());
     }
 
+    @Override
+    public void enforcePaymentOwnership(Integer paymentId, Long userId) {
+        Payment payment = findById(paymentId);
+        boolean owned = false;
+        if (payment.getBookingId() != null) {
+            bookingRepository.findById(payment.getBookingId().longValue())
+                    .ifPresent(b -> { if (!b.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay"); });
+            owned = true;
+        }
+        if (payment.getSessionId() != null) {
+            parkingSessionRepository.findById(payment.getSessionId().longValue())
+                    .ifPresent(s -> { if (!s.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay"); });
+            owned = true;
+        }
+        if (!owned) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay");
+    }
+
+    @Override
+    public void enforceBookingOwnership(Integer bookingId, Long userId) {
+        bookingRepository.findById(bookingId.longValue()).ifPresent(b -> {
+            if (!b.getUserId().equals(userId)) {
+                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment cua booking nay");
+            }
+        });
+    }
+
     private Payment findById(Integer paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Payment not found"));
+    }
+
+    private BigDecimal resolveHourlyRate(ParkingSession session) {
+        if (session.getVehicle() == null || session.getVehicle().getVehicleType() == null) {
+            return new BigDecimal("20000");
+        }
+        Long vtId = session.getVehicle().getVehicleType().getId();
+        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vtId);
+        LocalDateTime refTime = session.getEntryTime() != null ? session.getEntryTime() : LocalDateTime.now();
+        return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }
 
     private void completeSessionAfterParkingFee(Payment payment) {
@@ -186,9 +287,6 @@ public class PaymentServiceImpl implements PaymentService {
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session not found"));
 
         session.setStatus(ParkingSession.SessionStatus.COMPLETED);
-        if (session.getExitTime() == null) {
-            session.setExitTime(LocalDateTime.now());
-        }
         parkingSessionRepository.save(session);
 
         Booking booking = session.getBooking();

@@ -40,7 +40,9 @@ public class ParkingSessionController {
     @Operation(summary = "Xe vào cổng",
             description = "entryMode: BOOKING (truyền qrToken) | WALK_IN_AUTO | WALK_IN_MANUAL (truyền licensePlate + slotId)")
     public ResponseEntity<ApiResponse<SessionResponse>> entry(
-            @Valid @RequestBody SessionEntryRequest request) {
+            @Valid @RequestBody SessionEntryRequest request,
+            Authentication authentication) {
+        request.setStaffUserId(resolveStaffUserId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Xe đã vào bãi",
                 sessionService.processEntry(request)));
     }
@@ -51,7 +53,9 @@ public class ParkingSessionController {
             description = "Session → WAITING_PAYMENT. BE4 xử lý payment sau.")
     public ResponseEntity<ApiResponse<SessionResponse>> exit(
             @PathVariable Long id,
-            @Valid @RequestBody SessionExitRequest request) {
+            @Valid @RequestBody SessionExitRequest request,
+            Authentication authentication) {
+        request.setStaffUserId(resolveStaffUserId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Xe đang chờ thanh toán",
                 sessionService.processExit(id, request)));
     }
@@ -60,9 +64,17 @@ public class ParkingSessionController {
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Scan Exit QR and record gate exit")
     public ResponseEntity<ApiResponse<SessionResponse>> exitByQr(
-            @Valid @RequestBody SessionQrScanRequest request) {
+            @Valid @RequestBody SessionQrScanRequest request,
+            Authentication authentication) {
+        request.setStaffUserId(resolveStaffUserId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Exit QR hop le, xe dang cho thanh toan",
                 sessionService.processExitQr(request)));
+    }
+
+    private Long resolveStaffUserId(Authentication authentication) {
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"))
+                .getUserId().longValue();
     }
 
     @PostMapping("/{id}/exit-qr")

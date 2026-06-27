@@ -97,6 +97,7 @@ CREATE TABLE `users` (
     `password_reset_otp` varchar(10),
     `password_reset_otp_expires_at` datetime,
     `status` varchar(20) NOT NULL,
+    `assigned_building_id` int DEFAULT NULL,
     `created_at` datetime,
     `updated_at` datetime
 );
@@ -311,6 +312,7 @@ ALTER TABLE `zone` ADD FOREIGN KEY (`floor_id`) REFERENCES `floor` (`floor_id`);
 ALTER TABLE `zone` ADD FOREIGN KEY (`vehicle_type_id`) REFERENCES `vehicle_type` (`vehicle_type_id`);
 ALTER TABLE `parking_slot` ADD FOREIGN KEY (`zone_id`) REFERENCES `zone` (`zone_id`);
 ALTER TABLE `gate` ADD FOREIGN KEY (`building_id`) REFERENCES `parking_building` (`building_id`);
+ALTER TABLE `users` ADD FOREIGN KEY (`assigned_building_id`) REFERENCES `parking_building` (`building_id`);
 ALTER TABLE `user_role` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 ALTER TABLE `user_role` ADD FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`);
 ALTER TABLE `password_reset_token` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
@@ -383,6 +385,9 @@ INSERT INTO `parking_building`
  '06:00:00',
  '22:00:00',
  true, NOW(), NOW());
+
+-- 5b. Assign staff to building
+UPDATE `users` SET `assigned_building_id` = 1 WHERE `username` = 'staff1';
 
 -- 6. Floors: Tầng 1 = Xe máy (36 slots), Tầng 2 = Ô tô (36 slots)
 INSERT INTO `floor`
@@ -490,7 +495,7 @@ INSERT INTO `system_config` (`config_key`, `config_value`, `description`, `updat
 -- DONE — Accounts:
 -- admin   / Password123! → ADMIN
 -- manager / Password123! → MANAGER
--- staff1  / Password123! → STAFF
+-- staff1  / Password123! → STAFF  → assigned to Building 1
 -- driver1 / Password123! → DRIVER
 -- driver2 / Password123! → DRIVER
 --
@@ -498,4 +503,8 @@ INSERT INTO `system_config` (`config_key`, `config_value`, `description`, `updat
 -- Tầng 1 (Xe máy): 6 zone (T1-A → T1-F), mỗi zone 6 slot = 36 slots SMALL
 -- Tầng 2 (Ô tô):  6 zone (T2-A → T2-F), mỗi zone 6 slot = 36 slots LARGE
 -- Tổng: 72 slots
+--
+-- Staff building assignment:
+-- staff1 → Building 1 (Bãi xe FPT HCM)
+-- Manager gán building cho staff qua: PUT /users/{id}/assign-building?buildingId=X
 -- ============================================================
