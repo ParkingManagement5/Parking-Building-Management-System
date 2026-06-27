@@ -96,7 +96,7 @@ export default function DriverNotificationPage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-foreground">Notifications</h2>
         <button onClick={handleMarkAll} className="text-xs text-primary hover:underline">
