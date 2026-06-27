@@ -28,9 +28,7 @@ export default function PublicLayout() {
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links">
-            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>Trang chủ</a>
             <a href="/parking-info" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
-            <a href="/public-slots" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
