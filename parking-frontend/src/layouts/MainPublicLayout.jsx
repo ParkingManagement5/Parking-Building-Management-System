@@ -29,6 +29,7 @@ export default function MainPublicLayout() {
           </a>
           <div className="nav-links">
             <a href="/parking-info" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
+            <a href="/public-slots" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
