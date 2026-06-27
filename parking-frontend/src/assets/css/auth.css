@@ -251,25 +251,34 @@
 }
 
 /* ========== AUTH LIGHT MODE ========== */
+.ps-light .auth-left {
+  background: var(--bg);
+}
 .ps-light .auth-right {
-  background: linear-gradient(160deg, #e8f5e9, #c8e6c9, #e0f2f1);
+  background: linear-gradient(160deg, #0d2818, #1a3c28, #0a1f12);
 }
 .ps-light .auth-right::before {
-  background: radial-gradient(circle, rgba(0,184,94,0.08), transparent 70%);
+  background: radial-gradient(circle, rgba(5,150,82,0.1), transparent 70%);
 }
 .ps-light .float-card {
-  background: rgba(0,0,0,0.04);
-  border-color: rgba(0,0,0,0.08);
-  color: #1a1a1a;
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.1);
+  color: #fff;
 }
 .ps-light .auth-quote {
-  background: rgba(0,0,0,0.03);
-  border-color: rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
 }
-.ps-light .auth-quote p { color: rgba(0,0,0,0.75); }
-.ps-light .auth-quote span { color: rgba(0,0,0,0.4); }
+.ps-light .auth-quote p { color: rgba(255,255,255,0.85); }
+.ps-light .auth-quote span { color: rgba(255,255,255,0.4); }
 .ps-light .auth-divider::before { background: var(--border); }
 .ps-light .auth-divider span { background: var(--bg); }
+.ps-light .form-group input { background: var(--bg-elevated); color: var(--text); border-color: var(--border-hover); }
+.ps-light .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.ps-light .form-group input::placeholder { color: var(--text-muted); }
+.ps-light .social-btn { background: var(--bg-elevated); border-color: var(--border-hover); color: var(--text-secondary); }
+.ps-light .social-btn:hover { border-color: var(--accent); color: var(--text); }
+.ps-light .toggle-pw { color: var(--text-muted); }
 
 @media (max-width: 1024px) {
   .auth-layout { grid-template-columns: 1fr; }
