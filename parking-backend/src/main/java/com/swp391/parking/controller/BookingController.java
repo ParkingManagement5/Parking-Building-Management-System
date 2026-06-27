@@ -65,6 +65,16 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(bookingService.getMyBookings(getCurrentUserId(ud))));
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Tim booking theo bien so xe",
+            description = "Staff dung de kiem tra xe co booking active khong")
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> searchByPlate(
+            @RequestParam String licensePlate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                bookingService.searchByPlate(licensePlate)));
+    }
+
     @PostMapping("/verify-qr")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Verify booking QR without consuming it")

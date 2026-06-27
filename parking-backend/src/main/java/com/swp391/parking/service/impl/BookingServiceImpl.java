@@ -291,6 +291,20 @@ public class BookingServiceImpl implements BookingService {
         return toResponse(booking);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookingResponse> searchByPlate(String licensePlate) {
+        if (licensePlate == null || licensePlate.isBlank()) return List.of();
+        String plate = licensePlate.trim().toUpperCase();
+        return bookingRepository.findAll().stream()
+                .filter(b -> b.getVehicle() != null
+                        && plate.equals(b.getVehicle().getLicensePlate().toUpperCase())
+                        && List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
+                                .contains(b.getStatus()))
+                .map(this::toResponse)
+                .toList();
+    }
+
     // ── Helper ────────────────────────────────────────────────────────────────
     private Booking getBookingEntity(Long id) {
         return bookingRepository.findById(id)
