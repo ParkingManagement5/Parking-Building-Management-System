@@ -326,6 +326,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     public SessionResponse processExitQr(SessionQrScanRequest request) {
         Long sessionId = parseExitQrSessionId(request.getQrToken());
 
+        ParkingSession session = getSessionEntity(sessionId);
+        String sessionPlate = session.getVehicle() != null ? session.getVehicle().getLicensePlate() : null;
+
+        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Thieu bien so xe. Can xac minh bien so khop voi session (bien: " + sessionPlate + ")");
+        }
+        if (sessionPlate != null && !normalizePlate(request.getLicensePlate()).equals(normalizePlate(sessionPlate))) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Bien so khong khop. Session cho xe " + sessionPlate + " nhung bien scan la " + request.getLicensePlate());
+        }
+
         SessionExitRequest exitRequest = new SessionExitRequest();
         exitRequest.setGateId(request.getGateId());
         exitRequest.setStaffUserId(request.getStaffUserId());

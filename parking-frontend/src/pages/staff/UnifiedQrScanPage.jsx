@@ -448,10 +448,17 @@ export default function UnifiedQrScanPage() {
 
     try {
       let res;
+      if (!qrEntryPlate.trim()) {
+        setError("Nhap bien so xe de xac minh truoc khi xu ly QR.");
+        setProcessing(false);
+        return;
+      }
+
       if (type === "EXIT") {
         res = await sessionApi.exitByQr({
           qrToken: token,
           gateId: Number(gateId),
+          licensePlate: qrEntryPlate.trim(),
           staffUserId: Number(localStorage.getItem("userId")) || null,
         });
       } else {
@@ -761,9 +768,11 @@ export default function UnifiedQrScanPage() {
                   )}
                 </div>
 
-                {qrTokenType === "ENTRY" && (
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
-                    <p className="text-sm font-semibold text-foreground mb-2">Xac minh bien so xe</p>
+                {qrTokenType && (
+                  <div className={`rounded-2xl border p-4 ${qrTokenType === "EXIT" ? "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10" : "border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10"}`}>
+                    <p className="text-sm font-semibold text-foreground mb-2">
+                      Xac minh bien so xe {qrTokenType === "EXIT" ? "(Exit)" : "(Entry)"}
+                    </p>
                     {ocrPlate ? (
                       <div className="flex items-center gap-3">
                         <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
@@ -800,10 +809,10 @@ export default function UnifiedQrScanPage() {
                 </div>
 
                 <StaffPrimaryButton type="button" onClick={handleProcessQr}
-                  disabled={processing || !qrToken.trim() || !gateId || (qrTokenType === "ENTRY" && !qrEntryPlate.trim())}
+                  disabled={processing || !qrToken.trim() || !gateId || !qrEntryPlate.trim()}
                   className="flex w-full items-center justify-center gap-2">
                   {processing ? "Dang xu ly..." : qrTokenType === "EXIT" ? (
-                    <><LogOut size={15} /> Xu ly Exit QR</>
+                    <><LogOut size={15} /> Xu ly Exit QR + Xac minh bien</>
                   ) : qrTokenType === "ENTRY" ? (
                     <><LogIn size={15} /> Xu ly Entry QR + Xac minh bien</>
                   ) : (
