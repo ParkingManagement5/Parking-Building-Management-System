@@ -639,6 +639,99 @@ td strong { color: var(--text); font-family: 'JetBrains Mono', monospace; font-s
   color: var(--text-muted);
 }
 
+/* ========== GLOBAL SELECT STYLING ========== */
+.ps-landing select,
+.dashboard-content select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--card, #141414);
+  color: var(--foreground, #f2f2f2);
+  border: 1.5px solid var(--border, rgba(255,255,255,0.12));
+  border-radius: 10px;
+  padding: 10px 36px 10px 14px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.25s ease;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9a9a' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  min-width: 0;
+}
+.ps-landing select:hover,
+.dashboard-content select:hover {
+  border-color: var(--primary, #00e676);
+}
+.ps-landing select:focus,
+.dashboard-content select:focus {
+  border-color: var(--primary, #00e676);
+  box-shadow: 0 0 0 3px rgba(0,230,118,0.12);
+}
+.ps-landing select option,
+.dashboard-content select option {
+  background: var(--card, #141414);
+  color: var(--foreground, #f2f2f2);
+  padding: 8px 12px;
+}
+
+/* Light mode selects */
+.ps-light select {
+  background-color: var(--card, #fff);
+  color: var(--foreground, #0a0a0a);
+  border-color: var(--border, rgba(0,0,0,0.12));
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.ps-light select option {
+  background: #fff;
+  color: #0a0a0a;
+}
+
+/* ========== GLOBAL INPUT STYLING ========== */
+.ps-landing input[type="text"],
+.ps-landing input[type="search"],
+.ps-landing input[type="email"],
+.ps-landing input[type="number"],
+.ps-landing input[type="date"],
+.ps-landing input[type="datetime-local"],
+.dashboard-content input[type="text"],
+.dashboard-content input[type="search"],
+.dashboard-content input[type="email"],
+.dashboard-content input[type="number"],
+.dashboard-content input[type="date"],
+.dashboard-content input[type="datetime-local"] {
+  background-color: var(--card, #141414);
+  color: var(--foreground, #f2f2f2);
+  border: 1.5px solid var(--border, rgba(255,255,255,0.12));
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.25s ease;
+}
+.ps-landing input:focus,
+.dashboard-content input:focus {
+  border-color: var(--primary, #00e676);
+  box-shadow: 0 0 0 3px rgba(0,230,118,0.12);
+}
+.ps-landing input::placeholder,
+.dashboard-content input::placeholder {
+  color: var(--muted-foreground, #707070);
+}
+.ps-light input[type="text"],
+.ps-light input[type="search"],
+.ps-light input[type="email"],
+.ps-light input[type="number"],
+.ps-light input[type="date"],
+.ps-light input[type="datetime-local"] {
+  background-color: var(--card, #fff);
+  color: var(--foreground, #0a0a0a);
+  border-color: var(--border, rgba(0,0,0,0.12));
+}
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1200px) {
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
