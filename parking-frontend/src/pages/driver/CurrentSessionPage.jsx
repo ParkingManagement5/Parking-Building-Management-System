@@ -191,7 +191,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
             <p className="max-w-sm text-center text-xs text-muted-foreground">
               Xe da ra khoi bai. Staff dang xu ly thanh toan phi do xe.
             </p>
-            <button type="button" onClick={() => navigate("/driver/payment-history")}
+            <button type="button" onClick={() => navigate("/driver/payments")}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
               <CreditCard size={14} /> Xem lich su thanh toan
             </button>
