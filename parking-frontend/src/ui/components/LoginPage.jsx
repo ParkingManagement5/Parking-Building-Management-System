@@ -298,33 +298,59 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* ---- RIGHT: illustration cards ---- */}
+      {/* ---- RIGHT: stats dashboard ---- */}
       <div className="auth-right">
         <div className="auth-illustration">
-          <div className="float-card card-1">
-            <span className="fc-icon green">&#10003;</span>
-            <div>
-              <strong>Xe 29A-123.45</strong>
-              <small>Da vao bai - Tang 2</small>
+          {/* Live Occupancy block */}
+          <div className="auth-stat-block">
+            <div className="auth-stat-header">
+              <h3>Live Occupancy</h3>
+              <span className="auth-live-badge">
+                <span className="auth-live-dot" />
+                Live
+              </span>
+            </div>
+            <div className="auth-stat-grid">
+              <div className="auth-stat-item">
+                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>72</span>
+                <span className="auth-stat-label">Tong slot</span>
+              </div>
+              <div className="auth-stat-item">
+                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>71</span>
+                <span className="auth-stat-label">Trong</span>
+              </div>
+              <div className="auth-stat-item">
+                <span className="auth-stat-value" style={{ color: "#f97316" }}>1</span>
+                <span className="auth-stat-label">Dang do</span>
+              </div>
+            </div>
+            <div className="auth-stat-bars">
+              {[85, 40, 95, 60, 30, 75, 90, 20].map((h, i) => (
+                <div key={i} className="auth-bar" style={{ height: `${h}%`, animationDelay: `${i * 0.1}s` }} />
+              ))}
             </div>
           </div>
-          <div className="float-card card-2">
-            <span className="fc-icon blue">P</span>
-            <div>
-              <strong>128 cho trong</strong>
-              <small>Cap nhat 2 phut truoc</small>
+
+          {/* Activity block */}
+          <div className="auth-stat-block" style={{ marginTop: 16 }}>
+            <div className="auth-stat-header">
+              <h3>Hoat dong gan day</h3>
             </div>
-          </div>
-          <div className="float-card card-3">
-            <span className="fc-icon purple">$</span>
-            <div>
-              <strong>12.5M VND</strong>
-              <small>Doanh thu hom nay</small>
+            <div className="auth-activity-list">
+              {[
+                { icon: "✓", color: "var(--accent)", text: "Xe 59F1-12345 vao bai", time: "Vua xong" },
+                { icon: "P", color: "#60a5fa", text: "Slot T1-A-01 da dat", time: "2 phut truoc" },
+                { icon: "$", color: "#a78bfa", text: "Thanh toan 15,000 VND", time: "5 phut truoc" },
+              ].map((item, i) => (
+                <div key={i} className="auth-activity-item">
+                  <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
+                  <div>
+                    <strong>{item.text}</strong>
+                    <small>{item.time}</small>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="auth-quote">
-            <p>"ParkSmart giup chung toi tang 40% hieu suat van hanh bai do xe."</p>
-            <span>- Nguyen Van A, Quan ly bai xe Times City</span>
           </div>
         </div>
       </div>
