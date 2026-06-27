@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BrowserQRCodeReader } from "@zxing/browser";
 import {
   AlertTriangle, Camera, CheckCircle2, CreditCard, ImageUp, LogIn, LogOut,
-  QrCode, RefreshCw, Search, ScanLine, Video, VideoOff, XCircle,
+  QrCode, RefreshCw, Search, ScanLine, StopCircle, Video, VideoOff, X, XCircle,
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { buildingApi } from "../../api/manager/buildingApi";
@@ -42,6 +43,11 @@ export default function UnifiedScanPage() {
 
   // QR (for booking entry + exit)
   const [qrToken, setQrToken] = useState("");
+  const [showQrModal, setShowQrModal] = useState(false);
+  const qrVideoRef = useRef(null);
+  const qrReaderRef = useRef(null);
+  const qrControlsRef = useRef(null);
+  const [qrCameraOn, setQrCameraOn] = useState(false);
 
   // Gate
   const [buildingId, setBuildingId] = useState(assignedId || "");
@@ -176,6 +182,33 @@ export default function UnifiedScanPage() {
       setLookupData(vehicle);
     } catch { setLookupType("WALKIN"); setLookupData(null); }
     finally { setLookupLoading(false); }
+  }
+
+  // ==================== QR MODAL ====================
+  function stopQrCamera() {
+    qrControlsRef.current?.stop(); qrControlsRef.current = null;
+    if (qrVideoRef.current) qrVideoRef.current.srcObject = null;
+    setQrCameraOn(false);
+  }
+
+  function closeQrModal() { stopQrCamera(); setShowQrModal(false); }
+
+  async function openQrModal() {
+    setShowQrModal(true);
+    setTimeout(async () => {
+      try {
+        if (!qrReaderRef.current) qrReaderRef.current = new BrowserQRCodeReader();
+        setQrCameraOn(true);
+        qrControlsRef.current = await qrReaderRef.current.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } },
+          qrVideoRef.current,
+          (res) => {
+            const v = res?.getText();
+            if (v) { setQrToken(v); closeQrModal(); }
+          },
+        );
+      } catch { /* camera error */ }
+    }, 100);
   }
 
   // ==================== PROCESS ====================
@@ -380,8 +413,18 @@ export default function UnifiedScanPage() {
                       <p className="text-sm font-semibold text-foreground mb-2">
                         {lookupType === "BOOKING" ? "Scan QR booking cua driver (bat buoc)" : "Exit QR cua driver (neu co)"}
                       </p>
-                      <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
-                        placeholder={lookupType === "BOOKING" ? "Paste booking QR token" : "Paste exit QR token (hoac bo qua)"} />
+                      <div className="flex gap-2">
+                        <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
+                          placeholder="Paste QR token" className="flex-1" />
+                        <StaffPrimaryButton type="button" onClick={openQrModal} className="flex items-center gap-2 shrink-0">
+                          <QrCode size={15} /> Scan QR
+                        </StaffPrimaryButton>
+                      </div>
+                      {qrToken && (
+                        <div className="mt-2 flex items-center gap-2 text-sm text-emerald-600">
+                          <CheckCircle2 size={14} /> QR da nhan
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -477,6 +520,32 @@ export default function UnifiedScanPage() {
           )}
         </StaffPageSection>
       </div>
+
+      {/* QR Scan Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <QrCode size={20} /> Scan QR Code
+              </h3>
+              <button type="button" onClick={closeQrModal} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-slate-950">
+              <video ref={qrVideoRef} className="h-full w-full object-cover" muted playsInline />
+              {qrCameraOn && (
+                <div className="pointer-events-none absolute inset-12 rounded-2xl border-2 border-emerald-400/80 shadow-[0_0_0_999px_rgba(2,6,23,0.3)]" />
+              )}
+              <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-background/85 px-3 py-1 text-xs font-medium text-foreground shadow-sm">
+                {qrCameraOn ? "Dua QR vao khung..." : "Dang mo camera..."}
+              </div>
+            </div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">Dua ma QR cua driver vao khung. Tu dong nhan dien.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
