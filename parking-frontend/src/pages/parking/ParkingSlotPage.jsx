@@ -440,7 +440,7 @@ export default function ParkingSlotPage() {
             </p>
           </div>
         </div>
-        <div className="space-y-2" style={{ minHeight: SLOT_PAGE_SIZE * 66 }}>
+        <div className="space-y-2" style={{ minHeight: 680 }}>
           {pagedFloorSlots.map((slot) => (
             <div
               key={`list-${slot.id}`}
