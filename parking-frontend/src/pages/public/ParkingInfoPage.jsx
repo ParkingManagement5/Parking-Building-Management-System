@@ -50,7 +50,7 @@ export default function ParkingInfoPage() {
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
           Thông tin bãi đỗ xe
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginTop: 6 }}>
@@ -104,7 +104,7 @@ export default function ParkingInfoPage() {
                   borderRadius: "var(--radius-sm)", padding: "14px 16px",
                 }}>
                   <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 4 }}>{s.label}</p>
-                  <p style={{ fontSize: "1.4rem", fontWeight: 800, color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
+                  <p style={{ fontSize: "1.4rem", fontWeight: 700, color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
                 </div>
               ))}
             </div>
