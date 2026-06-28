@@ -286,7 +286,7 @@ export default function LandingPage() {
       <nav className="nav" id="nav" ref={navRef}>
         <div className="container nav-inner">
           <a href="#" className="nav-logo" onClick={(e) => e.preventDefault()}>
-            <span className="nav-logo-mark">P</span>
+            <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links" id="navLinks" ref={navLinksRef}>
@@ -701,7 +701,7 @@ export default function LandingPage() {
         <div className="container footer-grid">
           <div className="footer-brand">
             <a href="#" className="nav-logo" onClick={(e) => e.preventDefault()}>
-              <span className="nav-logo-mark">P</span>
+              <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
               <span className="nav-logo-text">ParkSmart</span>
             </a>
             <p>Giải pháp quản lý bãi đỗ xe thông minh hàng đầu Việt Nam.</p>
