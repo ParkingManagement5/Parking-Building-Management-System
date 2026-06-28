@@ -732,6 +732,32 @@ td strong { color: var(--text); font-family: 'JetBrains Mono', monospace; font-s
   border-color: var(--border, rgba(0,0,0,0.12));
 }
 
+/* ========== DARK MODE PASTEL OVERRIDES ========== */
+.ps-landing:not(.ps-light) .bg-emerald-50 { background: rgba(16,185,129,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-emerald-100 { background: rgba(16,185,129,0.12) !important; }
+.ps-landing:not(.ps-light) .bg-rose-50 { background: rgba(239,68,68,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-rose-100 { background: rgba(239,68,68,0.12) !important; }
+.ps-landing:not(.ps-light) .bg-amber-50 { background: rgba(245,158,11,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-amber-100 { background: rgba(245,158,11,0.12) !important; }
+.ps-landing:not(.ps-light) .bg-blue-50 { background: rgba(59,130,246,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-blue-100 { background: rgba(59,130,246,0.12) !important; }
+.ps-landing:not(.ps-light) .bg-violet-50 { background: rgba(139,92,246,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-violet-100 { background: rgba(139,92,246,0.12) !important; }
+.ps-landing:not(.ps-light) .bg-slate-50 { background: rgba(100,116,139,0.08) !important; }
+.ps-landing:not(.ps-light) .bg-slate-100 { background: rgba(100,116,139,0.12) !important; }
+
+.ps-landing:not(.ps-light) .border-emerald-200 { border-color: rgba(16,185,129,0.2) !important; }
+.ps-landing:not(.ps-light) .border-rose-200 { border-color: rgba(239,68,68,0.2) !important; }
+.ps-landing:not(.ps-light) .border-amber-200 { border-color: rgba(245,158,11,0.2) !important; }
+.ps-landing:not(.ps-light) .border-blue-200 { border-color: rgba(59,130,246,0.2) !important; }
+.ps-landing:not(.ps-light) .border-violet-200 { border-color: rgba(139,92,246,0.2) !important; }
+
+.ps-landing:not(.ps-light) .text-emerald-700 { color: #6ee7b7 !important; }
+.ps-landing:not(.ps-light) .text-rose-700 { color: #fca5a5 !important; }
+.ps-landing:not(.ps-light) .text-amber-700 { color: #fcd34d !important; }
+.ps-landing:not(.ps-light) .text-blue-700 { color: #93c5fd !important; }
+.ps-landing:not(.ps-light) .text-violet-700 { color: #c4b5fd !important; }
+
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1280px) {
   .dashboard-content { max-width: 960px; padding: 24px 24px; }
