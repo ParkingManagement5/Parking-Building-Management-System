@@ -26,6 +26,7 @@ export default function PricingPolicyPage() {
   const [policies, setPolicies] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     vehicleTypeId: "",
     timeType: "HOURLY",
@@ -151,6 +152,10 @@ export default function PricingPolicyPage() {
     }
   };
 
+  const PAGE_SIZE = 10;
+  const pagedPolicies = useMemo(() => policies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [policies, page]);
+  const totalPages = Math.max(1, Math.ceil(policies.length / PAGE_SIZE));
+
   const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")}d`;
 
   return (
@@ -176,7 +181,7 @@ export default function PricingPolicyPage() {
           <ManagerEmptyState title="No pricing policies yet" description="Create a policy to prepare the pricing engine for bookings and payments." />
         ) : (
           <ManagerDataTable columns={["Vehicle Type", "Time Type", "Day Type", "Hour Range", "Price", "Status", "Actions"]}>
-            {policies.map((item) => (
+            {pagedPolicies.map((item) => (
               <ManagerRow key={item.policyId}>
                 <ManagerCell>{vehicleTypeMap[item.vehicleTypeId] || item.vehicleTypeId}</ManagerCell>
                 <ManagerCell><ManagerStatusBadge tone="blue">{item.timeType}</ManagerStatusBadge></ManagerCell>
@@ -195,6 +200,24 @@ export default function PricingPolicyPage() {
               </ManagerRow>
             ))}
           </ManagerDataTable>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
+          </div>
         )}
       </ManagerPanel>
 
