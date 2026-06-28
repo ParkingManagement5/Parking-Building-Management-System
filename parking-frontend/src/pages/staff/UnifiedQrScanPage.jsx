@@ -17,6 +17,12 @@ import {
   StaffSelect, StaffStatusBadge,
 } from "./StaffUi";
 
+function canonicalPlate(value) {
+  return String(value ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 export default function UnifiedScanPage() {
   const navigate = useNavigate();
   const assignedId = getAssignedBuildingId();
@@ -159,7 +165,8 @@ export default function UnifiedScanPage() {
       // Active session? → EXIT
       const sRes = await sessionApi.getSessions({ status: "ACTIVE", keyword: p });
       const sessions = unwrapApiData(sRes.data, []);
-      const match = sessions.find((s) => String(s.licensePlate || "").toUpperCase() === p.toUpperCase());
+      const plateKey = canonicalPlate(p);
+      const match = plateKey ? sessions.find((s) => canonicalPlate(s.licensePlate) === plateKey) : null;
       if (match) { setLookupType("EXIT"); setLookupData(match); return; }
 
       // Vehicle registered?

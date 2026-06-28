@@ -12,6 +12,7 @@ import com.swp391.parking.repository.*;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.ParkingSessionService;
 import com.swp391.parking.util.FeeCalculatorUtil;
+import com.swp391.parking.util.LicensePlateUtil;
 import com.swp391.parking.util.QrTokenUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -23,8 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -121,9 +125,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Thieu bien so xe. Staff can xac minh bien so xe khop voi booking (bien dang ky: " + bookingPlate + ")");
         }
-        String requestPlate = normalizePlate(request.getLicensePlate());
-        String normalizedBookingPlate = normalizePlate(bookingPlate);
-        if (!requestPlate.equals(normalizedBookingPlate)) {
+        if (!LicensePlateUtil.equivalent(request.getLicensePlate(), bookingPlate)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Bien so xe khong khop. QR booking cho xe " + bookingPlate + " nhung bien scan la " + request.getLicensePlate());
         }
@@ -333,7 +335,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Thieu bien so xe. Can xac minh bien so khop voi session (bien: " + sessionPlate + ")");
         }
-        if (sessionPlate != null && !normalizePlate(request.getLicensePlate()).equals(normalizePlate(sessionPlate))) {
+        if (sessionPlate != null && !LicensePlateUtil.equivalent(request.getLicensePlate(), sessionPlate)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Bien so khong khop. Session cho xe " + sessionPlate + " nhung bien scan la " + request.getLicensePlate());
         }
@@ -398,13 +400,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     public List<SessionResponse> getSessions(String status, String keyword) {
         if (keyword != null && !keyword.isBlank() && status != null && !status.isBlank()) {
             ParkingSession.SessionStatus sessionStatus = ParkingSession.SessionStatus.valueOf(status.trim().toUpperCase());
-            return sessionRepository.searchByPlateOrIdAndStatus(keyword.trim(), sessionStatus)
-                    .stream().map(this::toResponse).toList();
+            return searchByPlateOrId(keyword, sessionStatus).stream().map(this::toResponse).toList();
         }
 
         if (keyword != null && !keyword.isBlank()) {
-            return sessionRepository.searchByPlateOrId(keyword.trim())
-                    .stream().map(this::toResponse).toList();
+            return searchByPlateOrId(keyword, null).stream().map(this::toResponse).toList();
         }
 
         if (status != null && !status.isBlank()) {
@@ -462,8 +462,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     private Vehicle findOrCreateWalkInVehicle(SessionEntryRequest request) {
-        String licensePlate = normalizePlate(request.getLicensePlate());
-        return vehicleRepository.findByLicensePlate(licensePlate)
+        String licensePlate = LicensePlateUtil.normalizeDisplay(request.getLicensePlate());
+        return findByEquivalentLicensePlate(licensePlate)
                 .orElseGet(() -> createWalkInGuestVehicle(request, licensePlate));
     }
 
@@ -550,17 +550,23 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
     }
 
-    private String normalizePlate(String licensePlate) {
-        String normalized = licensePlate.toUpperCase().replace(" ", "");
-        int separatorIndex = normalized.lastIndexOf('-');
-        if (separatorIndex >= 0 && separatorIndex < normalized.length() - 1) {
-            String prefix = normalized.substring(0, separatorIndex + 1);
-            String serial = normalized.substring(separatorIndex + 1).replace(".", "");
-            if (serial.matches("\\d{5}")) {
-                return prefix + serial.substring(0, 3) + "." + serial.substring(3);
-            }
-        }
-        return normalized;
+    private Optional<Vehicle> findByEquivalentLicensePlate(String licensePlate) {
+        return LicensePlateUtil.lookupCandidates(licensePlate).stream()
+                .map(vehicleRepository::findByLicensePlate)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+    }
+
+    private List<ParkingSession> searchByPlateOrId(String keyword, ParkingSession.SessionStatus status) {
+        Map<Long, ParkingSession> matches = new LinkedHashMap<>();
+        LicensePlateUtil.lookupCandidates(keyword).forEach(candidate -> {
+            List<ParkingSession> found = status != null
+                    ? sessionRepository.searchByPlateOrIdAndStatus(candidate, status)
+                    : sessionRepository.searchByPlateOrId(candidate);
+            found.forEach(session -> matches.putIfAbsent(session.getId(), session));
+        });
+        return matches.values().stream().toList();
     }
 
     private BigDecimal resolveHourlyRate(ParkingSession s) {
