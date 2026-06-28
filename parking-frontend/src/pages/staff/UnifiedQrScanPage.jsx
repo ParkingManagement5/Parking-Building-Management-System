@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BrowserQRCodeReader } from "@zxing/browser";
 import {
   AlertTriangle, Camera, CheckCircle2, CreditCard, ImageUp, LogIn, LogOut,
-  QrCode, RefreshCw, Search, ScanLine, StopCircle, Video, VideoOff, X, XCircle,
+  QrCode, RefreshCw, Search, ScanLine, Video, VideoOff, X, XCircle,
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { buildingApi } from "../../api/manager/buildingApi";
@@ -23,6 +23,23 @@ function canonicalPlate(value) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+function normalizePlateDisplay(value) {
+  const canonical = canonicalPlate(value);
+  if (!canonical) return "";
+
+  const match = canonical.match(/^(\d{2})([A-Z]\d|[A-Z]{1,2})(\d{4}|\d{5})$/);
+  if (match) {
+    const [, province, series, serial] = match;
+    const prefix = series.length > 1 ? `${province}-${series}` : `${province}${series}`;
+    if (serial.length === 5) {
+      return `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`;
+    }
+    return `${prefix}-${serial}`;
+  }
+
+  return String(value ?? "").toUpperCase().replace(/\s+/g, "");
+}
+
 export default function UnifiedScanPage() {
   const navigate = useNavigate();
   const assignedId = getAssignedBuildingId();
@@ -40,6 +57,11 @@ export default function UnifiedScanPage() {
   const [confidence, setConfidence] = useState(null);
   const [platePreview, setPlatePreview] = useState("");
   const [ocrError, setOcrError] = useState("");
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualPlate, setManualPlate] = useState("");
+  const [manualEntryError, setManualEntryError] = useState("");
+  const [manualExitSuggestions, setManualExitSuggestions] = useState([]);
+  const [manualExitLoading, setManualExitLoading] = useState(false);
 
   // Lookup
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -150,13 +172,95 @@ export default function UnifiedScanPage() {
       const d = res.data?.data || {};
       const p = d.effectivePlate || d.detectedPlate || "";
       const c = Math.round((d.plateConfidenceScore || 0) * 100);
-      if (!p || p === "UNKNOWN") { setOcrError("OCR khong doc duoc. Thu lai."); return; }
+      if (!p || p === "UNKNOWN") {
+        setOcrError("OCR khong doc duoc. Thu lai hoac nhap tay bien so.");
+        setManualPlate("");
+        setShowManualEntry(true);
+        return;
+      }
       setPlate(p); setConfidence(c);
       await autoLookup(p);
       setStep(2);
     } catch (err) { setOcrError(err.response?.data?.message || "OCR that bai."); }
     finally { setScanning(false); }
   }
+
+  function openManualEntry() {
+    setManualEntryError("");
+    setManualPlate(plate || "");
+    setShowManualEntry(true);
+  }
+
+  function closeManualEntry() {
+    setShowManualEntry(false);
+    setManualEntryError("");
+    setManualExitSuggestions([]);
+    setManualExitLoading(false);
+  }
+
+  async function handleManualPlateSubmit(event) {
+    event?.preventDefault?.();
+    const canonicalManualPlate = canonicalPlate(manualPlate);
+    if (!canonicalManualPlate) {
+      setManualEntryError("Nhap bien so truoc khi tiep tuc.");
+      return;
+    }
+    const normalizedPlate = normalizePlateDisplay(manualPlate);
+
+    setLookupType(null);
+    setLookupData(null);
+    setQrToken("");
+    setError("");
+    setOcrError("");
+    setPlate(normalizedPlate);
+    setConfidence(null);
+    closeManualEntry();
+    await autoLookup(normalizedPlate);
+    setStep(2);
+  }
+
+  useEffect(() => {
+    if (!showManualEntry) return;
+
+    const query = canonicalPlate(manualPlate);
+    if (query.length < 2) {
+      setManualExitSuggestions([]);
+      setManualExitLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setManualExitLoading(true);
+      try {
+        const res = await sessionApi.getSessions({ status: "ACTIVE", keyword: query });
+        if (cancelled) return;
+        const sessions = unwrapApiData(res.data, []);
+        const uniquePlates = [];
+        const seen = new Set();
+
+        sessions.forEach((item) => {
+          const normalizedCandidate = canonicalPlate(item.licensePlate);
+          if (!normalizedCandidate || !normalizedCandidate.includes(query) || seen.has(normalizedCandidate)) {
+            return;
+          }
+          seen.add(normalizedCandidate);
+          uniquePlates.push(item);
+        });
+
+        setManualExitSuggestions(uniquePlates.slice(0, 6));
+      } catch {
+        if (!cancelled) setManualExitSuggestions([]);
+      } finally {
+        if (!cancelled) setManualExitLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [showManualEntry, manualPlate]);
 
   // ==================== LOOKUP ====================
   async function autoLookup(p) {
@@ -169,21 +273,19 @@ export default function UnifiedScanPage() {
       const match = plateKey ? sessions.find((s) => canonicalPlate(s.licensePlate) === plateKey) : null;
       if (match) { setLookupType("EXIT"); setLookupData(match); return; }
 
+      // Has booking?
+      try {
+        const bRes = await axiosClient.get(`/bookings/search?licensePlate=${encodeURIComponent(p)}`);
+        const bookings = unwrapApiData(bRes.data, []);
+        const active = bookings.find((b) => ["CONFIRMED", "PENDING_PAYMENT"].includes(String(b.status || "").toUpperCase()));
+        if (active) { setLookupType("BOOKING"); setLookupData(active); return; }
+      } catch {}
+
       // Vehicle registered?
       let vehicle = null;
       try { vehicle = unwrapApiData((await axiosClient.get(`/vehicles/plate/${encodeURIComponent(p)}`)).data, null); } catch {}
 
       if (vehicle && vehicle.isActive === false) { setLookupType("BLOCKED"); setLookupData("Xe bi vo hieu hoa."); return; }
-
-      // Has booking?
-      if (vehicle) {
-        try {
-          const bRes = await axiosClient.get(`/bookings/search?licensePlate=${encodeURIComponent(p)}`);
-          const bookings = unwrapApiData(bRes.data, []);
-          const active = bookings.find((b) => ["CONFIRMED", "PENDING_PAYMENT"].includes(String(b.status || "").toUpperCase()));
-          if (active) { setLookupType("BOOKING"); setLookupData(active); return; }
-        } catch {}
-      }
 
       setLookupType(vehicle ? "WALKIN" : "UNREGISTERED");
       setLookupData(vehicle);
@@ -315,7 +417,7 @@ export default function UnifiedScanPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:grid-cols-5">
                 <StaffSecondaryButton type="button" onClick={cameraOn ? stopCamera : startCamera} disabled={scanning} className="flex items-center justify-center gap-2">
                   {cameraOn ? <VideoOff size={15} /> : <Video size={15} />} {cameraOn ? "Stop" : "Camera"}
                 </StaffSecondaryButton>
@@ -329,11 +431,20 @@ export default function UnifiedScanPage() {
                 <StaffSecondaryButton type="button" onClick={resetAll} disabled={scanning} className="flex items-center justify-center gap-2">
                   <RefreshCw size={15} /> Reset
                 </StaffSecondaryButton>
+                <StaffSecondaryButton type="button" onClick={openManualEntry} disabled={scanning} className="flex items-center justify-center gap-2">
+                  <ScanLine size={15} /> Nhap tay
+                </StaffSecondaryButton>
               </div>
 
               {ocrError && (
                 <div className="mt-3 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0" /> <p>{ocrError}</p>
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                  <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p>{ocrError}</p>
+                    <StaffSecondaryButton type="button" onClick={openManualEntry} className="shrink-0">
+                      Nhap tay ngay
+                    </StaffSecondaryButton>
+                  </div>
                 </div>
               )}
             </StaffPageSection>
@@ -550,6 +661,103 @@ export default function UnifiedScanPage() {
               </div>
             </div>
             <p className="mt-3 text-center text-xs text-muted-foreground">Dua ma QR cua driver vao khung. Tu dong nhan dien.</p>
+          </div>
+        </div>
+      )}
+
+      {showManualEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Nhap tay bien so</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Dung khi OCR doc sai hoac khong nhan ra bien so. Sau khi nhap, he thong se tiep tuc buoc xac minh hien tai.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeManualEntry}
+                className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualPlateSubmit} className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                <label className="mb-2 block text-sm font-medium text-foreground">Bien so xe</label>
+                <StaffInput
+                  value={manualPlate}
+                  onChange={(event) => {
+                    setManualPlate(event.target.value.toUpperCase());
+                    if (manualEntryError) setManualEntryError("");
+                  }}
+                  placeholder="Vi du: 51A12345"
+                  autoFocus
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Co the nhap lien hoac co dau gach. He thong se tu chuan hoa truoc khi lookup.
+                </p>
+              </div>
+
+              {(manualExitLoading || manualExitSuggestions.length > 0 || canonicalPlate(manualPlate).length >= 2) && (
+                <div className="rounded-2xl border border-border bg-muted/10 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-foreground">Goi y xe dang trong bai</p>
+                    <span className="text-xs text-muted-foreground">
+                      {manualExitLoading ? "Dang loc..." : `${manualExitSuggestions.length} ket qua`}
+                    </span>
+                  </div>
+
+                  {manualExitSuggestions.length > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {manualExitSuggestions.map((item) => (
+                        <button
+                          key={`${item.sessionId}-${item.licensePlate}`}
+                          type="button"
+                          onClick={() => {
+                            setManualPlate(item.licensePlate || "");
+                            setManualEntryError("");
+                          }}
+                          className="flex w-full items-center justify-between rounded-2xl border border-border bg-background px-4 py-3 text-left transition hover:bg-muted"
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Session #{item.sessionId} · Slot {item.slotCode || "--"}
+                            </p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{formatStaffDateTime(item.entryTime)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    !manualExitLoading && (
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Khong tim thay xe dang trong bai khop voi bien dang nhap.
+                      </p>
+                    )
+                  )}
+                </div>
+              )}
+
+              {manualEntryError && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {manualEntryError}
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <StaffSecondaryButton type="button" onClick={closeManualEntry}>
+                  Huy
+                </StaffSecondaryButton>
+                <StaffPrimaryButton type="submit" className="flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} />
+                  Dung bien so nay
+                </StaffPrimaryButton>
+              </div>
+            </form>
           </div>
         </div>
       )}
