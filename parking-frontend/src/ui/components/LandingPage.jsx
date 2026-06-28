@@ -453,15 +453,6 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-        <div className="container trusted-strip reveal-up delay-3">
-          <span className="trusted-label">Truy cập nhanh</span>
-          <div className="trusted-logos">
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/parking-info")}>Bãi đỗ xe</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/public-slots")}>Xem slot trống</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/login")}>Đăng nhập</span>
-            <span className="trust-logo" style={{ cursor: "pointer", opacity: 0.7 }} onClick={() => navigate("/register")}>Đăng ký</span>
-          </div>
-        </div>
       </section>
 
       {/* FEATURES */}

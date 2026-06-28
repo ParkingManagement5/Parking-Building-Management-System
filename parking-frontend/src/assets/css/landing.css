@@ -335,10 +335,11 @@ html { scroll-behavior: smooth; }
 
 /* ========== HERO ========== */
 .hero {
-  padding: 120px 0 40px;
+  padding: 90px 0 30px;
   position: relative;
   overflow: hidden;
   min-height: 100dvh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
