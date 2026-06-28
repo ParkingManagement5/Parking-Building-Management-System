@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Edit2, Plus, SquareParking, Trash2, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
@@ -53,6 +53,8 @@ export default function ParkingSlotPage() {
   const [activeFloorId, setActiveFloorId] = useState("");
   const [filter, setFilter] = useState("all");
   const [slotPage, setSlotPage] = useState(1);
+  const slotListRef = useRef(null);
+  const handleSlotPage = (p) => { setSlotPage(typeof p === "function" ? p : () => p); slotListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -440,7 +442,7 @@ export default function ParkingSlotPage() {
             </p>
           </div>
         </div>
-        <div className="space-y-2" style={{ minHeight: 680 }}>
+        <div className="space-y-2" ref={slotListRef}>
           {pagedFloorSlots.map((slot) => (
             <div
               key={`list-${slot.id}`}
@@ -487,17 +489,17 @@ export default function ParkingSlotPage() {
         </div>
         {totalSlotPages > 1 && (
           <div className="flex items-center justify-center gap-2 pt-4">
-            <button onClick={() => setSlotPage(p => Math.max(1, p - 1))} disabled={slotPage === 1}
+            <button onClick={() => handleSlotPage(Math.max(1, slotPage - 1))} disabled={slotPage === 1}
               className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
               ← Trước
             </button>
             {Array.from({ length: totalSlotPages }, (_, i) => i + 1).map(p => (
-              <button key={p} onClick={() => setSlotPage(p)}
+              <button key={p} onClick={() => handleSlotPage(p)}
                 className={`size-8 rounded-lg text-xs font-bold transition ${p === slotPage ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
                 {p}
               </button>
             ))}
-            <button onClick={() => setSlotPage(p => Math.min(totalSlotPages, p + 1))} disabled={slotPage === totalSlotPages}
+            <button onClick={() => handleSlotPage(Math.min(totalSlotPages, slotPage + 1))} disabled={slotPage === totalSlotPages}
               className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
               Sau →
             </button>
