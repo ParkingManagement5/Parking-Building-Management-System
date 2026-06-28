@@ -426,8 +426,8 @@ export default function LandingPage() {
                 </svg>
               </span>
               <div>
-                <span className="pill-num">{liveStats.total || 72}</span>
-                <span className="pill-label">tổng chỗ đỗ</span>
+                <span className="pill-num">{liveStats.total ? Math.round((liveStats.occupied / liveStats.total) * 100) : 0}%</span>
+                <span className="pill-label">tỷ lệ lấp đầy</span>
               </div>
             </div>
             <div className="hero-float-pill pill-3 reveal-up delay-4">
