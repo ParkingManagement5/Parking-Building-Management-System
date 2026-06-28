@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Car, Plus, X } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
@@ -148,6 +148,11 @@ export default function MyVehiclesPage() {
     }
   };
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 9;
+  const paged = useMemo(() => vehicles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [vehicles, page]);
+  const totalPages = Math.max(1, Math.ceil(vehicles.length / PAGE_SIZE));
+
   const inputClass =
     "w-full rounded-xl border border-border bg-muted px-3 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10";
 
@@ -171,7 +176,7 @@ export default function MyVehiclesPage() {
 
       {/* Vehicle grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {vehicles.map((item) => {
+        {paged.map((item) => {
           const id = item.vehicleId || item.id;
           const status =
             item.isActive !== false && item.status !== "INACTIVE" ? "active" : "inactive";
@@ -231,6 +236,25 @@ export default function MyVehiclesPage() {
           <span className="text-sm font-medium">Thêm xe mới</span>
         </button>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            ← Trước
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => setPage(p)}
+              className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            Sau →
+          </button>
+        </div>
+      )}
 
       {/* Empty state */}
       {vehicles.length === 0 && (

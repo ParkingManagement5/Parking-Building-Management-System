@@ -52,6 +52,7 @@ export default function ParkingSlotPage() {
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
   const [activeFloorId, setActiveFloorId] = useState("");
   const [filter, setFilter] = useState("all");
+  const [slotPage, setSlotPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -171,6 +172,10 @@ export default function ParkingSlotPage() {
     [zones, form.zoneId]
   );
   const derivedSlotSize = selectedZone?.vehicleType?.slotSize || "";
+
+  const SLOT_PAGE_SIZE = 10;
+  const pagedFloorSlots = useMemo(() => floorSlots.slice((slotPage - 1) * SLOT_PAGE_SIZE, slotPage * SLOT_PAGE_SIZE), [floorSlots, slotPage]);
+  const totalSlotPages = Math.max(1, Math.ceil(floorSlots.length / SLOT_PAGE_SIZE));
 
   const filteredFloorsForForm = useMemo(
     () => floors.filter((floor) => String(floor.building?.buildingId ?? floor.building?.id) === String(form.buildingId)),
@@ -436,7 +441,7 @@ export default function ParkingSlotPage() {
           </div>
         </div>
         <div className="space-y-2">
-          {floorSlots.map((slot) => (
+          {pagedFloorSlots.map((slot) => (
             <div
               key={`list-${slot.id}`}
               className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3"
@@ -480,6 +485,24 @@ export default function ParkingSlotPage() {
             </div>
           ))}
         </div>
+        {totalSlotPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setSlotPage(p => Math.max(1, p - 1))} disabled={slotPage === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalSlotPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setSlotPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === slotPage ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setSlotPage(p => Math.min(totalSlotPages, p + 1))} disabled={slotPage === totalSlotPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
+          </div>
+        )}
       </div>
 
       {showModal ? (
