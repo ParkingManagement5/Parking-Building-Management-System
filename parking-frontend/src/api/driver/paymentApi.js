@@ -52,5 +52,7 @@ export const paymentApi = {
 
   getById: (id) => axiosClient.get(`/payments/${id}`),
 
+  getBySessionId: (sessionId) => axiosClient.get(`/payments/session/${sessionId}`),
+
   getByStatus: (status) => axiosClient.get(`/payments/status/${status}`),
 };
