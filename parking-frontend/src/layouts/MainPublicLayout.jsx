@@ -24,7 +24,7 @@ export default function MainPublicLayout() {
       <nav className="nav" ref={navRef}>
         <div className="container nav-inner">
           <a href="/" className="nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-            <span className="nav-logo-mark">P</span>
+            <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links">
