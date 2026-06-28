@@ -97,6 +97,9 @@ export default function UserManagementPage() {
     };
   }, [selectedRole]);
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   const users = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) {
@@ -109,6 +112,9 @@ export default function UserManagementPage() {
         .some((value) => String(value).toLowerCase().includes(query))
     );
   }, [allUsers, search]);
+
+  const paged = useMemo(() => users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [users, page]);
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
 
   const roleFilters = useMemo(
     () => ["ALL", ...roles.map((item) => item.roleName)],
@@ -165,7 +171,7 @@ export default function UserManagementPage() {
             <Search size={14} className="text-muted-foreground" />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
               placeholder="Search users..."
               className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
@@ -175,7 +181,7 @@ export default function UserManagementPage() {
               <button
                 key={item}
                 type="button"
-                onClick={() => setSelectedRole(item)}
+                onClick={() => { setSelectedRole(item); setPage(1); }}
                 className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
                   selectedRole === item
                     ? "bg-card text-foreground shadow-sm"
@@ -206,7 +212,7 @@ export default function UserManagementPage() {
           <ManagerEmptyState title="No users available" description="No users matched the current role filter or search query." />
         ) : (
           <ManagerDataTable columns={["User", "Role", "Status", "Contact", "User ID", "Actions"]}>
-            {users.map((item) => (
+            {paged.map((item) => (
               <ManagerRow key={item.userId}>
                 <ManagerCell>
                   <div className="flex items-center gap-3">
@@ -247,6 +253,24 @@ export default function UserManagementPage() {
               </ManagerRow>
             ))}
           </ManagerDataTable>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button key={p} onClick={() => setPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
+          </div>
         )}
       </ManagerPanel>
 

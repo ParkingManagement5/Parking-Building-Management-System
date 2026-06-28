@@ -15,6 +15,8 @@ import { unwrapApiData } from "../../utils/api";
 
 export default function ManagerNotificationPage() {
   const [notifications, setNotifications] = useState([]);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 8;
 
   useEffect(() => {
     void loadNotifications();
@@ -61,6 +63,9 @@ export default function ManagerNotificationPage() {
     [notifications]
   );
 
+  const paged = useMemo(() => notifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [notifications, page]);
+  const totalPages = Math.max(1, Math.ceil(notifications.length / PAGE_SIZE));
+
   return (
     <div className="space-y-5">
       <ManagerPageHeader
@@ -79,7 +84,7 @@ export default function ManagerNotificationPage() {
           <ManagerEmptyState title="No notifications" description="There are no notifications for the current manager account yet." />
         ) : (
           <div className="space-y-3">
-            {notifications.map((item) => (
+            {paged.map((item) => (
               <div key={item.notificationId} className="rounded-2xl border border-border bg-muted/20 p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
@@ -101,6 +106,24 @@ export default function ManagerNotificationPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button key={p} onClick={() => setPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
           </div>
         )}
       </ManagerPanel>
