@@ -32,6 +32,8 @@ export default function StaffShiftPage() {
   const [showBuildingModal, setShowBuildingModal] = useState(false);
   const [buildingForm, setBuildingForm] = useState({ userId: "", buildingId: "" });
   const [loadError, setLoadError] = useState("");
+  const [shiftPage, setShiftPage] = useState(1);
+  const [staffPage, setStaffPage] = useState(1);
   const [form, setForm] = useState({
     userId: "",
     shiftId: "",
@@ -66,6 +68,12 @@ export default function StaffShiftPage() {
 
   const shiftMap = useMemo(() => Object.fromEntries(shifts.map((item) => [item.shiftId, item])), [shifts]);
   const canAssign = staffUsers.length > 0 && shifts.length > 0;
+
+  const PAGE_SIZE = 10;
+  const pagedStaffShifts = useMemo(() => staffShifts.slice((shiftPage - 1) * PAGE_SIZE, shiftPage * PAGE_SIZE), [staffShifts, shiftPage]);
+  const totalShiftPages = Math.max(1, Math.ceil(staffShifts.length / PAGE_SIZE));
+  const pagedStaffUsers = useMemo(() => staffUsers.slice((staffPage - 1) * PAGE_SIZE, staffPage * PAGE_SIZE), [staffUsers, staffPage]);
+  const totalStaffPages = Math.max(1, Math.ceil(staffUsers.length / PAGE_SIZE));
 
   const resetForm = () => {
     setEditingId(null);
@@ -158,7 +166,7 @@ export default function StaffShiftPage() {
           <ManagerEmptyState title="Chua co staff" description="Tao tai khoan staff truoc." />
         ) : (
           <ManagerDataTable columns={["Staff", "Email", "Building", "Actions"]}>
-            {staffUsers.map((staff) => (
+            {pagedStaffUsers.map((staff) => (
               <ManagerRow key={staff.userId}>
                 <ManagerCell className="font-medium">{staff.fullName}</ManagerCell>
                 <ManagerCell>{staff.email}</ManagerCell>
@@ -181,6 +189,24 @@ export default function StaffShiftPage() {
             ))}
           </ManagerDataTable>
         )}
+        {totalStaffPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setStaffPage(p => Math.max(1, p - 1))} disabled={staffPage === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalStaffPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setStaffPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === staffPage ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setStaffPage(p => Math.min(totalStaffPages, p + 1))} disabled={staffPage === totalStaffPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
+          </div>
+        )}
       </ManagerPanel>
 
       <ManagerPanel title="Staff Shift Directory" subtitle={`${staffShifts.length} assignment records available`}>
@@ -188,7 +214,7 @@ export default function StaffShiftPage() {
           <ManagerEmptyState title="No staff shifts yet" description="Create assignments after staff accounts and shift templates are available." />
         ) : (
           <ManagerDataTable columns={["Staff", "Shift", "Working Date", "Time", "Status", "Actions"]}>
-            {staffShifts.map((item) => {
+            {pagedStaffShifts.map((item) => {
               const shift = shiftMap[item.shiftId];
               return (
                 <ManagerRow key={item.staffShiftId}>
@@ -207,6 +233,24 @@ export default function StaffShiftPage() {
               );
             })}
           </ManagerDataTable>
+        )}
+        {totalShiftPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setShiftPage(p => Math.max(1, p - 1))} disabled={shiftPage === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalShiftPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setShiftPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === shiftPage ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setShiftPage(p => Math.min(totalShiftPages, p + 1))} disabled={shiftPage === totalShiftPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
+          </div>
         )}
       </ManagerPanel>
 
