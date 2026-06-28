@@ -296,8 +296,8 @@ html { scroll-behavior: smooth; }
   color: var(--bg);
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem;
 }
+.nav-logo-mark svg { width: 20px; height: 20px; stroke-width: 2.2; }
 
 .nav-links {
   display: flex;
