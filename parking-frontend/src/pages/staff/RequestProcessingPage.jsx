@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { requestApi } from "../../api/driver/requestApi";
 import { unwrapApiData } from "../../utils/api";
 import { formatStaffDateTime } from "./staffPortalState";
@@ -9,6 +9,10 @@ export default function RequestProcessingPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const paged = useMemo(() => requests.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [requests, page]);
+  const totalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
 
   useEffect(() => {
     void loadRequests();
@@ -90,7 +94,7 @@ export default function RequestProcessingPage() {
         />
       ) : (
         <div className="space-y-3">
-          {requests.map((item) => (
+          {paged.map((item) => (
             <div key={item.requestId} className="rounded-2xl border border-border p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1">
@@ -130,6 +134,24 @@ export default function RequestProcessingPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            ← Trước
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button key={p} onClick={() => setPage(p)}
+              className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            Sau →
+          </button>
         </div>
       )}
 

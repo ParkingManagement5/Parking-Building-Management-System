@@ -51,6 +51,9 @@ export default function ParkingSessionPage() {
     void loadSessions();
   }, []);
 
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   const filteredSessions = useMemo(() => {
     const query = keyword.trim().toLowerCase();
     if (!query) return sessions;
@@ -62,12 +65,15 @@ export default function ParkingSessionPage() {
     );
   }, [sessions, keyword]);
 
+  const paged = useMemo(() => filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredSessions, page]);
+  const totalPages = Math.max(1, Math.ceil(filteredSessions.length / PAGE_SIZE));
+
   return (
     <div className="space-y-5">
       <StaffPageSection title="Parking Sessions" subtitle="Track backend active, waiting-payment, and completed sessions">
         <StaffInput
           value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
+          onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
           placeholder="Filter by plate, session ID, or slot"
           className="mb-4"
         />
@@ -85,7 +91,7 @@ export default function ParkingSessionPage() {
           />
         ) : (
           <div className="space-y-3">
-            {filteredSessions.map((item) => (
+            {paged.map((item) => (
               <div key={item.sessionId} className="rounded-2xl border border-border px-4 py-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1">
@@ -119,6 +125,24 @@ export default function ParkingSessionPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button key={p} onClick={() => setPage(p)}
+                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                {p}
+              </button>
+            ))}
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+              Sau →
+            </button>
           </div>
         )}
       </StaffPageSection>
