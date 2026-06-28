@@ -21,7 +21,7 @@ export default function PublicLayout() {
 
   return (
     <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100dvh" }}>
-      <nav className="nav" ref={navRef} style={{ position: "sticky", top: 0 }}>
+      <nav className="nav" ref={navRef}>
         <div className="container nav-inner">
           <a href="/" className="nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
             <span className="nav-logo-mark">P</span>
@@ -44,7 +44,7 @@ export default function PublicLayout() {
           </div>
         </div>
       </nav>
-      <main style={{ paddingTop: 20 }}>
+      <main style={{ paddingTop: 92 }}>
         <Outlet />
       </main>
     </div>
