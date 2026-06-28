@@ -41,7 +41,13 @@ export default function PaymentProcessingPage() {
         paymentApi.getByStatus("PAID"),
         pricingPolicyApi.getAll(),
       ]);
-      setSessions(unwrapApiData(res.data, []));
+      const waitingSessions = unwrapApiData(res.data, []);
+      const restoredPayments = await loadExistingPendingPayments(waitingSessions);
+      setSessions(waitingSessions);
+      setPendingPaymentMap((prev) => ({
+        ...restoredPayments,
+        ...prev,
+      }));
       setRecentPayments(unwrapApiData(paidRes.data, []).slice(0, 6));
       const policies = unwrapApiData(pricingRes.data, []);
       setPricingPolicies(policies);
@@ -51,6 +57,28 @@ export default function PaymentProcessingPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadExistingPendingPayments(waitingSessions) {
+    const entries = await Promise.all(
+      waitingSessions.map(async (session) => {
+        try {
+          const res = await paymentApi.getBySessionId(session.sessionId);
+          const payments = unwrapApiData(res.data, []);
+          const payment = payments.find(
+            (item) =>
+              item?.paymentType === "PARKING_FEE" &&
+              item?.paymentStatus === "PENDING"
+          );
+          return payment ? [session.sessionId, buildPendingPaymentState(payment, session)] : null;
+        } catch (err) {
+          console.warn("Failed to load existing payment for session", session.sessionId, err);
+          return null;
+        }
+      })
+    );
+
+    return Object.fromEntries(entries.filter(Boolean));
   }
 
   function buildMockPaymentPayload(payment, session, amount) {
@@ -63,6 +91,20 @@ export default function PaymentProcessingPage() {
       currency: "VND",
       purpose: "PARKING_FEE",
     });
+  }
+
+  function toAmount(value) {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount) ? amount : 0;
+  }
+
+  function buildPendingPaymentState(payment, session) {
+    const payableAmount = toAmount(payment.totalAmount);
+    return {
+      payment,
+      payload: buildMockPaymentPayload(payment, session, payableAmount),
+      amount: payableAmount,
+    };
   }
 
   function resolveHourlyRate(session) {
@@ -92,13 +134,12 @@ export default function PaymentProcessingPage() {
         paymentMethod: method,
       });
       const payment = unwrapApiData(paymentRes.data, null);
+      if (!payment?.paymentId) {
+        throw new Error("Backend payment response missing paymentId");
+      }
       setPendingPaymentMap((prev) => ({
         ...prev,
-        [session.sessionId]: {
-          payment,
-          payload: buildMockPaymentPayload(payment, session, amount),
-          amount,
-        },
+        [session.sessionId]: buildPendingPaymentState(payment, session),
       }));
     } catch (err) {
       console.error("Create mock payment QR failed", err);
@@ -125,7 +166,7 @@ export default function PaymentProcessingPage() {
         entryTime: session.entryTime,
         exitTime: session.exitTime,
         transactionRef,
-        durationFee: pending.amount,
+        durationFee: toAmount(paid.totalAmount ?? pending.amount),
       });
       setRecentPayments((prev) => [paid, ...prev].slice(0, 6));
       setPendingPaymentMap((prev) => {
@@ -213,9 +254,13 @@ export default function PaymentProcessingPage() {
                   </div>
                   <div className="grid gap-3 md:grid-cols-[180px_140px_auto]">
                     <div className="rounded-2xl bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Current Fee</p>
+                      <p className="text-xs text-muted-foreground">
+                        {pendingPaymentMap[item.sessionId] ? "Payable Amount" : "Payment Amount"}
+                      </p>
                       <p className="mt-1 text-sm font-semibold text-foreground">
-                        {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime, resolveHourlyRate(item)))}
+                        {pendingPaymentMap[item.sessionId]
+                          ? formatStaffCurrency(pendingPaymentMap[item.sessionId].amount)
+                          : "Create payment to calculate the payable amount"}
                       </p>
                     </div>
                     <StaffSelect
@@ -326,7 +371,7 @@ export default function PaymentProcessingPage() {
                 ["Entry", formatStaffDateTime(receipt.entryTime)],
                 ["Exit", formatStaffDateTime(receipt.exitTime || receipt.paidAt)],
                 ["Paid At", formatStaffDateTime(receipt.paidAt)],
-                ["Total", formatStaffCurrency(receipt.totalAmount || receipt.durationFee)],
+                ["Total", formatStaffCurrency(receipt.totalAmount ?? receipt.durationFee)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl bg-background/80 p-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
