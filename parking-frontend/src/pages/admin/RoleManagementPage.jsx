@@ -22,10 +22,17 @@ const ROLE_PERMISSIONS = {
 };
 
 function roleTone(name) {
-  if (name === "ADMIN") return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300";
-  if (name === "MANAGER") return "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300";
-  if (name === "STAFF") return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300";
-  return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300";
+  if (name === "ADMIN") return "border-border bg-card text-foreground";
+  if (name === "MANAGER") return "border-border bg-card text-foreground";
+  if (name === "STAFF") return "border-border bg-card text-foreground";
+  return "border-border bg-card text-foreground";
+}
+
+function roleAccent(name) {
+  if (name === "ADMIN") return "#ef4444";
+  if (name === "MANAGER") return "#8b5cf6";
+  if (name === "STAFF") return "#10b981";
+  return "#3b82f6";
 }
 
 export default function RoleManagementPage() {
@@ -95,23 +102,23 @@ export default function RoleManagementPage() {
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
             {roleCards.map((item) => (
-              <div key={item.roleId} className={`rounded-3xl border p-5 transition-all hover:shadow-sm ${roleTone(item.roleName)}`}>
+              <div key={item.roleId} className="rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">{item.roleName}</h3>
-                    <p className="mt-1 text-xs opacity-80">Role ID: {item.roleId}</p>
+                    <div className="flex items-center gap-3">
+                      <span className="size-3 rounded-full" style={{ background: roleAccent(item.roleName) }} />
+                      <h3 className="text-lg font-bold text-foreground">{item.roleName}</h3>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">Role ID: {item.roleId}</p>
                   </div>
-                  <ManagerStatusBadge tone={item.roleName === "ADMIN" ? "rose" : item.roleName === "MANAGER" ? "violet" : item.roleName === "STAFF" ? "emerald" : "blue"}>
+                  <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${roleAccent(item.roleName)}20`, color: roleAccent(item.roleName) }}>
                     {roleCounts.get(item.roleName) || 0} users
-                  </ManagerStatusBadge>
+                  </span>
                 </div>
-                <p className="mb-4 text-sm opacity-90">{item.description}</p>
-                <div className="mb-4 flex flex-wrap gap-1.5">
+                <p className="mb-4 text-sm text-muted-foreground">{item.description}</p>
+                <div className="flex flex-wrap gap-1.5">
                   {item.permissions.map((permission) => (
-                    <span
-                      key={permission}
-                      className="rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-mono dark:bg-white/10"
-                    >
+                    <span key={permission} className="rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-mono text-muted-foreground">
                       {permission}
                     </span>
                   ))}
