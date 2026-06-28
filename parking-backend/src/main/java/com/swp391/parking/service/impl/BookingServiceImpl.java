@@ -7,6 +7,7 @@ import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.*;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.NotificationService;
+import com.swp391.parking.util.LicensePlateUtil;
 import com.swp391.parking.util.QrTokenUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -295,14 +298,17 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public List<BookingResponse> searchByPlate(String licensePlate) {
         if (licensePlate == null || licensePlate.isBlank()) return List.of();
-        String plate = licensePlate.trim().toUpperCase();
-        return bookingRepository.findAll().stream()
-                .filter(b -> b.getVehicle() != null
-                        && plate.equals(b.getVehicle().getLicensePlate().toUpperCase())
-                        && List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
-                                .contains(b.getStatus()))
-                .map(this::toResponse)
-                .toList();
+        Map<Long, Booking> matches = new LinkedHashMap<>();
+        List<Booking.BookingStatus> activeStatuses = List.of(
+                Booking.BookingStatus.PENDING_PAYMENT,
+                Booking.BookingStatus.CONFIRMED);
+        LicensePlateUtil.lookupCandidates(licensePlate).stream()
+                .map(vehicleRepository::findByLicensePlate)
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .forEach(vehicle -> bookingRepository.findByVehicle_IdAndStatusIn(vehicle.getId(), activeStatuses)
+                        .ifPresent(booking -> matches.putIfAbsent(booking.getId(), booking)));
+        return matches.values().stream().map(this::toResponse).toList();
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
