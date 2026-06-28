@@ -175,7 +175,7 @@ export default function PublicSlotListPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px" }}>
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: "1.8rem", fontWeight: 800, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.01em" }}>
             Bản đồ bãi đỗ xe
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginTop: 6 }}>
@@ -191,7 +191,7 @@ export default function PublicSlotListPage() {
                 <div style={{ width: 14, height: 14, borderRadius: "50%", background: c.color }} />
               </div>
               <div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", lineHeight: 1 }}>{c.value}</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{c.value}</div>
                 <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 2 }}>{c.label}</div>
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function PublicSlotListPage() {
                 {/* Floor header */}
                 <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <span style={{ fontWeight: 800, color: "var(--text)", fontSize: "1.1rem" }}>{floor.building}</span>
+                    <span style={{ fontWeight: 700, color: "var(--text)", fontSize: "1.1rem" }}>{floor.building}</span>
                     <span style={{ color: "var(--accent)", fontSize: "0.88rem", marginLeft: 14, fontWeight: 600 }}>{floor.floor}</span>
                   </div>
                   <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
@@ -295,7 +295,7 @@ export default function PublicSlotListPage() {
                 <div style={{ padding: "28px 24px", background: "var(--bg-section)", position: "relative" }}>
                   {/* Entry gate */}
                   <div style={{ textAlign: "center", marginBottom: 18 }}>
-                    <span style={{ display: "inline-block", padding: "5px 28px", background: "var(--accent)", color: "#000", borderRadius: "0 0 10px 10px", fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em" }}>
+                    <span style={{ display: "inline-block", padding: "5px 28px", background: "var(--accent)", color: "#000", borderRadius: "0 0 10px 10px", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em" }}>
                       ▼ CỔNG VÀO
                     </span>
                   </div>
@@ -322,7 +322,7 @@ export default function PublicSlotListPage() {
 
                   {/* Exit gate */}
                   <div style={{ textAlign: "center", marginTop: 18 }}>
-                    <span style={{ display: "inline-block", padding: "5px 28px", background: "rgba(255,77,77,0.15)", color: "var(--danger)", borderRadius: "10px 10px 0 0", fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.1em" }}>
+                    <span style={{ display: "inline-block", padding: "5px 28px", background: "rgba(255,77,77,0.15)", color: "var(--danger)", borderRadius: "10px 10px 0 0", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em" }}>
                       ▲ CỔNG RA
                     </span>
                   </div>
