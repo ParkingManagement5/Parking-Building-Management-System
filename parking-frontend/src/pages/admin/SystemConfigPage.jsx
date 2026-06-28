@@ -74,6 +74,7 @@ function serializeToggleValue(value, originalValue) {
 
 export default function SystemConfigPage() {
   const [configs, setConfigs] = useState([]);
+  const [page, setPage] = useState(1);
   const [draftValues, setDraftValues] = useState({});
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -105,6 +106,10 @@ export default function SystemConfigPage() {
     }
   }
 
+  const PAGE_SIZE = 10;
+  const pagedConfigs = useMemo(() => configs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [configs, page]);
+  const totalPages = Math.max(1, Math.ceil(configs.length / PAGE_SIZE));
+
   const groupedConfigs = useMemo(() => {
     const groups = {
       OCR: [],
@@ -114,12 +119,12 @@ export default function SystemConfigPage() {
       OTHER: [],
     };
 
-    configs.forEach((item) => {
+    pagedConfigs.forEach((item) => {
       groups[detectGroup(item.configKey)].push(item);
     });
 
     return groups;
-  }, [configs]);
+  }, [pagedConfigs]);
 
   const hasChanges = useMemo(
     () =>
@@ -353,6 +358,25 @@ export default function SystemConfigPage() {
           .map((groupKey) => renderCard(groupKey, groupedConfigs[groupKey]))
           .filter(Boolean)}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            ← Trước
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+            <button key={p} onClick={() => setPage(p)}
+              className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {p}
+            </button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+            Sau →
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 sm:justify-start">
