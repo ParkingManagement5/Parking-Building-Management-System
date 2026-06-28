@@ -143,6 +143,20 @@ export default function ParkingSlotPage() {
     return current.filter((slot) => slot.status.toLowerCase() === filter);
   }, [slots, resolvedActiveFloorId, filter]);
 
+  const zoneGroups = useMemo(() => {
+    const currentSlots = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
+    const map = {};
+    currentSlots.forEach((slot) => {
+      const zid = slot.zoneId || "unknown";
+      if (!map[zid]) {
+        const zone = floorZones.find((z) => String(z.zoneId ?? z.id) === String(zid));
+        map[zid] = { name: zone?.zoneName || zone?.name || `Zone ${zid}`, vehicleType: zone?.vehicleType?.name || "", slots: [] };
+      }
+      map[zid].slots.push(slot);
+    });
+    return Object.values(map).map((g) => ({ ...g, slots: g.slots.sort((a, b) => (a.slotCode || "").localeCompare(b.slotCode || "")) }));
+  }, [slots, resolvedActiveFloorId, floorZones]);
+
   const counts = useMemo(() => {
     const current = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
     return {
@@ -335,29 +349,80 @@ export default function ParkingSlotPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-muted/30 p-4">
-          <p className="mb-3 text-xs text-muted-foreground">
-            Floor {buildingFloors.find((floor) => String(floor.floorId ?? floor.id) === String(resolvedActiveFloorId))?.label || "--"} -{" "}
-            {selectedBuilding?.name || "No building selected"}
-          </p>
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(10, minmax(0, 1fr))" }}>
-            {floorSlots.map((slot) => (
-              <button
-                key={slot.id}
-                type="button"
-                title={`${slot.slotCode} - ${slot.status}`}
-                onClick={() => openEditModal(slot)}
-                className={`${statusColor(slot.status)} aspect-[1.6] rounded-md text-[10px] font-bold text-white transition-all hover:z-10 hover:scale-110`}
-              >
-                {slot.slotCode}
-              </button>
+        <div className="rounded-2xl bg-muted/30 p-5">
+          {/* Entry gate */}
+          <div className="text-center mb-4">
+            <span className="inline-block rounded-b-lg bg-emerald-600 px-6 py-1.5 text-[11px] font-bold text-white tracking-wider">▼ CỔNG VÀO</span>
+          </div>
+
+          {/* Top row: first 3 zones */}
+          <div className="grid grid-cols-3 gap-3">
+            {zoneGroups.slice(0, 3).map((zone) => (
+              <div key={zone.name} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-foreground">{zone.name}</span>
+                  <span className="text-[10px] text-emerald-500 font-mono">
+                    {zone.slots.filter((s) => s.status === "AVAILABLE").length}/{zone.slots.length}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground mb-2">{zone.vehicleType}</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {zone.slots.map((slot) => (
+                    <button key={slot.id} type="button" title={`${slot.slotCode} — ${slot.status}`}
+                      onClick={() => openEditModal(slot)}
+                      className={`${statusColor(slot.status)} rounded-lg py-2.5 text-[10px] font-bold text-white transition hover:scale-105 hover:z-10`}>
+                      {(slot.slotCode || "").split("-").pop()}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
-          {floorSlots.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-              No slots found for this floor and filter.
+
+          {/* Aisle */}
+          {zoneGroups.length > 3 && (
+            <div className="relative text-center my-3">
+              <div className="absolute left-[5%] right-[5%] top-1/2 h-px bg-border" />
+              <span className="relative inline-block bg-muted/30 px-4 text-[10px] font-bold text-muted-foreground tracking-widest">ĐƯỜNG ĐI</span>
             </div>
-          ) : null}
+          )}
+
+          {/* Bottom row: next 3 zones */}
+          {zoneGroups.length > 3 && (
+            <div className="grid grid-cols-3 gap-3">
+              {zoneGroups.slice(3, 6).map((zone) => (
+                <div key={zone.name} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-foreground">{zone.name}</span>
+                    <span className="text-[10px] text-emerald-500 font-mono">
+                      {zone.slots.filter((s) => s.status === "AVAILABLE").length}/{zone.slots.length}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mb-2">{zone.vehicleType}</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {zone.slots.map((slot) => (
+                      <button key={slot.id} type="button" title={`${slot.slotCode} — ${slot.status}`}
+                        onClick={() => openEditModal(slot)}
+                        className={`${statusColor(slot.status)} rounded-lg py-2.5 text-[10px] font-bold text-white transition hover:scale-105 hover:z-10`}>
+                        {(slot.slotCode || "").split("-").pop()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Exit gate */}
+          <div className="text-center mt-4">
+            <span className="inline-block rounded-t-lg bg-rose-500/20 px-6 py-1.5 text-[11px] font-bold text-rose-400 tracking-wider">▲ CỔNG RA</span>
+          </div>
+
+          {zoneGroups.length === 0 && (
+            <div className="mt-4 rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
+              Không có slot nào cho tầng này.
+            </div>
+          )}
         </div>
       </div>
 
