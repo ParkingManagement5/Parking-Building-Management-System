@@ -24,8 +24,6 @@ import RequestCenterPage from "../pages/driver/RequestCenterPage";
 import DriverProfilePage from "../pages/driver/DriverProfilePage";
 import StaffDashboard from "../pages/staff/StaffDashboard";
 import StaffNotificationPage from "../pages/staff/StaffNotificationPage";
-import VehicleEntryPage from "../pages/staff/VehicleEntryPage";
-import VehicleExitPage from "../pages/staff/VehicleExitPage";
 import UnifiedQrScanPage from "../pages/staff/UnifiedQrScanPage";
 import StaffGatePage from "../pages/staff/GatePage";
 import ParkingSessionPage from "../pages/staff/ParkingSessionPage";
