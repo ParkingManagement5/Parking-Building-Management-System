@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -35,6 +36,22 @@ public class QrTokenUtil {
         Date expiry = Date.from(expiredAt.atZone(ZoneId.systemDefault()).toInstant());
         return Jwts.builder()
                 .subject("QR_BOOKING")
+                .claims(Map.of(
+                        "booking_id", bookingId,
+                        "license_plate", licensePlate,
+                        "slot_id", slotId
+                ))
+                .expiration(expiry)
+                .signWith(getKey())
+                .compact();
+    }
+
+    public String generateBookingQrToken(Long bookingId, String licensePlate,
+                                         Long slotId, LocalDateTime expiredAt) {
+        Date expiry = Date.from(expiredAt.atZone(ZoneId.systemDefault()).toInstant());
+        return Jwts.builder()
+                .subject("QR_BOOKING")
+                .id(UUID.randomUUID().toString())
                 .claims(Map.of(
                         "booking_id", bookingId,
                         "license_plate", licensePlate,
