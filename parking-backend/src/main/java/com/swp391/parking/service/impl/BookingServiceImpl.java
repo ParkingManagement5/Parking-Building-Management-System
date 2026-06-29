@@ -169,21 +169,20 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
         }
 
-        // Sinh QR token — hạn 2 giờ (session-based, driver đến khi nào cũng được)
-        LocalDateTime qrExpiry = LocalDateTime.now().plusHours(2);
-        String qr = qrTokenUtil.generateQrToken(
+        // Booking QR is valid until bookingStartTime + 30 minutes.
+        LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
+        String qr = qrTokenUtil.generateBookingQrToken(
                 booking.getId(),
                 booking.getVehicle().getLicensePlate(),
                 booking.getSlot().getId(),
                 qrExpiry);
 
         booking.setQrToken(qr);
-        booking.setQrIssuedAt(LocalDateTime.now());
-        booking.setDepositPaidAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        booking.setQrIssuedAt(now);
+        booking.setDepositPaidAt(now);
         booking.setStatus(Booking.BookingStatus.CONFIRMED);
-        booking.setExpiredAt(booking.getBookingEndTime() != null
-                ? booking.getBookingEndTime()
-                : LocalDateTime.now().plusHours(2));
+        booking.setExpiredAt(qrExpiry);
 
         // Mark slot RESERVED
         ParkingSlot slot = booking.getSlot();
@@ -278,8 +277,13 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.CONFLICT, "QR đã được sử dụng, không thể tạo lại");
         }
 
-        LocalDateTime qrExpiry = LocalDateTime.now().plusHours(2);
-        String newQr = qrTokenUtil.generateQrToken(
+        LocalDateTime qrExpiry = booking.getExpiredAt();
+        if (qrExpiry == null || !qrExpiry.isAfter(LocalDateTime.now())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "QR da het han, khong the tao lai cho booking nay");
+        }
+
+        String newQr = qrTokenUtil.generateBookingQrToken(
                 booking.getId(),
                 booking.getVehicle().getLicensePlate(),
                 booking.getSlot().getId(),
@@ -287,7 +291,6 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setQrToken(newQr);
         booking.setQrIssuedAt(LocalDateTime.now());
-        booking.setExpiredAt(qrExpiry);
         booking = bookingRepository.save(booking);
 
         log.info("Booking #{} QR regenerated, new expiry={}", bookingId, qrExpiry);
@@ -315,6 +318,13 @@ public class BookingServiceImpl implements BookingService {
     private Booking getBookingEntity(Long id) {
         return bookingRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking #" + id));
+    }
+
+    private LocalDateTime confirmedBookingQrExpiry(Booking booking) {
+        if (booking.getBookingStartTime() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking thieu bookingStartTime");
+        }
+        return booking.getBookingStartTime().plusMinutes(30).withNano(0);
     }
 
     private void expireStaleOpenBookings(LocalDateTime now) {
