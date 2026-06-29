@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Scheduler để tự động expire booking theo các rule:
  * - PENDING_PAYMENT quá expired_at → EXPIRED (slot vẫn AVAILABLE)
- * - CONFIRMED quá 30p sau booking_start_time → EXPIRED + giải phóng slot
+ * - CONFIRMED qua expired_at -> EXPIRED + giai phong slot
  *
  * Chạy mỗi phút 1 lần (fixedDelay = 60_000) để đảm bảo timely expire.
  * Dùng @Transactional để đảm bảo atomicity khi update booking + slot.
@@ -43,12 +43,11 @@ public class BookingScheduler {
         }
     }
 
-    /** Expire CONFIRMED quá 30p sau booking_start_time [BR-03c] → giải phóng slot */
+    /** Expire CONFIRMED qua expired_at -> giai phong slot */
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void expireConfirmedNoShow() {
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(30);
-        List<Booking> list = bookingRepository.findConfirmedExpired(threshold);
+        List<Booking> list = bookingRepository.findConfirmedExpired(LocalDateTime.now());
         if (!list.isEmpty()) {
             log.info("Scheduler: expire {} CONFIRMED no-show bookings", list.size());
             list.forEach(b -> {
