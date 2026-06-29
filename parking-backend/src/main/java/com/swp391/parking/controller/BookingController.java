@@ -95,7 +95,7 @@ public class BookingController {
     @PutMapping("/{id}/regenerate-qr")
     @PreAuthorize("hasRole('DRIVER')")
     @Operation(summary = "Tạo lại QR khi hết hạn",
-            description = "Driver tạo lại QR cho booking CONFIRMED khi QR cũ hết hạn. QR mới có hạn 2 giờ.")
+            description = "Driver tạo lại QR cho booking CONFIRMED khi QR cũ chưa dùng và booking còn trong hạn.")
     public ResponseEntity<ApiResponse<BookingResponse>> regenerateQr(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails ud) {
