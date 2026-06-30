@@ -49,7 +49,9 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentMethod paymentMethod
     ) {
         var existingDeposit = paymentRepository.findByBookingIdAndPaymentType(bookingId, PaymentType.DEPOSIT);
-        if (existingDeposit.isPresent()) {
+        if (existingDeposit.isPresent()
+                && (existingDeposit.get().getPaymentStatus() == PaymentStatus.PENDING
+                || existingDeposit.get().getPaymentStatus() == PaymentStatus.PAID)) {
             return toResponse(existingDeposit.get());
         }
 
@@ -77,6 +79,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
         }
+        if (payment.getPaymentStatus() == PaymentStatus.FAILED
+                || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Khong the confirm payment dang o trang thai " + payment.getPaymentStatus());
+        }
 
         if (payment.getBookingId() != null) {
             Booking booking = bookingRepository.findById(payment.getBookingId().longValue()).orElse(null);
@@ -97,6 +104,28 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return toResponse(savedPayment);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse markFailed(Integer paymentId, String transactionRef) {
+        Payment payment = findById(paymentId);
+
+        if (payment.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Payment da PAID, khong the mark FAILED");
+        }
+        if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Payment da REFUNDED, khong the mark FAILED");
+        }
+        if (payment.getPaymentStatus() == PaymentStatus.FAILED) {
+            return toResponse(payment);
+        }
+
+        payment.setPaymentStatus(PaymentStatus.FAILED);
+        if (transactionRef != null && !transactionRef.isBlank()) {
+            payment.setTransactionRef(transactionRef);
+        }
+        return toResponse(paymentRepository.save(payment));
     }
 
     @Override
@@ -130,8 +159,13 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         BigDecimal serverRate = resolveHourlyRate(session);
+        List<PricingPolicy> activePolicies = List.of();
+        if (session.getVehicle() != null && session.getVehicle().getVehicleType() != null) {
+            activePolicies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(
+                    session.getVehicle().getVehicleType().getId());
+        }
         BigDecimal serverBaseFee = FeeCalculatorUtil.calculateSessionFee(
-                session.getEntryTime(), session.getExitTime(), serverRate);
+                session.getEntryTime(), session.getExitTime(), activePolicies, serverRate);
 
         BigDecimal serverDeposit = BigDecimal.ZERO;
         if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
@@ -180,6 +214,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
             throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
         }
+        if (payment.getPaymentStatus() == PaymentStatus.FAILED
+                || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Khong the confirm payment dang o trang thai " + payment.getPaymentStatus());
+        }
 
         if (payment.getSessionId() != null) {
             ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue()).orElse(null);
@@ -197,6 +236,27 @@ public class PaymentServiceImpl implements PaymentService {
         completeSessionAfterParkingFee(saved);
 
         return toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse refundPayment(Integer paymentId, String transactionRef) {
+        Payment payment = findById(paymentId);
+
+        if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
+            return toResponse(payment);
+        }
+        if (payment.getPaymentStatus() != PaymentStatus.PAID) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi refund payment da PAID (hien: " + payment.getPaymentStatus() + ")");
+        }
+
+        validateRefundEligibility(payment);
+        payment.setPaymentStatus(PaymentStatus.REFUNDED);
+        if (transactionRef != null && !transactionRef.isBlank()) {
+            payment.setTransactionRef(transactionRef);
+        }
+        return toResponse(paymentRepository.save(payment));
     }
 
     @Override
@@ -276,6 +336,36 @@ public class PaymentServiceImpl implements PaymentService {
         List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vtId);
         LocalDateTime refTime = session.getEntryTime() != null ? session.getEntryTime() : LocalDateTime.now();
         return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
+    }
+
+    private void validateRefundEligibility(Payment payment) {
+        if (payment.getPaymentType() == PaymentType.DEPOSIT) {
+            if (payment.getBookingId() == null) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Deposit payment khong gan voi booking, khong the refund");
+            }
+            Booking booking = bookingRepository.findById(payment.getBookingId().longValue())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+            if (booking.getStatus() != Booking.BookingStatus.CANCELLED
+                    && booking.getStatus() != Booking.BookingStatus.EXPIRED) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Chi refund deposit khi booking da CANCELLED hoac EXPIRED");
+            }
+            return;
+        }
+
+        if (payment.getPaymentType() == PaymentType.PARKING_FEE) {
+            if (payment.getSessionId() == null) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Parking fee khong gan voi session, khong the refund");
+            }
+            ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session khong ton tai"));
+            if (session.getStatus() != ParkingSession.SessionStatus.COMPLETED) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Chi refund parking fee khi session da COMPLETED");
+            }
+        }
     }
 
     private void completeSessionAfterParkingFee(Payment payment) {

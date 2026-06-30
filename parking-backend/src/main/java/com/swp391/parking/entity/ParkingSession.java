@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 public class ParkingSession extends BaseEntity {
 
     public enum EntryMode { BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL }
-    public enum SessionStatus { ACTIVE, WAITING_PAYMENT, COMPLETED, EXCEPTION }
+    public enum SessionStatus { ACTIVE, WAITING_PAYMENT, COMPLETED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
