@@ -182,7 +182,7 @@ export default function BookingHistoryPage() {
               const rawStatus = String(item.status || "").toUpperCase();
               const isPendingPayment = rawStatus === "PENDING_PAYMENT";
               const isConfirmed = rawStatus === "CONFIRMED";
-              const isConfirmedNoQr = isConfirmed && !item.qrToken && !item.qrUsed;
+              const canRegenerateQr = isConfirmed && Boolean(item.qrToken) && !item.qrUsed;
               const cancelDeadline = getConfirmedCancelDeadline(item);
               const canCancelConfirmed = isConfirmed && cancelDeadline != null && cancelDeadline >= Date.now();
               const canCancel = isPendingPayment || canCancelConfirmed;
@@ -236,7 +236,7 @@ export default function BookingHistoryPage() {
                           )}
                         </button>
                       )}
-                      {isConfirmedNoQr && (
+                      {canRegenerateQr && (
                         <button
                           onClick={async () => {
                             try {

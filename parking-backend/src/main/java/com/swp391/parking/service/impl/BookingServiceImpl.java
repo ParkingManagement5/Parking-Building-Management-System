@@ -65,6 +65,12 @@ public class BookingServiceImpl implements BookingService {
                             + " (" + slot.getSlotSize() + ")");
         }
 
+        // Slot phải đang được kích hoạt trước khi kiểm tra trạng thái khai thác.
+        if (!Boolean.TRUE.equals(slot.getIsActive())) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Slot " + slot.getSlotCode() + " đang bị vô hiệu hóa, không thể đặt");
+        }
+
         // [BR-11] Slot không được MAINTENANCE
         if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Slot đang bảo trì, không thể đặt");
@@ -243,6 +249,11 @@ public class BookingServiceImpl implements BookingService {
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
+        }
+        // Token verify phải đúng token hiện tại trong DB để QR cũ bị revoke sau regenerate.
+        if (booking.getQrToken() == null || !booking.getQrToken().equals(qrToken)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "QR da bi thay the boi token moi. Dung QR moi nhat.");
         }
 
         return toResponse(booking);
