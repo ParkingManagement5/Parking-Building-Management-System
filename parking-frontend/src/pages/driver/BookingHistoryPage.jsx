@@ -78,33 +78,42 @@ export default function BookingHistoryPage() {
   }, []);
 
   async function handlePayDeposit(booking) {
-    let createdPaymentId = null;
+    // depositAmount = 0 → xác nhận miễn phí không qua VNPay
+    if (!booking.depositAmount || booking.depositAmount <= 0) {
+      try {
+        setProcessingBookingId(booking.bookingId);
+        setError("");
+        const createRes = await paymentApi.createDeposit({
+          bookingId: booking.bookingId,
+          depositAmount: 0,
+          paymentMethod: "CASH",
+        });
+        const payment = unwrapApiData(createRes.data, null);
+        if (payment?.paymentId) await paymentApi.confirmDeposit(payment.paymentId);
+        await loadBookings();
+      } catch (e) {
+        setError(e.response?.data?.message || "Không thể xác nhận booking.");
+      } finally {
+        setProcessingBookingId(null);
+      }
+      return;
+    }
+
+    // Có cọc → redirect sang VNPay
     try {
       setProcessingBookingId(booking.bookingId);
       setError("");
-      const createRes = await paymentApi.createDeposit({
-        bookingId: booking.bookingId,
-        depositAmount: booking.depositAmount ?? 0,
-        paymentMethod: "CASH",
-      });
-
-      const payment = unwrapApiData(createRes.data, null);
-      if (!payment?.paymentId) {
-        setError("Tạo thanh toán thất bại. Vui lòng thử lại.");
-        return;
-      }
-      createdPaymentId = payment.paymentId;
-      await paymentApi.confirmDeposit(createdPaymentId);
-      await loadBookings();
-    } catch (paymentError) {
-      console.error("Failed to pay deposit", paymentError);
-      const msg = paymentError.response?.data?.message || "Không thể thanh toán đặt cọc cho booking này.";
-      if (createdPaymentId) {
-        setError(`${msg} Thanh toán #${createdPaymentId} đã được tạo nhưng chưa xác nhận. Vui lòng liên hệ nhân viên.`);
+      const res = await paymentApi.createVnpayDepositUrl(booking.bookingId);
+      const data = unwrapApiData(res.data, null);
+      if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
       } else {
-        setError(msg);
+        setError("Không tạo được URL thanh toán. Vui lòng thử lại.");
+        setProcessingBookingId(null);
       }
-    } finally {
+    } catch (e) {
+      console.error("VNPay deposit error", e);
+      setError(e.response?.data?.message || "Không thể kết nối VNPay. Vui lòng thử lại.");
       setProcessingBookingId(null);
     }
   }

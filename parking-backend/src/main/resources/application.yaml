@@ -40,6 +40,9 @@ spring:
 server:
   port: 8080
 
+app:
+  frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+
 jwt:
   secret: ${JWT_SECRET:swp391-parking-dev-secret-key-must-be-at-least-256-bits-long-string}
   expiration: ${JWT_EXPIRATION:86400000}
@@ -57,3 +60,10 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /api-docs
+
+vnpay:
+  tmn-code: YOMWKDME
+  hash-secret: 4EQYIP7REP7K5TKBFLOMQAZFYRSF7P06
+  pay-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  return-url: ${VNPAY_RETURN_URL:http://localhost:5173/payment/result}
+  ipn-url: ${VNPAY_IPN_URL:https://until-deeply-able.ngrok-free.dev/api/v1/payments/vnpay/ipn}

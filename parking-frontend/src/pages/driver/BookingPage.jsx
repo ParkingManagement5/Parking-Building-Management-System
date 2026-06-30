@@ -224,15 +224,28 @@ export default function BookingPage() {
     setPayingDeposit(true);
     setPayError("");
     try {
-      const depositRes = await paymentApi.createDeposit({
-        bookingId: Number(confirmation.bookingId),
-        depositAmount: Number(confirmation.depositAmount || 0),
-        paymentMethod: "CASH",
-      });
-      const deposit = unwrapApiData(depositRes.data, null);
-      if (deposit?.paymentId) await paymentApi.confirmDeposit(deposit.paymentId);
-      setDepositPaid(true);
-      setConfirmation((p) => ({ ...p, status: "CONFIRMED" }));
+      const depositAmount = Number(confirmation.depositAmount || 0);
+      if (depositAmount > 0) {
+        // VNPay redirect
+        const res = await paymentApi.createVnpayDepositUrl(confirmation.bookingId);
+        const data = unwrapApiData(res.data, null);
+        if (data?.paymentUrl) {
+          window.location.href = data.paymentUrl;
+          return;
+        }
+        throw new Error("Không lấy được URL thanh toán VNPay");
+      } else {
+        // deposit = 0 → auto confirm CASH
+        const depositRes = await paymentApi.createDeposit({
+          bookingId: Number(confirmation.bookingId),
+          depositAmount: 0,
+          paymentMethod: "CASH",
+        });
+        const deposit = unwrapApiData(depositRes.data, null);
+        if (deposit?.paymentId) await paymentApi.confirmDeposit(deposit.paymentId);
+        setDepositPaid(true);
+        setConfirmation((p) => ({ ...p, status: "CONFIRMED" }));
+      }
     } catch (err) {
       setPayError(getErrorMessage(err, "Thanh toán cọc thất bại."));
     } finally {
@@ -271,12 +284,18 @@ export default function BookingPage() {
             <CheckCircle2 size={30} className={depositPaid ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"} />
           </div>
           <h3 className="font-bold text-foreground mb-1 text-xl">
-            {depositPaid ? "Đặt chỗ thành công — QR sẵn sàng" : "Đặt chỗ thành công — Cần thanh toán cọc"}
+            {depositPaid
+              ? "Đặt chỗ thành công — QR sẵn sàng"
+              : confirmation.depositAmount > 0
+                ? "Đặt chỗ thành công — Cần thanh toán cọc"
+                : "Đặt chỗ thành công"}
           </h3>
           <p className="text-muted-foreground text-sm mb-6">
             {depositPaid
               ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
-              : "Booking đã tạo. Thanh toán cọc để giữ chỗ. Phí đỗ xe sẽ tính từ lúc entry đến exit, trừ tiền cọc."}
+              : confirmation.depositAmount > 0
+                ? "Booking đã tạo. Thanh toán cọc qua VNPay để xác nhận giữ chỗ."
+                : "Booking đã tạo (miễn cọc). Nhấn xác nhận để lấy mã QR check-in."}
           </p>
           <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2 mb-6">
             {rows.map(([label, value, cls]) => (
@@ -290,7 +309,11 @@ export default function BookingPage() {
           <div className="space-y-3 mt-4">
             {!depositPaid ? (
               <button onClick={handlePayDeposit} disabled={payingDeposit} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60">
-                {payingDeposit ? "Đang thanh toán..." : `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND`}
+                {payingDeposit
+                  ? "Đang xử lý..."
+                  : confirmation.depositAmount > 0
+                    ? `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND qua VNPay`
+                    : "Xác nhận đặt chỗ (miễn cọc)"}
               </button>
             ) : (
               <button onClick={() => navigate("/driver/bookings")} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-colors">
@@ -367,11 +390,17 @@ export default function BookingPage() {
                 <SelectValue placeholder={loadingVehicles ? "Đang tải xe..." : "Chọn xe"} />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border bg-card shadow-xl">
-                {vehiclesWithStatus.map((v) => (
-                  <SelectItem key={v.vehicleId} value={String(v.vehicleId)} disabled={v.isLocked} className="rounded-lg px-3 py-2 text-sm">
-                    {v.licensePlate}{v.isLocked ? ` — đang có booking #${v.activeBooking.bookingId || v.activeBooking.id}` : ""}
-                  </SelectItem>
-                ))}
+                {vehiclesWithStatus.map((v) => {
+                  const typeName = v.vehicleType?.name;
+                  const typeLabel = typeName === "CAR" ? "Ô tô" : typeName === "MOTORBIKE" ? "Xe máy" : typeName || "";
+                  return (
+                    <SelectItem key={v.vehicleId} value={String(v.vehicleId)} disabled={v.isLocked} className="rounded-lg px-3 py-2 text-sm">
+                      {v.licensePlate}
+                      {typeLabel ? ` (${typeLabel})` : ""}
+                      {v.isLocked ? ` — đang có booking #${v.activeBooking.bookingId || v.activeBooking.id}` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {isSelectedVehicleLocked && (
