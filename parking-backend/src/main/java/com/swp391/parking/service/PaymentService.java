@@ -15,6 +15,8 @@ public interface PaymentService {
 
     PaymentResponse confirmDeposit(Integer paymentId);
 
+    PaymentResponse markFailed(Integer paymentId, String transactionRef);
+
     PaymentResponse createParkingFee(Integer sessionId,
                                       Integer bookingId,
                                       Integer policyId,
@@ -28,6 +30,8 @@ public interface PaymentService {
                                       PaymentMethod paymentMethod);
 
     PaymentResponse confirmParkingFee(Integer paymentId, String transactionRef);
+
+    PaymentResponse refundPayment(Integer paymentId, String transactionRef);
 
     PaymentResponse getById(Integer paymentId);
 

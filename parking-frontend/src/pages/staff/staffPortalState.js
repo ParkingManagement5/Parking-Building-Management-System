@@ -105,8 +105,13 @@ export function computeSessionFee(entryTime, endTimeOrHourlyRate = new Date(), h
   const end = rawEndTime ? new Date(rawEndTime) : new Date();
   const effectiveEnd = Number.isNaN(end.getTime()) ? new Date() : end;
   const elapsedMs = Math.max(0, effectiveEnd.getTime() - start.getTime());
-  const hours = Math.max(1, Math.ceil(elapsedMs / (1000 * 60 * 60)));
-  return hours * resolvedHourlyRate;
+  const graceMs = 10 * 60 * 1000;
+  if (elapsedMs <= graceMs) return 0;
+
+  const billableMs = elapsedMs - graceMs;
+  const blockMs = 30 * 60 * 1000;
+  const blocks = Math.max(1, Math.ceil(billableMs / blockMs));
+  return blocks * resolvedHourlyRate;
 }
 
 export function createPortalId(prefix) {
