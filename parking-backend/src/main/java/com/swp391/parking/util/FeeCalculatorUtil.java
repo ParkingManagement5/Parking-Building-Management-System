@@ -3,15 +3,20 @@ package com.swp391.parking.util;
 import com.swp391.parking.entity.PricingPolicy;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public class FeeCalculatorUtil {
 
     private static final BigDecimal DEFAULT_RATE = new BigDecimal("20000");
+    public static final long GRACE_PERIOD_MINUTES = 10;
+    public static final long BILLING_BLOCK_MINUTES = 30;
 
     /**
      * Chọn hourlyRate đúng theo BR-12:
@@ -47,6 +52,37 @@ public class FeeCalculatorUtil {
 
         // Fallback: policy đầu tiên
         return policies.get(0).getPricePerHour();
+    }
+
+    public static BigDecimal calculateSessionFee(LocalDateTime entryTime,
+                                                 LocalDateTime exitTime,
+                                                 List<PricingPolicy> policies,
+                                                 BigDecimal fallbackRate) {
+        if (entryTime == null || exitTime == null) {
+            return BigDecimal.ZERO;
+        }
+
+        if (!exitTime.isAfter(entryTime.plusMinutes(GRACE_PERIOD_MINUTES))) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal defaultRate = fallbackRate != null ? fallbackRate : DEFAULT_RATE;
+        if (policies == null || policies.isEmpty()) {
+            return calculateWindowFee(entryTime.plusMinutes(GRACE_PERIOD_MINUTES), exitTime, defaultRate);
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        LocalDateTime cursor = entryTime.plusMinutes(GRACE_PERIOD_MINUTES);
+        while (cursor.isBefore(exitTime)) {
+            BigDecimal blockRate = resolveHourlyRate(policies, cursor);
+            LocalDateTime nextBoundary = findNextPolicyBoundary(cursor, policies);
+            LocalDateTime segmentEnd = min(exitTime, nextBoundary);
+
+            total = total.add(calculateWindowFee(cursor, segmentEnd, blockRate != null ? blockRate : defaultRate));
+            cursor = segmentEnd;
+        }
+
+        return total;
     }
 
     private static boolean isWeekend(LocalDateTime dt) {
@@ -105,5 +141,45 @@ public class FeeCalculatorUtil {
         long hours = Math.max(1, (long) Math.ceil(totalMinutes / 60.0));
 
         return hourlyRate.multiply(BigDecimal.valueOf(hours));
+    }
+
+    private static BigDecimal calculateWindowFee(LocalDateTime start,
+                                                 LocalDateTime end,
+                                                 BigDecimal blockRate) {
+        if (start == null || end == null || blockRate == null || !end.isAfter(start)) {
+            return BigDecimal.ZERO;
+        }
+
+        long totalSeconds = Duration.between(start, end).getSeconds();
+        long blockSeconds = BILLING_BLOCK_MINUTES * 60;
+        long blocks = Math.max(1, (long) Math.ceil(totalSeconds / (double) blockSeconds));
+        return blockRate.multiply(BigDecimal.valueOf(blocks));
+    }
+
+    private static LocalDateTime findNextPolicyBoundary(LocalDateTime current, List<PricingPolicy> policies) {
+        List<LocalDateTime> boundaries = new ArrayList<>();
+        LocalDate today = current.toLocalDate();
+        LocalDate tomorrow = today.plusDays(1);
+
+        for (PricingPolicy policy : policies) {
+            addBoundary(boundaries, today, policy.getStartHour());
+            addBoundary(boundaries, today, policy.getEndHour());
+            addBoundary(boundaries, tomorrow, policy.getStartHour());
+            addBoundary(boundaries, tomorrow, policy.getEndHour());
+        }
+
+        return boundaries.stream()
+                .filter(boundary -> boundary.isAfter(current))
+                .min(Comparator.naturalOrder())
+                .orElse(current.plusMinutes(BILLING_BLOCK_MINUTES));
+    }
+
+    private static void addBoundary(List<LocalDateTime> boundaries, LocalDate date, Integer hour) {
+        if (hour == null) return;
+        boundaries.add(LocalDateTime.of(date, LocalTime.of(hour, 0)));
+    }
+
+    private static LocalDateTime min(LocalDateTime a, LocalDateTime b) {
+        return a.isBefore(b) ? a : b;
     }
 }

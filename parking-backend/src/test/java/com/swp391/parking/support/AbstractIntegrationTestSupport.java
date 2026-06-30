@@ -3,6 +3,7 @@ package com.swp391.parking.support;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.swp391.parking.entity.Floor;
+import com.swp391.parking.entity.ExceptionCase;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.Notification;
 import com.swp391.parking.entity.ParkingBuilding;
@@ -19,8 +20,10 @@ import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.entity.Zone;
 import com.swp391.parking.repository.FloorRepository;
+import com.swp391.parking.repository.ExceptionCaseRepository;
 import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.NotificationRepository;
+import com.swp391.parking.repository.OcrScanRepository;
 import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.ParkingSessionRepository;
@@ -35,6 +38,7 @@ import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.repository.VehicleTypeRepository;
 import com.swp391.parking.repository.ZoneRepository;
+import com.swp391.parking.scheduler.BookingScheduler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -74,6 +78,9 @@ public abstract class AbstractIntegrationTestSupport {
     protected FloorRepository floorRepository;
 
     @Autowired
+    protected ExceptionCaseRepository exceptionCaseRepository;
+
+    @Autowired
     protected GateRepository gateRepository;
 
     @Autowired
@@ -98,6 +105,9 @@ public abstract class AbstractIntegrationTestSupport {
     protected NotificationRepository notificationRepository;
 
     @Autowired
+    protected OcrScanRepository ocrScanRepository;
+
+    @Autowired
     protected PricingPolicyRepository pricingPolicyRepository;
 
     @Autowired
@@ -114,6 +124,9 @@ public abstract class AbstractIntegrationTestSupport {
 
     @Autowired
     protected RoleRepository roleRepository;
+
+    @Autowired
+    protected BookingScheduler bookingScheduler;
 
     protected String json(Object value) throws JsonProcessingException {
         return objectMapper.writeValueAsString(value);
@@ -269,6 +282,21 @@ public abstract class AbstractIntegrationTestSupport {
             .createdAt(LocalDateTime.now())
             .build();
         return notificationRepository.save(notification);
+    }
+
+    protected ExceptionCase createExceptionCase(
+            ExceptionCase.ExceptionType type,
+            ExceptionCase.ExceptionStatus status,
+            Integer sessionId,
+            Integer requestId) {
+        ExceptionCase exceptionCase = ExceptionCase.builder()
+            .exceptionType(type)
+            .description(type.name() + " test case")
+            .status(status)
+            .sessionId(sessionId)
+            .requestId(requestId)
+            .build();
+        return exceptionCaseRepository.save(exceptionCase);
     }
 
     protected PricingPolicy createPricingPolicy(VehicleType vehicleType, boolean isActive) {
