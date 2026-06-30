@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PaymentResponse;
+import com.swp391.parking.entity.Booking;
 import com.swp391.parking.entity.Payment;
 import com.swp391.parking.entity.Payment.PaymentMethod;
 import com.swp391.parking.exception.AppException;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -49,6 +51,13 @@ public class VNPayController {
 
         var booking = bookingRepository.findById(bookingId.longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+
+        if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking khong o trang thai cho thanh toan");
+        }
+        if (booking.getExpiredAt() == null || !booking.getExpiredAt().isAfter(LocalDateTime.now())) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han thanh toan");
+        }
 
         BigDecimal depositAmount = booking.getDepositAmount();
         if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
