@@ -45,6 +45,7 @@ import UserManagementPage from "../pages/user/UserManagementPage";
 import RoleManagementPage from "../pages/admin/RoleManagementPage";
 import SystemConfigPage from "../pages/admin/SystemConfigPage";
 import PortalSettingsPage from "../pages/user/PortalSettingsPage";
+import PaymentResultPage from "../pages/payment/PaymentResultPage";
 
 export default function AppRoutes() {
   return (
@@ -65,6 +66,7 @@ export default function AppRoutes() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="/payment/result" element={<PaymentResultPage />} />
 
         <Route element={<ProtectedRoute allowedRoles={["DRIVER"]} />}>
           <Route path="/driver" element={<RolePortalLayout portal="driver" />}>

@@ -13,7 +13,11 @@ public interface PaymentService {
                                    BigDecimal depositAmount,
                                    PaymentMethod paymentMethod);
 
-    PaymentResponse confirmDeposit(Integer paymentId);
+    PaymentResponse confirmDeposit(Integer paymentId, String transactionRef);
+
+    default PaymentResponse confirmDeposit(Integer paymentId) {
+        return confirmDeposit(paymentId, null);
+    }
 
     PaymentResponse markFailed(Integer paymentId, String transactionRef);
 

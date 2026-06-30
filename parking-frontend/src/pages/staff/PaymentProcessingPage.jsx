@@ -114,15 +114,34 @@ export default function PaymentProcessingPage() {
     return Number(policy?.pricePerHour ?? 20000);
   }
 
-  const createMockPaymentQr = async (session) => {
-    const rate = resolveHourlyRate(session);
-    const amount = computeSessionFee(session.entryTime, session.exitTime, rate);
+  const [vnpayQrMap, setVnpayQrMap] = useState({});
+
+  const createPayment = async (session) => {
     const method = methodMap[session.sessionId] || "CASH";
-    const policy = pricingPolicies.find(
-      (p) => p.isActive && p.vehicleTypeId === session.vehicleTypeId
-    );
     setProcessingId(session.sessionId);
     setError("");
+
+    if (method === "VNPAY") {
+      try {
+        const res = await paymentApi.createVnpayParkingFeeUrl(session.sessionId);
+        const data = unwrapApiData(res.data, null);
+        if (data?.autoConfirmed) {
+          await loadPendingPayments();
+        } else if (data?.paymentUrl) {
+          setVnpayQrMap((prev) => ({ ...prev, [session.sessionId]: data.paymentUrl }));
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || "Không tạo được URL VNPay.");
+      } finally {
+        setProcessingId(null);
+      }
+      return;
+    }
+
+    // CASH flow
+    const rate = resolveHourlyRate(session);
+    const amount = computeSessionFee(session.entryTime, session.exitTime, rate);
+    const policy = pricingPolicies.find((p) => p.isActive && p.vehicleTypeId === session.vehicleTypeId);
     try {
       const paymentRes = await paymentApi.createParkingFee({
         sessionId: Number(session.sessionId),
@@ -134,50 +153,30 @@ export default function PaymentProcessingPage() {
         paymentMethod: method,
       });
       const payment = unwrapApiData(paymentRes.data, null);
-      if (!payment?.paymentId) {
-        throw new Error("Backend payment response missing paymentId");
-      }
-      setPendingPaymentMap((prev) => ({
-        ...prev,
-        [session.sessionId]: buildPendingPaymentState(payment, session),
-      }));
+      if (!payment?.paymentId) throw new Error("Backend payment response missing paymentId");
+      setPendingPaymentMap((prev) => ({ ...prev, [session.sessionId]: buildPendingPaymentState(payment, session) }));
     } catch (err) {
-      console.error("Create mock payment QR failed", err);
-      setError(err.response?.data?.message || "Khong tao duoc QR thanh toan gia.");
+      setError(err.response?.data?.message || "Không tạo được thanh toán.");
     } finally {
       setProcessingId(null);
     }
   };
 
-  const confirmMockPayment = async (session) => {
+  const confirmCashPayment = async (session) => {
     const pending = pendingPaymentMap[session.sessionId];
     if (!pending?.payment?.paymentId) return;
-
-    const transactionRef = `MOCKPAY-${Date.now()}`;
+    const transactionRef = `CASH-${Date.now()}`;
     setProcessingId(session.sessionId);
     setError("");
     try {
       const paidRes = await paymentApi.confirmParkingFee(pending.payment.paymentId, transactionRef);
       const paid = unwrapApiData(paidRes.data, pending.payment);
-      setReceipt({
-        ...paid,
-        licensePlate: session.licensePlate,
-        slotCode: session.slotCode,
-        entryTime: session.entryTime,
-        exitTime: session.exitTime,
-        transactionRef,
-        durationFee: toAmount(paid.totalAmount ?? pending.amount),
-      });
+      setReceipt({ ...paid, licensePlate: session.licensePlate, slotCode: session.slotCode, entryTime: session.entryTime, exitTime: session.exitTime, transactionRef, durationFee: toAmount(paid.totalAmount ?? pending.amount) });
       setRecentPayments((prev) => [paid, ...prev].slice(0, 6));
-      setPendingPaymentMap((prev) => {
-        const next = { ...prev };
-        delete next[session.sessionId];
-        return next;
-      });
+      setPendingPaymentMap((prev) => { const next = { ...prev }; delete next[session.sessionId]; return next; });
       await loadPendingPayments();
     } catch (err) {
-      console.error("Confirm mock payment failed", err);
-      setError(err.response?.data?.message || "Khong xac nhan duoc thanh toan mock.");
+      setError(err.response?.data?.message || "Không xác nhận được thanh toán.");
     } finally {
       setProcessingId(null);
     }
@@ -279,38 +278,47 @@ export default function PaymentProcessingPage() {
                       type="button"
                       onClick={() =>
                         pendingPaymentMap[item.sessionId]
-                          ? confirmMockPayment(item)
-                          : createMockPaymentQr(item)
+                          ? confirmCashPayment(item)
+                          : createPayment(item)
                       }
                       disabled={processingId === item.sessionId}
                     >
                       {processingId === item.sessionId
                         ? "Processing..."
                         : pendingPaymentMap[item.sessionId]
-                          ? "Confirm Mock Payment"
-                          : "Create Payment QR"}
+                          ? "Xác nhận tiền mặt"
+                          : (methodMap[item.sessionId] || "CASH") === "VNPAY"
+                            ? "Tạo QR VNPay"
+                            : "Tạo phiếu thu tiền mặt"}
                     </StaffPrimaryButton>
                   </div>
                 </div>
-                {pendingPaymentMap[item.sessionId] ? (
+                {vnpayQrMap[item.sessionId] ? (
+                  <div className="mt-4 grid gap-4 rounded-2xl border border-dashed border-blue-300 bg-blue-50/40 p-4 dark:border-blue-500/20 dark:bg-blue-500/5 md:grid-cols-[120px_1fr]">
+                    <div className="rounded-2xl bg-white p-3 shadow-sm">
+                      <QRCodeSVG value={vnpayQrMap[item.sessionId]} size={96} level="M" includeMargin={false} />
+                    </div>
+                    <div className="min-w-0 flex flex-col justify-center gap-1">
+                      <p className="text-sm font-semibold text-foreground">QR VNPay – Khách quét để thanh toán</p>
+                      <p className="text-xs text-muted-foreground">Khách hàng dùng app ngân hàng hoặc VNPay quét mã này. Hệ thống tự xác nhận sau khi thanh toán.</p>
+                      <button type="button" onClick={() => { setVnpayQrMap((p) => { const n = {...p}; delete n[item.sessionId]; return n; }); void loadPendingPayments(); }}
+                        className="mt-2 self-start rounded-lg border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted">
+                        Làm mới trạng thái
+                      </button>
+                    </div>
+                  </div>
+                ) : pendingPaymentMap[item.sessionId] ? (
                   <div className="mt-4 grid gap-4 rounded-2xl border border-dashed border-border bg-muted/20 p-4 md:grid-cols-[120px_1fr]">
                     <div className="rounded-2xl bg-white p-3">
-                      <QRCodeSVG
-                        value={pendingPaymentMap[item.sessionId].payload}
-                        size={96}
-                        level="M"
-                        includeMargin={false}
-                      />
+                      <QRCodeSVG value={pendingPaymentMap[item.sessionId].payload} size={96} level="M" includeMargin={false} />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground">
-                        Mock payment QR #{pendingPaymentMap[item.sessionId].payment.paymentId}
+                        Tiền mặt – Payment #{pendingPaymentMap[item.sessionId].payment.paymentId}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Customer scans this fake QR, then staff confirms mock payment to complete the session.
-                      </p>
-                      <p className="mt-2 break-all rounded-xl bg-background/80 px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                        {pendingPaymentMap[item.sessionId].payload}
+                      <p className="mt-1 text-xs text-muted-foreground">Thu tiền mặt từ khách, bấm "Xác nhận tiền mặt" để hoàn tất.</p>
+                      <p className="mt-2 text-xs font-semibold text-foreground">
+                        Số tiền: {formatStaffCurrency(pendingPaymentMap[item.sessionId].amount)}
                       </p>
                     </div>
                   </div>
