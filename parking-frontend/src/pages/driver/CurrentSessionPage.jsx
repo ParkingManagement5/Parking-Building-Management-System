@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
+import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
 import {
   formatCurrency,
@@ -64,6 +65,50 @@ const BADGE_MAP = {
   QR_EXPIRED: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "QR hết hạn" },
   SYNCING: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "Đang đồng bộ" },
 };
+
+function WaitingPaymentAction({ sessionId, onError }) {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  async function handleVnpay() {
+    setLoading(true);
+    onError("");
+    try {
+      const res = await paymentApi.createVnpayParkingFeeUrl(sessionId);
+      const data = unwrapApiData(res.data, null);
+      if (data?.autoConfirmed) {
+        navigate("/driver/current-session");
+      } else if (data?.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      }
+    } catch (e) {
+      onError(e.response?.data?.message || "Không tạo được URL thanh toán VNPay.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <p className="text-sm font-semibold text-foreground">Chờ thanh toán phí đỗ xe</p>
+      <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+        Xe đã ra khỏi bãi. Thanh toán để hoàn tất phiên.
+      </p>
+      <div className="mt-3 flex flex-col gap-2 w-full max-w-xs">
+        <button type="button" onClick={handleVnpay} disabled={loading}
+          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition-colors">
+          {loading
+            ? <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Đang tạo...</span>
+            : "Thanh toán qua VNPay"}
+        </button>
+        <button type="button" onClick={() => navigate("/driver/payments")}
+          className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+          Xem lịch sử thanh toán
+        </button>
+      </div>
+    </>
+  );
+}
 
 function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigate, generatingId }) {
   const { displayMode } = item;
@@ -143,12 +188,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
         </button>
 
         {displayMode === "WAITING_PAYMENT" ? (
-          <>
-            <p className="text-sm font-semibold text-foreground">Chờ thanh toán</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Xe đã ra khỏi bãi. Staff đang xử lý thanh toán.</p>
-            <button type="button" onClick={() => navigate("/driver/payments")}
-              className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Xem lịch sử thanh toán</button>
-          </>
+          <WaitingPaymentAction sessionId={item.sessionId} onError={onError} />
         ) : displayMode === "EXIT_QR" ? (
           exitQr?.qrToken ? (
             <>

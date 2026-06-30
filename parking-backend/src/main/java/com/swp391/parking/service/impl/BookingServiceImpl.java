@@ -34,6 +34,8 @@ public class BookingServiceImpl implements BookingService {
     private final ParkingSlotRepository parkingSlotRepository;
     private final QrTokenUtil qrTokenUtil;
     private final NotificationService notificationService;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -208,6 +210,10 @@ public class BookingServiceImpl implements BookingService {
                 "Booking #" + bookingId + " da xac nhan. Dua QR cho staff tai cong vao.",
                 "success", "BOOKING", bookingId.intValue());
 
+        Booking confirmedBooking = booking;
+        userRepository.findById(confirmedBooking.getUserId().intValue())
+                .ifPresent(user -> emailService.sendBookingQrEmail(user, confirmedBooking));
+
         return toResponse(booking);
     }
 
@@ -370,7 +376,7 @@ public class BookingServiceImpl implements BookingService {
                 && !vehicleTypeName.equalsIgnoreCase("ELECTRIC_CAR")) {
             return BigDecimal.ZERO;
         }
-        if (minutesUntilStart < 30)  return BigDecimal.ZERO;
+        if (minutesUntilStart < 10)  return BigDecimal.ZERO;
         if (minutesUntilStart < 120) return new BigDecimal("10000");
         if (minutesUntilStart < 240) return new BigDecimal("15000");
         if (minutesUntilStart < 360) return new BigDecimal("20000");
