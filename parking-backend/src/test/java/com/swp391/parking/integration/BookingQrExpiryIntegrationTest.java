@@ -102,6 +102,71 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
     }
 
     @Test
+    void createBookingShouldRejectInactiveSlot() {
+        User driver = createUser("inactive-slot-driver", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Inactive Slot Building");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Inactive Slot Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Inactive Slot Zone");
+        ParkingSlot slot = createSlot(zone, "INACTIVE-01", ParkingSlot.Status.AVAILABLE);
+        slot.setIsActive(false);
+        parkingSlotRepository.save(slot);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "59A-19999");
+
+        CreateBookingRequest request = new CreateBookingRequest();
+        request.setVehicleId(vehicle.getId());
+        request.setSlotId(slot.getId());
+        request.setBookingStartTime(LocalDateTime.now().plusHours(2));
+        request.setBookingEndTime(LocalDateTime.now().plusHours(4));
+
+        assertThatThrownBy(() -> bookingService.createBooking(driver.getUserId().longValue(), request))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> {
+                    AppException appException = (AppException) ex;
+                    assertThat(appException.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(appException.getMessage()).contains("vô hiệu hóa");
+                });
+
+        assertThat(bookingRepository.findByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                java.util.List.of(
+                        Booking.BookingStatus.PENDING_PAYMENT,
+                        Booking.BookingStatus.CONFIRMED,
+                        Booking.BookingStatus.CHECKED_IN,
+                        Booking.BookingStatus.WAITING_PAYMENT)))
+                .isEmpty();
+        ParkingSlot unchangedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        assertThat(unchangedSlot.getIsActive()).isFalse();
+        assertThat(unchangedSlot.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
+    @Test
+    void standaloneVerifyShouldRejectReplacedQrAndAcceptCurrentQr() {
+        User driver = createUser("verify-regenerated-driver", Role.RoleName.DRIVER);
+        BookingResponse confirmed = confirmedBookingFor(driver, "VR-01", "59A-18888",
+                LocalDateTime.now().plusHours(2));
+        String oldToken = confirmed.getQrToken();
+
+        assertThat(bookingService.verifyQrToken(oldToken).getBookingId())
+                .isEqualTo(confirmed.getBookingId());
+
+        BookingResponse regenerated = bookingService.regenerateQr(
+                confirmed.getBookingId(), driver.getUserId().longValue());
+
+        assertThatThrownBy(() -> bookingService.verifyQrToken(oldToken))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> {
+                    AppException appException = (AppException) ex;
+                    assertThat(appException.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(appException.getMessage()).contains("thay the");
+                });
+
+        BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken());
+        assertThat(verifiedCurrent.getBookingId()).isEqualTo(confirmed.getBookingId());
+        assertThat(verifiedCurrent.getQrToken()).isEqualTo(regenerated.getQrToken());
+    }
+
+    @Test
     void regenerateQrShouldRejectExpiredConfirmedBookingWithoutExtendingExpiry() {
         User driver = createUser("expired-regen-driver", Role.RoleName.DRIVER);
         Booking booking = confirmedBookingEntityFor(driver, "ER-01", "59A-10002",
