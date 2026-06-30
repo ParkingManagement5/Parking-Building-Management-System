@@ -169,8 +169,18 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime pendingPaymentExpiry = booking.getExpiredAt();
+        if (pendingPaymentExpiry == null || !pendingPaymentExpiry.isAfter(now)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã hết hạn thanh toán");
+        }
+
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
+        if (!qrExpiry.isAfter(now)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã quá hạn vào bãi");
+        }
+
         String qr = qrTokenUtil.generateBookingQrToken(
                 booking.getId(),
                 booking.getVehicle().getLicensePlate(),
@@ -178,7 +188,6 @@ public class BookingServiceImpl implements BookingService {
                 qrExpiry);
 
         booking.setQrToken(qr);
-        LocalDateTime now = LocalDateTime.now();
         booking.setQrIssuedAt(now);
         booking.setDepositPaidAt(now);
         booking.setStatus(Booking.BookingStatus.CONFIRMED);
