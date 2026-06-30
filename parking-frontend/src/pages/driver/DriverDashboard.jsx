@@ -39,6 +39,77 @@ function resolveSessionEnd(item) {
   return item?.exitTime || item?.endTime || item?.checkOutTime || null;
 }
 
+function resolveBookingStart(item) {
+  return item?.bookingStartTime || item?.reservedAt || item?.createdAt || null;
+}
+
+function bookingPriority(item) {
+  const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
+  if (status === "PENDING_PAYMENT") return 0;
+  if (status === "CONFIRMED") return 1;
+  return 2;
+}
+
+function pickActiveBooking(bookings) {
+  const openBookings = bookings.filter(isOpenBooking);
+  if (!openBookings.length) return null;
+
+  return [...openBookings].sort((a, b) => {
+    const priorityDiff = bookingPriority(a) - bookingPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const startA = resolveBookingStart(a) ? new Date(resolveBookingStart(a)).getTime() : Number.MAX_SAFE_INTEGER;
+    const startB = resolveBookingStart(b) ? new Date(resolveBookingStart(b)).getTime() : Number.MAX_SAFE_INTEGER;
+    if (startA !== startB) return startA - startB;
+
+    const createdA = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const createdB = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return createdB - createdA;
+  })[0];
+}
+
+function resolveHeroMetric(record, isSessionRecord) {
+  if (!record) return "--:--";
+  if (isSessionRecord) {
+    return formatDuration(resolveSessionStart(record), resolveSessionEnd(record) || new Date().toISOString());
+  }
+
+  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
+  if (status === "PENDING_PAYMENT") return "Cho coc";
+  if (status === "CONFIRMED") return "Cho vao";
+  return "--:--";
+}
+
+function resolveHeroMetricLabel(record, isSessionRecord) {
+  if (isSessionRecord) return "Thoi gian";
+
+  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
+  if (status === "PENDING_PAYMENT") return "Trang thai";
+  if (status === "CONFIRMED") return "Dieu kien";
+  return "Thoi gian";
+}
+
+function resolveHeroTitle(record, isSessionRecord) {
+  if (!record) return "Chua co phien do xe";
+  if (isSessionRecord) {
+    return record?.slotCode ? `Xe dang do tai ${record.slotCode}` : "Xe dang do trong bai";
+  }
+  return record?.buildingName || record?.parkingBuildingName || "Cho xe vao bai";
+}
+
+function resolveHeroSubtitle(record, isSessionRecord) {
+  if (!record) return "Tao booking de xem phien do xe hien tai tai day";
+  const slotLabel = record?.slotCode || record?.parkingSlotCode || "Cho cho xac nhan";
+  const plateLabel = record?.licensePlate || record?.vehiclePlate || "Xe da lien ket";
+
+  if (isSessionRecord) {
+    return `${slotLabel} - ${plateLabel}`;
+  }
+
+  const startLabel = resolveBookingStart(record) ? formatRelativeTime(resolveBookingStart(record)) : "Sap den luot";
+  return `${slotLabel} - ${plateLabel} - ${startLabel}`;
+}
+
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState([
@@ -76,7 +147,7 @@ export default function DriverDashboard() {
         const payments = paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
         const notifications = notificationsRes.status === "fulfilled" ? unwrapApiData(notificationsRes.value.data, []) : [];
 
-        const active = bookings.find(isOpenBooking) || null;
+        const active = pickActiveBooking(bookings);
         const activeSession = sessions.find((s) => String(s.status || "").toUpperCase() === "ACTIVE") || null;
         const waitingPaymentSession = sessions.find((s) => String(s.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
         const currentSession = activeSession || waitingPaymentSession || null;
@@ -115,6 +186,7 @@ export default function DriverDashboard() {
   }, []);
 
   const heroRecord = currentDriverSession || activeBooking;
+  const heroIsSession = Boolean(currentDriverSession);
   const heroStatus = currentDriverSession
     ? String(currentDriverSession.status || "").toUpperCase()
     : getBookingStatus(activeBooking);
@@ -122,12 +194,13 @@ export default function DriverDashboard() {
   const heroSubtitle = heroRecord
     ? `${heroRecord.slotCode || heroRecord.parkingSlotCode || "Chỗ chờ xác nhận"} - ${heroRecord.licensePlate || heroRecord.vehiclePlate || "Xe đã liên kết"}`
     : "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
-  const heroDuration = heroRecord
-    ? formatDuration(resolveSessionStart(heroRecord), resolveSessionEnd(heroRecord) || new Date().toISOString())
-    : "--:--";
+  const heroDuration = resolveHeroMetric(heroRecord, heroIsSession);
+  const heroDurationLabel = resolveHeroMetricLabel(heroRecord, heroIsSession);
   const heroStatusLabel = currentDriverSession
     ? heroStatus.toLowerCase()
     : activeBooking ? getBookingStatus(activeBooking) : "waiting";
+  const heroDisplayTitle = resolveHeroTitle(heroRecord, heroIsSession);
+  const heroDisplaySubtitle = resolveHeroSubtitle(heroRecord, heroIsSession);
 
   return (
     <div className="space-y-5">
@@ -150,12 +223,12 @@ export default function DriverDashboard() {
         <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
           <div>
             <p className="text-xs text-white/70 mb-1">Phiên đỗ xe hiện tại</p>
-            <h2 className="text-xl font-bold">{heroTitle}</h2>
-            <p className="text-sm text-white/80 mt-0.5">{heroSubtitle}</p>
+            <h2 className="text-xl font-bold">{heroDisplayTitle}</h2>
+            <p className="text-sm text-white/80 mt-0.5">{heroDisplaySubtitle}</p>
           </div>
           <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center">
             <div className="text-2xl font-bold font-mono">{heroDuration}</div>
-            <div className="text-xs text-white/60">Thời gian</div>
+            <div className="text-xs text-white/60">{heroDurationLabel}</div>
           </div>
         </div>
 
