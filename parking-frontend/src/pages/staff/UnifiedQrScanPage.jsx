@@ -8,6 +8,8 @@ import {
 import axiosClient from "../../api/axiosClient";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
+import { exceptionApi } from "../../api/staff/exceptionApi";
+import { ocrApi } from "../../api/staff/ocrApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
@@ -16,6 +18,8 @@ import {
   StaffInput, StaffPageSection, StaffPrimaryButton, StaffSecondaryButton,
   StaffSelect, StaffStatusBadge,
 } from "./StaffUi";
+
+const LOW_CONFIDENCE_PROCESS_STATUS = "MANUAL_REVIEW";
 
 function canonicalPlate(value) {
   return String(value ?? "")
@@ -62,6 +66,11 @@ export default function UnifiedScanPage() {
   const [manualEntryError, setManualEntryError] = useState("");
   const [manualExitSuggestions, setManualExitSuggestions] = useState([]);
   const [manualExitLoading, setManualExitLoading] = useState(false);
+  const [pendingLowConfidenceScan, setPendingLowConfidenceScan] = useState(null);
+  const [lowConfidencePlate, setLowConfidencePlate] = useState("");
+  const [lowConfidenceError, setLowConfidenceError] = useState("");
+  const [showLowConfidenceReview, setShowLowConfidenceReview] = useState(false);
+  const [creatingException, setCreatingException] = useState(false);
 
   // Lookup
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -94,6 +103,9 @@ export default function UnifiedScanPage() {
     if (lookupType === "EXIT") return gates.filter((g) => ["EXIT", "BOTH"].includes(String(g.gateType || "").toUpperCase()));
     return gates.filter((g) => ["ENTRY", "BOTH"].includes(String(g.gateType || "").toUpperCase()));
   }, [gates, lookupType]);
+  const bookingStatus = String(lookupData?.status || "").toUpperCase();
+  const isConfirmedBooking = lookupType === "BOOKING" && bookingStatus === "CONFIRMED";
+  const isPendingPaymentBooking = lookupType === "BOOKING" && bookingStatus === "PENDING_PAYMENT";
 
   useEffect(() => { loadBuildings(); return () => stopCamera(); }, []);
 
@@ -122,6 +134,100 @@ export default function UnifiedScanPage() {
       if (assignedId) setBuildingId(assignedId);
       else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
     } catch {}
+  }
+
+  async function proceedWithResolvedPlate(rawPlate, nextConfidence = null) {
+    const normalizedPlate = normalizePlateDisplay(rawPlate);
+    setLookupType(null);
+    setLookupData(null);
+    setQrToken("");
+    setError("");
+    setOcrError("");
+    setPlate(normalizedPlate);
+    setConfidence(nextConfidence);
+    await autoLookup(normalizedPlate);
+    setStep(2);
+  }
+
+  function openLowConfidenceReview(scanData, detectedPlate, detectedConfidence) {
+    setPendingLowConfidenceScan(scanData);
+    setLowConfidencePlate(detectedPlate);
+    setLowConfidenceError("");
+    setConfidence(detectedConfidence);
+    setShowLowConfidenceReview(true);
+  }
+
+  function closeLowConfidenceReview() {
+    setShowLowConfidenceReview(false);
+    setLowConfidenceError("");
+  }
+
+  function buildExceptionContext(exceptionType, reasonOverride = "") {
+    const currentGate = gates.find((g) => String(g.gateId || g.id) === String(gateId));
+    const gateLabel = currentGate?.gateName || currentGate?.gateCode || `Gate ${gateId || "?"}`;
+    const segments = [
+      `Reason: ${reasonOverride || error || ocrError || "Staff khong the hoan tat flow scan thuong."}`,
+      `Gate: ${gateLabel}`,
+      `Building: ${assignedLabel || buildingId || "N/A"}`,
+      `Plate OCR/Final: ${plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN"}`,
+      pendingLowConfidenceScan?.detectedPlate ? `Detected plate: ${pendingLowConfidenceScan.detectedPlate}` : null,
+      pendingLowConfidenceScan?.plateConfidenceScore != null
+        ? `Confidence: ${Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%`
+        : confidence != null
+          ? `Confidence: ${confidence}%`
+          : null,
+      `Lookup type: ${lookupType || "UNRESOLVED"}`,
+      lookupData?.sessionId ? `Session: #${lookupData.sessionId}` : null,
+      lookupData?.bookingId ? `Booking: #${lookupData.bookingId}` : null,
+      qrToken.trim() ? "QR: provided" : "QR: missing",
+      pendingLowConfidenceScan?.scanId ? `OCR scan: #${pendingLowConfidenceScan.scanId}` : null,
+    ].filter(Boolean);
+
+    return {
+      exceptionType,
+      sessionId: lookupData?.sessionId ? Number(lookupData.sessionId) : null,
+      requestId: pendingLowConfidenceScan?.scanId ? Number(pendingLowConfidenceScan.scanId) : null,
+      description: segments.join(" | "),
+    };
+  }
+
+  function deriveExceptionType() {
+    if (lookupType === "BOOKING") return "BOOKING_MISMATCH";
+    if (lookupType === "EXIT") return "EXIT_VERIFICATION_FAILED";
+    if (lookupType === "BLOCKED") return "SESSION_CONFLICT";
+    if (pendingLowConfidenceScan) return "PLATE_UNVERIFIED";
+    if (error) return "SYSTEM_ERROR";
+    return "OTHER";
+  }
+
+  async function createExceptionCase(exceptionType, reasonOverride = "") {
+    setCreatingException(true);
+    setError("");
+    setOcrError("");
+    setManualEntryError("");
+    setLowConfidenceError("");
+    try {
+      await exceptionApi.create(buildExceptionContext(exceptionType, reasonOverride));
+      closeLowConfidenceReview();
+      closeManualEntry();
+      resetAll();
+      setResult({
+        type: "EXCEPTION",
+        sessionId: lookupData?.sessionId || pendingLowConfidenceScan?.scanId || "N/A",
+        licensePlate: plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN",
+        slotCode: "Exception queue",
+        status: exceptionType,
+        time: new Date().toISOString(),
+      });
+      setStep(3);
+    } catch (err) {
+      const message = err.response?.data?.message || "Khong tao duoc exception.";
+      if (showLowConfidenceReview) setLowConfidenceError(message);
+      else if (showManualEntry) setManualEntryError(message);
+      else setError(message);
+    } finally {
+      setCreatingException(false);
+    }
   }
 
   // ==================== CAMERA ====================
@@ -178,9 +284,11 @@ export default function UnifiedScanPage() {
         setShowManualEntry(true);
         return;
       }
-      setPlate(p); setConfidence(c);
-      await autoLookup(p);
-      setStep(2);
+      if (String(d.processStatus || "").toUpperCase() === LOW_CONFIDENCE_PROCESS_STATUS) {
+        openLowConfidenceReview(d, p, c);
+        return;
+      }
+      await proceedWithResolvedPlate(p, c);
     } catch (err) { setOcrError(err.response?.data?.message || "OCR that bai."); }
     finally { setScanning(false); }
   }
@@ -207,16 +315,34 @@ export default function UnifiedScanPage() {
     }
     const normalizedPlate = normalizePlateDisplay(manualPlate);
 
-    setLookupType(null);
-    setLookupData(null);
-    setQrToken("");
-    setError("");
-    setOcrError("");
-    setPlate(normalizedPlate);
-    setConfidence(null);
     closeManualEntry();
-    await autoLookup(normalizedPlate);
-    setStep(2);
+    await proceedWithResolvedPlate(normalizedPlate, null);
+  }
+
+  async function handleLowConfidenceConfirm(event) {
+    event?.preventDefault?.();
+    const canonical = canonicalPlate(lowConfidencePlate);
+    if (!canonical) {
+      setLowConfidenceError("Nhap bien so xac nhan truoc khi tiep tuc.");
+      return;
+    }
+
+    setScanning(true);
+    setLowConfidenceError("");
+    try {
+      const correctedPlate = normalizePlateDisplay(lowConfidencePlate);
+      const res = await ocrApi.review(pendingLowConfidenceScan.scanId, {
+        correctedPlate,
+        staffUserId: Number(localStorage.getItem("userId")) || 0,
+      });
+      const reviewed = unwrapApiData(res.data, null);
+      closeLowConfidenceReview();
+      await proceedWithResolvedPlate(reviewed?.effectivePlate || correctedPlate, confidence);
+    } catch (err) {
+      setLowConfidenceError(err.response?.data?.message || "Khong xac nhan duoc ket qua OCR.");
+    } finally {
+      setScanning(false);
+    }
   }
 
   useEffect(() => {
@@ -332,8 +458,12 @@ export default function UnifiedScanPage() {
         } else {
           res = await sessionApi.exit(lookupData.sessionId, { gateId: Number(gateId), staffUserId: Number(localStorage.getItem("userId")) || null, qrVerified: false });
         }
-      } else if (lookupType === "BOOKING" && qrToken.trim()) {
+      } else if (isPendingPaymentBooking) {
+        throw new Error("Booking chua thanh toan coc. Khong the cho xe vao.");
+      } else if (isConfirmedBooking && qrToken.trim()) {
         res = await sessionApi.entry({ gateId: Number(gateId), entryMode: "BOOKING", qrToken: qrToken.trim(), licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
+      } else if (lookupType === "BOOKING") {
+        throw new Error("Can QR booking hop le de xac nhan xe vao.");
       } else {
         res = await sessionApi.entry({ gateId: Number(gateId), licensePlate: plate, entryMode: "WALK_IN_AUTO", staffUserId: Number(localStorage.getItem("userId")) || null });
       }
@@ -348,7 +478,7 @@ export default function UnifiedScanPage() {
       setResult(record);
       setHistory((prev) => [record, ...prev].slice(0, 10));
       setStep(3);
-    } catch (err) { setError(err.response?.data?.message || "Xu ly that bai."); }
+    } catch (err) { setError(err.response?.data?.message || err.message || "Xu ly that bai."); }
     finally { setProcessing(false); }
   }
 
@@ -356,6 +486,8 @@ export default function UnifiedScanPage() {
     stopCamera(); setStep(1); setPlate(""); setConfidence(null); setOcrError("");
     setPlatePreview((p) => { if (p) URL.revokeObjectURL(p); return ""; });
     setLookupType(null); setLookupData(null); setQrToken(""); setError(""); setResult(null);
+    setPendingLowConfidenceScan(null); setLowConfidencePlate(""); setLowConfidenceError(""); setShowLowConfidenceReview(false);
+    setShowManualEntry(false); setManualPlate(""); setManualEntryError(""); setManualExitSuggestions([]); setManualExitLoading(false);
   }
 
   // Step indicator
@@ -486,13 +618,46 @@ export default function UnifiedScanPage() {
                     </div>
                   )}
 
-                  {lookupType === "BOOKING" && (
+                  {false && lookupType === "BOOKING" && (
                     <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
                       <div className="flex items-center gap-3">
                         <QrCode size={20} className="text-blue-600" />
                         <div>
                           <p className="font-bold text-foreground">BOOKING — Xe co booking, can QR</p>
                           <p className="text-sm text-muted-foreground">Booking #{lookupData?.bookingId} • Slot {lookupData?.slotCode} • {String(lookupData?.status || "")}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lookupType === "BOOKING" && (
+                    <div
+                      className={`rounded-2xl border p-4 ${
+                        isPendingPaymentBooking
+                          ? "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10"
+                          : "border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isPendingPaymentBooking ? (
+                          <CreditCard size={20} className="text-amber-600" />
+                        ) : (
+                          <QrCode size={20} className="text-blue-600" />
+                        )}
+                        <div>
+                          <p className="font-bold text-foreground">
+                            {isPendingPaymentBooking
+                              ? "BOOKING - Chua thanh toan coc, khong cho vao"
+                              : "BOOKING - Xe co booking, can QR"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Booking #{lookupData?.bookingId} - Slot {lookupData?.slotCode} - {bookingStatus || "UNKNOWN"}
+                          </p>
+                          {isPendingPaymentBooking && (
+                            <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                              Khach can thanh toan xong de booking chuyen sang CONFIRMED truoc khi staff cho xe vao.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -526,10 +691,10 @@ export default function UnifiedScanPage() {
                   )}
 
                   {/* QR input — for BOOKING entry + EXIT with QR */}
-                  {(lookupType === "BOOKING" || lookupType === "EXIT") && (
+                  {(isConfirmedBooking || lookupType === "EXIT") && (
                     <div className="rounded-2xl border border-border bg-muted/20 p-4">
                       <p className="text-sm font-semibold text-foreground mb-2">
-                        {lookupType === "BOOKING" ? "Scan QR booking cua driver (bat buoc)" : "Exit QR cua driver (neu co)"}
+                        {isConfirmedBooking ? "Scan QR booking cua driver (bat buoc)" : "Exit QR cua driver (neu co)"}
                       </p>
                       <div className="flex gap-2">
                         <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
@@ -567,7 +732,7 @@ export default function UnifiedScanPage() {
                       {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">{error}</div>}
 
                       <StaffPrimaryButton type="button" onClick={handleProcess}
-                        disabled={processing || !gateId || (lookupType === "BOOKING" && !qrToken.trim())}
+                        disabled={processing || !gateId || isPendingPaymentBooking || (isConfirmedBooking && !qrToken.trim())}
                         className="flex w-full items-center justify-center gap-2">
                         {processing ? "Dang xu ly..." : lookupType === "EXIT" ? (
                           <><LogOut size={15} /> Xac nhan xe ra</>
@@ -575,6 +740,25 @@ export default function UnifiedScanPage() {
                           <><LogIn size={15} /> Xac nhan xe vao</>
                         )}
                       </StaffPrimaryButton>
+
+                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 px-4 py-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Flow thuong khong chot duoc?</p>
+                            <p className="text-xs text-muted-foreground">
+                              Tao exception khi staff khong the xac minh bien so, QR, session, hoac booking de xu ly tiep tai cong.
+                            </p>
+                          </div>
+                          <StaffSecondaryButton
+                            type="button"
+                            onClick={() => createExceptionCase(deriveExceptionType())}
+                            disabled={creatingException}
+                            className="shrink-0"
+                          >
+                            {creatingException ? "Dang tao..." : "Khong xu ly duoc -> Tao exception"}
+                          </StaffSecondaryButton>
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
@@ -588,7 +772,9 @@ export default function UnifiedScanPage() {
               <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
                 <CheckCircle2 size={26} className="text-emerald-600 dark:text-emerald-300" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">{result.type === "EXIT" ? "Xe da ra bai" : "Xe da vao bai"}</h3>
+              <h3 className="text-lg font-bold text-foreground">
+                {result.type === "EXIT" ? "Xe da ra bai" : result.type === "EXCEPTION" ? "Da tao exception" : "Xe da vao bai"}
+              </h3>
               {platePreview && <img src={platePreview} alt="Plate" className="mx-auto mt-3 max-h-20 rounded-xl border border-border object-contain bg-slate-950" />}
               <div className="mt-4 space-y-2 rounded-2xl bg-white/60 dark:bg-white/5 p-4 text-left">
                 {[["Session", result.sessionId], ["Bien so", result.licensePlate], ["Slot", result.slotCode], ["Trang thai", result.status], ["Thoi gian", formatStaffDateTime(result.time)]].map(([k, v]) => (
@@ -661,6 +847,82 @@ export default function UnifiedScanPage() {
               </div>
             </div>
             <p className="mt-3 text-center text-xs text-muted-foreground">Dua ma QR cua driver vao khung. Tu dong nhan dien.</p>
+          </div>
+        </div>
+      )}
+
+      {showLowConfidenceReview && pendingLowConfidenceScan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Xac nhan bien so OCR confidence thap</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  OCR da doc ra bien so nhung confidence chua du de tu dong xu ly. Staff xac nhan bien cuoi cung ngay tai cong de tiep tuc flow thuong.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeLowConfidenceReview}
+                className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+              <div className="overflow-hidden rounded-2xl border border-border bg-slate-950">
+                {platePreview ? (
+                  <img src={platePreview} alt="Low confidence OCR" className="h-full w-full object-contain" />
+                ) : (
+                  <div className="flex min-h-48 items-center justify-center text-sm text-white/50">Khong co anh preview</div>
+                )}
+              </div>
+
+              <form onSubmit={handleLowConfidenceConfirm} className="space-y-4">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  OCR phat hien <span className="font-semibold">{pendingLowConfidenceScan.detectedPlate || "UNKNOWN"}</span> voi
+                  {" "}
+                  <span className="font-semibold">{Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%</span> confidence.
+                </div>
+
+                <div className="rounded-2xl border border-border bg-muted/20 p-4">
+                  <label className="mb-2 block text-sm font-medium text-foreground">Bien so xac nhan</label>
+                  <StaffInput
+                    value={lowConfidencePlate}
+                    onChange={(event) => {
+                      setLowConfidencePlate(event.target.value.toUpperCase());
+                      if (lowConfidenceError) setLowConfidenceError("");
+                    }}
+                    placeholder="Nhap bien so dung"
+                    autoFocus
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Neu staff xac nhan duoc bien so, he thong se bo queue OCR review va tiep tuc lookup ngay.
+                  </p>
+                </div>
+
+                {lowConfidenceError && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                    {lowConfidenceError}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <StaffSecondaryButton
+                    type="button"
+                    onClick={() => createExceptionCase("PLATE_UNVERIFIED", "OCR confidence thap va staff khong the xac nhan bien so tai cong.")}
+                    disabled={creatingException || scanning}
+                  >
+                    {creatingException ? "Dang tao..." : "Khong xac minh duoc -> Tao exception"}
+                  </StaffSecondaryButton>
+                  <StaffPrimaryButton type="submit" disabled={scanning} className="flex items-center justify-center gap-2">
+                    <CheckCircle2 size={15} />
+                    {scanning ? "Dang xac nhan..." : "Xac nhan bien va tiep tuc"}
+                  </StaffPrimaryButton>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -751,6 +1013,13 @@ export default function UnifiedScanPage() {
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <StaffSecondaryButton type="button" onClick={closeManualEntry}>
                   Huy
+                </StaffSecondaryButton>
+                <StaffSecondaryButton
+                  type="button"
+                  onClick={() => createExceptionCase("PLATE_UNVERIFIED", "Staff da mo nhap tay nhung van khong xac minh duoc bien so de tiep tuc flow.")}
+                  disabled={creatingException}
+                >
+                  {creatingException ? "Dang tao..." : "Khong xac minh duoc"}
                 </StaffSecondaryButton>
                 <StaffPrimaryButton type="submit" className="flex items-center justify-center gap-2">
                   <CheckCircle2 size={15} />

@@ -10,6 +10,8 @@ import {
   getStatusClasses,
 } from "./driverPortalUtils";
 
+const CONFIRMED_CANCEL_WINDOW_MS = 10 * 60 * 1000;
+
 function StatusBadge({ status }) {
   return (
     <span
@@ -26,6 +28,12 @@ function shortToken(value) {
   if (!value) return "";
   if (value.length <= 28) return value;
   return `${value.slice(0, 14)}...${value.slice(-10)}`;
+}
+
+function getConfirmedCancelDeadline(booking) {
+  const paidAt = booking?.depositPaidAt ? new Date(booking.depositPaidAt).getTime() : Number.NaN;
+  if (!Number.isFinite(paidAt)) return null;
+  return paidAt + CONFIRMED_CANCEL_WINDOW_MS;
 }
 
 export default function BookingHistoryPage() {
@@ -101,6 +109,20 @@ export default function BookingHistoryPage() {
     }
   }
 
+  async function handleCancelBooking(booking) {
+    try {
+      setProcessingBookingId(booking.bookingId);
+      setError("");
+      await bookingApi.cancel(booking.bookingId);
+      await loadBookings();
+    } catch (cancelError) {
+      console.error("Failed to cancel booking", cancelError);
+      setError(cancelError.response?.data?.message || "Khong the huy booking nay.");
+    } finally {
+      setProcessingBookingId(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Page header */}
@@ -148,8 +170,14 @@ export default function BookingHistoryPage() {
           <div className="divide-y divide-border">
             {paged.map((item, index) => {
               const status = getBookingStatus(item);
-              const isPendingPayment = String(item.status || "").toUpperCase() === "PENDING_PAYMENT";
-              const isConfirmedNoQr = String(item.status || "").toUpperCase() === "CONFIRMED" && !item.qrToken && !item.qrUsed;
+              const rawStatus = String(item.status || "").toUpperCase();
+              const isPendingPayment = rawStatus === "PENDING_PAYMENT";
+              const isConfirmed = rawStatus === "CONFIRMED";
+              const isConfirmedNoQr = isConfirmed && !item.qrToken && !item.qrUsed;
+              const cancelDeadline = getConfirmedCancelDeadline(item);
+              const canCancelConfirmed = isConfirmed && cancelDeadline != null && cancelDeadline >= Date.now();
+              const canCancel = isPendingPayment || canCancelConfirmed;
+              const showCancelWindowNotice = isConfirmed && !canCancelConfirmed;
 
               return (
                 <div key={item.bookingId || item.id || index} className="px-5 py-4 space-y-3">
@@ -186,6 +214,19 @@ export default function BookingHistoryPage() {
                           )}
                         </button>
                       )}
+                      {canCancel && (
+                        <button
+                          onClick={() => void handleCancelBooking(item)}
+                          disabled={processingBookingId === item.bookingId}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                        >
+                          {processingBookingId === item.bookingId ? (
+                            <><LoaderCircle size={12} className="animate-spin" /> Dang xu ly</>
+                          ) : (
+                            "Huy booking"
+                          )}
+                        </button>
+                      )}
                       {isConfirmedNoQr && (
                         <button
                           onClick={async () => {
@@ -204,6 +245,12 @@ export default function BookingHistoryPage() {
                       )}
                     </div>
                   </div>
+
+                  {showCancelWindowNotice && (
+                    <div className="ml-[52px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+                      Booking da qua 10 phut sau khi thanh toan coc nen khong the huy tay. Neu khach khong den, he thong se xu ly no-show sau bookingStartTime + 30 phut.
+                    </div>
+                  )}
 
                   {/* Detail grid */}
                   <div className="grid gap-3 sm:grid-cols-3 text-sm pl-[52px]">
@@ -227,6 +274,17 @@ export default function BookingHistoryPage() {
                       <p className="text-xs text-muted-foreground">Tạo lúc {formatDateTime(item.createdAt)}</p>
                     </div>
                   </div>
+
+                  {isConfirmed && item.depositPaidAt && (
+                    <div className="ml-[52px] flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>Coc luc {formatDateTime(item.depositPaidAt)}</span>
+                      {canCancelConfirmed && cancelDeadline != null && (
+                        <span className="text-emerald-600 dark:text-emerald-300">
+                          Co the huy den {formatDateTime(new Date(cancelDeadline).toISOString())}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* QR section */}
                   {item.qrToken && (

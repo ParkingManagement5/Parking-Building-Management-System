@@ -38,7 +38,8 @@ public class ExceptionCase extends BaseEntity {
     private LocalDateTime resolvedAt;
 
     public enum ExceptionType {
-        LOST_QR, WRONG_FEE, CANNOT_FIND_CAR, SYSTEM_ERROR, OTHER
+        LOST_QR, WRONG_FEE, CANNOT_FIND_CAR, SYSTEM_ERROR, OTHER,
+        PLATE_UNVERIFIED, BOOKING_MISMATCH, EXIT_VERIFICATION_FAILED, SESSION_CONFLICT
     }
 
     public enum ExceptionStatus {

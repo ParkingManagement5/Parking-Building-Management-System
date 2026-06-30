@@ -26,6 +26,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
+    private static final long CONFIRMED_CANCEL_WINDOW_MINUTES = 10;
 
     private final BookingRepository bookingRepository;
     private final ParkingSessionRepository sessionRepository;
@@ -263,6 +264,11 @@ public class BookingServiceImpl implements BookingService {
         }
         // Giải phóng slot nếu đã CONFIRMED
         if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
+            LocalDateTime depositPaidAt = booking.getDepositPaidAt();
+            if (depositPaidAt == null || depositPaidAt.plusMinutes(CONFIRMED_CANCEL_WINDOW_MINUTES).isBefore(LocalDateTime.now())) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "Booking da qua 10 phut sau khi thanh toan coc. Khong the huy tay; neu khach khong den he thong se xu ly no-show theo bookingStartTime + 30 phut.");
+            }
             ParkingSlot slot = booking.getSlot();
             slot.setStatus(ParkingSlot.Status.AVAILABLE);
             parkingSlotRepository.save(slot);
@@ -344,7 +350,7 @@ public class BookingServiceImpl implements BookingService {
             bookingRepository.saveAll(stalePending);
         }
 
-        List<Booking> staleConfirmed = bookingRepository.findConfirmedExpired(now);
+        List<Booking> staleConfirmed = bookingRepository.findConfirmedNoShow(now.minusMinutes(30));
         if (!staleConfirmed.isEmpty()) {
             staleConfirmed.forEach(b -> {
                 b.setStatus(Booking.BookingStatus.EXPIRED);

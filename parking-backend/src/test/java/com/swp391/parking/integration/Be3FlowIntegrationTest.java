@@ -1,11 +1,14 @@
 package com.swp391.parking.integration;
 
 import com.swp391.parking.entity.Booking;
+import com.swp391.parking.entity.ExceptionCase;
 import com.swp391.parking.entity.Gate;
+import com.swp391.parking.entity.OcrScan;
 import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Payment;
+import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.entity.Vehicle;
@@ -183,6 +186,144 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         ParkingSession sessionAfterPayment = parkingSessionRepository.findById(session.getId()).orElseThrow();
         assertThat(slotAfterPayment.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
         assertThat(sessionAfterPayment.getStatus()).isEqualTo(ParkingSession.SessionStatus.COMPLETED);
+    }
+
+    @Test
+    @WithMockUser(username = "staff-walkin-lifecycle", roles = "STAFF")
+    void walkInLifecycleShouldReachCompletedWithoutBookingOrQr() throws Exception {
+        User staff = createUser("staff-walkin-lifecycle", Role.RoleName.STAFF);
+        ParkingBuilding building = createBuilding("WalkIn Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("WalkIn Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "WalkIn Zone");
+        ParkingSlot slot = createSlot(zone, "WI-01", ParkingSlot.Status.AVAILABLE);
+        Gate entryGate = createGate(building, "ENTRY-WI", Gate.GateType.ENTRY);
+        Gate exitGate = createGate(building, "EXIT-WI", Gate.GateType.EXIT);
+
+        long vehiclesBefore = vehicleRepository.count();
+
+        mockMvc.perform(post("/api/v1/sessions/entry")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "gateId": %d,
+                      "entryMode": "WALK_IN_AUTO",
+                      "licensePlate": "59a 12345",
+                      "vehicleTypeId": %d
+                    }
+                    """.formatted(entryGate.getId(), vehicleType.getId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.entryMode").value("WALK_IN_AUTO"))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.slotCode").value("WI-01"))
+            .andExpect(jsonPath("$.data.licensePlate").value("59A-123.45"))
+            .andExpect(jsonPath("$.data.bookingId").isEmpty());
+
+        ParkingSession activeSession = parkingSessionRepository.findAll().get(0);
+        ParkingSlot occupiedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        assertThat(activeSession.getBooking()).isNull();
+        assertThat(activeSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.ACTIVE);
+        assertThat(occupiedSlot.getStatus()).isEqualTo(ParkingSlot.Status.OCCUPIED);
+        assertThat(vehicleRepository.count()).isEqualTo(vehiclesBefore + 1);
+        assertThat(activeSession.getVehicle().getLicensePlate()).isEqualTo("59A-123.45");
+
+        mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "gateId": %d,
+                      "qrVerified": false
+                    }
+                    """.formatted(exitGate.getId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.status").value("WAITING_PAYMENT"))
+            .andExpect(jsonPath("$.data.exitGateCode").value("EXIT-WI"));
+
+        ParkingSession waitingPaymentSession = parkingSessionRepository.findById(activeSession.getId()).orElseThrow();
+        ParkingSlot slotAfterExit = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        assertThat(waitingPaymentSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.WAITING_PAYMENT);
+        assertThat(waitingPaymentSession.getBooking()).isNull();
+        assertThat(slotAfterExit.getStatus()).isEqualTo(ParkingSlot.Status.OCCUPIED);
+
+        mockMvc.perform(post("/api/v1/payments/parking-fee")
+                .param("sessionId", waitingPaymentSession.getId().toString())
+                .param("totalAmount", "15000")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.sessionId").value(waitingPaymentSession.getId()))
+            .andExpect(jsonPath("$.data.bookingId").isEmpty())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        Payment payment = paymentRepository.findAll().stream()
+            .filter(savedPayment -> savedPayment.getPaymentType() == Payment.PaymentType.PARKING_FEE)
+            .findFirst()
+            .orElseThrow();
+
+        mockMvc.perform(put("/api/v1/payments/parking-fee/{paymentId}/confirm", payment.getPaymentId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.paymentStatus").value("PAID"));
+
+        ParkingSession completedSession = parkingSessionRepository.findById(activeSession.getId()).orElseThrow();
+        ParkingSlot releasedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        Payment paidPayment = paymentRepository.findById(payment.getPaymentId()).orElseThrow();
+        assertThat(completedSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.COMPLETED);
+        assertThat(completedSession.getBooking()).isNull();
+        assertThat(releasedSlot.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
+        assertThat(paidPayment.getPaymentStatus()).isEqualTo(Payment.PaymentStatus.PAID);
+        assertThat(paidPayment.getBookingId()).isNull();
+    }
+
+    @Test
+    @WithMockUser(username = "staff-pricing-blocks", roles = "STAFF")
+    void parkingFeeShouldUseGracePeriodThirtyMinuteBlocksAndWindowSplit() throws Exception {
+        User staff = createUser("staff-pricing-blocks", Role.RoleName.STAFF);
+        ParkingBuilding building = createBuilding("Pricing Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Pricing Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Pricing Zone");
+        ParkingSlot slot = createSlot(zone, "PR-01", ParkingSlot.Status.OCCUPIED);
+        Gate entryGate = createGate(building, "ENTRY-PR", Gate.GateType.ENTRY);
+        Vehicle vehicle = createVehicle(staff, vehicleType, "51H-99999");
+
+        pricingPolicyRepository.save(PricingPolicy.builder()
+                .vehicleType(vehicleType)
+                .dayType("WEEKDAY")
+                .timeType("DAY")
+                .startHour(6)
+                .endHour(22)
+                .pricePerHour(new BigDecimal("15000"))
+                .isActive(true)
+                .build());
+        pricingPolicyRepository.save(PricingPolicy.builder()
+                .vehicleType(vehicleType)
+                .dayType("WEEKDAY")
+                .timeType("NIGHT")
+                .startHour(22)
+                .endHour(6)
+                .pricePerHour(new BigDecimal("12000"))
+                .isActive(true)
+                .build());
+
+        ParkingSession session = createSession(
+                staff, vehicle, slot, entryGate,
+                ParkingSession.EntryMode.WALK_IN_MANUAL, ParkingSession.SessionStatus.WAITING_PAYMENT);
+        session.setEntryTime(LocalDateTime.of(2026, 6, 30, 21, 35));
+        session.setExitTime(LocalDateTime.of(2026, 6, 30, 22, 20));
+        parkingSessionRepository.save(session);
+
+        mockMvc.perform(post("/api/v1/payments/parking-fee")
+                .param("sessionId", session.getId().toString())
+                .param("totalAmount", "999999")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.baseFee").value(27000))
+            .andExpect(jsonPath("$.data.totalAmount").value(27000))
+            .andExpect(jsonPath("$.data.appliedRate").value(15000));
     }
 
     @Test
@@ -365,8 +506,404 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
             .andExpect(jsonPath("$.data.status").value("WAITING_PAYMENT"));
     }
 
+    @Test
+    @WithMockUser(username = "driver-cancel-window-ok", roles = "DRIVER")
+    void confirmedBookingShouldAllowCancelWithinTenMinutesAfterDepositPayment() throws Exception {
+        User driver = createUser("driver-cancel-window-ok", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Cancel Window Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Cancel Window Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Cancel Window Zone");
+        ParkingSlot slot = createSlot(zone, "CW-01", ParkingSlot.Status.RESERVED);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "70A-12345");
+        Booking booking = createConfirmedBooking(driver, vehicle, slot, LocalDateTime.now().minusMinutes(9));
+
+        mockMvc.perform(put("/api/v1/bookings/{id}/cancel", booking.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+
+        assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
+            .isEqualTo(Booking.BookingStatus.CANCELLED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
+    @Test
+    @WithMockUser(username = "driver-cancel-window-block", roles = "DRIVER")
+    void confirmedBookingShouldRejectCancelAfterTenMinutesFromDepositPayment() throws Exception {
+        User driver = createUser("driver-cancel-window-block", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("No Show Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("No Show Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "No Show Zone");
+        ParkingSlot slot = createSlot(zone, "NS-01", ParkingSlot.Status.RESERVED);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "71A-54321");
+        Booking booking = createConfirmedBooking(driver, vehicle, slot, LocalDateTime.now().minusMinutes(11));
+
+        mockMvc.perform(put("/api/v1/bookings/{id}/cancel", booking.getId()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false));
+
+        assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
+            .isEqualTo(Booking.BookingStatus.CONFIRMED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.RESERVED);
+    }
+
+    @Test
+    @WithMockUser(username = "staff-exception-close", roles = "STAFF")
+    void exceptionLifecycleShouldRequireResolvedBeforeClose() throws Exception {
+        User staff = createUser("staff-exception-close", Role.RoleName.STAFF);
+        ExceptionCase exceptionCase = createExceptionCase(
+            ExceptionCase.ExceptionType.PLATE_UNVERIFIED,
+            ExceptionCase.ExceptionStatus.OPEN,
+            null,
+            101
+        );
+
+        mockMvc.perform(put("/api/v1/exceptions/{id}/close", exceptionCase.getExceptionId()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false));
+
+        mockMvc.perform(put("/api/v1/exceptions/{id}/assign", exceptionCase.getExceptionId())
+                .param("staffId", String.valueOf(staff.getUserId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+
+        mockMvc.perform(put("/api/v1/exceptions/{id}/resolve", exceptionCase.getExceptionId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("RESOLVED"));
+
+        mockMvc.perform(put("/api/v1/exceptions/{id}/close", exceptionCase.getExceptionId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("CLOSED"));
+
+        mockMvc.perform(get("/api/v1/exceptions/status/CLOSED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].exceptionId").value(exceptionCase.getExceptionId()))
+            .andExpect(jsonPath("$.data[0].status").value("CLOSED"));
+    }
+
+    @Test
+    void schedulerShouldExpirePendingPaymentBookingWhenExpiredAtPassed() {
+        User driver = createUser("driver-expire-pending", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Pending Expire Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Pending Expire Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Pending Expire Zone");
+        ParkingSlot slot = createSlot(zone, "PE-01", ParkingSlot.Status.AVAILABLE);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "52A-12345");
+
+        Booking booking = Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(LocalDateTime.now().plusHours(1))
+            .bookingEndTime(LocalDateTime.now().plusHours(3))
+            .reservedAt(LocalDateTime.now().minusMinutes(20))
+            .expiredAt(LocalDateTime.now().minusMinutes(5))
+            .depositAmount(BigDecimal.ZERO)
+            .status(Booking.BookingStatus.PENDING_PAYMENT)
+            .build();
+        booking = bookingRepository.save(booking);
+
+        bookingScheduler.expirePendingPayment();
+
+        Booking expiredBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(expiredBooking.getStatus()).isEqualTo(Booking.BookingStatus.EXPIRED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
+    @Test
+    void schedulerShouldExpireConfirmedNoShowAndReleaseReservedSlot() {
+        User driver = createUser("driver-expire-confirmed", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Confirmed Expire Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Confirmed Expire Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Confirmed Expire Zone");
+        ParkingSlot slot = createSlot(zone, "CE-01", ParkingSlot.Status.RESERVED);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "53A-54321");
+
+        Booking booking = Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(LocalDateTime.now().minusMinutes(31))
+            .bookingEndTime(LocalDateTime.now().plusHours(1))
+            .reservedAt(LocalDateTime.now().minusHours(1))
+            .expiredAt(LocalDateTime.now().plusHours(1))
+            .qrToken(qrTokenUtil.generateQrToken(999L, vehicle.getLicensePlate(), slot.getId(), LocalDateTime.now().plusHours(1)))
+            .qrIssuedAt(LocalDateTime.now().minusHours(1))
+            .depositAmount(new BigDecimal("10000"))
+            .depositPaidAt(LocalDateTime.now().minusHours(1))
+            .status(Booking.BookingStatus.CONFIRMED)
+            .build();
+        booking = bookingRepository.save(booking);
+        booking.setQrToken(qrTokenUtil.generateQrToken(booking.getId(), vehicle.getLicensePlate(), slot.getId(), LocalDateTime.now().plusHours(1)));
+        bookingRepository.save(booking);
+
+        bookingScheduler.expireConfirmedNoShow();
+
+        Booking expiredBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(expiredBooking.getStatus()).isEqualTo(Booking.BookingStatus.EXPIRED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
+    @Test
+    @WithMockUser(username = "staff-ocr-review", roles = "STAFF")
+    void lowConfidenceScanShouldEnterManualReviewAndBeStaffApproved() throws Exception {
+        User staff = createUser("staff-ocr-review", Role.RoleName.STAFF);
+        ParkingBuilding building = createBuilding("OCR Review Tower");
+        Gate gate = createGate(building, "OCR-ENTRY", Gate.GateType.ENTRY);
+
+        mockMvc.perform(post("/api/v1/ocr/scan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "gateId": %d,
+                      "triggerType": "ENTRY",
+                      "detectedPlate": "29-Y3-036.5B",
+                      "confidenceScore": 0.81,
+                      "imagePath": "uploads/ocr/manual-review.jpg"
+                    }
+                    """.formatted(gate.getId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.processStatus").value("MANUAL_REVIEW"))
+            .andExpect(jsonPath("$.data.detectedPlate").value("29-Y3-036.5B"));
+
+        OcrScan pendingScan = ocrScanRepository.findAll().get(0);
+        assertThat(pendingScan.getProcessStatus()).isEqualTo(OcrScan.ProcessStatus.MANUAL_REVIEW);
+
+        mockMvc.perform(get("/api/v1/ocr/pending-reviews"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].scanId").value(pendingScan.getId()))
+            .andExpect(jsonPath("$.data[0].processStatus").value("MANUAL_REVIEW"));
+
+        mockMvc.perform(put("/api/v1/ocr/{scanId}/review", pendingScan.getId())
+                .param("correctedPlate", "29-Y3-036.58")
+                .param("staffUserId", staff.getUserId().toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.processStatus").value("STAFF_APPROVED"))
+            .andExpect(jsonPath("$.data.isCorrected").value(true))
+            .andExpect(jsonPath("$.data.correctedPlate").value("29-Y3-036.58"))
+            .andExpect(jsonPath("$.data.effectivePlate").value("29-Y3-036.58"));
+
+        OcrScan approvedScan = ocrScanRepository.findById(pendingScan.getId()).orElseThrow();
+        assertThat(approvedScan.getProcessStatus()).isEqualTo(OcrScan.ProcessStatus.STAFF_APPROVED);
+        assertThat(approvedScan.getCorrectedByUserId()).isEqualTo(staff.getUserId().longValue());
+        assertThat(approvedScan.getCorrectedAt()).isNotNull();
+
+        mockMvc.perform(get("/api/v1/ocr/pending-reviews"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "staff-ocr-failed", roles = "STAFF")
+    void failedScanShouldBeStoredAndSkippedFromPendingReviewQueue() throws Exception {
+        ParkingBuilding building = createBuilding("OCR Failed Tower");
+        Gate gate = createGate(building, "OCR-FAIL", Gate.GateType.ENTRY);
+
+        mockMvc.perform(post("/api/v1/ocr/scan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "gateId": %d,
+                      "triggerType": "ENTRY",
+                      "imagePath": "uploads/ocr/failed.jpg"
+                    }
+                    """.formatted(gate.getId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.processStatus").value("FAILED"))
+            .andExpect(jsonPath("$.data.detectedPlate").doesNotExist());
+
+        OcrScan failedScan = ocrScanRepository.findAll().get(0);
+        assertThat(failedScan.getProcessStatus()).isEqualTo(OcrScan.ProcessStatus.FAILED);
+
+        mockMvc.perform(get("/api/v1/ocr/{scanId}", failedScan.getId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.scanId").value(failedScan.getId()))
+            .andExpect(jsonPath("$.data.processStatus").value("FAILED"));
+
+        mockMvc.perform(get("/api/v1/ocr/pending-reviews"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "staff-ocr-correct-after-auto", roles = "STAFF")
+    void autoApprovedScanShouldBecomeCorrectedAfterApprovalWhenStaffChangesPlate() throws Exception {
+        User staff = createUser("staff-ocr-correct-after-auto", Role.RoleName.STAFF);
+        ParkingBuilding building = createBuilding("OCR Auto Tower");
+        Gate gate = createGate(building, "OCR-AUTO", Gate.GateType.ENTRY);
+
+        mockMvc.perform(post("/api/v1/ocr/scan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "gateId": %d,
+                      "triggerType": "ENTRY",
+                      "detectedPlate": "30G-493.4A",
+                      "confidenceScore": 0.99,
+                      "imagePath": "uploads/ocr/auto-approved.jpg"
+                    }
+                    """.formatted(gate.getId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.processStatus").value("AUTO_APPROVED"));
+
+        OcrScan autoApprovedScan = ocrScanRepository.findAll().get(0);
+
+        mockMvc.perform(put("/api/v1/ocr/{scanId}/review", autoApprovedScan.getId())
+                .param("correctedPlate", "30G-493.44")
+                .param("staffUserId", staff.getUserId().toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.processStatus").value("CORRECTED_AFTER_APPROVAL"))
+            .andExpect(jsonPath("$.data.isCorrected").value(true))
+            .andExpect(jsonPath("$.data.effectivePlate").value("30G-493.44"));
+
+        OcrScan correctedScan = ocrScanRepository.findById(autoApprovedScan.getId()).orElseThrow();
+        assertThat(correctedScan.getProcessStatus()).isEqualTo(OcrScan.ProcessStatus.CORRECTED_AFTER_APPROVAL);
+        assertThat(correctedScan.getCorrectedPlate()).isEqualTo("30G-493.44");
+    }
+
+    @Test
+    @WithMockUser(username = "staff-payment-failed", roles = "STAFF")
+    void pendingDepositShouldBeMarkableAsFailedAndAllowRecreate() throws Exception {
+        User driver = createUser("driver-payment-failed", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Failed Payment Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Failed Payment Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Failed Payment Zone");
+        ParkingSlot slot = createSlot(zone, "FP-01", ParkingSlot.Status.AVAILABLE);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "77A-12345");
+
+        Booking booking = Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(LocalDateTime.now().plusHours(1))
+            .bookingEndTime(LocalDateTime.now().plusHours(2))
+            .reservedAt(LocalDateTime.now())
+            .expiredAt(LocalDateTime.now().plusMinutes(15))
+            .depositAmount(new BigDecimal("10000"))
+            .status(Booking.BookingStatus.PENDING_PAYMENT)
+            .build();
+        booking = bookingRepository.save(booking);
+
+        mockMvc.perform(post("/api/v1/payments/deposit")
+                .param("bookingId", booking.getId().toString())
+                .param("depositAmount", "10000")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        Payment pendingPayment = paymentRepository.findAll().get(0);
+
+        mockMvc.perform(put("/api/v1/payments/{paymentId}/fail", pendingPayment.getPaymentId())
+                .param("transactionRef", "FAIL-DEPOSIT-001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.paymentStatus").value("FAILED"))
+            .andExpect(jsonPath("$.data.transactionRef").value("FAIL-DEPOSIT-001"));
+
+        Payment failedPayment = paymentRepository.findById(pendingPayment.getPaymentId()).orElseThrow();
+        assertThat(failedPayment.getPaymentStatus()).isEqualTo(Payment.PaymentStatus.FAILED);
+        assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
+            .isEqualTo(Booking.BookingStatus.PENDING_PAYMENT);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+
+        mockMvc.perform(post("/api/v1/payments/deposit")
+                .param("bookingId", booking.getId().toString())
+                .param("depositAmount", "10000")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        assertThat(paymentRepository.findAll()).hasSize(2);
+        assertThat(paymentRepository.findAll().stream()
+                .filter(payment -> payment.getPaymentStatus() == Payment.PaymentStatus.PENDING)
+                .count())
+            .isEqualTo(1);
+    }
+
+    @Test
+    @WithMockUser(username = "staff-payment-refund", roles = "STAFF")
+    void paidDepositShouldBeRefundableAfterBookingCancelled() throws Exception {
+        User driver = createUser("driver-payment-refund", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Refund Payment Tower");
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Refund Payment Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Refund Payment Zone");
+        ParkingSlot slot = createSlot(zone, "RF-01", ParkingSlot.Status.AVAILABLE);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "78A-54321");
+
+        Booking booking = Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(LocalDateTime.now().plusHours(1))
+            .bookingEndTime(LocalDateTime.now().plusHours(3))
+            .reservedAt(LocalDateTime.now())
+            .expiredAt(LocalDateTime.now().plusMinutes(15))
+            .depositAmount(new BigDecimal("10000"))
+            .status(Booking.BookingStatus.PENDING_PAYMENT)
+            .build();
+        booking = bookingRepository.save(booking);
+
+        mockMvc.perform(post("/api/v1/payments/deposit")
+                .param("bookingId", booking.getId().toString())
+                .param("depositAmount", "10000")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        Payment depositPayment = paymentRepository.findAll().get(0);
+
+        mockMvc.perform(put("/api/v1/payments/deposit/{paymentId}/confirm", depositPayment.getPaymentId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PAID"));
+
+        Booking confirmedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
+        assertThat(confirmedBooking.getStatus()).isEqualTo(Booking.BookingStatus.CONFIRMED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.RESERVED);
+
+        confirmedBooking.setStatus(Booking.BookingStatus.CANCELLED);
+        bookingRepository.save(confirmedBooking);
+        ParkingSlot releasedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        releasedSlot.setStatus(ParkingSlot.Status.AVAILABLE);
+        parkingSlotRepository.save(releasedSlot);
+
+        mockMvc.perform(put("/api/v1/payments/{paymentId}/refund", depositPayment.getPaymentId())
+                .param("transactionRef", "REFUND-DEPOSIT-001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.paymentStatus").value("REFUNDED"))
+            .andExpect(jsonPath("$.data.transactionRef").value("REFUND-DEPOSIT-001"));
+
+        Payment refundedPayment = paymentRepository.findById(depositPayment.getPaymentId()).orElseThrow();
+        assertThat(refundedPayment.getPaymentStatus()).isEqualTo(Payment.PaymentStatus.REFUNDED);
+        assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
+            .isEqualTo(Booking.BookingStatus.CANCELLED);
+        assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
     private Booking createConfirmedBooking(User driver, Vehicle vehicle, ParkingSlot slot) {
-        LocalDateTime now = LocalDateTime.now();
+        return createConfirmedBooking(driver, vehicle, slot, LocalDateTime.now());
+    }
+
+    private Booking createConfirmedBooking(User driver, Vehicle vehicle, ParkingSlot slot, LocalDateTime depositPaidAt) {
+        LocalDateTime now = depositPaidAt;
         String qrToken = qrTokenUtil.generateQrToken(
                 1L,
                 vehicle.getLicensePlate(),
@@ -383,7 +920,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                 .qrToken(qrToken)
                 .qrIssuedAt(now)
                 .depositAmount(new BigDecimal("10000"))
-                .depositPaidAt(now)
+                .depositPaidAt(depositPaidAt)
                 .status(Booking.BookingStatus.CONFIRMED)
                 .build();
         booking = bookingRepository.save(booking);

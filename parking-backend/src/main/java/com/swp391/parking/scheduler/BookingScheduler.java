@@ -47,7 +47,8 @@ public class BookingScheduler {
     @Scheduled(fixedDelay = 60_000)
     @Transactional
     public void expireConfirmedNoShow() {
-        List<Booking> list = bookingRepository.findConfirmedExpired(LocalDateTime.now());
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(30);
+        List<Booking> list = bookingRepository.findConfirmedNoShow(threshold);
         if (!list.isEmpty()) {
             log.info("Scheduler: expire {} CONFIRMED no-show bookings", list.size());
             list.forEach(b -> {

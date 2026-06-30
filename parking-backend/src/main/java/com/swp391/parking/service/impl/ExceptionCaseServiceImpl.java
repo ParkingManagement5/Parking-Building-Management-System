@@ -82,6 +82,10 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     @Transactional
     public ExceptionCaseResponse assignToStaff(Integer exceptionId, Integer staffId) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        if (exceptionCase.getStatus() != ExceptionStatus.OPEN) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi co the assign exception dang OPEN (hien: " + exceptionCase.getStatus() + ")");
+        }
 
         exceptionCase.setResolvedBy(staffId);
         exceptionCase.setStatus(ExceptionStatus.IN_PROGRESS);
@@ -93,6 +97,10 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     @Transactional
     public ExceptionCaseResponse resolveExceptionCase(Integer exceptionId) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        if (exceptionCase.getStatus() != ExceptionStatus.IN_PROGRESS) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi co the resolve exception dang IN_PROGRESS (hien: " + exceptionCase.getStatus() + ")");
+        }
 
         exceptionCase.setStatus(ExceptionStatus.RESOLVED);
         exceptionCase.setResolvedAt(LocalDateTime.now());
@@ -104,6 +112,10 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     @Transactional
     public ExceptionCaseResponse closeExceptionCase(Integer exceptionId) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        if (exceptionCase.getStatus() != ExceptionStatus.RESOLVED) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chi co the close exception da RESOLVED (hien: " + exceptionCase.getStatus() + ")");
+        }
 
         exceptionCase.setStatus(ExceptionStatus.CLOSED);
 
