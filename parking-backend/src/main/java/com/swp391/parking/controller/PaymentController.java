@@ -51,6 +51,17 @@ public class PaymentController {
             ApiResponse.success("Deposit confirmed successfully", response));
     }
 
+    @Operation(summary = "Mark pending payment as failed")
+    @PutMapping("/{paymentId}/fail")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PaymentResponse>> markFailed(
+            @PathVariable Integer paymentId,
+            @RequestParam(required = false) String transactionRef) {
+        PaymentResponse response = paymentService.markFailed(paymentId, transactionRef);
+        return ResponseEntity.ok(
+            ApiResponse.success("Payment marked as failed", response));
+    }
+
     @Operation(summary = "Create parking fee for session")
     @PostMapping("/parking-fee")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
@@ -91,6 +102,17 @@ public class PaymentController {
             paymentId, transactionRef);
         return ResponseEntity.ok(
             ApiResponse.success("Payment confirmed successfully", response));
+    }
+
+    @Operation(summary = "Refund paid payment with business validation")
+    @PutMapping("/{paymentId}/refund")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<PaymentResponse>> refundPayment(
+            @PathVariable Integer paymentId,
+            @RequestParam(required = false) String transactionRef) {
+        PaymentResponse response = paymentService.refundPayment(paymentId, transactionRef);
+        return ResponseEntity.ok(
+            ApiResponse.success("Payment refunded successfully", response));
     }
 
     @Operation(summary = "Get payment by ID")

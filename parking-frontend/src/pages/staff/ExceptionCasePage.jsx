@@ -5,15 +5,58 @@ import { StaffEmptyState, StaffPageSection, StaffPrimaryButton, StaffSecondaryBu
 import { unwrapApiData } from "../../utils/api";
 import OcrCorrectionPage from "./OcrCorrectionPage";
 
+function exceptionMeta(type) {
+  switch (type) {
+    case "PLATE_UNVERIFIED":
+      return {
+        priority: "HIGH",
+        priorityTone: "rose",
+        recommendation: "Mo lai anh scan, xac minh bien so cuoi cung, neu van mo ho thi escalate manager.",
+      };
+    case "BOOKING_MISMATCH":
+      return {
+        priority: "HIGH",
+        priorityTone: "amber",
+        recommendation: "Doi chieu booking, bien xe, va QR. Khong cho xe vao neu khong khop.",
+      };
+    case "EXIT_VERIFICATION_FAILED":
+    case "LOST_QR":
+      return {
+        priority: "HIGH",
+        priorityTone: "rose",
+        recommendation: "Kiem tra lai session/QR tai cong ra. Chi cho ra khi da xac minh hop le.",
+      };
+    case "SESSION_CONFLICT":
+      return {
+        priority: "MEDIUM",
+        priorityTone: "amber",
+        recommendation: "Mo session/booking lien quan va doi chieu voi xe thuc te truoc khi quyet dinh.",
+      };
+    case "SYSTEM_ERROR":
+      return {
+        priority: "HIGH",
+        priorityTone: "violet",
+        recommendation: "Retry flow neu co the, neu van loi thi chuyen ky thuat/manager.",
+      };
+    default:
+      return {
+        priority: "MEDIUM",
+        priorityTone: "slate",
+        recommendation: "Xem mo ta va xu ly theo tinh huong thuc te tai cong.",
+      };
+  }
+}
+
 export default function ExceptionCasePage() {
-  const [cases, setCases] = useState([]);
+  const [activeCases, setActiveCases] = useState([]);
+  const [resolvedCases, setResolvedCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
-  const paged = useMemo(() => cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [cases, page]);
-  const totalPages = Math.max(1, Math.ceil(cases.length / PAGE_SIZE));
+  const paged = useMemo(() => activeCases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [activeCases, page]);
+  const totalPages = Math.max(1, Math.ceil(activeCases.length / PAGE_SIZE));
 
   useEffect(() => {
     void loadCases();
@@ -23,14 +66,16 @@ export default function ExceptionCasePage() {
     setLoading(true);
     setError("");
     try {
-      const [openRes, progressRes] = await Promise.all([
+      const [openRes, progressRes, resolvedRes] = await Promise.all([
         exceptionApi.getByStatus("OPEN"),
         exceptionApi.getByStatus("IN_PROGRESS"),
+        exceptionApi.getByStatus("RESOLVED"),
       ]);
-      setCases([
+      setActiveCases([
         ...unwrapApiData(openRes.data, []),
         ...unwrapApiData(progressRes.data, []),
       ]);
+      setResolvedCases(unwrapApiData(resolvedRes.data, []));
     } catch (err) {
       console.error("Failed to load exception cases", err);
       setError(err.response?.data?.message || "Khong tai duoc danh sach exception.");
@@ -73,6 +118,20 @@ export default function ExceptionCasePage() {
     }
   };
 
+  const closeCase = async (item) => {
+    setSavingId(item.exceptionId);
+    setError("");
+    try {
+      await exceptionApi.close(item.exceptionId);
+      await loadCases();
+    } catch (err) {
+      console.error("Close exception failed", err);
+      setError(err.response?.data?.message || "Khong close duoc exception.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
     <StaffPageSection title="Operational Exceptions" subtitle="Review abnormal gate, plate, and session situations from backend">
@@ -88,7 +147,7 @@ export default function ExceptionCasePage() {
         </div>
       ) : null}
 
-      {cases.length === 0 ? (
+      {activeCases.length === 0 ? (
         <StaffEmptyState
           title={loading ? "Loading exception cases" : "No open exception cases"}
           description="New issues from entry, QR, OCR, or payment flows will appear here."
@@ -96,7 +155,9 @@ export default function ExceptionCasePage() {
         />
       ) : (
         <div className="space-y-4">
-          {paged.map((item) => (
+          {paged.map((item) => {
+            const meta = exceptionMeta(item.exceptionType);
+            return (
             <div key={item.exceptionId} className="rounded-2xl border border-border p-4">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1">
@@ -104,6 +165,9 @@ export default function ExceptionCasePage() {
                     <p className="text-sm font-semibold text-foreground">{item.exceptionType}</p>
                     <StaffStatusBadge tone={item.status === "IN_PROGRESS" ? "blue" : "amber"}>
                       {String(item.status).toLowerCase()}
+                    </StaffStatusBadge>
+                    <StaffStatusBadge tone={meta.priorityTone}>
+                      {meta.priority}
                     </StaffStatusBadge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -114,6 +178,9 @@ export default function ExceptionCasePage() {
                     {formatStaffDateTime(item.createdAt)}
                   </p>
                   <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
+                  <div className="mt-3 rounded-2xl border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">Recommended action:</span> {meta.recommendation}
+                  </div>
                   {item.resolvedBy ? (
                     <p className="mt-2 text-xs text-muted-foreground">Assigned/resolved by user #{item.resolvedBy}</p>
                   ) : null}
@@ -129,17 +196,20 @@ export default function ExceptionCasePage() {
                       Assign to me
                     </StaffSecondaryButton>
                   ) : null}
-                  <StaffPrimaryButton
-                    type="button"
-                    onClick={() => resolveCase(item)}
-                    disabled={savingId === item.exceptionId}
-                  >
-                    {savingId === item.exceptionId ? "Saving..." : "Resolve"}
-                  </StaffPrimaryButton>
+                  {item.status === "IN_PROGRESS" ? (
+                    <StaffPrimaryButton
+                      type="button"
+                      onClick={() => resolveCase(item)}
+                      disabled={savingId === item.exceptionId}
+                    >
+                      {savingId === item.exceptionId ? "Saving..." : "Resolve"}
+                    </StaffPrimaryButton>
+                  ) : null}
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {totalPages > 1 && (
@@ -158,6 +228,50 @@ export default function ExceptionCasePage() {
             className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
             Sau →
           </button>
+        </div>
+      )}
+    </StaffPageSection>
+    <StaffPageSection title="Resolved Gan Day" subtitle="Case da xu ly xong va cho dong ho so">
+      {resolvedCases.length === 0 ? (
+        <StaffEmptyState
+          title={loading ? "Loading resolved cases" : "No resolved cases waiting to close"}
+          description="Case RESOLVED se hien o day truoc khi dong ho so."
+        />
+      ) : (
+        <div className="space-y-4">
+          {resolvedCases.slice(0, 6).map((item) => {
+            const meta = exceptionMeta(item.exceptionType);
+            return (
+              <div key={item.exceptionId} className="rounded-2xl border border-border p-4">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{item.exceptionType}</p>
+                      <StaffStatusBadge tone="emerald">resolved</StaffStatusBadge>
+                      <StaffStatusBadge tone={meta.priorityTone}>{meta.priority}</StaffStatusBadge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Exception #{item.exceptionId}
+                      {item.sessionId ? ` - Session #${item.sessionId}` : ""}
+                      {item.requestId ? ` - Request #${item.requestId}` : ""}
+                      {" - "}
+                      {formatStaffDateTime(item.resolvedAt || item.createdAt)}
+                    </p>
+                    <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <StaffSecondaryButton
+                      type="button"
+                      onClick={() => closeCase(item)}
+                      disabled={savingId === item.exceptionId}
+                    >
+                      {savingId === item.exceptionId ? "Saving..." : "Close"}
+                    </StaffSecondaryButton>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </StaffPageSection>
