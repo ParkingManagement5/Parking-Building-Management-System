@@ -55,4 +55,14 @@ export const paymentApi = {
   getBySessionId: (sessionId) => axiosClient.get(`/payments/session/${sessionId}`),
 
   getByStatus: (status) => axiosClient.get(`/payments/status/${status}`),
+
+  // VNPay
+  createVnpayDepositUrl: (bookingId) =>
+    axiosClient.post(`/payments/vnpay/create-deposit/${bookingId}`),
+
+  createVnpayParkingFeeUrl: (sessionId) =>
+    axiosClient.post(`/payments/vnpay/create-parking-fee/${sessionId}`),
+
+  confirmVnpayReturn: (params) =>
+    axiosClient.get("/payments/vnpay/return", { params }),
 };

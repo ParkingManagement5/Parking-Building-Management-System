@@ -15,6 +15,7 @@ import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.repository.PricingPolicyRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.PaymentService;
@@ -39,7 +40,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final ParkingSessionRepository parkingSessionRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final PricingPolicyRepository pricingPolicyRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -68,7 +71,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse confirmDeposit(Integer paymentId) {
+    public PaymentResponse confirmDeposit(Integer paymentId, String transactionRef) {
         Payment payment = findById(paymentId);
 
         if (payment.getPaymentType() != PaymentType.DEPOSIT) {
@@ -96,6 +99,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         payment.setPaymentStatus(PaymentStatus.PAID);
         payment.setPaidAt(LocalDateTime.now());
+        if (transactionRef != null && !transactionRef.isBlank()) {
+            payment.setTransactionRef(transactionRef);
+        }
 
         Payment savedPayment = paymentRepository.save(payment);
 
@@ -395,6 +401,9 @@ public class PaymentServiceImpl implements PaymentService {
                 "Thanh toan hoan tat",
                 "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
                 "success", "PAYMENT", payment.getPaymentId());
+
+        userRepository.findById(session.getUserId().intValue())
+                .ifPresent(user -> emailService.sendParkingReceiptEmail(user, session, payment));
     }
 
     private PaymentResponse toResponse(Payment payment) {
