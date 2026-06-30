@@ -466,11 +466,13 @@ INSERT INTO `gate`
 INSERT INTO `pricing_policy`
 (`vehicle_type_id`, `time_type`, `day_type`, `start_hour`, `end_hour`, `price_per_hour`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, 'NORMAL', 'WEEKDAY',  6, 22,  5000.00, true, NOW(), NOW()),
-(1, 'NORMAL', 'WEEKEND',  6, 22,  7000.00, true, NOW(), NOW()),
-(1, 'NIGHT',  'WEEKDAY', 22,  6,  3000.00, true, NOW(), NOW()),
+(1, 'NIGHT',  'WEEKDAY', 22,  6,  4000.00, true, NOW(), NOW()),
+(1, 'NORMAL', 'WEEKEND',  6, 22,  6000.00, true, NOW(), NOW()),
+(1, 'NIGHT',  'WEEKEND', 22,  6,  5000.00, true, NOW(), NOW()),
 (2, 'NORMAL', 'WEEKDAY',  6, 22, 15000.00, true, NOW(), NOW()),
+(2, 'NIGHT',  'WEEKDAY', 22,  6, 12000.00, true, NOW(), NOW()),
 (2, 'NORMAL', 'WEEKEND',  6, 22, 20000.00, true, NOW(), NOW()),
-(2, 'NIGHT',  'WEEKDAY', 22,  6, 10000.00, true, NOW(), NOW());
+(2, 'NIGHT',  'WEEKEND', 22,  6, 15000.00, true, NOW(), NOW());
 
 -- 11. Vehicles (driver1: 1 moto + 1 car, driver2: 1 moto)
 INSERT INTO `vehicle`
@@ -489,7 +491,7 @@ INSERT INTO `shift` (`shift_name`, `start_time`, `end_time`, `status`) VALUES
 INSERT INTO `system_config` (`config_key`, `config_value`, `description`, `updated_at`) VALUES
 ('BOOKING_MIN_ADVANCE_MINUTES', '10', 'Tối thiểu N phút trước mới được booking (BR-03a)', NOW()),
 ('BOOKING_EXPIRE_AFTER_START',  '30', 'Booking hết hạn sau N phút từ booking_start_time (BR-03c)', NOW()),
-('QR_EXPIRE_BUFFER_MINUTES',    '15', 'QR hết hạn sau N phút nếu xa hơn start_time (BR-03b)', NOW());
+('QR_EXPIRE_BUFFER_MINUTES',    '30', 'QR hết hạn tại booking_start_time + N phút (BR-03b)', NOW());
 
 -- ============================================================
 -- DONE — Accounts:
