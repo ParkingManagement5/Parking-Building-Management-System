@@ -70,6 +70,23 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
     }
 
     @Test
+    void expiredPendingPaymentBookingCannotBeConfirmedAndSlotRemainsAvailable() {
+        User driver = createUser("expired-pending-driver", Role.RoleName.DRIVER);
+        Booking booking = pendingBookingEntityFor(driver, "EP-01", "59A-10000",
+                LocalDateTime.now().plusHours(2), LocalDateTime.now().minusMinutes(1));
+
+        assertThatThrownBy(() -> bookingService.confirmBookingAfterPayment(booking.getId()))
+                .isInstanceOf(AppException.class)
+                .extracting(ex -> ((AppException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        Booking after = bookingRepository.findById(booking.getId()).orElseThrow();
+        ParkingSlot slot = parkingSlotRepository.findById(booking.getSlot().getId()).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(Booking.BookingStatus.PENDING_PAYMENT);
+        assertThat(slot.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
+    }
+
+    @Test
     void regenerateQrShouldIssueDifferentTokenWithoutChangingOrExtendingExpiry() {
         User driver = createUser("regen-driver", Role.RoleName.DRIVER);
         BookingResponse confirmed = confirmedBookingFor(driver, "RG-01", "59A-10001",
@@ -169,6 +186,30 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
         request.setBookingEndTime(startTime.plusHours(2));
 
         return bookingService.createBooking(driver.getUserId().longValue(), request);
+    }
+
+    private Booking pendingBookingEntityFor(User driver, String slotCode, String licensePlate,
+                                            LocalDateTime bookingStartTime, LocalDateTime expiredAt) {
+        ParkingBuilding building = createBuilding("Manual Pending " + slotCode);
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Manual Pending Car " + slotCode, VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Manual Pending Zone " + slotCode);
+        ParkingSlot slot = createSlot(zone, slotCode, ParkingSlot.Status.AVAILABLE);
+        Vehicle vehicle = createVehicle(driver, vehicleType, licensePlate);
+        LocalDateTime reservedAt = LocalDateTime.now().minusMinutes(20).withNano(0);
+
+        Booking booking = Booking.builder()
+                .userId(driver.getUserId().longValue())
+                .vehicle(vehicle)
+                .slot(slot)
+                .bookingStartTime(bookingStartTime)
+                .bookingEndTime(bookingStartTime.plusHours(2))
+                .reservedAt(reservedAt)
+                .expiredAt(expiredAt.withNano(0))
+                .depositAmount(new BigDecimal("10000"))
+                .status(Booking.BookingStatus.PENDING_PAYMENT)
+                .build();
+        return bookingRepository.save(booking);
     }
 
     private BookingResponse confirmDepositForBooking(BookingResponse pending) {
