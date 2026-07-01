@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Building2, DoorOpen, Plus, ShieldCheck, X } from "lucide-react";
+import { ArrowLeftRight, Building2, DoorOpen, Plus, Search, ShieldCheck, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
 import {
@@ -37,18 +37,20 @@ export default function GatePage() {
   const [gates, setGates] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterBuilding, setFilterBuilding] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
     buildingId: "",
     gateCode: "",
     gateType: "ENTRY",
   });
 
-  const refreshGates = useCallback(async (buildingList) => {
+  const refreshGates = useCallback(async () => {
     try {
-      const responses = await Promise.all(
-        buildingList.map((building) => gateApi.getByBuilding(building.buildingId ?? building.id))
-      );
-      setGates(responses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeGate)));
+      const res = await gateApi.getAll();
+      setGates(unwrapApiData(res.data, []).map(normalizeGate));
     } catch (error) {
       console.error("Failed to fetch gates", error);
       alert("Cannot load gates");
@@ -59,17 +61,22 @@ export default function GatePage() {
     let cancelled = false;
 
     async function loadInitialData() {
-      try {
-        const buildingRes = await buildingApi.getAll();
-        const buildingList = unwrapApiData(buildingRes.data, []);
-        if (cancelled) {
-          return;
-        }
-        setBuildings(buildingList);
-        await refreshGates(buildingList);
-      } catch (error) {
-        console.error("Failed to load gate dependencies", error);
-        alert("Cannot load buildings");
+      const [buildingRes, gateRes] = await Promise.allSettled([
+        buildingApi.getAll(),
+        gateApi.getAll(),
+      ]);
+      if (cancelled) return;
+
+      if (buildingRes.status === "fulfilled") {
+        setBuildings(unwrapApiData(buildingRes.value.data, []));
+      } else {
+        console.error("Failed to load buildings", buildingRes.reason);
+      }
+
+      if (gateRes.status === "fulfilled") {
+        setGates(unwrapApiData(gateRes.value.data, []).map(normalizeGate));
+      } else {
+        console.error("Failed to load gates", gateRes.reason);
       }
     }
 
@@ -78,7 +85,7 @@ export default function GatePage() {
     return () => {
       cancelled = true;
     };
-  }, [refreshGates]);
+  }, []);
 
   const stats = useMemo(
     () => ({
@@ -88,6 +95,18 @@ export default function GatePage() {
     }),
     [gates]
   );
+
+  const filteredGates = useMemo(() => {
+    const q = filterSearch.toLowerCase();
+    return gates.filter((g) => {
+      if (q && !g.gateCode.toLowerCase().includes(q)) return false;
+      if (filterBuilding && String(g.buildingId) !== String(filterBuilding)) return false;
+      if (filterType && g.gateType !== filterType) return false;
+      if (filterStatus === "active" && !g.isActive) return false;
+      if (filterStatus === "inactive" && g.isActive) return false;
+      return true;
+    });
+  }, [gates, filterSearch, filterBuilding, filterType, filterStatus]);
 
   const gateTone = (type) => (type === "ENTRY" ? "emerald" : type === "EXIT" ? "amber" : "blue");
 
@@ -127,7 +146,7 @@ export default function GatePage() {
       } else {
         await gateApi.create(payload);
       }
-      await refreshGates(buildings);
+      await refreshGates();
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save gate", error);
@@ -149,7 +168,7 @@ export default function GatePage() {
     if (!window.confirm("Are you sure you want to delete this gate?")) return;
     try {
       await gateApi.delete(id);
-      await refreshGates(buildings);
+      await refreshGates();
     } catch (error) {
       console.error("Failed to delete gate", error);
       alert(error.response?.data?.message || "Delete gate failed");
@@ -174,12 +193,63 @@ export default function GatePage() {
         <ManagerStatCard icon={Building2} label="Dual Use Gates" value={stats.both} hint="Gates configured for both directions" tone="blue" />
       </ManagerStatsRow>
 
-      <ManagerPanel title="Gate Directory" subtitle={`${gates.length} gate records available`}>
-        {gates.length === 0 ? (
-          <ManagerEmptyState title="No gates yet" description="Create building gates to support staff entry and exit workflows." />
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={filterSearch}
+            onChange={(e) => setFilterSearch(e.target.value)}
+            placeholder="Tìm mã cổng..."
+            className="w-full rounded-xl border border-border bg-muted py-2 pl-8 pr-3 text-xs outline-none focus:border-primary"
+          />
+        </div>
+        <select
+          value={filterBuilding}
+          onChange={(e) => setFilterBuilding(e.target.value)}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="">Tất cả tòa nhà</option>
+          {buildings.map((b) => (
+            <option key={b.buildingId ?? b.id} value={b.buildingId ?? b.id}>{b.name}</option>
+          ))}
+        </select>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="">Tất cả loại</option>
+          <option value="ENTRY">ENTRY</option>
+          <option value="EXIT">EXIT</option>
+          <option value="BOTH">BOTH</option>
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {(filterSearch || filterBuilding || filterType || filterStatus !== "all") && (
+          <button
+            onClick={() => { setFilterSearch(""); setFilterBuilding(""); setFilterType(""); setFilterStatus("all"); }}
+            className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={12} /> Xóa lọc
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{filteredGates.length} / {gates.length} cổng</span>
+      </div>
+
+      <ManagerPanel title="Gate Directory" subtitle={`${filteredGates.length} gate records`}>
+        {filteredGates.length === 0 ? (
+          <ManagerEmptyState title="No gates found" description="Create building gates to support staff entry and exit workflows." />
         ) : (
           <ManagerDataTable columns={["Building", "Gate Code", "Gate Type", "Status", "Actions"]}>
-            {gates.map((item) => (
+            {filteredGates.map((item) => (
               <ManagerRow key={item.id}>
                 <ManagerCell>{item.buildingName}</ManagerCell>
                 <ManagerCell className="font-medium">{item.gateCode}</ManagerCell>

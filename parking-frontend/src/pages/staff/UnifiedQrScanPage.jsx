@@ -201,7 +201,8 @@ export default function UnifiedScanPage() {
     return {
       exceptionType,
       sessionId: lookupData?.sessionId ? Number(lookupData.sessionId) : null,
-      requestId: pendingLowConfidenceScan?.scanId ? Number(pendingLowConfidenceScan.scanId) : null,
+      bookingId: lookupData?.bookingId ? Number(lookupData.bookingId) : null,
+      requestId: null,
       description: segments.join(" | "),
     };
   }

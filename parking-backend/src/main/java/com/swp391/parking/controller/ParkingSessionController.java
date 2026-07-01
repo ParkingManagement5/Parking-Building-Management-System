@@ -104,6 +104,16 @@ public class ParkingSessionController {
             if (!currentUserId.equals(response.getUserId())) {
                 throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay session #" + id);
             }
+        } else if (authentication != null && hasRole(authentication, Role.RoleName.STAFF)) {
+            com.swp391.parking.entity.User staffUser = userRepository
+                    .findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"));
+            if (staffUser.getAssignedBuilding() != null
+                    && staffUser.getAssignedBuilding().getId() != null
+                    && response.getBuildingId() != null
+                    && !staffUser.getAssignedBuilding().getId().equals(response.getBuildingId())) {
+                throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay session #" + id);
+            }
         }
         return ResponseEntity.ok(ApiResponse.success(response));
     }

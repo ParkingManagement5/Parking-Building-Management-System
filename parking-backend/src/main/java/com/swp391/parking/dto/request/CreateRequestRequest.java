@@ -13,4 +13,6 @@ public class CreateRequestRequest {
     private String subject;
 
     private String description;
+
+    private Long buildingId;
 }

@@ -2,12 +2,14 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.CreateRequestRequest;
 import com.swp391.parking.dto.response.RequestResponse;
+import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.Request;
 import com.swp391.parking.entity.Request.RequestStatus;
 import com.swp391.parking.entity.Request.RequestType;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.RequestRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.NotificationService;
@@ -28,11 +30,18 @@ public class RequestServiceImpl implements RequestService {
     private final RequestRepository requestRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ParkingBuildingRepository parkingBuildingRepository;
 
     @Override
     @Transactional
     public RequestResponse createRequest(Integer userId, CreateRequestRequest req) {
         User user = findUserById(userId);
+
+        ParkingBuilding building = null;
+        if (req.getBuildingId() != null) {
+            building = parkingBuildingRepository.findById(req.getBuildingId())
+                    .orElse(null);
+        }
 
         Request request = Request.builder()
             .user(user)
@@ -40,13 +49,19 @@ public class RequestServiceImpl implements RequestService {
             .subject(req.getSubject())
             .description(req.getDescription())
             .status(RequestStatus.OPEN)
+            .building(building)
             .build();
 
         Request saved = requestRepository.save(request);
 
-        notificationService.notifyAllStaff("Request moi tu driver",
-                (req.getSubject() != null ? req.getSubject() : req.getRequestType().name()),
-                "info", "REQUEST", saved.getRequestId());
+        String notifBody = req.getSubject() != null ? req.getSubject() : req.getRequestType().name();
+        if (building != null) {
+            notificationService.notifyStaffInBuilding(building.getId(),
+                    "Request moi tu driver", notifBody, "info", "REQUEST", saved.getRequestId());
+        } else {
+            notificationService.notifyAllStaff("Request moi tu driver",
+                    notifBody, "info", "REQUEST", saved.getRequestId());
+        }
 
         return toResponse(saved);
     }
@@ -168,6 +183,16 @@ public class RequestServiceImpl implements RequestService {
         if (!staffScoped) {
             return true;
         }
+        // Building scope: staff only sees requests for their assigned building
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser != null
+                && currentUser.getAssignedBuilding() != null
+                && request.getBuilding() != null) {
+            if (!currentUser.getAssignedBuilding().getId().equals(request.getBuilding().getId())) {
+                return false;
+            }
+        }
+        // Within scope: open requests visible to any staff, in-progress only to assigned staff
         if (request.getStatus() == RequestStatus.OPEN) {
             return true;
         }

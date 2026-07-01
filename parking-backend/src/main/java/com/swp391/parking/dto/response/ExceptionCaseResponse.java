@@ -14,6 +14,7 @@ public class ExceptionCaseResponse {
     private Integer exceptionId;
     private Integer sessionId;
     private Integer requestId;
+    private Integer bookingId;
     private ExceptionType exceptionType;
     private String description;
     private ExceptionStatus status;

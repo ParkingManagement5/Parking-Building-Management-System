@@ -12,4 +12,6 @@ public interface NotificationService {
     void markAllAsRead(Long userId);
     void notify(Long userId, String title, String body, String type, String entityType, Integer entityId);
     void notifyAllStaff(String title, String body, String type, String entityType, Integer entityId);
+
+    void notifyStaffInBuilding(Long buildingId, String title, String body, String type, String entityType, Integer entityId);
 }

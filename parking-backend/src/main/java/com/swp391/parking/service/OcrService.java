@@ -10,6 +10,7 @@ public interface OcrService {
     OcrScanResponse createScan(OcrScanRequest request);
     OcrScanResponse scanImage(MultipartFile image, Long gateId, String triggerType, Long sessionId);
     List<OcrScanResponse> getPendingReviews();
+    List<OcrScanResponse> getPendingReviews(Long buildingId);
     OcrScanResponse reviewScan(Long scanId, String correctedPlate, Long staffUserId);
     OcrScanResponse getScan(Long scanId);
 }
