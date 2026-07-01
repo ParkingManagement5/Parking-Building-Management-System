@@ -21,6 +21,7 @@ import {
   ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
 
 function normalizeZone(item) {
   return {
@@ -55,7 +56,7 @@ export default function ZonePage() {
   const refreshZones = useCallback(async (sourceFloors) => {
     try {
       const responses = await Promise.all(sourceFloors.map((floor) => zoneApi.getByFloor(floor.floorId ?? floor.id)));
-      setZones(responses.flatMap((res) => (res.data?.data || []).map(normalizeZone)));
+      setZones(responses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeZone)));
     } catch (error) {
       console.error("Failed to fetch zones", error);
       alert("Cannot load zones");
@@ -71,8 +72,8 @@ export default function ZonePage() {
           buildingApi.getAll(),
           vehicleTypeApi.getAll(),
         ]);
-        const buildingList = buildingRes.data?.data || [];
-        const vehicleTypeList = vehicleTypeRes.data?.data || [];
+        const buildingList = unwrapApiData(buildingRes.data, []);
+        const vehicleTypeList = unwrapApiData(vehicleTypeRes.data, []);
         if (cancelled) {
           return;
         }
@@ -82,7 +83,7 @@ export default function ZonePage() {
         const floorResponses = await Promise.all(
           buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
         );
-        const floorList = floorResponses.flatMap((res) => res.data?.data || []);
+        const floorList = floorResponses.flatMap((res) => unwrapApiData(res.data, []));
         if (cancelled) {
           return;
         }

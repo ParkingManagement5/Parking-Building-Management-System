@@ -27,14 +27,45 @@ export default function PaymentProcessingPage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState("");
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+  const [vnpayQrMap, setVnpayQrMap] = useState({});
 
   useEffect(() => {
     void loadPendingPayments();
   }, []);
 
-  async function loadPendingPayments() {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    const regularRefresh = setInterval(() => {
+      void loadPendingPayments({ silent: true });
+    }, 15000);
+
+    return () => clearInterval(regularRefresh);
+  }, []);
+
+  useEffect(() => {
+    if (Object.keys(vnpayQrMap).length === 0) return undefined;
+
+    let attempts = 0;
+    const fastRefresh = setInterval(() => {
+      attempts += 1;
+      void loadPendingPayments({ silent: true, auto: true });
+      if (attempts >= 10) {
+        clearInterval(fastRefresh);
+      }
+    }, 2000);
+
+    return () => clearInterval(fastRefresh);
+  }, [vnpayQrMap]);
+
+  async function loadPendingPayments(options = {}) {
+    const { silent = false, auto = false } = options;
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    } else if (auto) {
+      setIsAutoRefreshing(true);
+    }
     try {
       const [res, paidRes, pricingRes] = await Promise.all([
         sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
@@ -43,23 +74,41 @@ export default function PaymentProcessingPage() {
       ]);
       const waitingSessions = unwrapApiData(res.data, []);
       const restoredPayments = await loadExistingPendingPayments(waitingSessions);
+      const activeSessionIds = new Set(waitingSessions.map((item) => String(item.sessionId)));
+      const paidParkingFees = unwrapApiData(paidRes.data, []).filter(
+        (item) =>
+          item?.paymentType === "PARKING_FEE" &&
+          item?.paymentStatus === "PAID" &&
+          item?.sessionId != null
+      );
       setSessions(waitingSessions);
-      setPendingPaymentMap((prev) => ({
-        ...restoredPayments,
-        ...prev,
-      }));
-      setRecentPayments(unwrapApiData(paidRes.data, []).slice(0, 6));
+      setPendingPaymentMap(restoredPayments);
+      setVnpayQrMap((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).filter(([sessionId]) => activeSessionIds.has(String(sessionId)))
+        )
+      );
+      setRecentPayments(paidParkingFees.slice(0, 6));
       const policies = unwrapApiData(pricingRes.data, []);
       setPricingPolicies(policies);
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Failed to load pending payments", err);
-      setError(err.response?.data?.message || "Khong tai duoc danh sach cho thanh toan.");
+      if (!silent) {
+        setError(err.response?.data?.message || "Khong tai duoc danh sach cho thanh toan.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
+      if (auto) {
+        setIsAutoRefreshing(false);
+      }
     }
   }
 
   async function loadExistingPendingPayments(waitingSessions) {
+    const nextMethodMap = {};
     const entries = await Promise.all(
       waitingSessions.map(async (session) => {
         try {
@@ -70,6 +119,9 @@ export default function PaymentProcessingPage() {
               item?.paymentType === "PARKING_FEE" &&
               item?.paymentStatus === "PENDING"
           );
+          if (payment?.paymentMethod) {
+            nextMethodMap[session.sessionId] = payment.paymentMethod;
+          }
           return payment ? [session.sessionId, buildPendingPaymentState(payment, session)] : null;
         } catch (err) {
           console.warn("Failed to load existing payment for session", session.sessionId, err);
@@ -78,6 +130,10 @@ export default function PaymentProcessingPage() {
       })
     );
 
+    setMethodMap((prev) => ({
+      ...prev,
+      ...nextMethodMap,
+    }));
     return Object.fromEntries(entries.filter(Boolean));
   }
 
@@ -114,8 +170,6 @@ export default function PaymentProcessingPage() {
     return Number(policy?.pricePerHour ?? 20000);
   }
 
-  const [vnpayQrMap, setVnpayQrMap] = useState({});
-
   const createPayment = async (session) => {
     const method = methodMap[session.sessionId] || "CASH";
     setProcessingId(session.sessionId);
@@ -129,6 +183,7 @@ export default function PaymentProcessingPage() {
           await loadPendingPayments();
         } else if (data?.paymentUrl) {
           setVnpayQrMap((prev) => ({ ...prev, [session.sessionId]: data.paymentUrl }));
+          void loadPendingPayments({ silent: true, auto: true });
         }
       } catch (err) {
         setError(err.response?.data?.message || "Không tạo được URL VNPay.");
@@ -220,10 +275,16 @@ export default function PaymentProcessingPage() {
             <option value="CASH">Cash</option>
             <option value="VNPAY">VNPay</option>
           </StaffSelect>
-          <StaffSecondaryButton type="button" onClick={loadPendingPayments} disabled={loading}>
-            Refresh
+          <StaffSecondaryButton type="button" onClick={() => void loadPendingPayments()} disabled={loading}>
+            {isAutoRefreshing ? "Refreshing..." : "Refresh"}
           </StaffSecondaryButton>
         </div>
+
+        {lastSyncedAt ? (
+          <p className="mb-4 text-xs text-muted-foreground">
+            {isAutoRefreshing ? "Auto refreshing payment status..." : "Last synced"}: {formatStaffDateTime(lastSyncedAt)}
+          </p>
+        ) : null}
 
         {error ? (
           <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
@@ -277,7 +338,7 @@ export default function PaymentProcessingPage() {
                     <StaffPrimaryButton
                       type="button"
                       onClick={() =>
-                        pendingPaymentMap[item.sessionId]
+                        pendingPaymentMap[item.sessionId] && (methodMap[item.sessionId] || "CASH") === "CASH"
                           ? confirmCashPayment(item)
                           : createPayment(item)
                       }
@@ -285,7 +346,7 @@ export default function PaymentProcessingPage() {
                     >
                       {processingId === item.sessionId
                         ? "Processing..."
-                        : pendingPaymentMap[item.sessionId]
+                        : pendingPaymentMap[item.sessionId] && (methodMap[item.sessionId] || "CASH") === "CASH"
                           ? "Xác nhận tiền mặt"
                           : (methodMap[item.sessionId] || "CASH") === "VNPAY"
                             ? "Tạo QR VNPay"

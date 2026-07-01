@@ -8,8 +8,9 @@ import java.util.List;
 
 public interface ParkingSlotService {
     List<ParkingSlot> getByZone(Long zoneId);
+    List<ParkingSlot> getByZone(Long zoneId, Long currentUserId, boolean staffScoped);
     List<ParkingSlot> getAvailableByVehicleType(Long vehicleTypeId);
-    ParkingSlot getById(Long id);
+    ParkingSlot getById(Long id, Long currentUserId, boolean staffScoped);
     ParkingSlot create(SlotRequest req);
     ParkingSlot update(Long id, SlotRequest req);
     ParkingSlot updateStatus(Long id, Status newStatus);

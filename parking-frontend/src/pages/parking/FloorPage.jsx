@@ -19,6 +19,7 @@ import {
   ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
 
 function normalizeFloor(item) {
   return {
@@ -49,7 +50,7 @@ export default function FloorPage() {
       const responses = await Promise.all(
         buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
       );
-      setFloors(responses.flatMap((res) => (res.data?.data || []).map(normalizeFloor)));
+      setFloors(responses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeFloor)));
     } catch (error) {
       console.error("Failed to fetch floors", error);
       alert("Cannot load floors");
@@ -62,7 +63,7 @@ export default function FloorPage() {
     async function loadInitialData() {
       try {
         const buildingRes = await buildingApi.getAll();
-        const buildingList = buildingRes.data?.data || [];
+        const buildingList = unwrapApiData(buildingRes.data, []);
         if (cancelled) {
           return;
         }

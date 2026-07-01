@@ -5,6 +5,7 @@ import com.swp391.parking.dto.response.RequestResponse;
 import com.swp391.parking.entity.Request;
 import com.swp391.parking.entity.Request.RequestStatus;
 import com.swp391.parking.entity.Request.RequestType;
+import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.RequestRepository;
@@ -52,39 +53,52 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public RequestResponse getById(Integer requestId) {
-        return toResponse(findById(requestId));
+    public RequestResponse getById(Integer requestId, Integer currentUserId, boolean staffScoped) {
+        Request request = findById(requestId);
+        enforceStaffAccess(request, currentUserId, staffScoped);
+        return toResponse(request);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestResponse> getByUserId(Integer userId) {
+    public List<RequestResponse> getByUserId(Integer userId, Integer currentUserId, boolean staffScoped) {
         return requestRepository.findByUser_UserId(userId)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(request -> canStaffAccess(request, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestResponse> getByStatus(RequestStatus status) {
+    public List<RequestResponse> getByStatus(RequestStatus status, Integer currentUserId, boolean staffScoped) {
         return requestRepository.findByStatus(status)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(request -> canStaffAccess(request, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestResponse> getByType(RequestType requestType) {
+    public List<RequestResponse> getByType(RequestType requestType, Integer currentUserId, boolean staffScoped) {
         return requestRepository.findByRequestType(requestType)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(request -> canStaffAccess(request, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public RequestResponse assignStaff(Integer requestId, Integer staffId) {
+    public RequestResponse assignStaff(Integer requestId, Integer staffId, Integer currentUserId, boolean staffScoped) {
         Request request = findById(requestId);
+        enforceStaffAccess(request, currentUserId, staffScoped);
         User staff = findUserById(staffId);
+        ensureStatus(request, RequestStatus.OPEN, "assign");
+        if (!hasRole(staff, Role.RoleName.STAFF)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the assign request cho tai khoan STAFF");
+        }
 
         request.setAssignedStaff(staff);
         request.setStatus(RequestStatus.IN_PROGRESS);
@@ -94,8 +108,10 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional
-    public RequestResponse resolveRequest(Integer requestId) {
+    public RequestResponse resolveRequest(Integer requestId, Integer currentUserId, boolean staffScoped) {
         Request request = findById(requestId);
+        enforceAssignedStaff(request, currentUserId, staffScoped);
+        ensureStatus(request, RequestStatus.IN_PROGRESS, "resolve");
 
         request.setStatus(RequestStatus.RESOLVED);
         request.setResolvedAt(LocalDateTime.now());
@@ -105,8 +121,10 @@ public class RequestServiceImpl implements RequestService {
 
     @Override
     @Transactional
-    public RequestResponse closeRequest(Integer requestId) {
+    public RequestResponse closeRequest(Integer requestId, Integer currentUserId, boolean staffScoped) {
         Request request = findById(requestId);
+        enforceAssignedStaff(request, currentUserId, staffScoped);
+        ensureStatus(request, RequestStatus.RESOLVED, "close");
 
         request.setStatus(RequestStatus.CLOSED);
 
@@ -125,6 +143,45 @@ public class RequestServiceImpl implements RequestService {
         return userRepository.findById(userId)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                 "User not found"));
+    }
+
+    private void ensureStatus(Request request, RequestStatus expectedStatus, String action) {
+        if (request.getStatus() != expectedStatus) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Khong the " + action + " request khi trang thai la " + request.getStatus()
+                            + ". Trang thai hop le: " + expectedStatus);
+        }
+    }
+
+    private boolean hasRole(User user, Role.RoleName roleName) {
+        return user.getRoles() != null
+                && user.getRoles().stream().anyMatch(role -> role.getRoleName() == roleName);
+    }
+
+    private void enforceStaffAccess(Request request, Integer currentUserId, boolean staffScoped) {
+        if (!canStaffAccess(request, currentUserId, staffScoped)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem request cua staff khac");
+        }
+    }
+
+    private boolean canStaffAccess(Request request, Integer currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return true;
+        }
+        if (request.getStatus() == RequestStatus.OPEN) {
+            return true;
+        }
+        return request.getAssignedStaff() != null
+                && request.getAssignedStaff().getUserId().equals(currentUserId);
+    }
+
+    private void enforceAssignedStaff(Request request, Integer currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return;
+        }
+        if (request.getAssignedStaff() == null || !request.getAssignedStaff().getUserId().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chi staff duoc assign moi duoc xu ly request nay");
+        }
     }
 
     private RequestResponse toResponse(Request request) {

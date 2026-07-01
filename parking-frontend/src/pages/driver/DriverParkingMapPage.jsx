@@ -8,6 +8,7 @@ import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { unwrapApiData } from "../../utils/api";
 import { getBookingStatus } from "./driverPortalUtils";
+import { getFloorPlan } from "../../config/buildingFloorPlans";
 
 const PAL = {
   mine:        { label: "Slot cua ban", fill: "#3b82f6", text: "#fff",    ring: "#1d4ed8", dot: "bg-blue-500" },
@@ -220,6 +221,46 @@ function ParkingMap({sections,session,activeZone,zoom,onSlotClick,floorIdx,total
   );
 }
 
+/* ── Static floor plan (per-building SVG layout) ──────────── */
+function StaticFloorPlanMap({plan,sections,session,activeZone,zoom,onSlotClick}){
+  const{vbW,vbH,bg,decorations,zones:planZones}=plan;
+  return(
+    <div className="rounded-2xl border border-border bg-slate-100 dark:bg-slate-800/50 overflow-hidden">
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="block w-full h-auto"
+        style={{maxHeight:`${zoom*5.5}px`}}>
+        {/* Background */}
+        <rect width={vbW} height={vbH} fill={bg||"#e2e8f0"} rx={12}/>
+        {/* Decorations (walls, roads, gates, labels) */}
+        {decorations.map((d,i)=>{
+          if(d.type==="rect") return(
+            <rect key={i} x={d.x} y={d.y} width={d.w} height={d.h}
+              rx={d.rx??0} fill={d.fill||"none"}
+              stroke={d.stroke||"none"} strokeWidth={d.sw||0}/>
+          );
+          if(d.type==="text") return(
+            <text key={i} x={d.x} y={d.y} textAnchor={d.anchor||"start"}
+              dominantBaseline="central" fontSize={d.fontSize||10}
+              fill={d.fill||"#000"} fontFamily="system-ui"
+              className="select-none pointer-events-none">{d.text}</text>
+          );
+          return null;
+        })}
+        {/* Zones at configured positions */}
+        {planZones.map((pz,i)=>{
+          const zone=sections.find(s=>$zn(s)===pz.match||$zn(s).startsWith(pz.match)||pz.match.startsWith($zn(s)));
+          if(!zone) return null;
+          return(
+            <ZoneCell key={$zi(zone)||i} zone={zone} ses={session}
+              x={pz.x} y={pz.y} zw={pz.w} zh={pz.h}
+              onSlotClick={onSlotClick}
+              isActive={String($zi(zone))===String($zi(activeZone))}/>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 /* ── Empty state ───────────────────────────────────────────── */
 function EmptyState(){
   const navigate=useNavigate();
@@ -366,6 +407,7 @@ export default function DriverParkingMapPage(){
     ||sections.find(s=>String($zi(s))===String(session?.zoneId))||sections[0];
   const building=session?.buildingName||session?.parkingBuildingName||"Bai xe";
   const floorIdx=curFloor?.floorIndex||1;
+  const staticPlan=getFloorPlan(building,floorIdx);
 
   useEffect(()=>{
     if(!session||!activeZone)return;
@@ -389,7 +431,10 @@ export default function DriverParkingMapPage(){
       </div>
       <div className="grid gap-3 xl:grid-cols-[1fr_240px]">
         <div className="space-y-2" ref={mapRef}>
-          <ParkingMap sections={sections} session={session} activeZone={activeZone} zoom={zoom} onSlotClick={handleSlotClick} floorIdx={floorIdx} totalFloors={floors.length}/>
+          {staticPlan
+            ?<StaticFloorPlanMap plan={staticPlan} sections={sections} session={session} activeZone={activeZone} zoom={zoom} onSlotClick={handleSlotClick}/>
+            :<ParkingMap sections={sections} session={session} activeZone={activeZone} zoom={zoom} onSlotClick={handleSlotClick} floorIdx={floorIdx} totalFloors={floors.length}/>
+          }
           <div className="flex flex-wrap items-center justify-between gap-2">
             <FloorTabs floors={floors} selectedId={curFloor?.id} onSelect={setSelFloor}/>
             <ZoomCtrl zoom={zoom} onZoom={handleZoom} onReset={()=>setZoom(100)} onFs={handleFs}/>

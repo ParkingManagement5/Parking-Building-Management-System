@@ -147,13 +147,13 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 LocalDateTime.now().plusHours(2));
         String oldToken = confirmed.getQrToken();
 
-        assertThat(bookingService.verifyQrToken(oldToken).getBookingId())
+        assertThat(bookingService.verifyQrToken(oldToken, null, true).getBookingId())
                 .isEqualTo(confirmed.getBookingId());
 
         BookingResponse regenerated = bookingService.regenerateQr(
                 confirmed.getBookingId(), driver.getUserId().longValue());
 
-        assertThatThrownBy(() -> bookingService.verifyQrToken(oldToken))
+        assertThatThrownBy(() -> bookingService.verifyQrToken(oldToken, null, true))
                 .isInstanceOf(AppException.class)
                 .satisfies(ex -> {
                     AppException appException = (AppException) ex;
@@ -161,7 +161,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                     assertThat(appException.getMessage()).contains("thay the");
                 });
 
-        BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken());
+        BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken(), null, true);
         assertThat(verifiedCurrent.getBookingId()).isEqualTo(confirmed.getBookingId());
         assertThat(verifiedCurrent.getQrToken()).isEqualTo(regenerated.getQrToken());
     }
@@ -283,7 +283,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 pending.getDepositAmount() != null ? pending.getDepositAmount() : BigDecimal.ZERO,
                 Payment.PaymentMethod.CASH);
         paymentService.confirmDeposit(deposit.getPaymentId());
-        return bookingService.getBooking(pending.getBookingId());
+        return bookingService.getBooking(pending.getBookingId(), null, true);
     }
 
     private Booking confirmedBookingEntityFor(User driver, String slotCode, String licensePlate,

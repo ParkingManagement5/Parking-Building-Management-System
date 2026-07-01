@@ -19,6 +19,7 @@ import {
   ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
 
 function normalizeGate(item) {
   return {
@@ -47,7 +48,7 @@ export default function GatePage() {
       const responses = await Promise.all(
         buildingList.map((building) => gateApi.getByBuilding(building.buildingId ?? building.id))
       );
-      setGates(responses.flatMap((res) => (res.data?.data || []).map(normalizeGate)));
+      setGates(responses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeGate)));
     } catch (error) {
       console.error("Failed to fetch gates", error);
       alert("Cannot load gates");
@@ -60,7 +61,7 @@ export default function GatePage() {
     async function loadInitialData() {
       try {
         const buildingRes = await buildingApi.getAll();
-        const buildingList = buildingRes.data?.data || [];
+        const buildingList = unwrapApiData(buildingRes.data, []);
         if (cancelled) {
           return;
         }

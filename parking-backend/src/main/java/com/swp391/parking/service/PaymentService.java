@@ -43,11 +43,19 @@ public interface PaymentService {
 
     List<PaymentResponse> getBySessionId(Integer sessionId);
 
-    List<PaymentResponse> getByStatus(PaymentStatus status);
+    List<PaymentResponse> getByStatus(PaymentStatus status, Long currentUserId, boolean staffScoped);
 
     List<PaymentResponse> getMyPayments(Long userId);
 
     void enforcePaymentOwnership(Integer paymentId, Long userId);
 
     void enforceBookingOwnership(Integer bookingId, Long userId);
+
+    void enforceSessionOwnership(Integer sessionId, Long userId);
+
+    void enforcePaymentBuildingScope(Integer paymentId, Long currentUserId, boolean staffScoped);
+
+    void enforceBookingBuildingScope(Integer bookingId, Long currentUserId, boolean staffScoped);
+
+    void enforceSessionBuildingScope(Integer sessionId, Long currentUserId, boolean staffScoped);
 }
