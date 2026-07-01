@@ -19,6 +19,7 @@ import BookingPage from "../pages/driver/BookingPage";
 import BookingHistoryPage from "../pages/driver/BookingHistoryPage";
 import CurrentSessionPage from "../pages/driver/CurrentSessionPage";
 import DriverParkingMapPage from "../pages/driver/DriverParkingMapPage";
+import DriverFindBuildingPage from "../pages/driver/DriverFindBuildingPage";
 import PaymentHistoryPage from "../pages/driver/PaymentHistoryPage";
 import RequestCenterPage from "../pages/driver/RequestCenterPage";
 import DriverProfilePage from "../pages/driver/DriverProfilePage";
@@ -77,6 +78,7 @@ export default function AppRoutes() {
             <Route path="bookings" element={<BookingHistoryPage />} />
             <Route path="current-session" element={<CurrentSessionPage />} />
             <Route path="parking-map" element={<DriverParkingMapPage />} />
+            <Route path="find-building" element={<DriverFindBuildingPage />} />
             <Route path="payments" element={<PaymentHistoryPage />} />
             <Route path="requests" element={<RequestCenterPage />} />
             <Route path="notifications" element={<DriverNotificationPage />} />

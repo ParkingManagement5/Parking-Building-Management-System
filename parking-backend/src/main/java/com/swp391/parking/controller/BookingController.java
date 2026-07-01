@@ -48,10 +48,13 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingResponse>> getOne(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails ud) {
-        BookingResponse booking = bookingService.getBooking(id);
+        Long currentUserId = getCurrentUserId(ud);
+        boolean isStaff = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+        BookingResponse booking = bookingService.getBooking(id, currentUserId, isStaff);
         boolean isDriver = ud.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
-        if (isDriver && !booking.getUserId().equals(getCurrentUserId(ud))) {
+        if (isDriver && !booking.getUserId().equals(currentUserId)) {
             throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking nay");
         }
         return ResponseEntity.ok(ApiResponse.success(booking));
@@ -70,16 +73,24 @@ public class BookingController {
     @Operation(summary = "Tim booking theo bien so xe",
             description = "Staff dung de kiem tra xe co booking active khong")
     public ResponseEntity<ApiResponse<List<BookingResponse>>> searchByPlate(
-            @RequestParam String licensePlate) {
+            @RequestParam String licensePlate,
+            @AuthenticationPrincipal UserDetails ud) {
+        boolean isStaff = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
         return ResponseEntity.ok(ApiResponse.success(
-                bookingService.searchByPlate(licensePlate)));
+                bookingService.searchByPlate(licensePlate, getCurrentUserId(ud), isStaff)));
     }
 
     @PostMapping("/verify-qr")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Verify booking QR without consuming it")
-    public ResponseEntity<ApiResponse<BookingResponse>> verifyQr(@RequestParam String qrToken) {
-        return ResponseEntity.ok(ApiResponse.success("QR hop le", bookingService.verifyQrToken(qrToken)));
+    public ResponseEntity<ApiResponse<BookingResponse>> verifyQr(
+            @RequestParam String qrToken,
+            @AuthenticationPrincipal UserDetails ud) {
+        boolean isStaff = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+        return ResponseEntity.ok(ApiResponse.success("QR hop le",
+                bookingService.verifyQrToken(qrToken, getCurrentUserId(ud), isStaff)));
     }
 
     @PutMapping("/{id}/cancel")

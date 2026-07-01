@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Bell, CheckCircle2 } from "lucide-react";
 import { notificationApi } from "../../api/notificationApi";
 import { getUserId } from "../../utils/auth";
+import { unwrapApiData } from "../../utils/api";
 import { formatRelativeTime } from "./driverPortalUtils";
 
 export default function DriverNotificationPage() {
@@ -22,7 +23,7 @@ export default function DriverNotificationPage() {
       try {
         const res = await notificationApi.getByUser(userId);
         if (!cancelled) {
-          setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
+          setNotifications(unwrapApiData(res.data, []));
         }
       } catch (error) {
         console.error("Failed to load notifications", error);
@@ -48,7 +49,7 @@ export default function DriverNotificationPage() {
         return;
       }
       const res = await notificationApi.getByUser(userId);
-      setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
+      setNotifications(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to mark notification as read", error);
     }
@@ -63,7 +64,7 @@ export default function DriverNotificationPage() {
     try {
       await notificationApi.markAllAsRead(userId);
       const res = await notificationApi.getByUser(userId);
-      setNotifications(res.data?.data ?? (Array.isArray(res.data) ? res.data : []));
+      setNotifications(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to mark all notifications as read", error);
     }

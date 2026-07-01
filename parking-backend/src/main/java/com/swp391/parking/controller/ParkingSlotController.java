@@ -3,11 +3,16 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.request.SlotRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ParkingSlotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +23,7 @@ import java.util.List;
 public class ParkingSlotController {
 
     private final ParkingSlotService slotService;
+    private final UserRepository userRepository;
 
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> searchAvailable(
@@ -35,14 +41,16 @@ public class ParkingSlotController {
     }
 
     @GetMapping("/zone/{zoneId}")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId) {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getByZone(zoneId)));
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                slotService.getByZone(zoneId, resolveUserId(authentication), isStaff(authentication))));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ParkingSlot>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getById(id)));
+    public ResponseEntity<ApiResponse<ParkingSlot>> getById(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                slotService.getById(id, resolveUserId(authentication), isStaff(authentication))));
     }
 
     @PostMapping
@@ -66,5 +74,24 @@ public class ParkingSlotController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         slotService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa slot khoi DB"));
+    }
+
+    private boolean isAuthenticated(Authentication authentication) {
+        return authentication != null
+                && !(authentication instanceof AnonymousAuthenticationToken)
+                && authentication.isAuthenticated();
+    }
+
+    private boolean isStaff(Authentication authentication) {
+        if (!isAuthenticated(authentication)) return false;
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+    }
+
+    private Long resolveUserId(Authentication authentication) {
+        if (!isAuthenticated(authentication)) return null;
+        return userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                .getUserId().longValue();
     }
 }

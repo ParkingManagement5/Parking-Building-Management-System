@@ -16,6 +16,7 @@ export default function LandingPage() {
   const mobileBtnRef = useRef(null);
 
   const [liveStats, setLiveStats] = useState({ available: 0, occupied: 0, total: 0 });
+  const [statsError, setStatsError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -40,7 +41,10 @@ export default function LandingPage() {
           available: allSlots.filter((s) => s.status === "AVAILABLE").length,
           occupied: allSlots.filter((s) => s.status === "OCCUPIED").length,
         });
-      } catch {}
+        setStatsError("");
+      } catch (err) {
+        setStatsError(err.response?.data?.message || "Khong tai duoc thong ke bai do song.");
+      }
     })();
   }, []);
 
@@ -381,6 +385,7 @@ export default function LandingPage() {
                 <span className="hero-metric-label">Xe đang đỗ</span>
               </div>
             </div>
+            {statsError ? <p className="mt-3 text-xs text-amber-200">{statsError}</p> : null}
           </div>
           <div className="hero-visual reveal-up delay-2">
             <div className="hero-img-wrapper">

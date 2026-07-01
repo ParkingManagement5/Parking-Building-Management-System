@@ -42,7 +42,9 @@ public class EmailService {
     public void sendPasswordResetOtp(String to, String username, String otp) {
         if (!StringUtils.hasText(mailUsername)) {
             log.warn("Email not configured. Password reset OTP for {} ({}) is {}", username, to, otp);
-            return;
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Chua cau hinh email SMTP nen khong gui duoc OTP dat lai mat khau");
         }
 
         try {
@@ -61,6 +63,9 @@ public class EmailService {
             mailSender.send(message);
         } catch (Exception ex) {
             log.warn("Failed to send password reset email to {}. OTP is {}", to, otp, ex);
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Gui email OTP dat lai mat khau that bai. Vui long kiem tra SMTP username/password");
         }
     }
 

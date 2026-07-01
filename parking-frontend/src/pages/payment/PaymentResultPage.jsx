@@ -5,6 +5,7 @@ import { bookingApi } from "../../api/driver/bookingApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
 import { unwrapApiData } from "../../utils/api";
+import { markPaymentSync } from "../../utils/paymentSync";
 
 const VNP_RESPONSE_MESSAGES = {
   "00": "Giao dich thanh cong",
@@ -73,6 +74,7 @@ export default function PaymentResultPage() {
             const session = sessions.find((item) => Number(item.sessionId) === targetId);
             if (session && String(session.status || "").toUpperCase() === "COMPLETED") {
               if (!cancelled) {
+                markPaymentSync("parking_fee", targetId);
                 setBackendReady(true);
                 setSyncMessage("");
               }
@@ -91,6 +93,7 @@ export default function PaymentResultPage() {
               Boolean(booking.qrToken);
             if (ready) {
               if (!cancelled) {
+                markPaymentSync("deposit", targetId);
                 setBackendReady(true);
                 setSyncMessage("");
               }
@@ -110,6 +113,7 @@ export default function PaymentResultPage() {
       }
 
       if (!cancelled) {
+        markPaymentSync(isParkingFee ? "parking_fee" : "deposit", targetId);
         setBackendReady(true);
         setSyncMessage(
           isParkingFee

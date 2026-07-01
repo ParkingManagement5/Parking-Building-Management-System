@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw } from "lucide-react";
 import { ocrApi } from "../../api/staff/ocrApi";
 import { unwrapApiData } from "../../utils/api";
-import { formatStaffDateTime, updateStaffPortalState } from "./staffPortalState";
+import { formatStaffDateTime } from "./staffPortalState";
 import { StaffEmptyState, StaffInput, StaffPageSection, StaffPrimaryButton, StaffSecondaryButton, StaffStatusBadge } from "./StaffUi";
 
 function statusTone(status) {
@@ -56,21 +56,10 @@ export default function OcrCorrectionPage() {
     setSavingId(record.scanId);
     setError("");
     try {
-      const res = await ocrApi.review(record.scanId, {
+      await ocrApi.review(record.scanId, {
         correctedPlate,
         staffUserId: Number(localStorage.getItem("userId")) || 0,
       });
-      const reviewed = unwrapApiData(res.data, null);
-      const plate = reviewed?.effectivePlate || correctedPlate;
-      updateStaffPortalState((current) => ({
-        ...current,
-        latestOcrPlate: plate,
-        latestOcrRecord: reviewed || {
-          scanId: record.scanId,
-          detectedPlate: record.detectedPlate,
-          correctedPlate: plate,
-        },
-      }));
       await loadRecords();
     } catch (err) {
       console.error("OCR review failed", err);

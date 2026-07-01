@@ -202,7 +202,7 @@ export default function VehicleExitPage() {
       const exitRes = await sessionApi.exit(foundSession.sessionId, {
         gateId: Number(gateId),
         staffUserId: Number(localStorage.getItem("userId")) || null,
-        qrVerified: false,
+        qrVerified: true,
       });
       const exitedSession = unwrapApiData(exitRes.data, null);
       setConfirmed({

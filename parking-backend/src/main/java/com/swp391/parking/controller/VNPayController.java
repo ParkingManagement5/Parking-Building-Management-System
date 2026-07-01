@@ -8,6 +8,7 @@ import com.swp391.parking.entity.Payment.PaymentMethod;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.BookingRepository;
 import com.swp391.parking.repository.PaymentRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.PaymentService;
 import com.swp391.parking.service.VNPayService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,22 +43,36 @@ public class VNPayController {
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
 
     @Operation(summary = "Tao URL thanh toan coc qua VNPay")
     @PostMapping("/create-deposit/{bookingId}")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createDepositUrl(
             @PathVariable Integer bookingId,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            Authentication authentication) {
+        boolean isDriver = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
+        if (isDriver) {
+            Long userId = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                    .getUserId().longValue();
+            paymentService.enforceBookingOwnership(bookingId, userId);
+        }
 
         var booking = bookingRepository.findById(bookingId.longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
 
+        if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da duoc xac nhan (da thanh toan coc)");
+        }
+        if (booking.getStatus() == Booking.BookingStatus.EXPIRED
+                || booking.getStatus() == Booking.BookingStatus.CANCELLED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han hoac bi huy, khong the thanh toan");
+        }
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking khong o trang thai cho thanh toan");
-        }
-        if (booking.getExpiredAt() == null || !booking.getExpiredAt().isAfter(LocalDateTime.now())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han thanh toan");
         }
 
         BigDecimal depositAmount = booking.getDepositAmount();
@@ -64,6 +80,10 @@ public class VNPayController {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Booking nay khong yeu cau coc (depositAmount = 0). Xac nhan mien phi.");
         }
+
+        // Extend expiredAt 30 min to give user time to complete VNPay payment
+        booking.setExpiredAt(LocalDateTime.now().plusMinutes(30));
+        bookingRepository.save(booking);
 
         PaymentResponse payment = paymentService.createDeposit(bookingId, depositAmount, PaymentMethod.VNPAY);
         String orderInfo = "Coc booking #" + bookingId;
@@ -86,7 +106,16 @@ public class VNPayController {
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createParkingFeeUrl(
             @PathVariable Integer sessionId,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            Authentication authentication) {
+        boolean isDriver = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
+        if (isDriver) {
+            Long userId = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                    .getUserId().longValue();
+            paymentService.enforceSessionOwnership(sessionId, userId);
+        }
 
         PaymentResponse payment = paymentService.createParkingFee(
                 sessionId,
