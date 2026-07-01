@@ -43,6 +43,12 @@ public class ParkingBuilding extends BaseEntity {
     @Column(name = "close_time", nullable = false)
     private LocalTime closeTime;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Builder.Default
     @Transient
     private Status status = Status.ACTIVE;

@@ -5,8 +5,11 @@ import com.swp391.parking.dto.response.ExceptionCaseResponse;
 import com.swp391.parking.entity.ExceptionCase;
 import com.swp391.parking.entity.ExceptionCase.ExceptionStatus;
 import com.swp391.parking.entity.ExceptionCase.ExceptionType;
+import com.swp391.parking.entity.Role;
+import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ExceptionCaseRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ExceptionCaseService;
 import com.swp391.parking.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
     private final ExceptionCaseRepository exceptionCaseRepository;
+    private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -46,45 +50,63 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
-    public ExceptionCaseResponse getById(Integer exceptionId) {
-        return toResponse(findById(exceptionId));
+    public ExceptionCaseResponse getById(Integer exceptionId, Integer currentUserId, boolean staffScoped) {
+        ExceptionCase exceptionCase = findById(exceptionId);
+        enforceStaffAccess(exceptionCase, currentUserId, staffScoped);
+        return toResponse(exceptionCase);
     }
 
     @Override
-    public List<ExceptionCaseResponse> getBySessionId(Integer sessionId) {
+    public List<ExceptionCaseResponse> getBySessionId(Integer sessionId, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findBySessionId(sessionId)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(exceptionCase -> canStaffAccess(exceptionCase, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
-    public List<ExceptionCaseResponse> getByRequestId(Integer requestId) {
+    public List<ExceptionCaseResponse> getByRequestId(Integer requestId, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByRequestId(requestId)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(exceptionCase -> canStaffAccess(exceptionCase, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
-    public List<ExceptionCaseResponse> getByStatus(ExceptionStatus status) {
+    public List<ExceptionCaseResponse> getByStatus(ExceptionStatus status, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByStatus(status)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(exceptionCase -> canStaffAccess(exceptionCase, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
-    public List<ExceptionCaseResponse> getByType(ExceptionType exceptionType) {
+    public List<ExceptionCaseResponse> getByType(ExceptionType exceptionType, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByExceptionType(exceptionType)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(exceptionCase -> canStaffAccess(exceptionCase, currentUserId, staffScoped))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public ExceptionCaseResponse assignToStaff(Integer exceptionId, Integer staffId) {
+    public ExceptionCaseResponse assignToStaff(Integer exceptionId, Integer staffId, Integer currentUserId, boolean staffScoped) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        enforceStaffAccess(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.OPEN) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Chi co the assign exception dang OPEN (hien: " + exceptionCase.getStatus() + ")");
+        }
+        User staff = userRepository.findById(staffId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay staff duoc assign"));
+        boolean isStaff = staff.getRoles() != null
+                && staff.getRoles().stream().anyMatch(role -> role.getRoleName() == Role.RoleName.STAFF);
+        if (!isStaff) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the assign exception cho tai khoan STAFF");
         }
 
         exceptionCase.setResolvedBy(staffId);
@@ -95,8 +117,9 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
     @Override
     @Transactional
-    public ExceptionCaseResponse resolveExceptionCase(Integer exceptionId) {
+    public ExceptionCaseResponse resolveExceptionCase(Integer exceptionId, Integer currentUserId, boolean staffScoped) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        enforceAssignedStaff(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.IN_PROGRESS) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Chi co the resolve exception dang IN_PROGRESS (hien: " + exceptionCase.getStatus() + ")");
@@ -110,8 +133,9 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
     @Override
     @Transactional
-    public ExceptionCaseResponse closeExceptionCase(Integer exceptionId) {
+    public ExceptionCaseResponse closeExceptionCase(Integer exceptionId, Integer currentUserId, boolean staffScoped) {
         ExceptionCase exceptionCase = findById(exceptionId);
+        enforceAssignedStaff(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.RESOLVED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Chi co the close exception da RESOLVED (hien: " + exceptionCase.getStatus() + ")");
@@ -128,6 +152,31 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         return exceptionCaseRepository.findById(exceptionId)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                 "Exception case not found"));
+    }
+
+    private void enforceStaffAccess(ExceptionCase exceptionCase, Integer currentUserId, boolean staffScoped) {
+        if (!canStaffAccess(exceptionCase, currentUserId, staffScoped)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem exception cua staff khac");
+        }
+    }
+
+    private boolean canStaffAccess(ExceptionCase exceptionCase, Integer currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return true;
+        }
+        if (exceptionCase.getStatus() == ExceptionStatus.OPEN) {
+            return true;
+        }
+        return exceptionCase.getResolvedBy() != null && exceptionCase.getResolvedBy().equals(currentUserId);
+    }
+
+    private void enforceAssignedStaff(ExceptionCase exceptionCase, Integer currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return;
+        }
+        if (exceptionCase.getResolvedBy() == null || !exceptionCase.getResolvedBy().equals(currentUserId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chi staff duoc assign moi duoc xu ly exception nay");
+        }
     }
 
     private ExceptionCaseResponse toResponse(ExceptionCase exceptionCase) {

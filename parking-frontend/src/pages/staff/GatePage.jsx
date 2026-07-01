@@ -34,6 +34,7 @@ export default function MapPage() {
   const [zonesMap, setZonesMap] = useState({});
   const [slotsMap, setSlotsMap] = useState({});
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const [activeSessions, setActiveSessions] = useState([]);
   const [waitingPayments, setWaitingPayments] = useState([]);
@@ -57,9 +58,13 @@ export default function MapPage() {
       const bs = unwrapApiData(bRes.data, []);
       setBuildings(bs);
       setPolicies(unwrapApiData(pRes.data, []));
+      setLoadError("");
       if (assignedId) setBuildingId(assignedId);
       else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
-    } catch {}
+      else setLoadError("He thong chua co toa nha nao de hien thi ban do bai xe.");
+    } catch (err) {
+      setLoadError(err.response?.data?.message || "Khong tai duoc du lieu toa nha hoac bang gia.");
+    }
     await loadSessions();
   }
 
@@ -71,7 +76,10 @@ export default function MapPage() {
       ]);
       setActiveSessions(unwrapApiData(aRes.data, []));
       setWaitingPayments(unwrapApiData(wRes.data, []));
-    } catch {}
+      setLoadError("");
+    } catch (err) {
+      setLoadError(err.response?.data?.message || "Khong tai duoc danh sach session cho staff.");
+    }
   }
 
   async function loadFloors() {
@@ -81,7 +89,10 @@ export default function MapPage() {
       const items = unwrapApiData(res.data, []);
       setFloors(items);
       if (items[0]) setSelectedFloor(items[0].floorId || items[0].id);
-    } catch {}
+      setLoadError(items.length ? "" : "Toa nha hien tai chua co tang nao de hien thi.");
+    } catch (err) {
+      setLoadError(err.response?.data?.message || "Khong tai duoc danh sach tang cho toa nha hien tai.");
+    }
     finally { setLoading(false); }
   }
 
@@ -98,7 +109,10 @@ export default function MapPage() {
         results[zid] = unwrapApiData(sRes.data, []);
       }));
       setSlotsMap((p) => ({ ...p, ...results }));
-    } catch {}
+      setLoadError("");
+    } catch (err) {
+      setLoadError(err.response?.data?.message || "Khong tai duoc zone/slot cho tang hien tai.");
+    }
     finally { setLoading(false); }
   }
 
@@ -127,6 +141,11 @@ export default function MapPage() {
 
   return (
     <div className="space-y-5">
+      {loadError && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          {loadError}
+        </div>
+      )}
       {/* Header stats */}
       <div className="grid gap-4 sm:grid-cols-4">
         {[

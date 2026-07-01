@@ -19,6 +19,7 @@ const CONFIG = {
           { id: "booking", label: "Đặt chỗ" },
           { id: "current-session", label: "Phiên hiện tại" },
           { id: "parking-map", label: "Bản đồ bãi" },
+          { id: "find-building", label: "Tìm bãi đỗ" },
         ],
       },
       {

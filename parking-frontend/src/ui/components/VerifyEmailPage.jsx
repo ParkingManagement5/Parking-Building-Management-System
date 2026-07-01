@@ -2,12 +2,18 @@ import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, MailCheck, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 import { authApi } from "../../api/auth/authApi";
+import { unwrapApiData } from "../../utils/api";
 import BrandLogo from "./BrandLogo";
 import PublicBackLink from "./PublicBackLink";
 
 function saveAuth(data) {
   const token = data.token || data.accessToken || data.jwt;
-  const rawRole = data.role || data.roleName || data.roles?.[0] || data.user?.roles?.[0] || "DRIVER";
+  const roleList = Array.isArray(data.roles)
+    ? data.roles
+    : Array.isArray(data.user?.roles)
+      ? data.user.roles
+      : [];
+  const rawRole = data.role || data.roleName || roleList[0] || data.user?.roles?.[0] || "DRIVER";
   const role = rawRole.toString().replace("ROLE_", "").toUpperCase();
 
   if (token) localStorage.setItem("token", token);
@@ -17,6 +23,13 @@ function saveAuth(data) {
   }
   if (data.username || data.user?.username) {
     localStorage.setItem("username", data.username || data.user?.username);
+  }
+  if (data.assignedBuildingId) {
+    localStorage.setItem("assignedBuildingId", data.assignedBuildingId);
+    localStorage.setItem("assignedBuildingName", data.assignedBuildingName || "");
+  } else {
+    localStorage.removeItem("assignedBuildingId");
+    localStorage.removeItem("assignedBuildingName");
   }
 
   return role.includes("ADMIN")
@@ -38,7 +51,9 @@ export default function VerifyEmailPage() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState(
-    initialEmail ? `We sent a verification code to ${initialEmail}.` : "Enter the verification code from your email."
+    initialEmail
+      ? `We sent a verification code to ${initialEmail}.`
+      : "Enter the verification code from your email."
   );
   const [error, setError] = useState("");
 
@@ -55,7 +70,7 @@ export default function VerifyEmailPage() {
 
     try {
       const res = await authApi.verifyEmail({ username, otp });
-      const data = res.data?.data || res.data || {};
+      const data = unwrapApiData(res.data, {});
       const nextRoute = saveAuth(data);
       navigate(nextRoute);
     } catch (err) {
@@ -97,7 +112,7 @@ export default function VerifyEmailPage() {
                 Verify your email
               </h1>
               <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-200">
-                Your username is used for sign in. Email verification only activates the account and protects the booking flow.
+                Your username is used for sign in. Email verification activates the account and protects the booking flow.
               </p>
               <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">

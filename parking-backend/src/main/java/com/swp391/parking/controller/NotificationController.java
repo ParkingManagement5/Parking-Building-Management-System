@@ -47,8 +47,16 @@ public class NotificationController {
     @PatchMapping("/{id}/read")
     @Operation(summary = "Mark notification as read")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
-    public ResponseEntity<Void> markAsRead(@PathVariable Long id) {
-        notificationService.markAsRead(id);
+    public ResponseEntity<Void> markAsRead(@PathVariable Long id, Authentication authentication) {
+        boolean privileged = authentication.getAuthorities().stream()
+                .anyMatch(a -> {
+                    String role = a.getAuthority();
+                    return role.equals("ROLE_STAFF") || role.equals("ROLE_MANAGER") || role.equals("ROLE_ADMIN");
+                });
+        Long currentUserId = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
+                .getUserId().longValue();
+        notificationService.markAsRead(id, currentUserId, privileged);
         return ResponseEntity.noContent().build();
     }
 

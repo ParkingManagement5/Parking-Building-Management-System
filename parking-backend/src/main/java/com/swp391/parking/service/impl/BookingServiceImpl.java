@@ -174,15 +174,18 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public BookingResponse confirmBookingAfterPayment(Long bookingId) {
         Booking booking = getBookingEntity(bookingId);
+
+        // Idempotent: if already CONFIRMED (e.g., duplicate IPN callback), return current state
+        if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
+            return toResponse(booking);
+        }
+
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Booking #" + bookingId + " không ở trạng thái chờ thanh toán (hiện: " + booking.getStatus() + ")");
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime pendingPaymentExpiry = booking.getExpiredAt();
-        if (pendingPaymentExpiry == null || !pendingPaymentExpiry.isAfter(now)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã hết hạn thanh toán");
-        }
 
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
@@ -225,13 +228,15 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public BookingResponse getBooking(Long bookingId) {
-        return toResponse(getBookingEntity(bookingId));
+    public BookingResponse getBooking(Long bookingId, Long currentUserId, boolean staffScoped) {
+        Booking booking = getBookingEntity(bookingId);
+        enforceStaffBuildingScope(booking, currentUserId, staffScoped);
+        return toResponse(booking);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public BookingResponse verifyQrToken(String qrToken) {
+    public BookingResponse verifyQrToken(String qrToken, Long currentUserId, boolean staffScoped) {
         if (qrToken == null || qrToken.isBlank()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu QR token");
         }
@@ -244,6 +249,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         Booking booking = getBookingEntity(bookingId);
+        enforceStaffBuildingScope(booking, currentUserId, staffScoped);
         if (booking.getQrUsedAt() != null) {
             throw new AppException(HttpStatus.CONFLICT, "QR đã được dùng rồi");
         }
@@ -331,7 +337,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<BookingResponse> searchByPlate(String licensePlate) {
+    public List<BookingResponse> searchByPlate(String licensePlate, Long currentUserId, boolean staffScoped) {
         if (licensePlate == null || licensePlate.isBlank()) return List.of();
         Map<Long, Booking> matches = new LinkedHashMap<>();
         List<Booking.BookingStatus> activeStatuses = List.of(
@@ -343,7 +349,9 @@ public class BookingServiceImpl implements BookingService {
                 .map(java.util.Optional::get)
                 .forEach(vehicle -> bookingRepository.findByVehicle_IdAndStatusIn(vehicle.getId(), activeStatuses)
                         .ifPresent(booking -> matches.putIfAbsent(booking.getId(), booking)));
-        return matches.values().stream().map(this::toResponse).toList();
+        return matches.values().stream()
+                .filter(booking -> canStaffAccessBooking(booking, currentUserId, staffScoped))
+                .map(this::toResponse).toList();
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -392,6 +400,30 @@ public class BookingServiceImpl implements BookingService {
         if (minutesUntilStart < 240) return new BigDecimal("15000");
         if (minutesUntilStart < 360) return new BigDecimal("20000");
         return new BigDecimal("30000");
+    }
+
+    private void enforceStaffBuildingScope(Booking booking, Long currentUserId, boolean staffScoped) {
+        if (!canStaffAccessBooking(booking, currentUserId, staffScoped)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking ngoai toa nha duoc phan cong");
+        }
+    }
+
+    private boolean canStaffAccessBooking(Booking booking, Long currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return true;
+        }
+        User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+        if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
+            // Staff without assigned building can see all bookings (e.g. floating/admin staff)
+            return true;
+        }
+        return booking.getSlot() != null
+                && booking.getSlot().getZone() != null
+                && booking.getSlot().getZone().getFloor() != null
+                && booking.getSlot().getZone().getFloor().getBuilding() != null
+                && currentUser.getAssignedBuilding().getId().equals(
+                        booking.getSlot().getZone().getFloor().getBuilding().getId());
     }
 
     private BookingResponse toResponse(Booking b) {
