@@ -9,6 +9,7 @@ import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ExceptionCaseRepository;
+import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ExceptionCaseService;
 import com.swp391.parking.service.NotificationService;
@@ -28,6 +29,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ParkingSessionRepository parkingSessionRepository;
 
     @Override
     @Transactional
@@ -35,6 +37,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         ExceptionCase exceptionCase = ExceptionCase.builder()
             .sessionId(req.getSessionId())
             .requestId(req.getRequestId())
+            .bookingId(req.getBookingId())
             .exceptionType(req.getExceptionType())
             .description(req.getDescription())
             .status(ExceptionStatus.OPEN)
@@ -42,9 +45,36 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
         ExceptionCase saved = exceptionCaseRepository.save(exceptionCase);
 
-        notificationService.notifyAllStaff("Exception moi",
-                "Loai: " + req.getExceptionType() + ". " + (req.getDescription() != null ? req.getDescription() : ""),
-                "warning", "EXCEPTION", saved.getExceptionId());
+        String notifBody = "Loai: " + req.getExceptionType() + ". " + (req.getDescription() != null ? req.getDescription() : "");
+        Long buildingId = null;
+
+        if (req.getSessionId() != null) {
+            var sessionOpt = parkingSessionRepository.findById(req.getSessionId().longValue());
+            if (sessionOpt.isPresent()) {
+                var session = sessionOpt.get();
+                if (session.getSlot() != null
+                        && session.getSlot().getZone() != null
+                        && session.getSlot().getZone().getFloor() != null
+                        && session.getSlot().getZone().getFloor().getBuilding() != null) {
+                    buildingId = session.getSlot().getZone().getFloor().getBuilding().getId();
+                }
+                notificationService.notify(
+                    session.getUserId(),
+                    "Co su co tai cong xe",
+                    "Nhan vien da ghi nhan su co: " + req.getExceptionType().name().replace("_", " ").toLowerCase()
+                        + ". Vui long lien he staff hoac gui yeu cau ho tro.",
+                    "warning", "EXCEPTION", saved.getExceptionId()
+                );
+            }
+        }
+
+        if (buildingId != null) {
+            notificationService.notifyStaffInBuilding(buildingId, "Exception moi", notifBody,
+                    "warning", "EXCEPTION", saved.getExceptionId());
+        } else {
+            notificationService.notifyAllStaff("Exception moi", notifBody,
+                    "warning", "EXCEPTION", saved.getExceptionId());
+        }
 
         return toResponse(saved);
     }
@@ -164,10 +194,39 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         if (!staffScoped) {
             return true;
         }
+        // Building scope: only see exceptions belonging to staff's assigned building
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser != null && currentUser.getAssignedBuilding() != null) {
+            Long staffBuildingId = currentUser.getAssignedBuilding().getId();
+            Long exceptionBuildingId = resolveExceptionBuildingId(exceptionCase);
+            if (exceptionBuildingId != null && !staffBuildingId.equals(exceptionBuildingId)) {
+                return false;
+            }
+        }
         if (exceptionCase.getStatus() == ExceptionStatus.OPEN) {
             return true;
         }
         return exceptionCase.getResolvedBy() != null && exceptionCase.getResolvedBy().equals(currentUserId);
+    }
+
+    private Long resolveExceptionBuildingId(ExceptionCase exceptionCase) {
+        if (exceptionCase.getSessionId() != null) {
+            return parkingSessionRepository.findById(exceptionCase.getSessionId().longValue())
+                    .map(s -> {
+                        try {
+                            return s.getSlot() != null
+                                    && s.getSlot().getZone() != null
+                                    && s.getSlot().getZone().getFloor() != null
+                                    && s.getSlot().getZone().getFloor().getBuilding() != null
+                                    ? s.getSlot().getZone().getFloor().getBuilding().getId()
+                                    : null;
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .orElse(null);
+        }
+        return null;
     }
 
     private void enforceAssignedStaff(ExceptionCase exceptionCase, Integer currentUserId, boolean staffScoped) {
@@ -184,6 +243,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
             .exceptionId(exceptionCase.getExceptionId())
             .sessionId(exceptionCase.getSessionId())
             .requestId(exceptionCase.getRequestId())
+            .bookingId(exceptionCase.getBookingId())
             .exceptionType(exceptionCase.getExceptionType())
             .description(exceptionCase.getDescription())
             .status(exceptionCase.getStatus())

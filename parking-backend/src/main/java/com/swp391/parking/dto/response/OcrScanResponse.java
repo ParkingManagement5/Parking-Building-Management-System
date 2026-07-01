@@ -9,6 +9,7 @@ public class OcrScanResponse {
     private Long scanId;
     private Long sessionId;
     private Long gateId;
+    private Long buildingId;
     private String imagePath;
     private String detectedPlate;
     private Float plateConfidenceScore;

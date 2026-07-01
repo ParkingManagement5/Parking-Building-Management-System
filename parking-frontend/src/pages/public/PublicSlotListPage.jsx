@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { zoneApi } from "../../api/manager/zoneApi";
+import { getFloorPlan } from "../../config/buildingFloorPlans";
 import { unwrapApiData } from "../../utils/api";
 import { usePublicTheme } from "../../utils/publicTheme";
 import "../../assets/css/landing.css";
@@ -34,6 +35,7 @@ function normalizeSlot(item) {
     buildingId: item.zone?.floor?.building?.buildingId ?? item.zone?.floor?.building?.id,
     building: item.zone?.floor?.building?.name || "Unknown building",
     floorId: item.zone?.floor?.floorId ?? item.zone?.floor?.id,
+    floorNumber: item.zone?.floor?.floorNumber,
     floor: item.zone?.floor?.name || "Unknown floor",
     zoneId: item.zone?.zoneId ?? item.zone?.id,
     zone: item.zone?.name || "Unknown zone",
@@ -52,10 +54,10 @@ const SLOT_COLORS = {
 };
 
 const SLOT_LABELS = {
-  Available: "Trong",
-  Occupied: "Co xe",
-  Reserved: "Da dat",
-  Maintenance: "Bao tri",
+  Available: "Trống",
+  Occupied: "Có xe",
+  Reserved: "Đã đặt",
+  Maintenance: "Bảo trì",
 };
 
 const card = {
@@ -90,9 +92,33 @@ function sortByName(a, b) {
   return String(a.name || a.floor || "").localeCompare(String(b.name || b.floor || ""), undefined, { numeric: true });
 }
 
+function chunkList(list, size) {
+  const result = [];
+  for (let i = 0; i < list.length; i += size) {
+    result.push(list.slice(i, i + size));
+  }
+  return result;
+}
+
+function shortenFloorLabel(label, floorNumber) {
+  if (floorNumber != null && floorNumber !== "") {
+    return `T${floorNumber}`;
+  }
+
+  const text = String(label || "").trim();
+  const match = text.match(/(\d+)/);
+  if (match) {
+    return `T${match[1]}`;
+  }
+
+  return text || "Tầng";
+}
+
 export default function PublicSlotListPage() {
   const { className: themeClass } = usePublicTheme();
+  const [isCompact, setIsCompact] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 768 : false));
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [buildings, setBuildings] = useState([]);
   const [vehicleTypes, setVehicleTypes] = useState([]);
@@ -103,39 +129,107 @@ export default function PublicSlotListPage() {
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
   const [selectedFloorKey, setSelectedFloorKey] = useState("");
   const timerRef = useRef(null);
+  const requestInFlightRef = useRef(false);
+  const metaLoadedRef = useRef(false);
+  const slotCacheRef = useRef(new Map());
 
-  const loadData = async () => {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleResize = () => setIsCompact(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const loadMeta = async () => {
+    const [bRes, vtRes] = await Promise.all([buildingApi.getAll(), vehicleTypeApi.getAll()]);
+    const bList = unwrapApiData(bRes.data, []);
+    const vtList = unwrapApiData(vtRes.data, []);
+
+    setBuildings(bList);
+    setVehicleTypes(vtList);
+    metaLoadedRef.current = true;
+
+    if (!filterBuilding && bList.length > 0) {
+      setFilterBuilding(String(getBuildingId(bList[0])));
+    }
+
+    return bList;
+  };
+
+  const loadData = async ({ silent = false, buildingId = "", force = false } = {}) => {
+    if (requestInFlightRef.current) return;
+
+    requestInFlightRef.current = true;
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      const [bRes, vtRes] = await Promise.all([buildingApi.getAll(), vehicleTypeApi.getAll()]);
-      const bList = unwrapApiData(bRes.data, []);
-      const vtList = unwrapApiData(vtRes.data, []);
-      const floorRes = await Promise.allSettled(bList.map((b) => floorApi.getByBuilding(getBuildingId(b))));
+      let availableBuildings = buildings;
+
+      if (!metaLoadedRef.current || !buildings.length || !vehicleTypes.length) {
+        const loadedBuildings = await loadMeta();
+        if (loadedBuildings) {
+          availableBuildings = loadedBuildings;
+        }
+      }
+
+      const defaultBuildingId = availableBuildings[0] ? String(getBuildingId(availableBuildings[0])) : "";
+      const targetBuildingIds = buildingId
+        ? [buildingId]
+        : filterBuilding
+          ? [filterBuilding]
+          : defaultBuildingId
+            ? [defaultBuildingId]
+            : [];
+      const cacheKey = buildingId || "__all__";
+
+      if (!force && slotCacheRef.current.has(cacheKey)) {
+        setSlots(slotCacheRef.current.get(cacheKey));
+        setError("");
+        return;
+      }
+
+      const floorRes = await Promise.allSettled(targetBuildingIds.map((id) => floorApi.getByBuilding(id)));
       const floors = floorRes.flatMap((result) => getSettledData(result, []));
       const zoneRes = await Promise.allSettled(floors.map((f) => zoneApi.getByFloor(getFloorId(f))));
       const zones = zoneRes.flatMap((result) => getSettledData(result, []));
       const slotRes = await Promise.allSettled(zones.map((z) => parkingSlotApi.getByZone(getZoneId(z))));
       const slotList = slotRes.flatMap((result) => getSettledData(result, []).map(normalizeSlot));
-      setBuildings(bList);
-      setVehicleTypes(vtList);
+      slotCacheRef.current.set(cacheKey, slotList);
       setSlots(slotList);
+      setError("");
     } catch (e) {
       console.error("Failed to load public slots", e);
-      setError("Khong the tai du lieu bai do tu he thong.");
-      setBuildings([]);
-      setVehicleTypes([]);
-      setSlots([]);
+      setError("Không thể tải dữ liệu bãi đỗ từ hệ thống.");
     } finally {
+      requestInFlightRef.current = false;
+      setRefreshing(false);
       setLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
-    timerRef.current = setInterval(loadData, 15000);
-    return () => clearInterval(timerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!metaLoadedRef.current || !filterBuilding) return;
+    loadData({ buildingId: filterBuilding, force: true });
+  }, [filterBuilding]);
+
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      loadData({ silent: true, buildingId: filterBuilding || "", force: true });
+    }, 15000);
+
+    return () => clearInterval(timerRef.current);
+  }, [filterBuilding]);
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -206,6 +300,7 @@ export default function PublicSlotListPage() {
           .map((floor) => ({
             key: floor.key,
             floorId: floor.floorId,
+            floorNumber: floor.slots[0]?.floorNumber ?? null,
             floor: floor.floor,
             stats: getStatusCounts(floor.slots),
             zones: Array.from(floor.zonesMap.values())
@@ -249,10 +344,9 @@ export default function PublicSlotListPage() {
   const stats = useMemo(() => getStatusCounts(filtered), [filtered]);
 
   const statCards = [
-    { label: "Tong slot", value: stats.total, color: "var(--accent)" },
-    { label: "Trong", value: stats.available, color: "#22c55e" },
-    { label: "Co xe", value: stats.occupied, color: "#ef4444" },
-    { label: "Da dat", value: stats.reserved, color: "#f59e0b" },
+    { label: "Bãi đỗ", value: buildings.length, color: "var(--accent)" },
+    { label: "Còn trống", value: stats.available, color: "#22c55e" },
+    { label: "Đang đỗ", value: stats.occupied, color: "#ef4444" },
   ];
 
   function renderZoneBlock(zone) {
@@ -313,89 +407,193 @@ export default function PublicSlotListPage() {
     );
   }
 
+  function renderZoneMap(floor) {
+    const rows = chunkList(floor.zones, 3);
+    const hasStaticPlan = Boolean(getFloorPlan(activeBuilding?.name, floor?.floorNumber));
+    const minWidth = rows.some((row) => row.length >= 3) ? 980 : 720;
+
+    return (
+      <div
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: 24,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
+          padding: 18,
+          overflowX: "auto",
+        }}
+      >
+        <div style={{ minWidth }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ padding: "8px 14px", borderRadius: 999, background: "rgba(34,197,94,0.14)", color: "var(--accent)", fontSize: "0.73rem", fontWeight: 800 }}>
+                CỔNG VÀO
+              </span>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
+                {hasStaticPlan ? "Bố cục đã được canh theo floor plan." : "Bố cục zone đã được canh song song theo từng hàng."}
+              </span>
+            </div>
+            <span style={{ padding: "8px 14px", borderRadius: 999, background: "rgba(239,68,68,0.14)", color: "#f87171", fontSize: "0.73rem", fontWeight: 800 }}>
+              CỔNG RA
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gap: 18 }}>
+            {rows.map((row, rowIndex) => (
+              <div key={`row-${rowIndex}`} style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
+                  {row.map((zone) => renderZoneBlock(zone))}
+                  {row.length < 3 &&
+                    Array.from({ length: 3 - row.length }).map((_, fillerIndex) => (
+                      <div
+                        key={`filler-${rowIndex}-${fillerIndex}`}
+                        style={{
+                          borderRadius: 18,
+                          border: "1px dashed rgba(148,163,184,0.35)",
+                          minHeight: 120,
+                          background: "rgba(148,163,184,0.05)",
+                        }}
+                      />
+                    ))}
+                </div>
+
+                {rowIndex < rows.length - 1 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 120px", alignItems: "center", gap: 18, margin: "2px 0 6px" }}>
+                    <div style={{ height: 1, background: "rgba(148,163,184,0.22)" }} />
+                    <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.72rem", letterSpacing: "0.22em", fontWeight: 800 }}>
+                      ĐƯỜNG ĐI
+                    </div>
+                    <div style={{ height: 1, background: "rgba(148,163,184,0.22)" }} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100vh", background: "var(--bg)" }}>
-      <div style={{ maxWidth: 1260, margin: "0 auto", padding: "40px 24px 56px" }}>
+      <div style={{ maxWidth: 1260, margin: "0 auto", padding: isCompact ? "24px 14px 40px" : "40px 24px 56px" }}>
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: "1.7rem", fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
-            Ban do slot cong khai
-          </h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.94rem", marginTop: 8, maxWidth: 760 }}>
-            Xem nhanh tung bai, tung tang va tinh trang cho trong theo thoi gian thuc. Du lieu tu dong cap nhat moi 15 giay.
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 22 }}>
-          {statCards.map((item) => (
-            <div key={item.label} style={{ ...card, display: "flex", alignItems: "center", gap: 14 }}>
-              <div
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <h1 style={{ fontSize: "1.7rem", fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
+                Bản đồ slot công khai
+              </h1>
+            </div>
+            {refreshing && slots.length > 0 ? (
+              <span
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: "var(--radius-sm)",
-                  background: `${item.color}18`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  background: "rgba(34,197,94,0.12)",
+                  color: "var(--accent)",
+                  fontSize: "0.76rem",
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
                 }}
               >
-                <div style={{ width: 14, height: 14, borderRadius: "50%", background: item.color }} />
-              </div>
+                Đang cập nhật dữ liệu...
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isCompact ? "repeat(2, minmax(0, 1fr))" : "repeat(12, minmax(0, 1fr))",
+            gap: 12,
+            marginBottom: 24,
+          }}
+        >
+          {statCards.map((item) => (
+            <div
+              key={item.label}
+              style={{
+                gridColumn: isCompact ? "span 1" : "span 2",
+                padding: isCompact ? "12px" : "12px 16px",
+                borderRadius: 16,
+                border: "1px solid var(--border)",
+                background: "var(--bg-elevated)",
+                display: "flex",
+                alignItems: isCompact ? "flex-start" : "center",
+                gap: 12,
+                minHeight: isCompact ? 104 : 88,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "var(--radius-sm)",
+                  background: item.color,
+                  flexShrink: 0,
+                }}
+              />
               <div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{item.value}</div>
-                <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 2 }}>{item.label}</div>
+                <div style={{ fontSize: isCompact ? "1.12rem" : "1.2rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{item.value}</div>
+                <div style={{ fontSize: isCompact ? "0.76rem" : "0.78rem", color: "var(--text-muted)", marginTop: 4, wordBreak: "break-word" }}>{item.label}</div>
               </div>
             </div>
           ))}
-        </div>
 
-        <div style={{ ...card, display: "grid", gridTemplateColumns: "220px 180px minmax(220px, 1fr) auto", gap: 12, alignItems: "center", marginBottom: 24 }}>
-          <select
-            value={filterBuilding}
-            onChange={(e) => setFilterBuilding(e.target.value)}
-            style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
-          >
-            <option value="">Tat ca bai do</option>
-            {buildings.map((building) => (
-              <option key={getBuildingId(building)} value={String(getBuildingId(building))}>
-                {building.name}
-              </option>
-            ))}
-          </select>
+          <div style={{ ...card, gridColumn: isCompact ? "1 / -1" : "span 6", padding: isCompact ? 14 : 16, minHeight: 88 }}>
+            <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>
+              Tìm bãi nhanh
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "1.1fr 1fr 1.2fr", gap: 10, alignItems: "center" }}>
+            <select
+              value={filterBuilding}
+              onChange={(e) => setFilterBuilding(e.target.value)}
+              style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
+            >
+              <option value="">Tất cả bãi đỗ</option>
+              {buildings.map((building) => (
+                <option key={getBuildingId(building)} value={String(getBuildingId(building))}>
+                  {building.name}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={filterVehicle}
-            onChange={(e) => setFilterVehicle(e.target.value)}
-            style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
-          >
-            <option value="">Tat ca loai xe</option>
-            {vehicleTypes.map((vehicle) => (
-              <option key={getVehicleTypeId(vehicle)} value={String(getVehicleTypeId(vehicle))}>
-                {vehicle.name}
-              </option>
-            ))}
-          </select>
+            <select
+              value={filterVehicle}
+              onChange={(e) => setFilterVehicle(e.target.value)}
+              style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
+            >
+              <option value="">Tất cả loại xe</option>
+              {vehicleTypes.map((vehicle) => (
+                <option key={getVehicleTypeId(vehicle)} value={String(getVehicleTypeId(vehicle))}>
+                  {vehicle.name}
+                </option>
+              ))}
+            </select>
 
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tim theo ma slot, zone, tang, bai do..."
-            style={inputStyle}
-          />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo mã slot, tầng hoặc tên bãi đỗ..."
+              style={inputStyle}
+            />
+          </div>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {Object.entries(SLOT_COLORS).map(([status, color]) => (
-              <span key={status} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
+            {Object.entries(SLOT_COLORS).slice(0, 3).map(([status, color]) => (
+              <span key={status} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: "var(--text-muted)" }}>
                 <span style={{ width: 10, height: 10, borderRadius: 999, background: color }} />
                 {SLOT_LABELS[status]}
               </span>
             ))}
           </div>
+          </div>
         </div>
 
         {loading && slots.length === 0 && (
           <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Dang tai du lieu bai do...</p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Đang tải dữ liệu bãi đỗ...</p>
           </div>
         )}
 
@@ -407,78 +605,21 @@ export default function PublicSlotListPage() {
 
         {!loading && filtered.length === 0 && !error && (
           <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Khong tim thay slot nao phu hop.</p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Không tìm thấy slot nào phù hợp.</p>
           </div>
         )}
 
         {!loading && groupedBuildings.length > 0 && (
           <>
-            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, marginBottom: 18 }}>
-              {groupedBuildings.map((building) => {
-                const active = activeBuilding?.id === building.id;
-                return (
-                  <button
-                    key={building.id}
-                    onClick={() => {
-                      setFilterBuilding("");
-                      setSelectedBuildingId(building.id);
-                    }}
-                    style={{
-                      minWidth: 240,
-                      textAlign: "left",
-                      borderRadius: 18,
-                      border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                      background: active ? "var(--accent-dim)" : "var(--bg-elevated)",
-                      color: "var(--text)",
-                      padding: "16px 18px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: 10 }}>{building.name}</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", fontSize: "0.76rem" }}>
-                      <span>{building.floors.length} tang</span>
-                      <span style={{ color: "var(--accent)", fontWeight: 700 }}>{building.stats.available}/{building.stats.total} trong</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
             {activeBuilding && (
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                <div
-                  style={{
-                    padding: "22px 24px",
-                    borderBottom: "1px solid var(--border)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text)" }}>{activeBuilding.name}</div>
-                    <div style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginTop: 5 }}>
-                      Dang hien thi {activeBuilding.stats.total} slot, trong do {activeBuilding.stats.available} slot con trong.
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ padding: "8px 12px", borderRadius: 999, background: "rgba(34,197,94,0.12)", color: "var(--accent)", fontSize: "0.76rem", fontWeight: 700 }}>
-                      Trong {activeBuilding.stats.available}
-                    </span>
-                    <span style={{ padding: "8px 12px", borderRadius: 999, background: "rgba(239,68,68,0.12)", color: "#f87171", fontSize: "0.76rem", fontWeight: 700 }}>
-                      Co xe {activeBuilding.stats.occupied}
-                    </span>
-                    <span style={{ padding: "8px 12px", borderRadius: 999, background: "rgba(245,158,11,0.12)", color: "#fbbf24", fontSize: "0.76rem", fontWeight: 700 }}>
-                      Dat truoc {activeBuilding.stats.reserved}
-                    </span>
-                  </div>
-                </div>
-
                 <div style={{ padding: "18px 24px 24px" }}>
                   {activeBuilding.floors.length > 1 && (
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>
+                        Chọn tầng
+                      </div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {activeBuilding.floors.map((floor) => {
                         const active = activeFloor?.key === floor.key;
                         return (
@@ -497,13 +638,11 @@ export default function PublicSlotListPage() {
                               fontFamily: "inherit",
                             }}
                           >
-                            {floor.floor}
-                            <span style={{ marginLeft: 8, opacity: 0.75, fontFamily: "'JetBrains Mono', monospace" }}>
-                              {floor.stats.available}/{floor.stats.total}
-                            </span>
+                            {shortenFloorLabel(floor.floor, floor.floorNumber)}
                           </button>
                         );
                       })}
+                      </div>
                     </div>
                   )}
 
@@ -512,15 +651,10 @@ export default function PublicSlotListPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
                         <div>
                           <div style={{ fontSize: "1.02rem", fontWeight: 700, color: "var(--text)" }}>{activeFloor.floor}</div>
-                          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 4 }}>
-                            {activeFloor.zones.length} khu vuc, {activeFloor.stats.available}/{activeFloor.stats.total} slot trong
-                          </div>
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
-                        {activeFloor.zones.map((zone) => renderZoneBlock(zone))}
-                      </div>
+                      {renderZoneMap(activeFloor)}
                     </div>
                   )}
                 </div>
@@ -532,9 +666,9 @@ export default function PublicSlotListPage() {
         {!loading && filtered.length > 0 && (
           <div style={{ marginTop: 22, textAlign: "center" }}>
             <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-              Hien thi {filtered.length} / {slots.length} slot -
+              Hiển thị {filtered.length} / {slots.length} slot -
               <Link to="/login" style={{ color: "var(--accent)", fontWeight: 600, marginLeft: 4 }}>
-                Dang nhap de dat cho
+                Đăng nhập để đặt chỗ
               </Link>
             </p>
           </div>
@@ -543,3 +677,4 @@ export default function PublicSlotListPage() {
     </div>
   );
 }
+

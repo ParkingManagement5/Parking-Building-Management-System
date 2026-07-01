@@ -86,9 +86,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 "Xe " + session.getVehicle().getLicensePlate() + " da vao slot " + session.getSlot().getSlotCode() + ".",
                 "success", "SESSION", session.getId().intValue());
 
-        notificationService.notifyAllStaff("Xe vao bai",
-                "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
-                "info", "SESSION", session.getId().intValue());
+        Long entryBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
+        if (entryBuildingId != null) {
+            notificationService.notifyStaffInBuilding(entryBuildingId, "Xe vao bai",
+                    "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
+                    "info", "SESSION", session.getId().intValue());
+        } else {
+            notificationService.notifyAllStaff("Xe vao bai",
+                    "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
+                    "info", "SESSION", session.getId().intValue());
+        }
 
         return toResponse(session);
     }
@@ -318,9 +325,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 "Xe " + session.getVehicle().getLicensePlate() + " da ra khoi bai. Vui long cho thanh toan.",
                 "warning", "SESSION", session.getId().intValue());
 
-        notificationService.notifyAllStaff("Xe ra bai",
-                "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
-                "warning", "SESSION", session.getId().intValue());
+        Long exitBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
+        if (exitBuildingId != null) {
+            notificationService.notifyStaffInBuilding(exitBuildingId, "Xe ra bai",
+                    "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
+                    "warning", "SESSION", session.getId().intValue());
+        } else {
+            notificationService.notifyAllStaff("Xe ra bai",
+                    "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
+                    "warning", "SESSION", session.getId().intValue());
+        }
 
         // Tao san parking fee PENDING de staff co the thu CASH hoac sinh QR VNPay ngay.
         paymentService.createParkingFee(

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Building2, CalendarRange, Clock3, ShieldCheck, Users, Plus, X } from "lucide-react";
+import { Building2, CalendarRange, Clock3, ShieldCheck, Users, Plus, Search, X } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 import { staffShiftApi } from "../../api/manager/staffShiftApi";
 import { buildingApi } from "../../api/manager/buildingApi";
@@ -34,6 +34,8 @@ export default function StaffShiftPage() {
   const [loadError, setLoadError] = useState("");
   const [shiftPage, setShiftPage] = useState(1);
   const [staffPage, setStaffPage] = useState(1);
+  const [filterStaffSearch, setFilterStaffSearch] = useState("");
+  const [filterShiftDate, setFilterShiftDate] = useState("");
   const [form, setForm] = useState({
     userId: "",
     shiftId: "",
@@ -69,9 +71,18 @@ export default function StaffShiftPage() {
   const shiftMap = useMemo(() => Object.fromEntries(shifts.map((item) => [item.shiftId, item])), [shifts]);
   const canAssign = staffUsers.length > 0 && shifts.length > 0;
 
+  const filteredStaffShifts = useMemo(() => {
+    const q = filterStaffSearch.toLowerCase();
+    return staffShifts.filter((s) => {
+      if (q && !(s.userName || "").toLowerCase().includes(q)) return false;
+      if (filterShiftDate && s.workingDate !== filterShiftDate) return false;
+      return true;
+    });
+  }, [staffShifts, filterStaffSearch, filterShiftDate]);
+
   const PAGE_SIZE = 10;
-  const pagedStaffShifts = useMemo(() => staffShifts.slice((shiftPage - 1) * PAGE_SIZE, shiftPage * PAGE_SIZE), [staffShifts, shiftPage]);
-  const totalShiftPages = Math.max(1, Math.ceil(staffShifts.length / PAGE_SIZE));
+  const pagedStaffShifts = useMemo(() => filteredStaffShifts.slice((shiftPage - 1) * PAGE_SIZE, shiftPage * PAGE_SIZE), [filteredStaffShifts, shiftPage]);
+  const totalShiftPages = Math.max(1, Math.ceil(filteredStaffShifts.length / PAGE_SIZE));
   const pagedStaffUsers = useMemo(() => staffUsers.slice((staffPage - 1) * PAGE_SIZE, staffPage * PAGE_SIZE), [staffUsers, staffPage]);
   const totalStaffPages = Math.max(1, Math.ceil(staffUsers.length / PAGE_SIZE));
 
@@ -209,8 +220,36 @@ export default function StaffShiftPage() {
         )}
       </ManagerPanel>
 
-      <ManagerPanel title="Staff Shift Directory" subtitle={`${staffShifts.length} assignment records available`}>
-        {staffShifts.length === 0 ? (
+      {/* Shift filter bar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={filterStaffSearch}
+            onChange={(e) => { setFilterStaffSearch(e.target.value); setShiftPage(1); }}
+            placeholder="Tìm tên nhân viên..."
+            className="w-full rounded-xl border border-border bg-muted py-2 pl-8 pr-3 text-xs outline-none focus:border-primary"
+          />
+        </div>
+        <input
+          type="date"
+          value={filterShiftDate}
+          onChange={(e) => { setFilterShiftDate(e.target.value); setShiftPage(1); }}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        />
+        {(filterStaffSearch || filterShiftDate) && (
+          <button
+            onClick={() => { setFilterStaffSearch(""); setFilterShiftDate(""); setShiftPage(1); }}
+            className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={12} /> Xóa lọc
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{filteredStaffShifts.length} / {staffShifts.length} ca làm</span>
+      </div>
+
+      <ManagerPanel title="Staff Shift Directory" subtitle={`${filteredStaffShifts.length} assignment records`}>
+        {filteredStaffShifts.length === 0 ? (
           <ManagerEmptyState title="No staff shifts yet" description="Create assignments after staff accounts and shift templates are available." />
         ) : (
           <ManagerDataTable columns={["Staff", "Shift", "Working Date", "Time", "Status", "Actions"]}>

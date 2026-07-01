@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { notificationApi } from "../../api/notificationApi";
 import { getRole, getUserId, getUsername } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
@@ -13,9 +13,10 @@ const CONFIG = {
     role: "driver",
     label: "Driver Portal",
     menuGroups: [
-      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
-        label: "Đỗ xe", items: [
+        label: "Đỗ xe",
+        items: [
           { id: "booking", label: "Đặt chỗ" },
           { id: "current-session", label: "Phiên hiện tại" },
           { id: "parking-map", label: "Bản đồ bãi" },
@@ -23,14 +24,16 @@ const CONFIG = {
         ],
       },
       {
-        label: "Hồ sơ", items: [
+        label: "Hồ sơ",
+        items: [
           { id: "bookings", label: "Lịch sử đặt" },
           { id: "payments", label: "Thanh toán" },
           { id: "vehicles", label: "Xe của tôi" },
         ],
       },
       {
-        label: "Tài khoản", items: [
+        label: "Tài khoản",
+        items: [
           { id: "requests", label: "Yêu cầu hỗ trợ" },
           { id: "notifications", label: "Thông báo" },
           { id: "profile", label: "Hồ sơ" },
@@ -43,9 +46,10 @@ const CONFIG = {
     role: "staff",
     label: "Staff Portal",
     menuGroups: [
-      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
-        label: "Vận hành", items: [
+        label: "Vận hành",
+        items: [
           { id: "scan", label: "Scan" },
           { id: "gate", label: "Bản đồ bãi" },
           { id: "sessions", label: "Sessions" },
@@ -53,7 +57,8 @@ const CONFIG = {
         ],
       },
       {
-        label: "Xử lý", items: [
+        label: "Xử lý",
+        items: [
           { id: "exceptions", label: "Ngoại lệ" },
           { id: "requests", label: "Yêu cầu" },
           { id: "notifications", label: "Thông báo" },
@@ -66,9 +71,10 @@ const CONFIG = {
     role: "manager",
     label: "Manager Portal",
     menuGroups: [
-      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
-        label: "Cơ sở hạ tầng", items: [
+        label: "Cơ sở hạ tầng",
+        items: [
           { id: "buildings", label: "Tòa nhà" },
           { id: "floors", label: "Tầng" },
           { id: "zones", label: "Zone" },
@@ -77,7 +83,8 @@ const CONFIG = {
         ],
       },
       {
-        label: "Cấu hình", items: [
+        label: "Cấu hình",
+        items: [
           { id: "vehicle-types", label: "Loại xe" },
           { id: "pricing-policies", label: "Bảng giá" },
           { id: "staff-shifts", label: "Ca làm việc" },
@@ -91,9 +98,10 @@ const CONFIG = {
     role: "admin",
     label: "Admin Portal",
     menuGroups: [
-      { label: "Tổng quan", items: [{ id: "overview", label: "Dashboard" }] },
+      { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
-        label: "Hệ thống", items: [
+        label: "Hệ thống",
+        items: [
           { id: "users", label: "Người dùng" },
           { id: "roles", label: "Vai trò" },
           { id: "system-config", label: "Cấu hình" },
@@ -110,9 +118,17 @@ const ROLE_COLORS = {
   admin: "#ef4444",
 };
 
+const DRIVER_MOBILE_NAV_ITEMS = [
+  { id: "overview", label: "Trang chủ" },
+  { id: "booking", label: "Đặt chỗ" },
+  { id: "current-session", label: "Phiên xe" },
+  { id: "parking-map", label: "Bản đồ" },
+  { id: "profile", label: "Tôi" },
+];
+
 function initialsFromName(name) {
   const parts = String(name || "U").trim().split(/\s+/);
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "U";
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("") || "U";
 }
 
 export default function RolePortalLayout({ portal }) {
@@ -127,40 +143,66 @@ export default function RolePortalLayout({ portal }) {
   const [notifications, setNotifications] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef(null);
 
   const currentPage = location.pathname.replace(`${config.basePath}/`, "").replace(config.basePath, "") || "overview";
   const pageKey = currentPage === "/" || currentPage === "" ? "overview" : currentPage;
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const flatMenuItems = useMemo(() => config.menuGroups.flatMap((group) => group.items), [config.menuGroups]);
+  const mobileTitle = flatMenuItems.find((item) => item.id === pageKey)?.label || "Trang chủ";
+  const isDriverPortal = portal === "driver";
+  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+
+    async function loadNotifications() {
       if (!userId) return;
+
       try {
-        const res = await notificationApi.getByUser(userId);
-        if (!cancelled) setNotifications(unwrapApiData(res.data, []));
-      } catch { if (!cancelled) setNotifications([]); }
+        const response = await notificationApi.getByUser(userId);
+        if (!cancelled) {
+          setNotifications(unwrapApiData(response.data, []));
+        }
+      } catch {
+        if (!cancelled) {
+          setNotifications([]);
+        }
+      }
     }
-    load();
-    const iv = setInterval(load, 15000);
-    return () => { cancelled = true; clearInterval(iv); };
+
+    loadNotifications();
+    const intervalId = setInterval(loadNotifications, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [userId, location.pathname]);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (!navRef.current?.contains(e.target)) {
+    const handleOutsideClick = (event) => {
+      if (!navRef.current?.contains(event.target)) {
         setOpenDropdown(null);
         setUserMenuOpen(false);
+        setMobileMenuOpen(false);
       }
     };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
+
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    setOpenDropdown(null);
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   function goTo(id) {
     setOpenDropdown(null);
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
     navigate(id === "overview" ? config.basePath : `${config.basePath}/${id}`);
   }
 
@@ -173,81 +215,257 @@ export default function RolePortalLayout({ portal }) {
 
   return (
     <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100dvh", background: "var(--bg)" }}>
-      {/* TOP NAVBAR */}
       <nav className="dash-nav" ref={navRef}>
         <div className="dash-nav-inner">
-          {/* Logo */}
-          <a href={config.basePath} className="dash-nav-logo" onClick={(e) => { e.preventDefault(); navigate(config.basePath); }}>
-            <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+          <a
+            href={config.basePath}
+            className="dash-nav-logo"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate(config.basePath);
+            }}
+          >
+            <span className="nav-logo-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              </svg>
+            </span>
             <span>ParkSmart</span>
           </a>
 
-          {/* Menu items with dropdowns */}
-          <div className="dash-nav-menu">
-            {config.menuGroups.filter((g) => !(g.items.length === 1 && g.items[0].id === "overview")).map((group, gi) => {
-              const isOpen = openDropdown === gi;
-              const hasActive = group.items.some((it) => pageKey === it.id);
-              return (
-                <button key={gi} className={`dash-nav-item ${isOpen ? "open" : ""} ${hasActive ? "active" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); setOpenDropdown(isOpen ? null : gi); setUserMenuOpen(false); }}>
-                  {group.label}
-                  <svg className="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
-                  <div className="dash-dropdown">
-                    {group.items.map((item) => (
-                      <a key={item.id} href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); goTo(item.id); }}
-                        style={pageKey === item.id ? { color: "var(--accent)", fontWeight: 600 } : {}}>
-                        {item.label}
-                        {item.id === "notifications" && unreadCount > 0 && (
-                          <span style={{ marginLeft: "auto", background: "var(--danger)", color: "#fff", fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 100 }}>
-                            {unreadCount > 9 ? "9+" : unreadCount}
-                          </span>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="dash-mobile-page-title">
+            <span>{mobileTitle}</span>
           </div>
 
-          {/* Right: notification + user */}
+          <div className="dash-nav-menu">
+            {config.menuGroups
+              .filter((group) => !(group.items.length === 1 && group.items[0].id === "overview"))
+              .map((group, index) => {
+                const isOpen = openDropdown === index;
+                const hasActive = group.items.some((item) => pageKey === item.id);
+
+                return (
+                  <button
+                    key={group.label}
+                    type="button"
+                    className={`dash-nav-item ${isOpen ? "open" : ""} ${hasActive ? "active" : ""}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setOpenDropdown(isOpen ? null : index);
+                      setUserMenuOpen(false);
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    {group.label}
+                    <svg className="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                    <div className="dash-dropdown">
+                      {group.items.map((item) => (
+                        <a
+                          key={item.id}
+                          href="/"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            goTo(item.id);
+                          }}
+                          style={pageKey === item.id ? { color: "var(--accent)", fontWeight: 600 } : {}}
+                        >
+                          {item.label}
+                          {item.id === "notifications" && unreadCount > 0 && (
+                            <span
+                              style={{
+                                marginLeft: "auto",
+                                background: "var(--danger)",
+                                color: "#fff",
+                                fontSize: "0.65rem",
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 100,
+                              }}
+                            >
+                              {unreadCount > 9 ? "9+" : unreadCount}
+                            </span>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+
           <div className="dash-nav-right">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
               {dark ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="5" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                </svg>
               )}
             </button>
+
             <button className="dash-notif-btn" onClick={() => goTo("notifications")} title="Thông báo">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" /></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
               {unreadCount > 0 && <span className="dash-notif-dot" />}
             </button>
 
-            <div className="dash-user" style={{ position: "relative" }}
-              onClick={(e) => { e.stopPropagation(); setUserMenuOpen(!userMenuOpen); setOpenDropdown(null); }}>
-              <div className="dash-user-avatar" style={{ background: accentColor }}>{initialsFromName(username)}</div>
+            <button
+              type="button"
+              className={`dash-mobile-toggle ${mobileMenuOpen ? "open" : ""}`}
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobileMenuOpen}
+              onClick={(event) => {
+                event.stopPropagation();
+                setMobileMenuOpen((prev) => !prev);
+                setOpenDropdown(null);
+                setUserMenuOpen(false);
+              }}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+
+            <div
+              className="dash-user"
+              style={{ position: "relative" }}
+              onClick={(event) => {
+                event.stopPropagation();
+                setUserMenuOpen(!userMenuOpen);
+                setOpenDropdown(null);
+                setMobileMenuOpen(false);
+              }}
+            >
+              <div className="dash-user-avatar" style={{ background: accentColor }}>
+                {initialsFromName(username)}
+              </div>
               <div>
                 <span className="dash-user-name">{username}</span>
                 <span className="dash-user-role">{config.label}</span>
               </div>
               {userMenuOpen && (
-                <div className="dash-dropdown" style={{ opacity: 1, visibility: "visible", transform: "translateY(0)", top: "calc(100% + 8px)", right: 0, left: "auto" }}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); goTo("profile"); }} style={portal !== "driver" ? { display: "none" } : {}}>Hồ sơ</a>
-                  <a href="#" onClick={(e) => { e.preventDefault(); goTo("settings"); }}>Cài đặt</a>
+                <div
+                  className="dash-dropdown"
+                  style={{
+                    opacity: 1,
+                    visibility: "visible",
+                    transform: "translateY(0)",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    left: "auto",
+                  }}
+                >
+                  {portal === "driver" && (
+                    <a
+                      href="/"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        goTo("profile");
+                      }}
+                    >
+                      Hồ sơ
+                    </a>
+                  )}
+                  <a
+                    href="/"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goTo("settings");
+                    }}
+                  >
+                    Cài đặt
+                  </a>
                   <div className="dash-dropdown-divider" />
-                  <a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }} style={{ color: "var(--danger)" }}>Đăng xuất</a>
+                  <a
+                    href="/"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      handleLogout();
+                    }}
+                    style={{ color: "var(--danger)" }}
+                  >
+                    Đăng xuất
+                  </a>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        <div className={`dash-mobile-panel ${mobileMenuOpen ? "open" : ""}`}>
+          <div className="dash-mobile-panel-body">
+            {config.menuGroups.map((group) => (
+              <div key={group.label} className="dash-mobile-group">
+                <p className="dash-mobile-group-label">{group.label}</p>
+                <div className="dash-mobile-links">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`dash-mobile-link ${pageKey === item.id ? "active" : ""}`}
+                      onClick={() => goTo(item.id)}
+                    >
+                      <span>{item.label}</span>
+                      {item.id === "notifications" && unreadCount > 0 && (
+                        <strong>{unreadCount > 9 ? "9+" : unreadCount}</strong>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div className="dash-mobile-account">
+              <div className="dash-mobile-user-card">
+                <div className="dash-user-avatar" style={{ background: accentColor }}>
+                  {initialsFromName(username)}
+                </div>
+                <div>
+                  <p>{username}</p>
+                  <span>{role}</span>
+                </div>
+              </div>
+              <button type="button" className="dash-mobile-secondary" onClick={() => goTo("settings")}>
+                Cài đặt
+              </button>
+              <button type="button" className="dash-mobile-danger" onClick={handleLogout}>
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
       </nav>
 
-      {/* CONTENT */}
-      <div className="dashboard-content">
+      <div className={`dashboard-content ${isDriverPortal ? "dashboard-content-has-mobile-nav" : ""}`}>
         <Outlet />
       </div>
+
+      {isDriverPortal && (
+        <div className="dash-mobile-bottom-nav">
+          {DRIVER_MOBILE_NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`dash-mobile-bottom-item ${pageKey === item.id ? "active" : ""}`}
+              onClick={() => goTo(item.id)}
+            >
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,8 @@ public class CreateExceptionCaseRequest {
 
     private Integer requestId;
 
+    private Integer bookingId;
+
     @NotNull(message = "Exception type is required")
     private ExceptionType exceptionType;
 

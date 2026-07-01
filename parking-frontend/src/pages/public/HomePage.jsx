@@ -9,8 +9,8 @@ export default function HomePage() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <a href="/parking-info" className="rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/90">
-              View Parking Buildings
+            <a href="/public-slots" className="rounded-2xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/90">
+              View Public Slots
             </a>
             <a href="/login" className="rounded-2xl border border-border px-5 py-3 text-sm font-medium text-foreground transition hover:bg-muted">
               Sign in

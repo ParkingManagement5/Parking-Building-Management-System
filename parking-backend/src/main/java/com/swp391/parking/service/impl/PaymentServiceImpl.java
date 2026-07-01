@@ -325,6 +325,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforcePaymentOwnership(Integer paymentId, Long userId) {
         Payment payment = findById(paymentId);
         boolean owned = false;
@@ -342,6 +343,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforceBookingOwnership(Integer bookingId, Long userId) {
         bookingRepository.findById(bookingId.longValue()).ifPresent(b -> {
             if (!b.getUserId().equals(userId)) {
@@ -351,6 +353,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforceSessionOwnership(Integer sessionId, Long userId) {
         parkingSessionRepository.findById(sessionId.longValue()).ifPresent(s -> {
             if (!s.getUserId().equals(userId)) {
@@ -360,6 +363,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforcePaymentBuildingScope(Integer paymentId, Long currentUserId, boolean staffScoped) {
         Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
         if (buildingId == null) {
@@ -372,6 +376,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforceBookingBuildingScope(Integer bookingId, Long currentUserId, boolean staffScoped) {
         Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
         if (buildingId == null) {
@@ -385,6 +390,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void enforceSessionBuildingScope(Integer sessionId, Long currentUserId, boolean staffScoped) {
         Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
         if (buildingId == null) {
