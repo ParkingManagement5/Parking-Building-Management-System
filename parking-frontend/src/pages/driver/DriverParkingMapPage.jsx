@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Building2, LoaderCircle, MapPin, Maximize2, Minus, Plus, SquareParking, ChevronRight } from "lucide-react";
+import { Building2, LoaderCircle, MapPin, Maximize2, Minus, Navigation, Plus, RefreshCw, SquareParking, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
@@ -363,10 +363,38 @@ export default function DriverParkingMapPage(){
   const[zoom,setZoom]=useState(100);
   const[selSlot,setSelSlot]=useState(null);
   const[selSt,setSelSt]=useState(null);
+  const[driverPos,setDriverPos]=useState(null);
+  const[geoLoading,setGeoLoading]=useState(false);
+  const[geoError,setGeoError]=useState("");
   const mapRef=useRef(null);
   const handleZoom=useCallback(d=>setZoom(z=>Math.max(60,Math.min(200,z+d))),[]);
   const handleSlotClick=useCallback((sl,st)=>{setSelSlot(sl);setSelSt(st);},[]);
   const handleFs=useCallback(()=>{const el=mapRef.current;if(!el)return;document.fullscreenElement?document.exitFullscreen():el.requestFullscreen?.();},[]);
+  const navigate=useNavigate();
+
+  const requestGeo=useCallback(()=>{
+    if(!navigator.geolocation){
+      setGeoError("Thiết bị không hỗ trợ GPS.");
+      return;
+    }
+    setGeoLoading(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        setDriverPos({lat:pos.coords.latitude,lon:pos.coords.longitude});
+        setGeoLoading(false);
+      },
+      (err)=>{
+        setGeoError(
+          err.code===1
+            ? "Bạn chưa cấp quyền truy cập vị trí."
+            : "Không lấy được vị trí GPS."
+        );
+        setGeoLoading(false);
+      },
+      {enableHighAccuracy:true,timeout:10000}
+    );
+  },[]);
 
   useEffect(()=>{
     let cancel=false;
@@ -400,6 +428,10 @@ export default function DriverParkingMapPage(){
     return()=>{cancel=true;};
   },[]);
 
+  useEffect(()=>{
+    requestGeo();
+  },[requestGeo]);
+
   const curFloor=floors.find(f=>(f.sections||[]).some(s=>(s.slots||[]).some(sl=>$m(sl,session))))
     ||floors.find(f=>String(f.id)===String(selFloor))||floors[0];
   const sections=curFloor?.sections||[];
@@ -424,10 +456,30 @@ export default function DriverParkingMapPage(){
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-muted-foreground"><Building2 size={12}/><span className="text-[10px] font-semibold uppercase tracking-widest">{building}</span></div>
           <h1 className="text-lg font-bold text-foreground tracking-tight">So do {$fn(curFloor)}</h1>
+          {driverPos&&<p className="mt-1 text-[11px] text-muted-foreground">GPS của bạn: {driverPos.lat.toFixed(6)}, {driverPos.lon.toFixed(6)}</p>}
+          {!driverPos&&geoError&&<p className="mt-1 text-[11px] text-amber-500">{geoError}</p>}
         </div>
-        {session&&<div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 px-2.5 py-1">
-          <MapPin size={12} className="text-blue-600"/><span className="text-xs font-bold text-blue-700 dark:text-blue-300">{$c(session)}</span>
-          <span className="text-[10px] text-blue-500">{$zn(activeZone)}</span></div>}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {session&&<div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 px-2.5 py-1">
+            <MapPin size={12} className="text-blue-600"/><span className="text-xs font-bold text-blue-700 dark:text-blue-300">{$c(session)}</span>
+            <span className="text-[10px] text-blue-500">{$zn(activeZone)}</span></div>}
+          <button
+            type="button"
+            onClick={requestGeo}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            {geoLoading?<RefreshCw size={12} className="animate-spin"/>:<Navigation size={12}/>}
+            {geoLoading?"Đang lấy GPS":"Cập nhật GPS"}
+          </button>
+          <button
+            type="button"
+            onClick={()=>navigate("/driver/find-building")}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 transition hover:bg-emerald-500/15"
+          >
+            <MapPin size={12}/>
+            Mở bản đồ GPS
+          </button>
+        </div>
       </div>
       <div className="grid gap-3 xl:grid-cols-[1fr_240px]">
         <div className="space-y-2" ref={mapRef}>

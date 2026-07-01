@@ -27,6 +27,12 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ParkingSlot> getAll() {
+        return slotRepo.findAll();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ParkingSlot> getByZone(Long zoneId) {
         return slotRepo.findByZoneId(zoneId);
     }

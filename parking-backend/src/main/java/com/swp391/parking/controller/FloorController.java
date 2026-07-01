@@ -4,6 +4,7 @@ import com.swp391.parking.dto.request.FloorRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.Floor;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.FloorRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.FloorService;
 import jakarta.validation.Valid;
@@ -23,7 +24,14 @@ import java.util.List;
 public class FloorController {
 
     private final FloorService floorService;
+    private final FloorRepository floorRepository;
     private final UserRepository userRepository;
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<Floor>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(floorRepository.findAll()));
+    }
 
     @GetMapping("/building/{buildingId}")
     public ResponseEntity<ApiResponse<List<Floor>>> getByBuilding(@PathVariable Long buildingId, Authentication authentication) {

@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { buildingApi } from "../../api/manager/buildingApi";
 import { requestApi } from "../../api/driver/requestApi";
 import { unwrapApiData } from "../../utils/api";
 import { formatDateTime, getStatusClasses } from "./driverPortalUtils";
 
 export default function RequestCenterPage() {
   const [requests, setRequests] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [form, setForm] = useState({
     requestType: "OTHER",
     subject: "",
     content: "",
+    buildingId: "",
   });
   const [submitStatus, setSubmitStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -19,21 +22,22 @@ export default function RequestCenterPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadRequests() {
+    async function loadInitial() {
       try {
-        const res = await requestApi.getMyRequests();
+        const [requestRes, buildingRes] = await Promise.all([
+          requestApi.getMyRequests(),
+          buildingApi.getAll(),
+        ]);
         if (!cancelled) {
-          setRequests(unwrapApiData(res.data, []));
+          setRequests(unwrapApiData(requestRes.data, []));
+          setBuildings(unwrapApiData(buildingRes.data, []));
         }
       } catch (error) {
         console.error("Failed to load requests", error);
-        if (!cancelled) {
-          setRequests([]);
-        }
       }
     }
 
-    void loadRequests();
+    void loadInitial();
 
     return () => {
       cancelled = true;
@@ -44,6 +48,10 @@ export default function RequestCenterPage() {
     event.preventDefault();
     setSubmitStatus("");
 
+    if (!form.buildingId) {
+      setSubmitStatus("error:Vui lòng chọn tòa nhà bạn đang ở.");
+      return;
+    }
     if (!form.content.trim()) {
       setSubmitStatus("error:Request content is required.");
       return;
@@ -54,6 +62,7 @@ export default function RequestCenterPage() {
         requestType: form.requestType,
         subject: form.subject.trim() || requestTypeLabel(form.requestType),
         description: form.content.trim(),
+        buildingId: form.buildingId ? Number(form.buildingId) : null,
       });
       const res = await requestApi.getMyRequests();
       setRequests(unwrapApiData(res.data, []));
@@ -62,6 +71,7 @@ export default function RequestCenterPage() {
         requestType: "OTHER",
         subject: "",
         content: "",
+        buildingId: "",
       });
       setSubmitStatus("success:Request submitted successfully!");
     } catch (error) {
@@ -99,6 +109,23 @@ export default function RequestCenterPage() {
               <option value="WRONG_FEE">Wrong Fee</option>
               <option value="CANNOT_FIND_CAR">Cannot Find Car</option>
               <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">
+              Building <span className="text-rose-500">*</span>
+            </label>
+            <select
+              value={form.buildingId}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, buildingId: event.target.value }))
+              }
+              className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="">Chọn tòa nhà bạn đang ở</option>
+              {buildings.map((b) => (
+                <option key={b.buildingId ?? b.id} value={b.buildingId ?? b.id}>{b.name}</option>
+              ))}
             </select>
           </div>
           <div>

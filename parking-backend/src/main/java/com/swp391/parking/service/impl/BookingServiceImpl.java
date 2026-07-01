@@ -1,4 +1,4 @@
-package com.swp391.parking.service.impl;
+﻿package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.CreateBookingRequest;
 import com.swp391.parking.dto.response.BookingResponse;
@@ -7,6 +7,7 @@ import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.*;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.NotificationService;
+import com.swp391.parking.service.SystemConfigService;
 import com.swp391.parking.util.LicensePlateUtil;
 import com.swp391.parking.util.QrTokenUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,16 +27,17 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
-    private static final long CONFIRMED_CANCEL_WINDOW_MINUTES = 10;
 
     private final BookingRepository bookingRepository;
     private final ParkingSessionRepository sessionRepository;
     private final VehicleRepository vehicleRepository;
     private final ParkingSlotRepository parkingSlotRepository;
+    private final PaymentRepository paymentRepository;
     private final QrTokenUtil qrTokenUtil;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final SystemConfigService systemConfigService;
 
     @Override
     @Transactional
@@ -43,44 +45,44 @@ public class BookingServiceImpl implements BookingService {
         LocalDateTime now = LocalDateTime.now();
         expireStaleOpenBookings(now);
 
-        // Load vehicle (BE2) — kiểm tra chủ sở hữu
+        // Load vehicle (BE2) â€” kiá»ƒm tra chá»§ sá»Ÿ há»¯u
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy xe"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y xe"));
         if (!vehicle.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Xe này không thuộc về bạn");
+            throw new AppException(HttpStatus.FORBIDDEN, "Xe nÃ y khÃ´ng thuá»™c vá» báº¡n");
         }
 
         // Load slot (BE2)
         ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y slot"));
 
-        // [BR-02] Loại xe phải match zone — so sánh slotSize
+        // [BR-02] Loáº¡i xe pháº£i match zone â€” so sÃ¡nh slotSize
         ParkingSlot.SlotSize vehicleSlotSize = vehicle.getVehicleType().getSlotSize() != null
                 ? ParkingSlot.SlotSize.valueOf(vehicle.getVehicleType().getSlotSize().name())
                 : null;
         if (vehicleSlotSize == null || vehicleSlotSize != slot.getSlotSize()) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Kích cỡ xe (" + vehicle.getVehicleType().getSlotSize()
-                            + ") không phù hợp với slot " + slot.getSlotCode()
+                    "KÃ­ch cá»¡ xe (" + vehicle.getVehicleType().getSlotSize()
+                            + ") khÃ´ng phÃ¹ há»£p vá»›i slot " + slot.getSlotCode()
                             + " (" + slot.getSlotSize() + ")");
         }
 
-        // Slot phải đang được kích hoạt trước khi kiểm tra trạng thái khai thác.
+        // Slot pháº£i Ä‘ang Ä‘Æ°á»£c kÃ­ch hoáº¡t trÆ°á»›c khi kiá»ƒm tra tráº¡ng thÃ¡i khai thÃ¡c.
         if (!Boolean.TRUE.equals(slot.getIsActive())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Slot " + slot.getSlotCode() + " đang bị vô hiệu hóa, không thể đặt");
+                    "Slot " + slot.getSlotCode() + " Ä‘ang bá»‹ vÃ´ hiá»‡u hÃ³a, khÃ´ng thá»ƒ Ä‘áº·t");
         }
 
-        // [BR-11] Slot không được MAINTENANCE
+        // [BR-11] Slot khÃ´ng Ä‘Æ°á»£c MAINTENANCE
         if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Slot đang bảo trì, không thể đặt");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot Ä‘ang báº£o trÃ¬, khÃ´ng thá»ƒ Ä‘áº·t");
         }
         if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Slot " + slot.getSlotCode() + " không khả dụng (trạng thái: " + slot.getStatus() + ")");
+                    "Slot " + slot.getSlotCode() + " khÃ´ng kháº£ dá»¥ng (tráº¡ng thÃ¡i: " + slot.getStatus() + ")");
         }
 
-        // [BR-06] 1 xe chỉ có 1 booking active
+        // [BR-06] 1 xe chá»‰ cÃ³ 1 booking active
         bookingRepository.findByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(
@@ -91,20 +93,20 @@ public class BookingServiceImpl implements BookingService {
                 )
         ).ifPresent(b -> {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Xe này đang có booking active (#" + b.getId() + ")");
+                    "Xe nÃ y Ä‘ang cÃ³ booking active (#" + b.getId() + ")");
         });
 
-        // [BR-06b] Xe đang có session chưa hoàn tất (walk-in hoặc booking) → không cho đặt thêm
+        // [BR-06b] Xe Ä‘ang cÃ³ session chÆ°a hoÃ n táº¥t (walk-in hoáº·c booking) â†’ khÃ´ng cho Ä‘áº·t thÃªm
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT)
         );
         if (hasOpenSession) {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Xe đang có phiên đỗ xe chưa hoàn tất, không thể đặt booking mới");
+                    "Xe Ä‘ang cÃ³ phiÃªn Ä‘á»— xe chÆ°a hoÃ n táº¥t, khÃ´ng thá»ƒ Ä‘áº·t booking má»›i");
         }
 
-        // Kiểm tra slot đã có booking active chưa
+        // Kiá»ƒm tra slot Ä‘Ã£ cÃ³ booking active chÆ°a
         bookingRepository.findBySlot_IdAndStatusIn(
                 slot.getId(),
                 List.of(
@@ -114,7 +116,7 @@ public class BookingServiceImpl implements BookingService {
                 )
         ).ifPresent(b -> {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Slot " + slot.getSlotCode() + " đã có booking active (#" + b.getId() + ")");
+                    "Slot " + slot.getSlotCode() + " Ä‘Ã£ cÃ³ booking active (#" + b.getId() + ")");
         });
 
         LocalDateTime startTime = request.getBookingStartTime();
@@ -122,11 +124,13 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Thieu bookingStartTime");
         }
 
-        // Đặt trước ít nhất 10 phút
+        long minAdvanceMinutes = systemConfigService.getLongValue("BOOKING_MIN_ADVANCE_MINUTES", 10);
+        long qrExpireBufferMinutes = systemConfigService.getLongValue("QR_EXPIRE_BUFFER_MINUTES", 15);
+
         long minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime);
-        if (minutesUntilStart < 10) {
+        if (minutesUntilStart < minAdvanceMinutes) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Phải đặt trước ít nhất 10 phút.");
+                    "Pháº£i Ä‘áº·t trÆ°á»›c Ã­t nháº¥t " + minAdvanceMinutes + " phÃºt.");
         }
 
         LocalDateTime endTime = request.getBookingEndTime() != null
@@ -137,14 +141,14 @@ public class BookingServiceImpl implements BookingService {
                     "bookingEndTime phai sau bookingStartTime");
         }
 
-        // expired_at = MIN(now+15p, start-5p)
-        LocalDateTime expiredAt = now.plusMinutes(15).isBefore(startTime.minusMinutes(5))
-                ? now.plusMinutes(15) : startTime.minusMinutes(5);
+        // expired_at = MIN(now+QR_EXPIRE_BUFFER_MINUTES, start-5p)
+        LocalDateTime expiredAt = now.plusMinutes(qrExpireBufferMinutes).isBefore(startTime.minusMinutes(5))
+                ? now.plusMinutes(qrExpireBufferMinutes) : startTime.minusMinutes(5);
         if (expiredAt.isBefore(now)) {
-            expiredAt = now.plusMinutes(15);
+            expiredAt = now.plusMinutes(qrExpireBufferMinutes);
         }
 
-        // Tính deposit (tiền đặt chỗ — mất nếu không đến)
+        // TÃ­nh deposit (tiá»n Ä‘áº·t chá»— â€” máº¥t náº¿u khÃ´ng Ä‘áº¿n)
         BigDecimal deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
 
         Booking booking = Booking.builder()
@@ -160,7 +164,7 @@ public class BookingServiceImpl implements BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
-        log.info("Booking #{} tạo bởi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
+        log.info("Booking #{} táº¡o bá»Ÿi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
 
         notificationService.notify(currentUserId,
                 "Dat cho thanh cong",
@@ -182,7 +186,7 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Booking #" + bookingId + " không ở trạng thái chờ thanh toán (hiện: " + booking.getStatus() + ")");
+                    "Booking #" + bookingId + " khÃ´ng á»Ÿ tráº¡ng thÃ¡i chá» thanh toÃ¡n (hiá»‡n: " + booking.getStatus() + ")");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -190,7 +194,7 @@ public class BookingServiceImpl implements BookingService {
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
         if (!qrExpiry.isAfter(now)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã quá hạn vào bãi");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking Ä‘Ã£ quÃ¡ háº¡n vÃ o bÃ£i");
         }
 
         String qr = qrTokenUtil.generateBookingQrToken(
@@ -238,25 +242,25 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public BookingResponse verifyQrToken(String qrToken, Long currentUserId, boolean staffScoped) {
         if (qrToken == null || qrToken.isBlank()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu QR token");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiáº¿u QR token");
         }
 
         Long bookingId;
         try {
             bookingId = qrTokenUtil.parseQrToken(qrToken).get("booking_id", Long.class);
         } catch (Exception ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "QR không hợp lệ hoặc đã hết hạn");
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR khÃ´ng há»£p lá»‡ hoáº·c Ä‘Ã£ háº¿t háº¡n");
         }
 
         Booking booking = getBookingEntity(bookingId);
         enforceStaffBuildingScope(booking, currentUserId, staffScoped);
         if (booking.getQrUsedAt() != null) {
-            throw new AppException(HttpStatus.CONFLICT, "QR đã được dùng rồi");
+            throw new AppException(HttpStatus.CONFLICT, "QR Ä‘Ã£ Ä‘Æ°á»£c dÃ¹ng rá»“i");
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking khÃ´ng cÃ²n hiá»‡u lá»±c");
         }
-        // Token verify phải đúng token hiện tại trong DB để QR cũ bị revoke sau regenerate.
+        // Token verify pháº£i Ä‘Ãºng token hiá»‡n táº¡i trong DB Ä‘á»ƒ QR cÅ© bá»‹ revoke sau regenerate.
         if (booking.getQrToken() == null || !booking.getQrToken().equals(qrToken)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "QR da bi thay the boi token moi. Dung QR moi nhat.");
@@ -278,26 +282,30 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse cancelBooking(Long bookingId, Long currentUserId) {
         Booking booking = getBookingEntity(bookingId);
         if (!booking.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền hủy booking này");
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen huy booking nay");
         }
         if (!List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
                 .contains(booking.getStatus())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chỉ hủy được PENDING_PAYMENT hoặc CONFIRMED");
+                    "Chi huy duoc PENDING_PAYMENT hoac CONFIRMED");
         }
-        // Giải phóng slot nếu đã CONFIRMED
+
+        boolean shouldRefundDeposit = false;
         if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
-            LocalDateTime depositPaidAt = booking.getDepositPaidAt();
-            if (depositPaidAt == null || depositPaidAt.plusMinutes(CONFIRMED_CANCEL_WINDOW_MINUTES).isBefore(LocalDateTime.now())) {
-                throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Booking da qua 10 phut sau khi thanh toan coc. Khong the huy tay; neu khach khong den he thong se xu ly no-show theo bookingStartTime + 30 phut.");
-            }
+            long cancelWindowMinutes = systemConfigService.getLongValue("BOOKING_CANCEL_WINDOW_MINUTES", 10);
+            shouldRefundDeposit = isWithinCancelRefundWindow(booking.getDepositPaidAt(), cancelWindowMinutes);
+
             ParkingSlot slot = booking.getSlot();
             slot.setStatus(ParkingSlot.Status.AVAILABLE);
             parkingSlotRepository.save(slot);
         }
+
         booking.setStatus(Booking.BookingStatus.CANCELLED);
-        return toResponse(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        if (shouldRefundDeposit) {
+            markDepositRefunded(savedBooking);
+        }
+        return toResponse(savedBooking);
     }
 
     @Override
@@ -305,14 +313,14 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse regenerateQr(Long bookingId, Long currentUserId) {
         Booking booking = getBookingEntity(bookingId);
         if (!booking.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền tạo lại QR cho booking này");
+            throw new AppException(HttpStatus.FORBIDDEN, "KhÃ´ng cÃ³ quyá»n táº¡o láº¡i QR cho booking nÃ y");
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chỉ tạo lại QR cho booking CONFIRMED (hiện: " + booking.getStatus() + ")");
+                    "Chá»‰ táº¡o láº¡i QR cho booking CONFIRMED (hiá»‡n: " + booking.getStatus() + ")");
         }
         if (booking.getQrUsedAt() != null) {
-            throw new AppException(HttpStatus.CONFLICT, "QR đã được sử dụng, không thể tạo lại");
+            throw new AppException(HttpStatus.CONFLICT, "QR Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng, khÃ´ng thá»ƒ táº¡o láº¡i");
         }
 
         LocalDateTime qrExpiry = booking.getExpiredAt();
@@ -354,17 +362,18 @@ public class BookingServiceImpl implements BookingService {
                 .map(this::toResponse).toList();
     }
 
-    // ── Helper ────────────────────────────────────────────────────────────────
+    // â”€â”€ Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private Booking getBookingEntity(Long id) {
         return bookingRepository.findById(id)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking #" + id));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y booking #" + id));
     }
 
     private LocalDateTime confirmedBookingQrExpiry(Booking booking) {
         if (booking.getBookingStartTime() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking thieu bookingStartTime");
         }
-        return booking.getBookingStartTime().plusMinutes(30).withNano(0);
+        long expireAfterStart = systemConfigService.getLongValue("BOOKING_EXPIRE_AFTER_START", 30);
+        return booking.getBookingStartTime().plusMinutes(expireAfterStart).withNano(0);
     }
 
     private void expireStaleOpenBookings(LocalDateTime now) {
@@ -375,7 +384,8 @@ public class BookingServiceImpl implements BookingService {
             bookingRepository.saveAll(stalePending);
         }
 
-        List<Booking> staleConfirmed = bookingRepository.findConfirmedNoShow(now.minusMinutes(30));
+        long expireAfterStart = systemConfigService.getLongValue("BOOKING_EXPIRE_AFTER_START", 30);
+        List<Booking> staleConfirmed = bookingRepository.findConfirmedNoShow(now.minusMinutes(expireAfterStart));
         if (!staleConfirmed.isEmpty()) {
             staleConfirmed.forEach(b -> {
                 b.setStatus(Booking.BookingStatus.EXPIRED);
@@ -390,7 +400,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BigDecimal calculateDeposit(String vehicleTypeName, long minutesUntilStart) {
-        // BR-03d: chỉ CAR và ELECTRIC_CAR mới tính cọc, MOTORBIKE không tính
+        // BR-03d: chá»‰ CAR vÃ  ELECTRIC_CAR má»›i tÃ­nh cá»c, MOTORBIKE khÃ´ng tÃ­nh
         if (!vehicleTypeName.equalsIgnoreCase("CAR")
                 && !vehicleTypeName.equalsIgnoreCase("ELECTRIC_CAR")) {
             return BigDecimal.ZERO;
@@ -400,6 +410,25 @@ public class BookingServiceImpl implements BookingService {
         if (minutesUntilStart < 240) return new BigDecimal("15000");
         if (minutesUntilStart < 360) return new BigDecimal("20000");
         return new BigDecimal("30000");
+    }
+
+    private boolean isWithinCancelRefundWindow(LocalDateTime depositPaidAt, long cancelWindowMinutes) {
+        if (depositPaidAt == null) {
+            return false;
+        }
+        return !depositPaidAt.plusMinutes(cancelWindowMinutes).isBefore(LocalDateTime.now());
+    }
+
+    private void markDepositRefunded(Booking booking) {
+        paymentRepository.findByBookingIdAndPaymentType(booking.getId().intValue(), Payment.PaymentType.DEPOSIT)
+                .filter(payment -> payment.getPaymentStatus() == Payment.PaymentStatus.PAID)
+                .ifPresent(payment -> {
+                    payment.setPaymentStatus(Payment.PaymentStatus.REFUNDED);
+                    if (payment.getTransactionRef() == null || payment.getTransactionRef().isBlank()) {
+                        payment.setTransactionRef("BOOKING-CANCEL-REFUND-" + booking.getId() + "-" + System.currentTimeMillis());
+                    }
+                    paymentRepository.save(payment);
+                });
     }
 
     private void enforceStaffBuildingScope(Booking booking, Long currentUserId, boolean staffScoped) {
@@ -463,3 +492,4 @@ public class BookingServiceImpl implements BookingService {
                 .build();
     }
 }
+
