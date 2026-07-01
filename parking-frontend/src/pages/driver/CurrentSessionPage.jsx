@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
-import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
 import { clearPaymentSync, getPaymentSync } from "../../utils/paymentSync";
 import {
@@ -69,41 +68,19 @@ const BADGE_MAP = {
   SYNCING: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "Đang đồng bộ" },
 };
 
-function WaitingPaymentAction({ sessionId, onError }) {
+function WaitingPaymentAction() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  async function handleVnpay() {
-    setLoading(true);
-    onError("");
-    try {
-      const res = await paymentApi.createVnpayParkingFeeUrl(sessionId);
-      const data = unwrapApiData(res.data, null);
-      if (data?.autoConfirmed) {
-        navigate("/driver/current-session");
-      } else if (data?.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      }
-    } catch (e) {
-      onError(e.response?.data?.message || "Không tạo được URL thanh toán VNPay.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <>
       <p className="text-sm font-semibold text-foreground">Chờ thanh toán phí đỗ xe</p>
       <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
-        Xe đã ra khỏi bãi. Thanh toán để hoàn tất phiên.
+        Staff da ghi nhan xe ra cong. Vui long thanh toan truc tiep voi nhan vien o cong ra de hoan tat phien.
       </p>
       <div className="mt-3 flex flex-col gap-2 w-full max-w-xs">
-        <button type="button" onClick={handleVnpay} disabled={loading}
-          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition-colors">
-          {loading
-            ? <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Đang tạo...</span>
-            : "Thanh toán qua VNPay"}
-        </button>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          Staff se thu tien mat hoac dua ma QR VNPay tai quay thanh toan. Driver khong tu tao payment o buoc nay.
+        </div>
         <button type="button" onClick={() => navigate("/driver/payments")}
           className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
           Xem lịch sử thanh toán
@@ -112,6 +89,7 @@ function WaitingPaymentAction({ sessionId, onError }) {
     </>
   );
 }
+
 
 function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigate, generatingId }) {
   const { displayMode } = item;
@@ -191,7 +169,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
         </button>
 
         {displayMode === "WAITING_PAYMENT" ? (
-          <WaitingPaymentAction sessionId={item.sessionId} onError={onError} />
+          <WaitingPaymentAction />
         ) : displayMode === "WAITING_PAYMENT_PENDING_SESSION" ? (
           <>
             <p className="text-sm font-semibold text-foreground">Chờ thanh toán phí đỗ xe</p>

@@ -20,6 +20,9 @@ public class ExceptionCase extends BaseEntity {
     @Column(name = "request_id")
     private Integer requestId;
 
+    @Column(name = "booking_id")
+    private Integer bookingId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "exception_type", nullable = false, length = 30)
     private ExceptionType exceptionType;

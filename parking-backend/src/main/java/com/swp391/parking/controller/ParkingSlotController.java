@@ -25,6 +25,12 @@ public class ParkingSlotController {
     private final ParkingSlotService slotService;
     private final UserRepository userRepository;
 
+    @GetMapping("/all")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getAll()));
+    }
+
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> searchAvailable(
             @RequestParam Long buildingId,

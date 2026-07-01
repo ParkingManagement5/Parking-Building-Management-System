@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Edit2, Plus, SquareParking, Trash2, X } from "lucide-react";
+import { Edit2, Plus, Search, SquareParking, Trash2, X } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
@@ -53,6 +53,8 @@ export default function ParkingSlotPage() {
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
   const [activeFloorId, setActiveFloorId] = useState("");
   const [filter, setFilter] = useState("all");
+  const [filterSlotSearch, setFilterSlotSearch] = useState("");
+  const [filterZoneId, setFilterZoneId] = useState("");
   const [slotPage, setSlotPage] = useState(1);
   const slotListRef = useRef(null);
   const handleSlotPage = (p) => { setSlotPage(typeof p === "function" ? p : () => p); slotListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
@@ -72,27 +74,18 @@ export default function ParkingSlotPage() {
 
   async function loadInitialData() {
     try {
-      const buildingRes = await buildingApi.getAll();
+      const [buildingRes, floorRes, zoneRes, slotRes] = await Promise.all([
+        buildingApi.getAll(),
+        floorApi.getAll(),
+        zoneApi.getAll(),
+        parkingSlotApi.getAll(),
+      ]);
+
       const buildingList = unwrapApiData(buildingRes.data, []);
       setBuildings(buildingList);
-
-      const floorResponses = await Promise.all(
-        buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
-      );
-      const floorList = floorResponses.flatMap((res) => unwrapApiData(res.data, []));
-      setFloors(floorList);
-
-      const zoneResponses = await Promise.all(
-        floorList.map((floor) => zoneApi.getByFloor(floor.floorId ?? floor.id))
-      );
-      const zoneList = zoneResponses.flatMap((res) => unwrapApiData(res.data, []));
-      setZones(zoneList);
-
-      const slotResponses = await Promise.all(
-        zoneList.map((zone) => parkingSlotApi.getByZone(zone.zoneId ?? zone.id))
-      );
-      const slotList = slotResponses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeSlot));
-      setSlots(slotList);
+      setFloors(unwrapApiData(floorRes.data, []));
+      setZones(unwrapApiData(zoneRes.data, []));
+      setSlots(unwrapApiData(slotRes.data, []).map(normalizeSlot));
 
       const firstBuilding = buildingList[0]?.buildingId
         ? String(buildingList[0].buildingId)
@@ -140,12 +133,15 @@ export default function ParkingSlotPage() {
   );
 
   const floorSlots = useMemo(() => {
-    const current = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
-    if (filter === "all") {
-      return current;
-    }
-    return current.filter((slot) => slot.status.toLowerCase() === filter);
-  }, [slots, resolvedActiveFloorId, filter]);
+    const q = filterSlotSearch.toLowerCase();
+    return slots.filter((slot) => {
+      if (String(slot.floorId) !== String(resolvedActiveFloorId)) return false;
+      if (filter !== "all" && slot.status.toLowerCase() !== filter) return false;
+      if (q && !slot.slotCode.toLowerCase().includes(q)) return false;
+      if (filterZoneId && String(slot.zoneId) !== String(filterZoneId)) return false;
+      return true;
+    });
+  }, [slots, resolvedActiveFloorId, filter, filterSlotSearch, filterZoneId]);
 
   const zoneGroups = useMemo(() => {
     const currentSlots = slots.filter((slot) => String(slot.floorId) === String(resolvedActiveFloorId));
@@ -442,6 +438,36 @@ export default function ParkingSlotPage() {
               {selectedBuilding?.name || "Current building"} - {floorZones.length} zones on this floor
             </p>
           </div>
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={filterSlotSearch}
+              onChange={(e) => { setFilterSlotSearch(e.target.value); setSlotPage(1); }}
+              placeholder="Tìm mã slot..."
+              className="w-full rounded-xl border border-border bg-muted py-2 pl-8 pr-3 text-xs outline-none focus:border-primary"
+            />
+          </div>
+          <select
+            value={filterZoneId}
+            onChange={(e) => { setFilterZoneId(e.target.value); setSlotPage(1); }}
+            className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+          >
+            <option value="">Tất cả zone</option>
+            {floorZones.map((z) => (
+              <option key={z.zoneId ?? z.id} value={z.zoneId ?? z.id}>{z.name || z.zoneName}</option>
+            ))}
+          </select>
+          {(filterSlotSearch || filterZoneId) && (
+            <button
+              onClick={() => { setFilterSlotSearch(""); setFilterZoneId(""); setSlotPage(1); }}
+              className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={12} /> Xóa
+            </button>
+          )}
+          <span className="ml-auto text-xs text-muted-foreground">{floorSlots.length} slot</span>
         </div>
         <div className="space-y-2" ref={slotListRef} style={{ minHeight: "calc(100vh - 300px)" }}>
           {pagedFloorSlots.map((slot) => (

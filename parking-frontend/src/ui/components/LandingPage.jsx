@@ -6,7 +6,85 @@ import { zoneApi } from "../../api/manager/zoneApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { unwrapApiData } from "../../utils/api";
 import { usePublicTheme } from "../../utils/publicTheme";
+import "leaflet/dist/leaflet.css";
 import "../../assets/css/landing.css";
+
+function getBuildingId(building) {
+  return building?.buildingId ?? building?.id;
+}
+
+function normalizeBuilding(building) {
+  return {
+    ...building,
+    id: getBuildingId(building),
+    latitude: Number(building.latitude),
+    longitude: Number(building.longitude),
+  };
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const earthRadiusKm = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function spreadNearbyBuildings(buildings) {
+  const thresholdKm = 0.09;
+  const groups = [];
+
+  buildings.forEach((building) => {
+    const matchedGroup = groups.find((group) =>
+      haversineKm(group.anchor.latitude, group.anchor.longitude, building.latitude, building.longitude) <= thresholdKm
+    );
+
+    if (matchedGroup) {
+      matchedGroup.items.push(building);
+    } else {
+      groups.push({ anchor: building, items: [building] });
+    }
+  });
+
+  return groups.flatMap((group) => {
+    if (group.items.length === 1) {
+      return group.items.map((building) => ({
+        ...building,
+        markerLat: building.latitude,
+        markerLon: building.longitude,
+        nearbyCount: 1,
+      }));
+    }
+
+    const radius = 0.00026;
+    return group.items.map((building, index) => {
+      const angle = (Math.PI * 2 * index) / group.items.length;
+      return {
+        ...building,
+        markerLat: building.latitude + Math.sin(angle) * radius,
+        markerLon: building.longitude + Math.cos(angle) * radius,
+        nearbyCount: group.items.length,
+      };
+    });
+  });
+}
+
+function getFloorId(floor) {
+  return floor?.floorId ?? floor?.id;
+}
+
+function getZoneId(zone) {
+  return zone?.zoneId ?? zone?.id;
+}
+
+function getSettledData(result, fallback = []) {
+  if (result?.status !== "fulfilled") return fallback;
+  return unwrapApiData(result.value?.data, fallback);
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -14,39 +92,167 @@ export default function LandingPage() {
   const navRef = useRef(null);
   const navLinksRef = useRef(null);
   const mobileBtnRef = useRef(null);
+  const heroMapRef = useRef(null);
+  const heroLeafletRef = useRef(null);
+  const heroMarkersRef = useRef([]);
 
-  const [liveStats, setLiveStats] = useState({ available: 0, occupied: 0, total: 0 });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [liveStats, setLiveStats] = useState({ buildingCount: 0, available: 0, occupied: 0, total: 0 });
   const [statsError, setStatsError] = useState("");
+  const [heroBuildings, setHeroBuildings] = useState([]);
+  const [heroMapReady, setHeroMapReady] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const bRes = await buildingApi.getAll();
         const buildings = unwrapApiData(bRes.data, []);
-        if (!buildings.length) return;
-        const bid = buildings[0].buildingId || buildings[0].id;
-        const fRes = await floorApi.getByBuilding(bid);
-        const floors = unwrapApiData(fRes.data, []);
-        let allSlots = [];
-        for (const f of floors) {
-          const zRes = await zoneApi.getByFloor(f.floorId || f.id);
-          const zones = unwrapApiData(zRes.data, []);
-          for (const z of zones) {
-            const sRes = await parkingSlotApi.getByZone(z.zoneId || z.id);
-            allSlots = allSlots.concat(unwrapApiData(sRes.data, []));
-          }
+        setHeroBuildings(
+          spreadNearbyBuildings(
+            buildings
+              .filter((building) => building.latitude != null && building.longitude != null)
+              .map(normalizeBuilding)
+          )
+        );
+        const buildingIds = buildings.map(getBuildingId).filter(Boolean);
+
+        if (!buildingIds.length) {
+          setLiveStats({ buildingCount: 0, available: 0, occupied: 0, total: 0 });
+          setStatsError("");
+          return;
         }
+
+        const floorResults = await Promise.allSettled(
+          buildingIds.map((buildingId) => floorApi.getByBuilding(buildingId))
+        );
+        const floors = floorResults.flatMap((result) => getSettledData(result, []));
+
+        const zoneResults = await Promise.allSettled(
+          floors.map((floor) => {
+            const floorId = getFloorId(floor);
+            if (!floorId) return Promise.resolve({ data: { data: [] } });
+            return zoneApi.getByFloor(floorId);
+          })
+        );
+        const zones = zoneResults.flatMap((result) => getSettledData(result, []));
+
+        const slotResults = await Promise.allSettled(
+          zones.map((zone) => {
+            const zoneId = getZoneId(zone);
+            if (!zoneId) return Promise.resolve({ data: { data: [] } });
+            return parkingSlotApi.getByZone(zoneId);
+          })
+        );
+        const allSlots = slotResults.flatMap((result) => getSettledData(result, []));
+        const hasPartialFailure =
+          floorResults.some((result) => result.status === "rejected") ||
+          zoneResults.some((result) => result.status === "rejected") ||
+          slotResults.some((result) => result.status === "rejected");
+
         setLiveStats({
+          buildingCount: buildingIds.length,
           total: allSlots.length,
           available: allSlots.filter((s) => s.status === "AVAILABLE").length,
           occupied: allSlots.filter((s) => s.status === "OCCUPIED").length,
         });
-        setStatsError("");
+        setStatsError(hasPartialFailure ? "Mot vai khu vuc chua tai du lieu day du, thong ke dang hien theo phan du lieu lay duoc." : "");
       } catch (err) {
         setStatsError(err.response?.data?.message || "Khong tai duoc thong ke bai do song.");
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    import("leaflet").then((leafletModule) => {
+      const leaflet = leafletModule.default || leafletModule;
+
+      if (!heroMapRef.current || heroLeafletRef.current) return;
+
+      const map = leaflet.map(heroMapRef.current, {
+        center: [10.7769, 106.7009],
+        zoom: 11,
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        touchZoom: false,
+      });
+
+      leaflet
+        .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+        })
+        .addTo(map);
+
+      heroLeafletRef.current = { map, leaflet };
+      setHeroMapReady(true);
+      window.setTimeout(() => map.invalidateSize(), 0);
+    });
+
+    return () => {
+      heroMarkersRef.current.forEach((marker) => marker.remove());
+      heroMarkersRef.current = [];
+      setHeroMapReady(false);
+      if (heroLeafletRef.current?.map) {
+        heroLeafletRef.current.map.remove();
+        heroLeafletRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!heroMapReady || !heroLeafletRef.current) return;
+
+    const { map, leaflet } = heroLeafletRef.current;
+    heroMarkersRef.current.forEach((marker) => marker.remove());
+    heroMarkersRef.current = [];
+
+    if (!heroBuildings.length) {
+      map.setView([10.7769, 106.7009], 11);
+      return;
+    }
+
+    const bounds = [];
+
+    heroBuildings.forEach((building) => {
+      const icon = leaflet.divIcon({
+        className: "landing-map-marker",
+        html: `
+          <div class="landing-map-marker__pin"></div>
+          <div class="landing-map-marker__label">
+            <span>${building.name || "Parking"}</span>
+            ${building.nearbyCount > 1 ? `<b>+${building.nearbyCount - 1}</b>` : ""}
+          </div>
+        `,
+        iconSize: [116, 52],
+        iconAnchor: [18, 44],
+      });
+
+      const marker = leaflet
+        .marker([building.markerLat, building.markerLon], { icon })
+        .addTo(map)
+        .bindTooltip(building.address || building.name || "Parking", {
+          direction: "top",
+          offset: [0, -22],
+          opacity: 0.95,
+        });
+
+      heroMarkersRef.current.push(marker);
+      bounds.push([building.latitude, building.longitude]);
+    });
+
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 13);
+    } else {
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 12 });
+    }
+    window.setTimeout(() => map.invalidateSize(), 0);
+  }, [heroBuildings, heroMapReady]);
 
   // Scroll reveal, nav scroll state, counter animations, tilt, spotlight, parallax
   useEffect(() => {
@@ -200,7 +406,7 @@ export default function LandingPage() {
     let scrollObserverForParallax = null;
     let onScroll = null;
     if (!reducedMotion) {
-      const parallaxImgs = document.querySelectorAll(".hero-img-wrapper, .showcase-inner");
+      const parallaxImgs = document.querySelectorAll(".showcase-inner");
       parallaxObserver = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
@@ -244,17 +450,6 @@ export default function LandingPage() {
       if (firstParallax) scrollObserverForParallax.observe(firstParallax);
     }
 
-    // ===== Mobile nav toggle =====
-    const mobileBtn = mobileBtnRef.current;
-    const navLinksEl = navLinksRef.current;
-    const handleMobileToggle = () => {
-      if (navLinksEl) navLinksEl.classList.toggle("show");
-      if (mobileBtn) mobileBtn.classList.toggle("active");
-    };
-    if (mobileBtn) {
-      mobileBtn.addEventListener("click", handleMobileToggle);
-    }
-
     // ===== Cleanup =====
     return () => {
       revealObserver.disconnect();
@@ -276,13 +471,13 @@ export default function LandingPage() {
       if (scrollObserverForParallax) scrollObserverForParallax.disconnect();
       if (onScroll) document.removeEventListener("scroll", onScroll);
 
-      if (mobileBtn) mobileBtn.removeEventListener("click", handleMobileToggle);
     };
   }, []);
 
   const handleLogin = useCallback(() => navigate("/login"), [navigate]);
   const handleRegister = useCallback(() => navigate("/register"), [navigate]);
   const handleDashboard = useCallback(() => navigate("/login"), [navigate]);
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   return (
     <div className={`ps-landing ${themeClass}`}>
@@ -294,9 +489,7 @@ export default function LandingPage() {
             <span className="nav-logo-text">ParkSmart</span>
           </a>
           <div className="nav-links" id="navLinks" ref={navLinksRef}>
-            <a href="#features">Tính năng</a>
-            <a href="#how-it-works">Cách hoạt động</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Bãi đỗ xe</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
           </div>
           <div className="nav-actions">
             <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
@@ -314,14 +507,53 @@ export default function LandingPage() {
             </button>
           </div>
           <button
-            className="nav-mobile-btn"
+            className={`nav-mobile-btn ${mobileMenuOpen ? "active" : ""}`}
             id="navMobileBtn"
             ref={mobileBtnRef}
             aria-label="Menu"
+            aria-expanded={mobileMenuOpen}
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
           >
             <span></span>
             <span></span>
+            <span></span>
           </button>
+        </div>
+        <div className={`nav-mobile-panel ${mobileMenuOpen ? "show" : ""}`}>
+          <div className="container nav-mobile-panel-inner">
+            <a
+              href="#"
+              className="nav-mobile-link"
+              onClick={(e) => {
+                e.preventDefault();
+                closeMobileMenu();
+                navigate("/public-slots");
+              }}
+            >
+              Bản đồ slot
+            </a>
+            <button
+              className="nav-mobile-action nav-mobile-action-secondary"
+              type="button"
+              onClick={() => {
+                closeMobileMenu();
+                handleLogin();
+              }}
+            >
+              Đăng nhập
+            </button>
+            <button
+              className="nav-mobile-action nav-mobile-action-primary"
+              type="button"
+              onClick={() => {
+                closeMobileMenu();
+                handleRegister();
+              }}
+            >
+              Đăng ký
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -368,19 +600,25 @@ export default function LandingPage() {
             </div>
             <div className="hero-metrics reveal-up delay-3">
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.total || 72}>0</span>
+                <span className="hero-metric-num" data-count={liveStats.buildingCount ?? 0}>
+                  {liveStats.buildingCount ?? 0}
+                </span>
                 <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Tổng slot</span>
+                <span className="hero-metric-label">Bãi đỗ</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.available || 72}>0</span>
+                <span className="hero-metric-num" data-count={liveStats.available ?? 0}>
+                  {liveStats.available ?? 0}
+                </span>
                 <span className="hero-metric-suffix"></span>
                 <span className="hero-metric-label">Slot trống</span>
               </div>
               <div className="hero-metric-divider"></div>
               <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.occupied || 0}>0</span>
+                <span className="hero-metric-num" data-count={liveStats.occupied ?? 0}>
+                  {liveStats.occupied ?? 0}
+                </span>
                 <span className="hero-metric-suffix"></span>
                 <span className="hero-metric-label">Xe đang đỗ</span>
               </div>
@@ -388,72 +626,50 @@ export default function LandingPage() {
             {statsError ? <p className="mt-3 text-xs text-amber-200">{statsError}</p> : null}
           </div>
           <div className="hero-visual reveal-up delay-2">
-            <div className="hero-img-wrapper">
-              <img
-                src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?w=640&q=80&auto=format"
-                alt="Hệ thống bãi đỗ xe thông minh"
-                className="hero-img"
-                loading="eager"
-              />
-              <div className="hero-img-overlay"></div>
+            <div className="hero-img-wrapper hero-map-wrapper">
+              <div ref={heroMapRef} className="hero-map-canvas" />
+              <div className="hero-map-overlay"></div>
             </div>
-            <div className="hero-float-pill pill-1 reveal-up delay-3">
-              <span className="pill-icon green">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-              </span>
-              <div>
-                <span className="pill-num">{liveStats.available || 0}</span>
-                <span className="pill-label">chỗ trống</span>
+            <div className="hero-pills-row">
+              <div className="hero-float-pill hero-pill-static reveal-up delay-3">
+                <span className="pill-icon green">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                </span>
+                <div>
+                  <span className="pill-num">{liveStats.available || 0}</span>
+                  <span className="pill-label">chỗ trống</span>
+                </div>
               </div>
-            </div>
-            <div className="hero-float-pill pill-2 reveal-up delay-4">
-              <span className="pill-icon orange">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <line x1="12" y1="1" x2="12" y2="23" />
-                  <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                </svg>
-              </span>
-              <div>
-                <span className="pill-num">{liveStats.total ? Math.round((liveStats.occupied / liveStats.total) * 100) : 0}%</span>
-                <span className="pill-label">tỷ lệ lấp đầy</span>
-              </div>
-            </div>
-            <div className="hero-float-pill pill-3 reveal-up delay-4">
-              <span className="pill-icon blue">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <rect x="1" y="3" width="15" height="13" rx="2" />
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                  <circle cx="5.5" cy="18.5" r="2.5" />
-                  <circle cx="18.5" cy="18.5" r="2.5" />
-                </svg>
-              </span>
-              <div>
-                <span className="pill-num">{liveStats.occupied || 0}</span>
-                <span className="pill-label">xe đang đỗ</span>
+              <div className="hero-float-pill hero-pill-static reveal-up delay-4">
+                <span className="pill-icon blue">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <rect x="1" y="3" width="15" height="13" rx="2" />
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                    <circle cx="5.5" cy="18.5" r="2.5" />
+                    <circle cx="18.5" cy="18.5" r="2.5" />
+                  </svg>
+                </span>
+                <div>
+                  <span className="pill-num">{liveStats.occupied || 0}</span>
+                  <span className="pill-label">xe đang đỗ</span>
+                </div>
               </div>
             </div>
           </div>
@@ -713,9 +929,7 @@ export default function LandingPage() {
           </div>
           <div className="footer-col">
             <h4>Sản phẩm</h4>
-            <a href="#features">Tính năng</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/parking-info"); }}>Thông tin bãi đỗ</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Slot trống</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
           </div>
           <div className="footer-col">
             <h4>Tài khoản</h4>

@@ -149,9 +149,9 @@ CREATE TABLE `booking` (
     `qr_token` varchar(500) UNIQUE,
     `qr_issued_at` datetime,
     `qr_used_at` datetime,
-    `deposit_amount` decimal(10,2) DEFAULT 0,
-    `deposit_paid_at` datetime,
-    `status` varchar(30) NOT NULL,
+    `deposit_amount` decimal(10,2) DEFAULT 0, -- so tien coc giu cho
+    `deposit_paid_at` datetime,               -- moc bat dau tinh cua so hoan coc khi driver huy booking
+    `status` varchar(30) NOT NULL,            -- PENDING_PAYMENT, CONFIRMED, CHECKED_IN, WAITING_PAYMENT, EXPIRED, CANCELLED, COMPLETED
     `created_at` datetime,
     `updated_at` datetime
 );
@@ -177,7 +177,7 @@ CREATE TABLE `payment` (
     `session_id` int,
     `booking_id` int,
     `policy_id` int,
-    `payment_type` varchar(20) NOT NULL,
+    `payment_type` varchar(20) NOT NULL,      -- DEPOSIT, PARKING_FEE
     `applied_rate` decimal(10,2),
     `base_fee` decimal(12,2),
     `overtime_fee` decimal(12,2),
@@ -187,11 +187,18 @@ CREATE TABLE `payment` (
     `total_amount` decimal(12,2) NOT NULL,
     `transaction_ref` varchar(100) UNIQUE,
     `payment_method` varchar(20) NOT NULL,
-    `payment_status` varchar(20) NOT NULL,
+    `payment_status` varchar(20) NOT NULL,    -- PENDING, PAID, FAILED, REFUNDED
     `paid_at` datetime,
     `created_at` datetime,
     `updated_at` datetime
 );
+
+-- Booking cancel rule hien tai:
+-- 1. Driver luon duoc huy booking o trang thai PENDING_PAYMENT hoac CONFIRMED.
+-- 2. Neu booking CONFIRMED va huy trong 10 phut sau deposit_paid_at -> booking.status = CANCELLED,
+--    slot RESERVED -> AVAILABLE, payment DEPOSIT dang PAID -> REFUNDED.
+-- 3. Neu booking CONFIRMED va huy sau 10 phut -> booking.status = CANCELLED,
+--    slot RESERVED -> AVAILABLE, payment DEPOSIT giu nguyen PAID (mat coc).
 
 CREATE TABLE `pricing_policy` (
     `policy_id` int PRIMARY KEY AUTO_INCREMENT,

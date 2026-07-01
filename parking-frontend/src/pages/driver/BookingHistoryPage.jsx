@@ -37,6 +37,23 @@ function getConfirmedCancelDeadline(booking) {
   return paidAt + CONFIRMED_CANCEL_WINDOW_MS;
 }
 
+function getCancelPolicy(booking) {
+  const rawStatus = String(booking?.status || "").toUpperCase();
+  if (rawStatus !== "CONFIRMED") {
+    return { refundable: false, deadline: null };
+  }
+
+  const deadline = getConfirmedCancelDeadline(booking);
+  if (deadline == null) {
+    return { refundable: false, deadline: null };
+  }
+
+  return {
+    refundable: deadline >= Date.now(),
+    deadline,
+  };
+}
+
 export default function BookingHistoryPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -212,10 +229,10 @@ export default function BookingHistoryPage() {
               const isPendingPayment = rawStatus === "PENDING_PAYMENT";
               const isConfirmed = rawStatus === "CONFIRMED";
               const canRegenerateQr = isConfirmed && Boolean(item.qrToken) && !item.qrUsed;
-              const cancelDeadline = getConfirmedCancelDeadline(item);
-              const canCancelConfirmed = isConfirmed && cancelDeadline != null && cancelDeadline >= Date.now();
+              const cancelPolicy = getCancelPolicy(item);
+              const canCancelConfirmed = isConfirmed;
               const canCancel = isPendingPayment || canCancelConfirmed;
-              const showCancelWindowNotice = isConfirmed && !canCancelConfirmed;
+              const showCancelWindowNotice = isConfirmed;
 
               return (
                 <div key={item.bookingId || item.id || index} className="px-5 py-4 space-y-3">
@@ -285,8 +302,14 @@ export default function BookingHistoryPage() {
                   </div>
 
                   {showCancelWindowNotice && (
-                    <div className="ml-[52px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-                      Booking da qua 10 phut sau khi thanh toan coc nen khong the huy tay. Neu khach khong den, he thong se xu ly no-show sau bookingStartTime + 30 phut.
+                    <div className={`ml-[52px] rounded-xl border px-3 py-2 text-xs ${
+                      cancelPolicy.refundable
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
+                    }`}>
+                      {cancelPolicy.refundable
+                        ? "Hủy trong 10 phút sau khi thanh toán cọc sẽ được hoàn cọc."
+                        : "Booking đã quá 10 phút sau khi thanh toán cọc. Bạn vẫn có thể hủy nhưng sẽ mất cọc."}
                     </div>
                   )}
 
@@ -316,9 +339,11 @@ export default function BookingHistoryPage() {
                   {isConfirmed && item.depositPaidAt && (
                     <div className="ml-[52px] flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span>Coc luc {formatDateTime(item.depositPaidAt)}</span>
-                      {canCancelConfirmed && cancelDeadline != null && (
-                        <span className="text-emerald-600 dark:text-emerald-300">
-                          Co the huy den {formatDateTime(new Date(cancelDeadline).toISOString())}
+                      {cancelPolicy.deadline != null && (
+                        <span className={cancelPolicy.refundable ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}>
+                          {cancelPolicy.refundable
+                            ? `Hoàn cọc nếu hủy trước ${formatDateTime(new Date(cancelPolicy.deadline).toISOString())}`
+                            : `Đã qua mốc hoàn cọc từ ${formatDateTime(new Date(cancelPolicy.deadline).toISOString())}`}
                         </span>
                       )}
                     </div>

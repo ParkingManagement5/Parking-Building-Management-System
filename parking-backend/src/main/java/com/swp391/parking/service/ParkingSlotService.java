@@ -7,6 +7,7 @@ import com.swp391.parking.entity.ParkingSlot.Status;
 import java.util.List;
 
 public interface ParkingSlotService {
+    List<ParkingSlot> getAll();
     List<ParkingSlot> getByZone(Long zoneId);
     List<ParkingSlot> getByZone(Long zoneId, Long currentUserId, boolean staffScoped);
     List<ParkingSlot> getAvailableByVehicleType(Long vehicleTypeId);

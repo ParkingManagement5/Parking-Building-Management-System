@@ -1,9 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
-import MainPublicLayout from "../layouts/MainPublicLayout";
 import PublicLayout from "../layouts/PublicLayout";
 import LandingPage from "../ui/components/LandingPage";
-import ParkingInfoPage from "../pages/public/ParkingInfoPage";
 import PublicSlotListPage from "../pages/public/PublicSlotListPage";
 import LoginPage from "../ui/components/LoginPage";
 import RegisterPage from "../ui/components/RegisterPage";
@@ -54,11 +52,8 @@ export default function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
-        <Route element={<MainPublicLayout />}>
-          <Route path="/parking-info" element={<ParkingInfoPage />} />
-        </Route>
-
         <Route element={<PublicLayout />}>
+          <Route path="/parking-info" element={<Navigate to="/public-slots" replace />} />
           <Route path="/public-slots" element={<PublicSlotListPage />} />
         </Route>
 

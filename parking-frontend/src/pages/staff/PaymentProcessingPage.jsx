@@ -170,6 +170,14 @@ export default function PaymentProcessingPage() {
     return Number(policy?.pricePerHour ?? 20000);
   }
 
+  function getSessionPayableAmount(session) {
+    if (session?.calculatedFee != null) {
+      return toAmount(session.calculatedFee);
+    }
+    const rate = resolveHourlyRate(session);
+    return toAmount(computeSessionFee(session.entryTime, session.exitTime, rate));
+  }
+
   const createPayment = async (session) => {
     const method = methodMap[session.sessionId] || "CASH";
     setProcessingId(session.sessionId);
@@ -195,7 +203,7 @@ export default function PaymentProcessingPage() {
 
     // CASH flow
     const rate = resolveHourlyRate(session);
-    const amount = computeSessionFee(session.entryTime, session.exitTime, rate);
+    const amount = getSessionPayableAmount(session);
     const policy = pricingPolicies.find((p) => p.isActive && p.vehicleTypeId === session.vehicleTypeId);
     try {
       const paymentRes = await paymentApi.createParkingFee({
@@ -317,11 +325,20 @@ export default function PaymentProcessingPage() {
                       <p className="text-xs text-muted-foreground">
                         {pendingPaymentMap[item.sessionId] ? "Payable Amount" : "Payment Amount"}
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
-                        {pendingPaymentMap[item.sessionId]
-                          ? formatStaffCurrency(pendingPaymentMap[item.sessionId].amount)
-                          : "Create payment to calculate the payable amount"}
-                      </p>
+                      {(pendingPaymentMap[item.sessionId]
+                        ? pendingPaymentMap[item.sessionId].amount
+                        : getSessionPayableAmount(item)) === 0 ? (
+                        <div className="mt-1 flex items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">0 VND</p>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Miễn phí</span>
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-sm font-semibold text-foreground">
+                          {pendingPaymentMap[item.sessionId]
+                            ? formatStaffCurrency(pendingPaymentMap[item.sessionId].amount)
+                            : formatStaffCurrency(getSessionPayableAmount(item))}
+                        </p>
+                      )}
                     </div>
                     <StaffSelect
                       value={methodMap[item.sessionId] || "CASH"}
@@ -347,7 +364,9 @@ export default function PaymentProcessingPage() {
                       {processingId === item.sessionId
                         ? "Processing..."
                         : pendingPaymentMap[item.sessionId] && (methodMap[item.sessionId] || "CASH") === "CASH"
-                          ? "Xác nhận tiền mặt"
+                          ? pendingPaymentMap[item.sessionId].amount === 0
+                            ? "Hoàn tất (Miễn phí)"
+                            : "Xác nhận tiền mặt"
                           : (methodMap[item.sessionId] || "CASH") === "VNPAY"
                             ? "Tạo QR VNPay"
                             : "Tạo phiếu thu tiền mặt"}

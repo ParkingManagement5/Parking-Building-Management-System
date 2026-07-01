@@ -30,11 +30,8 @@ export default function MainPublicNavbar() {
           <button type="button" onClick={() => goToSection("pricing")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Pricing
           </button>
-          <button type="button" onClick={() => navigate("/parking-info")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Parking Info
-          </button>
           <button type="button" onClick={() => navigate("/public-slots")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Public Slots
+            Bản đồ slot
           </button>
         </div>
 
