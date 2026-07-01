@@ -516,3 +516,83 @@ INSERT INTO `system_config` (`config_key`, `config_value`, `description`, `updat
 -- staff1 → Building 1 (Bãi xe FPT HCM)
 -- Manager gán building cho staff qua: PUT /users/{id}/assign-building?buildingId=X
 -- ============================================================
+-- ============================================================
+-- DOC UPDATE - DEMO MAP / PUBLIC SLOT LAYOUT
+-- Bo sung Bai xe Pi Pink trong file DB doc de khop voi du lieu demo moi
+-- Layout mau:
+-- - 2 tang O to
+-- - Moi tang 6 zone
+-- - Moi zone 6 slot LARGE
+-- Ghi chu:
+-- - Block nay phuc vu DB moi dung tu file SQL
+-- - Runtime DataInitializer van la lop chuan hoa cuoi cung khi backend khoi dong
+-- ============================================================
+
+INSERT INTO `parking_building`
+(`building_id`, `name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `latitude`, `longitude`, `is_active`, `created_at`, `updated_at`) VALUES
+(13, 'Bai xe Pi Pink', '53 Vo Van Tan, Phuong Vo Thi Sau, Quan 3, TP.HCM', '0900000101', 'pipink@parking.vn', 'Bai do xe Pi Pink dung layout demo 2 tang O to', '06:00:00', '22:00:00', 10.7813, 106.6917, true, NOW(), NOW());
+
+INSERT INTO `floor`
+(`floor_id`, `building_id`, `floor_number`, `floor_name`, `capacity`, `is_active`, `created_at`, `updated_at`) VALUES
+(3, 13, 1, 'Tang 1 - O to', 36, true, NOW(), NOW()),
+(4, 13, 2, 'Tang 2 - O to', 36, true, NOW(), NOW());
+
+INSERT INTO `zone`
+(`zone_id`, `floor_id`, `vehicle_type_id`, `zone_name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
+(13, 3, 2, 'T1-A', 'Khu A - O to tang 1', true, NOW(), NOW()),
+(14, 3, 2, 'T1-B', 'Khu B - O to tang 1', true, NOW(), NOW()),
+(15, 3, 2, 'T1-C', 'Khu C - O to tang 1', true, NOW(), NOW()),
+(16, 3, 2, 'T1-D', 'Khu D - O to tang 1', true, NOW(), NOW()),
+(17, 3, 2, 'T1-E', 'Khu E - O to tang 1', true, NOW(), NOW()),
+(18, 3, 2, 'T1-F', 'Khu F - O to tang 1', true, NOW(), NOW()),
+(19, 4, 2, 'T2-A', 'Khu A - O to tang 2', true, NOW(), NOW()),
+(20, 4, 2, 'T2-B', 'Khu B - O to tang 2', true, NOW(), NOW()),
+(21, 4, 2, 'T2-C', 'Khu C - O to tang 2', true, NOW(), NOW()),
+(22, 4, 2, 'T2-D', 'Khu D - O to tang 2', true, NOW(), NOW()),
+(23, 4, 2, 'T2-E', 'Khu E - O to tang 2', true, NOW(), NOW()),
+(24, 4, 2, 'T2-F', 'Khu F - O to tang 2', true, NOW(), NOW());
+
+INSERT INTO `parking_slot`
+(`slot_id`, `zone_id`, `slot_code`, `slot_size`, `priority`, `distance_to_gate`, `status`, `is_active`, `created_at`, `updated_at`) VALUES
+(73,13,'T1-A-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(74,13,'T1-A-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(75,13,'T1-A-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(76,13,'T1-A-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(77,13,'T1-A-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(78,13,'T1-A-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(79,14,'T1-B-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(80,14,'T1-B-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(81,14,'T1-B-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(82,14,'T1-B-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(83,14,'T1-B-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(84,14,'T1-B-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(85,15,'T1-C-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(86,15,'T1-C-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(87,15,'T1-C-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(88,15,'T1-C-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(89,15,'T1-C-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(90,15,'T1-C-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(91,16,'T1-D-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(92,16,'T1-D-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(93,16,'T1-D-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(94,16,'T1-D-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(95,16,'T1-D-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(96,16,'T1-D-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(97,17,'T1-E-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(98,17,'T1-E-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(99,17,'T1-E-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(100,17,'T1-E-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(101,17,'T1-E-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(102,17,'T1-E-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(103,18,'T1-F-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(104,18,'T1-F-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(105,18,'T1-F-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(106,18,'T1-F-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(107,18,'T1-F-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(108,18,'T1-F-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(109,19,'T2-A-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(110,19,'T2-A-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(111,19,'T2-A-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(112,19,'T2-A-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(113,19,'T2-A-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(114,19,'T2-A-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(115,20,'T2-B-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(116,20,'T2-B-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(117,20,'T2-B-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(118,20,'T2-B-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(119,20,'T2-B-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(120,20,'T2-B-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(121,21,'T2-C-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(122,21,'T2-C-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(123,21,'T2-C-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(124,21,'T2-C-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(125,21,'T2-C-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(126,21,'T2-C-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(127,22,'T2-D-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(128,22,'T2-D-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(129,22,'T2-D-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(130,22,'T2-D-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(131,22,'T2-D-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(132,22,'T2-D-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(133,23,'T2-E-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(134,23,'T2-E-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(135,23,'T2-E-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(136,23,'T2-E-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(137,23,'T2-E-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(138,23,'T2-E-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW()),
+(139,24,'T2-F-01','LARGE',1,5,'AVAILABLE',true,NOW(),NOW()),(140,24,'T2-F-02','LARGE',2,10,'AVAILABLE',true,NOW(),NOW()),
+(141,24,'T2-F-03','LARGE',3,15,'AVAILABLE',true,NOW(),NOW()),(142,24,'T2-F-04','LARGE',4,20,'AVAILABLE',true,NOW(),NOW()),
+(143,24,'T2-F-05','LARGE',5,25,'AVAILABLE',true,NOW(),NOW()),(144,24,'T2-F-06','LARGE',6,30,'AVAILABLE',true,NOW(),NOW());
+
+INSERT INTO `gate`
+(`gate_id`, `building_id`, `gate_code`, `gate_type`, `is_active`, `created_at`, `updated_at`) VALUES
+(4, 13, 'PIPINK-ENTRY', 'ENTRY', true, NOW(), NOW()),
+(5, 13, 'PIPINK-EXIT', 'EXIT', true, NOW(), NOW()),
+(6, 13, 'PIPINK-BOTH', 'BOTH', true, NOW(), NOW());
