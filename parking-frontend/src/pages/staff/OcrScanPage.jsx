@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, ImageUp, RefreshCw, ScanLine, Video, VideoOff, XCircle } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
-import {
-  createPortalId,
-  formatStaffDateTime,
-  updateStaffPortalState,
-} from "./staffPortalState";
+import { formatStaffDateTime } from "./staffPortalState";
+import { unwrapApiData } from "../../utils/api";
 import {
   StaffPageSection,
   StaffPrimaryButton,
@@ -122,10 +119,9 @@ export default function OcrScanPage() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const data = response.data?.data || {};
+      const data = unwrapApiData(response.data, {});
       const confidence = Math.round((data.plateConfidenceScore || 0) * 100);
       const record = {
-        id: data.scanId ? `OCR-${data.scanId}` : createPortalId("OCR"),
         scanId: data.scanId,
         detectedPlate: data.effectivePlate || data.detectedPlate || "UNKNOWN",
         correctedPlate: data.correctedPlate || "",
@@ -134,23 +130,6 @@ export default function OcrScanPage() {
         scanTime: data.scannedAt || new Date().toISOString(),
         imagePath: data.imagePath || filename,
       };
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        ocrRecords: [record, ...current.ocrRecords],
-        latestOcrPlate: record.detectedPlate,
-        latestOcrRecord: record,
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: record.detectedPlate,
-            action: `OCR scan completed with ${record.confidence}% confidence`,
-            type: "update",
-            time: record.scanTime,
-          },
-          ...current.activity,
-        ],
-      }));
 
       setResult(record);
       if (record.status === "FAILED") {

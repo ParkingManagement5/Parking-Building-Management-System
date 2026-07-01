@@ -38,4 +38,8 @@ public class BuildingRequest {
     private LocalTime closeTime; // format: "22:00:00"
 
     private Status status;
+
+    private Double latitude;
+
+    private Double longitude;
 }

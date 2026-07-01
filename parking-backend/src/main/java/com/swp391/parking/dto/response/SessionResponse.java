@@ -28,4 +28,11 @@ public class SessionResponse {
     private BigDecimal calculatedFee;
     private BigDecimal hourlyRate;
     private BigDecimal depositAmount;
+    // Location info populated from slot → zone → floor → building
+    private Long buildingId;
+    private String buildingName;
+    private Long floorId;
+    private String floorName;
+    private Long zoneId;
+    private String zoneName;
 }

@@ -5,6 +5,7 @@ import { floorApi } from "../../api/manager/floorApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { ManagerPageHeader, ManagerPrimaryButton } from "../../ui/components/manager/ManagerUi";
+import { unwrapApiData } from "../../utils/api";
 
 function normalizeSlot(item) {
   return {
@@ -72,25 +73,25 @@ export default function ParkingSlotPage() {
   async function loadInitialData() {
     try {
       const buildingRes = await buildingApi.getAll();
-      const buildingList = buildingRes.data?.data || [];
+      const buildingList = unwrapApiData(buildingRes.data, []);
       setBuildings(buildingList);
 
       const floorResponses = await Promise.all(
         buildingList.map((building) => floorApi.getByBuilding(building.buildingId ?? building.id))
       );
-      const floorList = floorResponses.flatMap((res) => res.data?.data || []);
+      const floorList = floorResponses.flatMap((res) => unwrapApiData(res.data, []));
       setFloors(floorList);
 
       const zoneResponses = await Promise.all(
         floorList.map((floor) => zoneApi.getByFloor(floor.floorId ?? floor.id))
       );
-      const zoneList = zoneResponses.flatMap((res) => res.data?.data || []);
+      const zoneList = zoneResponses.flatMap((res) => unwrapApiData(res.data, []));
       setZones(zoneList);
 
       const slotResponses = await Promise.all(
         zoneList.map((zone) => parkingSlotApi.getByZone(zone.zoneId ?? zone.id))
       );
-      const slotList = slotResponses.flatMap((res) => (res.data?.data || []).map(normalizeSlot));
+      const slotList = slotResponses.flatMap((res) => unwrapApiData(res.data, []).map(normalizeSlot));
       setSlots(slotList);
 
       const firstBuilding = buildingList[0]?.buildingId

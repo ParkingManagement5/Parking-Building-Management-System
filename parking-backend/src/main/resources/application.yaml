@@ -2,6 +2,10 @@ spring:
   application:
     name: parking-backend
 
+  devtools:
+    restart:
+      enabled: false
+
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 

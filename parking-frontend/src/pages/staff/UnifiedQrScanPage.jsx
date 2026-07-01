@@ -91,6 +91,7 @@ export default function UnifiedScanPage() {
   const [buildings, setBuildings] = useState([]);
   const [gates, setGates] = useState([]);
   const [gateId, setGateId] = useState("");
+  const [scopeError, setScopeError] = useState("");
 
   // Process
   const [processing, setProcessing] = useState(false);
@@ -115,8 +116,18 @@ export default function UnifiedScanPage() {
     (async () => {
       try {
         const res = await gateApi.getActiveByBuilding(buildingId);
-        if (!c) { const g = unwrapApiData(res.data, []); setGates(g); setGateId(String(g[0]?.gateId || g[0]?.id || "")); }
-      } catch { if (!c) setGates([]); }
+        if (!c) {
+          const g = unwrapApiData(res.data, []);
+          setGates(g);
+          setGateId(String(g[0]?.gateId || g[0]?.id || ""));
+          setScopeError(g.length ? "" : "Toa nha hien tai chua co cong active cho staff scan.");
+        }
+      } catch (err) {
+        if (!c) {
+          setGates([]);
+          setScopeError(err.response?.data?.message || "Khong tai duoc danh sach cong cho toa nha hien tai.");
+        }
+      }
     })();
     return () => { c = true; };
   }, [buildingId]);
@@ -131,9 +142,13 @@ export default function UnifiedScanPage() {
       const res = await buildingApi.getAll();
       const bs = unwrapApiData(res.data, []);
       setBuildings(bs);
+      setScopeError("");
       if (assignedId) setBuildingId(assignedId);
       else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
-    } catch {}
+      else setScopeError("He thong chua co toa nha nao de staff thao tac.");
+    } catch (err) {
+      setScopeError(err.response?.data?.message || "Khong tai duoc danh sach toa nha.");
+    }
   }
 
   async function proceedWithResolvedPlate(rawPlate, nextConfidence = null) {
@@ -275,7 +290,7 @@ export default function UnifiedScanPage() {
       const fd = new FormData();
       fd.append("image", file, filename); fd.append("gateId", gateId); fd.append("triggerType", "ENTRY");
       const res = await axiosClient.post("/ocr/scan-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      const d = res.data?.data || {};
+      const d = unwrapApiData(res.data, {});
       const p = d.effectivePlate || d.detectedPlate || "";
       const c = Math.round((d.plateConfidenceScore || 0) * 100);
       if (!p || p === "UNKNOWN") {
@@ -405,7 +420,9 @@ export default function UnifiedScanPage() {
         const bookings = unwrapApiData(bRes.data, []);
         const active = bookings.find((b) => ["CONFIRMED", "PENDING_PAYMENT"].includes(String(b.status || "").toUpperCase()));
         if (active) { setLookupType("BOOKING"); setLookupData(active); return; }
-      } catch {}
+      } catch (bookingErr) {
+        console.warn("[autoLookup] booking search failed:", bookingErr?.response?.data?.message || bookingErr?.message);
+      }
 
       // Vehicle registered?
       let vehicle = null;
@@ -513,6 +530,11 @@ export default function UnifiedScanPage() {
           {/* ==================== STEP 1: OCR SCAN ==================== */}
           {step === 1 && (
             <StaffPageSection title="Scan bien so xe" subtitle="Chup hoac upload anh bien so — bat buoc cho moi luong">
+              {scopeError && (
+                <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  {scopeError}
+                </div>
+              )}
               {/* Gate select */}
               <div className="mb-4 grid gap-3 md:grid-cols-2">
                 {assignedId ? (

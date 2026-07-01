@@ -6,7 +6,8 @@ import java.util.List;
 
 public interface ZoneService {
     List<Zone> getByFloor(Long floorId);
-    Zone getById(Long id);
+    List<Zone> getByFloor(Long floorId, Long currentUserId, boolean staffScoped);
+    Zone getById(Long id, Long currentUserId, boolean staffScoped);
     Zone create(ZoneRequest req);
     Zone update(Long id, ZoneRequest req);
     void deactivate(Long id);
