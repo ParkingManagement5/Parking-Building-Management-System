@@ -118,8 +118,9 @@ public class AuthService {
         User user = findByUsernameOrEmail(req.getUsername());
 
         if (User.UserStatus.ACTIVE.equals(user.getStatus())) {
-            String token = jwtUtil.generateToken(user.getUsername());
-            return buildAuthResponse(user, token);
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Tai khoan da duoc xac thuc. Vui long dang nhap bang email hoac username va mat khau");
         }
 
         if (!req.getOtp().equals(user.getEmailVerificationCode())) {
@@ -130,7 +131,9 @@ public class AuthService {
             throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP da het han");
         }
 
-        user.setStatus(User.UserStatus.ACTIVE);
+        if (!User.UserStatus.ACTIVE.equals(user.getStatus())) {
+            user.setStatus(User.UserStatus.ACTIVE);
+        }
         user.setEmailVerificationCode(null);
         user.setEmailVerificationExpiresAt(null);
         userRepository.save(user);
@@ -370,6 +373,7 @@ public class AuthService {
 
         AuthResponse.AuthResponseBuilder builder = AuthResponse.builder()
                 .token(token)
+                .requiresOtp(false)
                 .userId(user.getUserId())
                 .username(user.getUsername())
                 .fullName(user.getFullName())

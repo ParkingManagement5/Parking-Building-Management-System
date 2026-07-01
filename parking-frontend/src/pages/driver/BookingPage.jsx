@@ -90,7 +90,6 @@ export default function BookingPage() {
   const [conflictLock, setConflictLock] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [bookingStart, setBookingStart] = useState(() => { const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0); return d; });
-  const [bookingDurationHours, setBookingDurationHours] = useState(2);
   const [selection, setSelection] = useState({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
   const [payingDeposit, setPayingDeposit] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
@@ -182,7 +181,7 @@ export default function BookingPage() {
     setSubmitError("");
     try {
       const start = bookingStart;
-      const end = new Date(start.getTime() + bookingDurationHours * 3600000);
+      const end = new Date(start.getTime() + 2 * 3600000);
       if ((start.getTime() - Date.now()) / 60000 < 10) {
         setSubmitError("Thời gian bắt đầu phải cách hiện tại ít nhất 10 phút.");
         setSubmitting(false);
@@ -194,7 +193,7 @@ export default function BookingPage() {
         bookingStartTime: formatLocalDateTime(start),
         bookingEndTime: formatLocalDateTime(end),
       });
-      const p = res.data?.data || res.data || {};
+      const p = unwrapApiData(res.data, {});
       setConfirmation({
         bookingId: p.bookingId, status: p.status, depositAmount: p.depositAmount,
         expiredAt: p.expiredAt,
@@ -271,7 +270,6 @@ export default function BookingPage() {
       ["Tầng", confirmation.floor],
       ["Vị trí", `${confirmation.zone} — ${confirmation.slotCode}`],
       ["Hẹn đến bãi", formatDateTime(confirmation.bookingStartTime)],
-      ["Dự kiến kết thúc", formatDateTime(confirmation.bookingEndTime)],
       ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`],
       ["Tính phí", "Entry → Exit (trừ cọc)", "text-emerald-600"],
       ["Hạn thanh toán cọc", formatDateTime(confirmation.expiredAt)],
@@ -516,23 +514,14 @@ export default function BookingPage() {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Thời gian đến bãi đỗ</label>
-              <input type="datetime-local"
-                value={formatLocalDateTime(bookingStart).slice(0, 16)}
-                min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-                onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
-              <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Dự kiến gửi xe</label>
-              <select value={bookingDurationHours} onChange={(e) => setBookingDurationHours(Number(e.target.value))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground">
-                {[1, 2, 3, 4, 6, 8, 12, 24].map((h) => <option key={h} value={h}>{h} giờ</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Thời gian đến bãi đỗ</label>
+            <input type="datetime-local"
+              value={formatLocalDateTime(bookingStart).slice(0, 16)}
+              min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
+              onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
+            <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
           </div>
 
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
@@ -564,7 +553,6 @@ export default function BookingPage() {
               ["Tầng / Khu vực", `${selectedSlot?.floor || "--"} — ${selectedSlot?.zone || "--"}`],
               ["Slot", selectedSlot?.slotCode || "--"],
               ["Hẹn đến bãi", formatDateTime(bookingStart)],
-              ["Dự kiến kết thúc", formatDateTime(new Date(bookingStart.getTime() + bookingDurationHours * 3600000))],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between">
                 <span className="text-muted-foreground">{label}</span>

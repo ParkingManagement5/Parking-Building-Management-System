@@ -291,7 +291,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertFalse(created.getIsRead());
         assertEquals(1, notificationService.getNotifications(user.getUserId().longValue()).size());
 
-        notificationService.markAsRead(created.getNotificationId());
+        notificationService.markAsRead(created.getNotificationId(), null, true);
         assertTrue(notificationRepository.findById(created.getNotificationId()).orElseThrow().getIsRead());
 
         var second = notificationService.sendNotification(SendNotificationRequest.builder()

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { systemConfigApi } from "../../api/admin/systemConfigApi";
 import { getUserId } from "../../utils/auth";
+import { unwrapApiData } from "../../utils/api";
 import {
   ManagerEmptyState,
   ManagerField,
@@ -91,7 +92,7 @@ export default function SystemConfigPage() {
   async function loadConfigs() {
     try {
       const res = await systemConfigApi.getAll();
-      const items = Array.isArray(res.data) ? res.data : [];
+      const items = unwrapApiData(res.data, []);
       setConfigs(items);
       setDraftValues(
         Object.fromEntries(

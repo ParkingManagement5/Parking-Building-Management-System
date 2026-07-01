@@ -35,6 +35,8 @@ export default function BuildingPage() {
     description: "",
     openTime: "06:00",
     closeTime: "22:00",
+    latitude: "",
+    longitude: "",
   });
 
   useEffect(() => {
@@ -102,6 +104,8 @@ export default function BuildingPage() {
       description: "",
       openTime: "06:00",
       closeTime: "22:00",
+      latitude: "",
+      longitude: "",
     });
     setShowModal(true);
   };
@@ -116,6 +120,8 @@ export default function BuildingPage() {
       description: item.description || "",
       openTime: normalizeTime(item.openTime) || "06:00",
       closeTime: normalizeTime(item.closeTime) || "22:00",
+      latitude: item.latitude != null ? String(item.latitude) : "",
+      longitude: item.longitude != null ? String(item.longitude) : "",
     });
     setShowModal(true);
   };
@@ -148,6 +154,8 @@ export default function BuildingPage() {
       description: form.description || null,
       openTime: `${form.openTime}:00`,
       closeTime: `${form.closeTime}:00`,
+      latitude: form.latitude !== "" ? parseFloat(form.latitude) : null,
+      longitude: form.longitude !== "" ? parseFloat(form.longitude) : null,
     };
 
     try {
@@ -207,7 +215,12 @@ export default function BuildingPage() {
             </div>
 
             <h3 className="text-2xl font-semibold text-foreground">{item.name}</h3>
-            <p className="mb-4 mt-1 text-sm text-muted-foreground">{item.address}</p>
+            <p className="mb-1 mt-1 text-sm text-muted-foreground">{item.address}</p>
+            {item.latitude != null && item.longitude != null ? (
+              <p className="mb-3 text-xs text-emerald-600 dark:text-emerald-400">📍 {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}</p>
+            ) : (
+              <p className="mb-3 text-xs text-muted-foreground/60">Chưa có tọa độ</p>
+            )}
 
             <div className="mb-4 grid grid-cols-3 gap-3">
               <div className="rounded-3xl bg-slate-100/80 p-4 text-center dark:bg-white/5">
@@ -358,6 +371,45 @@ export default function BuildingPage() {
                   />
                 </div>
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">
+                    Vĩ độ (Latitude)
+                    <span className="ml-1 text-muted-foreground font-normal">tuỳ chọn</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    name="latitude"
+                    value={form.latitude}
+                    onChange={handleChange}
+                    placeholder="VD: 10.7769"
+                    className="w-full rounded-2xl border border-border bg-muted px-3 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">
+                    Kinh độ (Longitude)
+                    <span className="ml-1 text-muted-foreground font-normal">tuỳ chọn</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    name="longitude"
+                    value={form.longitude}
+                    onChange={handleChange}
+                    placeholder="VD: 106.7009"
+                    className="w-full rounded-2xl border border-border bg-muted px-3 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Nhập tọa độ thực hoặc giả lập để hiển thị bãi đỗ trên bản đồ cho driver. Lấy tọa độ tại{" "}
+                <a href="https://www.latlong.net" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                  latlong.net
+                </a>.
+              </p>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"

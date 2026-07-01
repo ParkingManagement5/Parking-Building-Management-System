@@ -20,6 +20,8 @@ CREATE TABLE `parking_building` (
     `description` text,
     `open_time` time NOT NULL,
     `close_time` time NOT NULL,
+    `latitude` double,
+    `longitude` double,
     `is_active` boolean NOT NULL DEFAULT true,
     `created_at` datetime NOT NULL,
     `updated_at` datetime
@@ -376,15 +378,19 @@ INSERT INTO `user_role` (`user_id`, `role_id`) VALUES
 
 -- 5. Parking Building
 INSERT INTO `parking_building`
-(`name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `is_active`, `created_at`, `updated_at`) VALUES
-('Bãi xe FPT HCM',
- 'Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP.HCM',
- '0900000010',
- 'parking@fpt.edu.vn',
- 'Bãi đỗ xe trong khuôn viên FPT HCM',
- '06:00:00',
- '22:00:00',
- true, NOW(), NOW());
+(`name`, `address`, `phone`, `email`, `description`, `open_time`, `close_time`, `latitude`, `longitude`, `is_active`, `created_at`, `updated_at`) VALUES
+('Bãi xe FPT HCM', 'Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP.HCM', '0900000010', 'parking@fpt.edu.vn', 'Bãi đỗ xe trong khuôn viên FPT HCM', '06:00:00', '22:00:00', 10.8413, 106.8098, true, NOW(), NOW()),
+('Bãi xe Bến Bạch Đằng', 'Tôn Đức Thắng, Bến Nghé, Quận 1, TP.HCM', '0900000011', 'bachdang@parking.vn', 'Điểm gửi xe gần phố đi bộ Nguyễn Huệ và bờ sông Sài Gòn', '06:00:00', '22:00:00', 10.7736, 106.7060, true, NOW(), NOW()),
+('Bãi xe Công viên Tao Đàn', 'Trương Định, Phường Bến Thành, Quận 1, TP.HCM', '0900000012', 'taodan@parking.vn', 'Bãi đỗ xe phục vụ khu công viên Tao Đàn và trung tâm Quận 1', '06:00:00', '22:00:00', 10.7768, 106.6925, true, NOW(), NOW()),
+('Bãi xe Lê Văn Tám', 'Hai Bà Trưng, Đa Kao, Quận 1, TP.HCM', '0900000013', 'levantam@parking.vn', 'Bãi đỗ xe gần công viên Lê Văn Tám và khu văn phòng', '06:00:00', '22:00:00', 10.7863, 106.6993, true, NOW(), NOW()),
+('Bãi xe Landmark 81', '208 Nguyễn Hữu Cảnh, Phường 22, Bình Thạnh, TP.HCM', '0900000014', 'landmark81@parking.vn', 'Điểm gửi xe phục vụ khu Landmark 81 và Vinhomes Central Park', '06:00:00', '22:00:00', 10.7949, 106.7219, true, NOW(), NOW()),
+('Bãi xe Tân Sơn Nhất', 'Trường Sơn, Phường 2, Tân Bình, TP.HCM', '0900000015', 'tsn@parking.vn', 'Bãi đỗ xe gần sân bay Tân Sơn Nhất cho xe máy và ô tô', '06:00:00', '22:00:00', 10.8130, 106.6654, true, NOW(), NOW()),
+('Bãi xe Phú Mỹ Hưng', 'Tôn Dật Tiên, Tân Phong, Quận 7, TP.HCM', '0900000016', 'phumyhung@parking.vn', 'Bãi đỗ xe cho khu đô thị Phú Mỹ Hưng', '06:00:00', '22:00:00', 10.7298, 106.7218, true, NOW(), NOW()),
+('Bãi xe Cộng Hòa', 'Cộng Hòa, Phường 13, Tân Bình, TP.HCM', '0900000017', 'conghoa@parking.vn', 'Điểm gửi xe phục vụ trục đường Cộng Hòa và khu văn phòng', '06:00:00', '22:00:00', 10.8019, 106.6408, true, NOW(), NOW()),
+('Bãi xe Gò Vấp Center', 'Quang Trung, Phường 10, Gò Vấp, TP.HCM', '0900000018', 'govap@parking.vn', 'Bãi đỗ xe gần khu mua sắm và dân cư Gò Vấp', '06:00:00', '22:00:00', 10.8389, 106.6688, true, NOW(), NOW()),
+('Bãi xe Aeon Tân Phú', '30 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú, TP.HCM', '0900000019', 'tanphu@parking.vn', 'Bãi đỗ xe cho khu mua sắm phía Tây Sài Gòn', '06:00:00', '22:00:00', 10.8010, 106.6187, true, NOW(), NOW()),
+('Bãi xe Bình Tân Hub', 'Kinh Dương Vương, An Lạc, Bình Tân, TP.HCM', '0900000020', 'binhtan@parking.vn', 'Điểm gửi xe kết nối cửa ngõ miền Tây', '06:00:00', '22:00:00', 10.7448, 106.6125, true, NOW(), NOW()),
+('Bãi xe Sala Thủ Thiêm', '10 Mai Chí Thọ, Thủ Thiêm, Thủ Đức, TP.HCM', '0900000021', 'sala@parking.vn', 'Bãi đỗ xe gần khu đô thị Thủ Thiêm và hầm vượt sông Sài Gòn', '06:00:00', '22:00:00', 10.7759, 106.7284, true, NOW(), NOW());
 
 -- 5b. Assign staff to building
 UPDATE `users` SET `assigned_building_id` = 1 WHERE `username` = 'staff1';

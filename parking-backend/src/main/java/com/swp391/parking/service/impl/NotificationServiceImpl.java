@@ -51,9 +51,13 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void markAsRead(Long notificationId) {
+    public void markAsRead(Long notificationId, Long currentUserId, boolean privileged) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Notification not found"));
+        Long ownerUserId = notification.getUser() != null ? notification.getUser().getUserId().longValue() : null;
+        if (!privileged && (ownerUserId == null || !ownerUserId.equals(currentUserId))) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen danh dau notification cua nguoi khac");
+        }
         notification.setIsRead(true);
         notificationRepository.save(notification);
     }

@@ -11,6 +11,7 @@ import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.repository.*;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.ParkingSessionService;
+import com.swp391.parking.service.PaymentService;
 import com.swp391.parking.util.FeeCalculatorUtil;
 import com.swp391.parking.util.LicensePlateUtil;
 import com.swp391.parking.util.QrTokenUtil;
@@ -48,6 +49,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final QrTokenUtil qrTokenUtil;
     private final SlotAssignmentService slotAssignmentService;
     private final NotificationService notificationService;
+    private final PaymentService paymentService;
 
     @Override
     @Transactional
@@ -292,7 +294,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         session.setExitGate(gate);
         session.setExitTime(LocalDateTime.now());
-        // [BR-09] Chờ BE4 xử lý payment → mới COMPLETED
+        // Exit chi ghi nhan xe ra cong; session chi COMPLETED sau khi parking fee duoc confirm.
         session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
         session = sessionRepository.save(session);
 
@@ -319,6 +321,21 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         notificationService.notifyAllStaff("Xe ra bai",
                 "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
                 "warning", "SESSION", session.getId().intValue());
+
+        // Tao san parking fee PENDING de staff co the thu CASH hoac sinh QR VNPay ngay.
+        paymentService.createParkingFee(
+                session.getId().intValue(),
+                booking != null && booking.getId() != null ? booking.getId().intValue() : null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                BigDecimal.ZERO,
+                Payment.PaymentMethod.CASH
+        );
 
         return toResponse(session);
     }
@@ -397,23 +414,30 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SessionResponse> getSessions(String status, String keyword) {
+    public List<SessionResponse> getSessions(String status, String keyword, Long currentUserId, boolean staffScoped) {
+        Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
         if (keyword != null && !keyword.isBlank() && status != null && !status.isBlank()) {
             ParkingSession.SessionStatus sessionStatus = ParkingSession.SessionStatus.valueOf(status.trim().toUpperCase());
-            return searchByPlateOrId(keyword, sessionStatus).stream().map(this::toResponse).toList();
+            return searchByPlateOrId(keyword, sessionStatus, buildingId).stream().map(this::toResponse).toList();
         }
 
         if (keyword != null && !keyword.isBlank()) {
-            return searchByPlateOrId(keyword, null).stream().map(this::toResponse).toList();
+            return searchByPlateOrId(keyword, null, buildingId).stream().map(this::toResponse).toList();
         }
 
         if (status != null && !status.isBlank()) {
             ParkingSession.SessionStatus sessionStatus = ParkingSession.SessionStatus.valueOf(status.trim().toUpperCase());
-            return sessionRepository.findByStatusOrderByCreatedAtDesc(sessionStatus)
+            List<ParkingSession> sessions = buildingId != null
+                    ? sessionRepository.findByStatusAndBuildingIdOrderByCreatedAtDesc(sessionStatus, buildingId)
+                    : sessionRepository.findByStatusOrderByCreatedAtDesc(sessionStatus);
+            return sessions
                     .stream().map(this::toResponse).toList();
         }
 
-        return sessionRepository.findAllByOrderByCreatedAtDesc()
+        List<ParkingSession> sessions = buildingId != null
+                ? sessionRepository.findAllByBuildingIdOrderByCreatedAtDesc(buildingId)
+                : sessionRepository.findAllByOrderByCreatedAtDesc();
+        return sessions
                 .stream().map(this::toResponse).toList();
     }
 
@@ -558,15 +582,35 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .findFirst();
     }
 
-    private List<ParkingSession> searchByPlateOrId(String keyword, ParkingSession.SessionStatus status) {
+    private List<ParkingSession> searchByPlateOrId(String keyword, ParkingSession.SessionStatus status, Long buildingId) {
         Map<Long, ParkingSession> matches = new LinkedHashMap<>();
         LicensePlateUtil.lookupCandidates(keyword).forEach(candidate -> {
-            List<ParkingSession> found = status != null
-                    ? sessionRepository.searchByPlateOrIdAndStatus(candidate, status)
-                    : sessionRepository.searchByPlateOrId(candidate);
+            List<ParkingSession> found;
+            if (buildingId != null) {
+                found = status != null
+                        ? sessionRepository.searchByPlateOrIdAndStatusAndBuildingId(candidate, status, buildingId)
+                        : sessionRepository.searchByPlateOrIdAndBuildingId(candidate, buildingId);
+            } else {
+                found = status != null
+                        ? sessionRepository.searchByPlateOrIdAndStatus(candidate, status)
+                        : sessionRepository.searchByPlateOrId(candidate);
+            }
             found.forEach(session -> matches.putIfAbsent(session.getId(), session));
         });
         return matches.values().stream().toList();
+    }
+
+    private Long resolveScopedBuildingId(Long currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return null;
+        }
+        User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+        if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Staff chua duoc gan toa nha, khong the xem danh sach session");
+        }
+        return currentUser.getAssignedBuilding().getId();
     }
 
     private BigDecimal resolveHourlyRate(ParkingSession s) {
@@ -592,11 +636,16 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 : BigDecimal.ZERO;
         BigDecimal depositAmount = s.getBooking() != null ? s.getBooking().getDepositAmount() : BigDecimal.ZERO;
 
+        var slot = s.getSlot();
+        var zone = slot != null ? slot.getZone() : null;
+        var floor = zone != null ? zone.getFloor() : null;
+        var building = floor != null ? floor.getBuilding() : null;
+
         return SessionResponse.builder()
                 .sessionId(s.getId())
                 .bookingId(s.getBooking() != null ? s.getBooking().getId() : null)
-                .slotId(s.getSlot() != null ? s.getSlot().getId() : null)
-                .slotCode(s.getSlot() != null ? s.getSlot().getSlotCode() : null)
+                .slotId(slot != null ? slot.getId() : null)
+                .slotCode(slot != null ? slot.getSlotCode() : null)
                 .userId(s.getUserId())
                 .vehicleId(s.getVehicle() != null ? s.getVehicle().getId() : null)
                 .licensePlate(s.getVehicle() != null ? s.getVehicle().getLicensePlate() : null)
@@ -616,6 +665,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .calculatedFee(calculatedFee)
                 .hourlyRate(hourlyRate)
                 .depositAmount(depositAmount)
+                .buildingId(building != null ? building.getId() : null)
+                .buildingName(building != null ? building.getName() : null)
+                .floorId(floor != null ? floor.getId() : null)
+                .floorName(floor != null ? floor.getName() : null)
+                .zoneId(zone != null ? zone.getId() : null)
+                .zoneName(zone != null ? zone.getName() : null)
                 .build();
     }
 }

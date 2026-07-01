@@ -44,15 +44,18 @@ public class RequestController {
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getMyRequests(Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(requestService.getByUserId(resolveUserId(authentication))));
+        Integer currentUserId = resolveUserId(authentication);
+        return ResponseEntity.ok(ApiResponse.success(requestService.getByUserId(currentUserId, currentUserId, false)));
     }
 
     @Operation(summary = "Get request by ID")
     @GetMapping("/{requestId}")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> getById(
-            @PathVariable Integer requestId) {
-        RequestResponse response = requestService.getById(requestId);
+            @PathVariable Integer requestId,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        RequestResponse response = requestService.getById(requestId, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -60,8 +63,10 @@ public class RequestController {
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByUserId(
-            @PathVariable Integer userId) {
-        List<RequestResponse> response = requestService.getByUserId(userId);
+            @PathVariable Integer userId,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        List<RequestResponse> response = requestService.getByUserId(userId, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -69,8 +74,10 @@ public class RequestController {
     @GetMapping("/status/{status}")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByStatus(
-            @PathVariable RequestStatus status) {
-        List<RequestResponse> response = requestService.getByStatus(status);
+            @PathVariable RequestStatus status,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        List<RequestResponse> response = requestService.getByStatus(status, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -78,8 +85,10 @@ public class RequestController {
     @GetMapping("/type/{type}")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<List<RequestResponse>>> getByType(
-            @PathVariable RequestType type) {
-        List<RequestResponse> response = requestService.getByType(type);
+            @PathVariable RequestType type,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        List<RequestResponse> response = requestService.getByType(type, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -88,8 +97,14 @@ public class RequestController {
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> assignStaff(
             @PathVariable Integer requestId,
-            @RequestParam Integer staffId) {
-        RequestResponse response = requestService.assignStaff(requestId, staffId);
+            @RequestParam Integer staffId,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        boolean staffScoped = isStaff(authentication);
+        if (staffScoped && !currentUserId.equals(staffId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chi duoc nhan request cho chinh minh");
+        }
+        RequestResponse response = requestService.assignStaff(requestId, staffId, currentUserId, staffScoped);
         return ResponseEntity.ok(
             ApiResponse.success("Staff assigned successfully", response));
     }
@@ -98,8 +113,10 @@ public class RequestController {
     @PutMapping("/{requestId}/resolve")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> resolveRequest(
-            @PathVariable Integer requestId) {
-        RequestResponse response = requestService.resolveRequest(requestId);
+            @PathVariable Integer requestId,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        RequestResponse response = requestService.resolveRequest(requestId, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(
             ApiResponse.success("Request resolved successfully", response));
     }
@@ -108,10 +125,17 @@ public class RequestController {
     @PutMapping("/{requestId}/close")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<RequestResponse>> closeRequest(
-            @PathVariable Integer requestId) {
-        RequestResponse response = requestService.closeRequest(requestId);
+            @PathVariable Integer requestId,
+            Authentication authentication) {
+        Integer currentUserId = resolveUserId(authentication);
+        RequestResponse response = requestService.closeRequest(requestId, currentUserId, isStaff(authentication));
         return ResponseEntity.ok(
             ApiResponse.success("Request closed successfully", response));
+    }
+
+    private boolean isStaff(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
     }
 
     private Integer resolveUserId(Authentication authentication) {

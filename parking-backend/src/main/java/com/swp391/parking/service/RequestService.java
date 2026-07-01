@@ -11,12 +11,12 @@ public interface RequestService {
 
     RequestResponse createRequest(Integer userId, CreateRequestRequest request);
 
-    RequestResponse getById(Integer requestId);
+    RequestResponse getById(Integer requestId, Integer currentUserId, boolean staffScoped);
 
-    List<RequestResponse> getByUserId(Integer userId);
-    List<RequestResponse> getByStatus(RequestStatus status);
-    List<RequestResponse> getByType(RequestType requestType);
-    RequestResponse assignStaff(Integer requestId, Integer staffId);
-    RequestResponse resolveRequest(Integer requestId);
-    RequestResponse closeRequest(Integer requestId);
+    List<RequestResponse> getByUserId(Integer userId, Integer currentUserId, boolean staffScoped);
+    List<RequestResponse> getByStatus(RequestStatus status, Integer currentUserId, boolean staffScoped);
+    List<RequestResponse> getByType(RequestType requestType, Integer currentUserId, boolean staffScoped);
+    RequestResponse assignStaff(Integer requestId, Integer staffId, Integer currentUserId, boolean staffScoped);
+    RequestResponse resolveRequest(Integer requestId, Integer currentUserId, boolean staffScoped);
+    RequestResponse closeRequest(Integer requestId, Integer currentUserId, boolean staffScoped);
 }

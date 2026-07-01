@@ -18,10 +18,24 @@ export default function ParkingSessionPage() {
   const [pricingPolicies, setPricingPolicies] = useState([]);
 
   function resolveHourlyRate(session) {
+    if (session?.hourlyRate != null) {
+      return Number(session.hourlyRate);
+    }
     const policy = pricingPolicies.find(
       (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
     );
     return Number(policy?.pricePerHour ?? 20000);
+  }
+
+  function resolveCurrentFee(session) {
+    if (!session) return 0;
+    if (session.status === "ACTIVE") {
+      return computeSessionFee(session.entryTime, session.exitTime || new Date(), resolveHourlyRate(session));
+    }
+    if (session.calculatedFee != null) {
+      return Number(session.calculatedFee);
+    }
+    return computeSessionFee(session.entryTime, session.exitTime || new Date(), resolveHourlyRate(session));
   }
 
   async function loadSessions() {
@@ -114,7 +128,7 @@ export default function ParkingSessionPage() {
                     <div className="rounded-2xl bg-muted/30 p-3">
                       <p className="text-xs text-muted-foreground">Current Fee</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
-                        {formatStaffCurrency(item.status === "ACTIVE" || item.status === "WAITING_PAYMENT" ? computeSessionFee(item.entryTime, item.exitTime || new Date(), resolveHourlyRate(item)) : 0)}
+                        {formatStaffCurrency(resolveCurrentFee(item))}
                       </p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">

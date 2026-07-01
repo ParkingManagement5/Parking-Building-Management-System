@@ -50,7 +50,7 @@ public class ParkingSessionController {
     @PostMapping("/{id}/exit")
     @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     @Operation(summary = "Xe ra cổng — chờ thanh toán",
-            description = "Session → WAITING_PAYMENT. BE4 xử lý payment sau.")
+            description = "Session → WAITING_PAYMENT va tao san parking fee pending de thu tien mat hoac VNPay.")
     public ResponseEntity<ApiResponse<SessionResponse>> exit(
             @PathVariable Long id,
             @Valid @RequestBody SessionExitRequest request,
@@ -113,8 +113,12 @@ public class ParkingSessionController {
     @Operation(summary = "Danh sach session cho staff")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> getSessions(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String keyword) {
-        return ResponseEntity.ok(ApiResponse.success(sessionService.getSessions(status, keyword)));
+            @RequestParam(required = false) String keyword,
+            Authentication authentication) {
+        Long currentUserId = resolveStaffUserId(authentication);
+        boolean staffScoped = hasRole(authentication, Role.RoleName.STAFF);
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionService.getSessions(status, keyword, currentUserId, staffScoped)));
     }
 
     @GetMapping("/my")

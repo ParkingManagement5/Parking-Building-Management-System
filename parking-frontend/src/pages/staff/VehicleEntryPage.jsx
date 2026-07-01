@@ -9,11 +9,8 @@ import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import {
   computeSessionFee,
-  createPortalId,
   formatStaffCurrency,
   formatStaffDateTime,
-  getStaffPortalState,
-  updateStaffPortalState,
 } from "./staffPortalState";
 import {
   StaffEmptyState,
@@ -65,12 +62,6 @@ function mapEntrySession(item) {
 }
 
 export default function VehicleEntryPage() {
-  const initialStaffState = getStaffPortalState();
-  const initialOcrPlate =
-    initialStaffState.latestOcrPlate ||
-    initialStaffState.ocrRecords[0]?.correctedPlate ||
-    initialStaffState.ocrRecords[0]?.detectedPlate ||
-    "";
   const [step, setStep] = useState(1);
   const [buildings, setBuildings] = useState([]);
   const [gates, setGates] = useState([]);
@@ -78,12 +69,12 @@ export default function VehicleEntryPage() {
   const [recentEntries, setRecentEntries] = useState([]);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const [latestOcrPlate, setLatestOcrPlate] = useState(initialOcrPlate);
+  const [latestOcrPlate, setLatestOcrPlate] = useState("");
   const [ocrState, setOcrState] = useState({ loading: false, error: "", notice: "", result: null });
   const [cameraOn, setCameraOn] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [form, setForm] = useState({
-    licensePlate: initialOcrPlate,
+    licensePlate: "",
     buildingId: "",
     gateId: "",
     vehicleTypeId: "",
@@ -96,22 +87,10 @@ export default function VehicleEntryPage() {
   async function loadRecentEntries() {
     try {
       const res = await sessionApi.getSessions({ status: "ACTIVE" });
-      const backendEntries = unwrapApiData(res.data, []).map(mapEntrySession).slice(0, 5);
-      const localEntries = getStaffPortalState().sessions
-        .filter((item) => String(item.status || "").toUpperCase() === "ACTIVE")
-        .map(mapEntrySession);
-      const merged = [...backendEntries, ...localEntries]
-        .filter((item, index, items) => items.findIndex((candidate) => String(candidate.sessionId) === String(item.sessionId)) === index)
-        .slice(0, 5);
-      setRecentEntries(merged);
+      setRecentEntries(unwrapApiData(res.data, []).map(mapEntrySession).slice(0, 5));
     } catch (error) {
       console.error("Failed to load active backend sessions", error);
-      setRecentEntries(
-        getStaffPortalState().sessions
-          .filter((item) => String(item.status || "").toUpperCase() === "ACTIVE")
-          .map(mapEntrySession)
-          .slice(0, 5)
-      );
+      setRecentEntries([]);
     }
   }
 
@@ -310,11 +289,6 @@ export default function VehicleEntryPage() {
       if (current) URL.revokeObjectURL(current);
       return "";
     });
-    updateStaffPortalState((current) => ({
-      ...current,
-      latestOcrPlate: "",
-      latestOcrRecord: null,
-    }));
   };
 
   const uploadForOcr = async (file, filename = "entry-plate.jpg") => {
@@ -338,7 +312,7 @@ export default function VehicleEntryPage() {
       const response = await axiosClient.post("/ocr/scan-image", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const data = response.data?.data || {};
+      const data = unwrapApiData(response.data, {});
       const detectedPlate = data.effectivePlate || data.detectedPlate || "";
       if (!detectedPlate || detectedPlate === "UNKNOWN") {
         setOcrState({
@@ -352,7 +326,6 @@ export default function VehicleEntryPage() {
 
       const confidence = Math.round((data.plateConfidenceScore || 0) * 100);
       const record = {
-        id: data.scanId ? `OCR-${data.scanId}` : createPortalId("OCR"),
         scanId: data.scanId,
         detectedPlate,
         correctedPlate: data.correctedPlate || "",
@@ -361,23 +334,6 @@ export default function VehicleEntryPage() {
         scanTime: data.scannedAt || new Date().toISOString(),
         imagePath: data.imagePath || filename,
       };
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        latestOcrPlate: detectedPlate,
-        latestOcrRecord: record,
-        ocrRecords: [record, ...current.ocrRecords],
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: detectedPlate,
-            action: `OCR scan completed with ${confidence}% confidence`,
-            type: "update",
-            time: record.scanTime,
-          },
-          ...current.activity,
-        ],
-      }));
 
       setLatestOcrPlate(detectedPlate);
       setForm((prev) => ({ ...prev, licensePlate: detectedPlate }));
@@ -405,11 +361,6 @@ export default function VehicleEntryPage() {
     setForm((prev) => ({
       ...prev,
       licensePlate: plateKey(prev.licensePlate) === plateKey(processedPlate) ? "" : prev.licensePlate,
-    }));
-    updateStaffPortalState((current) => ({
-      ...current,
-      latestOcrPlate: "",
-      latestOcrRecord: null,
     }));
   };
 
@@ -496,7 +447,7 @@ export default function VehicleEntryPage() {
       });
       const payload = unwrapApiData(res.data, null);
       const session = {
-        sessionId: payload?.sessionId || createPortalId("SES"),
+        sessionId: payload?.sessionId || Date.now(),
         licensePlate: payload?.licensePlate || lookup.vehicle.licensePlate || normalizedPlate,
         driverName: lookup.vehicle.user?.fullName || lookup.vehicle.user?.username || "Registered Driver",
         slotCode: payload?.slotCode || "Assigned by backend",
@@ -509,21 +460,6 @@ export default function VehicleEntryPage() {
         qrCode: form.qrCode.trim(),
         source: "backend-entry",
       };
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        sessions: [session, ...current.sessions.filter((item) => item.sessionId !== session.sessionId)],
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: session.licensePlate,
-            action: `Entered via ${session.gateName}`,
-            type: "entry",
-            time: session.entryTime,
-          },
-          ...current.activity,
-        ],
-      }));
 
       setRecentEntries((prev) => [session, ...prev.filter((item) => item.sessionId !== session.sessionId)].slice(0, 5));
       setConfirmedSession(session);
@@ -566,7 +502,7 @@ export default function VehicleEntryPage() {
       });
       const payload = unwrapApiData(res.data, null);
       const session = {
-        sessionId: payload?.sessionId || createPortalId("SES"),
+        sessionId: payload?.sessionId || Date.now(),
         licensePlate: payload?.licensePlate || normalizedPlate,
         driverName: "Walk-in Guest",
         slotCode: payload?.slotCode || "Assigned by backend",
@@ -579,21 +515,6 @@ export default function VehicleEntryPage() {
         qrCode: "",
         source: "walk-in-direct",
       };
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        sessions: [session, ...current.sessions.filter((item) => item.sessionId !== session.sessionId)],
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: session.licensePlate,
-            action: `Walk-in entered via ${session.gateName}`,
-            type: "entry",
-            time: session.entryTime,
-          },
-          ...current.activity,
-        ],
-      }));
 
       setRecentEntries((prev) => [session, ...prev.filter((item) => item.sessionId !== session.sessionId)].slice(0, 5));
       setConfirmedSession(session);
@@ -632,7 +553,7 @@ export default function VehicleEntryPage() {
       });
       const payload = unwrapApiData(res.data, null);
       const session = {
-        sessionId: payload?.sessionId || createPortalId("SES"),
+        sessionId: payload?.sessionId || Date.now(),
         licensePlate: payload?.licensePlate || "QR booking",
         driverName: "Booking Driver",
         slotCode: payload?.slotCode || "Booked slot",
@@ -645,31 +566,6 @@ export default function VehicleEntryPage() {
         qrCode: form.qrCode.trim(),
         source: "booking-qr",
       };
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        sessions: [session, ...current.sessions],
-        qrLogs: [
-          {
-            id: createPortalId("QR"),
-            bookingCode: `Booking #${payload?.bookingId || session.sessionId}`,
-            plate: session.licensePlate,
-            status: "valid",
-            checkedAt: session.entryTime,
-          },
-          ...current.qrLogs,
-        ],
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: session.licensePlate,
-            action: `Entered by booking QR via ${session.gateName}`,
-            type: "entry",
-            time: session.entryTime,
-          },
-          ...current.activity,
-        ],
-      }));
 
       setRecentEntries((prev) => [session, ...prev.filter((item) => item.sessionId !== session.sessionId)].slice(0, 5));
       setConfirmedSession(session);
@@ -703,37 +599,6 @@ export default function VehicleEntryPage() {
         exceptionType: "CANNOT_FIND_CAR",
         description,
       });
-      const payload = unwrapApiData(res.data, null);
-      const createdAt = payload?.createdAt || new Date().toISOString();
-
-      updateStaffPortalState((current) => ({
-        ...current,
-        latestOcrPlate: normalizedPlate,
-        exceptions: [
-          {
-            caseId: payload?.exceptionId ? `EX-${payload.exceptionId}` : createPortalId("EX"),
-            exceptionId: payload?.exceptionId,
-            title: "Vehicle not found in backend registry",
-            licensePlate: normalizedPlate,
-            description,
-            severity: "HIGH",
-            status: payload?.status || "OPEN",
-            createdAt,
-            source: "backend-exception",
-          },
-          ...current.exceptions,
-        ],
-        activity: [
-          {
-            id: createPortalId("ACT"),
-            plate: normalizedPlate,
-            action: "Exception opened for unregistered vehicle",
-            type: "exception",
-            time: createdAt,
-          },
-          ...current.activity,
-        ],
-      }));
       setLookup({
         loading: false,
         error: "",

@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
+import { clearPaymentSync, getPaymentSync } from "../../utils/paymentSync";
 import {
   formatDateTime,
   getBookingStatus,
@@ -51,7 +52,19 @@ export default function BookingHistoryPage() {
     setError("");
     try {
       const res = await bookingApi.getMyBookings();
-      setBookings(unwrapApiData(res.data, []));
+      const nextBookings = unwrapApiData(res.data, []);
+      const pendingSync = getPaymentSync("deposit");
+      if (pendingSync) {
+        const targetBooking = nextBookings.find((item) => Number(item.bookingId) === Number(pendingSync.targetId));
+        const isReady =
+          targetBooking &&
+          String(targetBooking.status || "").toUpperCase() === "CONFIRMED" &&
+          Boolean(targetBooking.qrToken);
+        if (isReady) {
+          clearPaymentSync("deposit");
+        }
+      }
+      setBookings(nextBookings);
     } catch (loadError) {
       console.error("Failed to load booking history", loadError);
       setBookings([]);
@@ -75,6 +88,22 @@ export default function BookingHistoryPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const pendingSync = getPaymentSync("deposit");
+    if (!pendingSync) return undefined;
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      void loadBookings();
+      if (attempts >= 6 || !getPaymentSync("deposit")) {
+        clearInterval(interval);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
   }, []);
 
   async function handlePayDeposit(booking) {

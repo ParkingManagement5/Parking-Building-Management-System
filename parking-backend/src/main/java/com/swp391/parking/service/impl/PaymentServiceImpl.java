@@ -157,11 +157,16 @@ public class PaymentServiceImpl implements PaymentService {
                     "Chi tao Parking Fee cho session WAITING_PAYMENT (hien: " + session.getStatus() + ")");
         }
 
-        boolean hasActiveFee = paymentRepository.findBySessionId(sessionId).stream()
+        Payment existingPending = paymentRepository.findBySessionId(sessionId).stream()
+                .filter(p -> p.getPaymentType() == PaymentType.PARKING_FEE
+                        && p.getPaymentStatus() == PaymentStatus.PENDING)
+                .findFirst()
+                .orElse(null);
+        boolean hasPaidFee = paymentRepository.findBySessionId(sessionId).stream()
                 .anyMatch(p -> p.getPaymentType() == PaymentType.PARKING_FEE
-                        && (p.getPaymentStatus() == PaymentStatus.PENDING || p.getPaymentStatus() == PaymentStatus.PAID));
-        if (hasActiveFee) {
-            throw new AppException(HttpStatus.CONFLICT, "Session da co Parking Fee, khong tao them");
+                        && p.getPaymentStatus() == PaymentStatus.PAID);
+        if (hasPaidFee) {
+            throw new AppException(HttpStatus.CONFLICT, "Session da co Parking Fee da thanh toan");
         }
 
         BigDecimal serverRate = resolveHourlyRate(session);
@@ -169,6 +174,10 @@ public class PaymentServiceImpl implements PaymentService {
         if (session.getVehicle() != null && session.getVehicle().getVehicleType() != null) {
             activePolicies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(
                     session.getVehicle().getVehicleType().getId());
+        }
+        if (session.getExitTime() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Session #" + sessionId + " chua co thoi gian ra (exitTime null), khong the tinh phi");
         }
         BigDecimal serverBaseFee = FeeCalculatorUtil.calculateSessionFee(
                 session.getEntryTime(), session.getExitTime(), activePolicies, serverRate);
@@ -188,21 +197,22 @@ public class PaymentServiceImpl implements PaymentService {
             }
         } catch (Exception ignored) {}
 
-        Payment payment = Payment.builder()
+        Payment payment = existingPending != null ? existingPending : Payment.builder()
             .sessionId(sessionId)
-            .bookingId(resolvedBookingId)
-            .policyId(policyId)
             .paymentType(PaymentType.PARKING_FEE)
-            .paymentMethod(paymentMethod)
             .paymentStatus(PaymentStatus.PENDING)
-            .appliedRate(serverRate)
-            .baseFee(serverBaseFee)
-            .overtimeFee(BigDecimal.ZERO)
-            .penaltyFee(BigDecimal.ZERO)
-            .discount(BigDecimal.ZERO)
-            .depositDeducted(serverDeposit)
-            .totalAmount(serverTotal)
             .build();
+
+        payment.setBookingId(resolvedBookingId);
+        payment.setPolicyId(policyId);
+        payment.setPaymentMethod(paymentMethod);
+        payment.setAppliedRate(serverRate);
+        payment.setBaseFee(serverBaseFee);
+        payment.setOvertimeFee(BigDecimal.ZERO);
+        payment.setPenaltyFee(BigDecimal.ZERO);
+        payment.setDiscount(BigDecimal.ZERO);
+        payment.setDepositDeducted(serverDeposit);
+        payment.setTotalAmount(serverTotal);
 
         return toResponse(paymentRepository.save(payment));
     }
@@ -217,8 +227,9 @@ public class PaymentServiceImpl implements PaymentService {
                     "Payment #" + paymentId + " khong phai PARKING_FEE (hien: " + payment.getPaymentType() + ")");
         }
 
+        // Idempotent: duplicate IPN or concurrent /return + IPN calls both succeed
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new AppException(HttpStatus.CONFLICT, "Payment already paid");
+            return toResponse(payment);
         }
         if (payment.getPaymentStatus() == PaymentStatus.FAILED
                 || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
@@ -232,6 +243,13 @@ public class PaymentServiceImpl implements PaymentService {
                 throw new AppException(HttpStatus.BAD_REQUEST,
                         "Session khong o trang thai WAITING_PAYMENT (hien: " + session.getStatus() + ")");
             }
+        }
+
+        // Update method to reflect how payment was actually made
+        if (transactionRef != null && transactionRef.startsWith("CASH-")) {
+            payment.setPaymentMethod(PaymentMethod.CASH);
+        } else if (transactionRef != null && !transactionRef.startsWith("FREE-")) {
+            payment.setPaymentMethod(PaymentMethod.VNPAY);
         }
 
         payment.setPaymentStatus(PaymentStatus.PAID);
@@ -289,9 +307,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PaymentResponse> getByStatus(PaymentStatus status) {
+    public List<PaymentResponse> getByStatus(PaymentStatus status, Long currentUserId, boolean staffScoped) {
+        Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
         return paymentRepository.findByPaymentStatusOrderByCreatedAtDesc(status)
-            .stream().map(this::toResponse)
+            .stream()
+            .filter(payment -> buildingId == null || paymentBelongsToBuilding(payment, buildingId))
+            .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
@@ -327,6 +348,53 @@ public class PaymentServiceImpl implements PaymentService {
                 throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment cua booking nay");
             }
         });
+    }
+
+    @Override
+    public void enforceSessionOwnership(Integer sessionId, Long userId) {
+        parkingSessionRepository.findById(sessionId.longValue()).ifPresent(s -> {
+            if (!s.getUserId().equals(userId)) {
+                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment cua session nay");
+            }
+        });
+    }
+
+    @Override
+    public void enforcePaymentBuildingScope(Integer paymentId, Long currentUserId, boolean staffScoped) {
+        Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
+        if (buildingId == null) {
+            return;
+        }
+        Payment payment = findById(paymentId);
+        if (!paymentBelongsToBuilding(payment, buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment ngoai toa nha duoc phan cong");
+        }
+    }
+
+    @Override
+    public void enforceBookingBuildingScope(Integer bookingId, Long currentUserId, boolean staffScoped) {
+        Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
+        if (buildingId == null) {
+            return;
+        }
+        Booking booking = bookingRepository.findById(bookingId.longValue())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking not found"));
+        if (!bookingBelongsToBuilding(booking, buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking ngoai toa nha duoc phan cong");
+        }
+    }
+
+    @Override
+    public void enforceSessionBuildingScope(Integer sessionId, Long currentUserId, boolean staffScoped) {
+        Long buildingId = resolveScopedBuildingId(currentUserId, staffScoped);
+        if (buildingId == null) {
+            return;
+        }
+        ParkingSession session = parkingSessionRepository.findById(sessionId.longValue())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Session not found"));
+        if (!sessionBelongsToBuilding(session, buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem session ngoai toa nha duoc phan cong");
+        }
     }
 
     private Payment findById(Integer paymentId) {
@@ -404,6 +472,53 @@ public class PaymentServiceImpl implements PaymentService {
 
         userRepository.findById(session.getUserId().intValue())
                 .ifPresent(user -> emailService.sendParkingReceiptEmail(user, session, payment));
+    }
+
+    private Long resolveScopedBuildingId(Long currentUserId, boolean staffScoped) {
+        if (!staffScoped) {
+            return null;
+        }
+        var currentUser = userRepository.findById(Math.toIntExact(currentUserId))
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+        if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Staff chua duoc gan toa nha, khong the xem payment ngoai pham vi");
+        }
+        return currentUser.getAssignedBuilding().getId();
+    }
+
+    private boolean paymentBelongsToBuilding(Payment payment, Long buildingId) {
+        if (payment.getSessionId() != null) {
+            ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue()).orElse(null);
+            if (session != null) {
+                return sessionBelongsToBuilding(session, buildingId);
+            }
+        }
+        if (payment.getBookingId() != null) {
+            Booking booking = bookingRepository.findById(payment.getBookingId().longValue()).orElse(null);
+            if (booking != null) {
+                return bookingBelongsToBuilding(booking, buildingId);
+            }
+        }
+        return false;
+    }
+
+    private boolean bookingBelongsToBuilding(Booking booking, Long buildingId) {
+        return booking != null
+                && booking.getSlot() != null
+                && booking.getSlot().getZone() != null
+                && booking.getSlot().getZone().getFloor() != null
+                && booking.getSlot().getZone().getFloor().getBuilding() != null
+                && buildingId.equals(booking.getSlot().getZone().getFloor().getBuilding().getId());
+    }
+
+    private boolean sessionBelongsToBuilding(ParkingSession session, Long buildingId) {
+        return session != null
+                && session.getSlot() != null
+                && session.getSlot().getZone() != null
+                && session.getSlot().getZone().getFloor() != null
+                && session.getSlot().getZone().getFloor().getBuilding() != null
+                && buildingId.equals(session.getSlot().getZone().getFloor().getBuilding().getId());
     }
 
     private PaymentResponse toResponse(Payment payment) {
