@@ -14,5 +14,5 @@ public interface ParkingSessionService {
     QrTokenResponse generateExitQr(Long sessionId, Long currentUserId);
     SessionResponse getSession(Long sessionId);
     List<SessionResponse> getMySessions(Long currentUserId);
-    List<SessionResponse> getSessions(String status, String keyword);
+    List<SessionResponse> getSessions(String status, String keyword, Long currentUserId, boolean staffScoped);
 }

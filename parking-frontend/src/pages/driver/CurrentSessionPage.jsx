@@ -6,6 +6,7 @@ import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
+import { clearPaymentSync, getPaymentSync } from "../../utils/paymentSync";
 import {
   formatCurrency,
   formatDateTime,
@@ -22,10 +23,11 @@ const ACTIVE_BOOKING_STATUSES = ["PENDING_PAYMENT", "CONFIRMED", "CHECKED_IN", "
 
 function classifyBooking(booking) {
   const status = String(booking?.status || "").toUpperCase();
-  if (status === "CHECKED_IN" || status === "WAITING_PAYMENT") return "SYNCING";
+  if (status === "WAITING_PAYMENT") return "WAITING_PAYMENT_PENDING_SESSION";
+  if (status === "CHECKED_IN") return "SYNCING";
   if (status === "CONFIRMED" && booking.qrToken) return "ENTRY_QR";
   if (status === "PENDING_PAYMENT") return "PENDING_DEPOSIT";
-  if (status === "CONFIRMED" && !booking.qrToken) return "QR_EXPIRED";
+  if (status === "CONFIRMED" && !booking.qrToken) return "SYNCING";
   return null;
 }
 
@@ -60,6 +62,7 @@ function buildDisplayItems(mySessions, myBookings) {
 const BADGE_MAP = {
   EXIT_QR: { bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Đang đỗ" },
   WAITING_PAYMENT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
+  WAITING_PAYMENT_PENDING_SESSION: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
   ENTRY_QR: { bg: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300", label: "Đã xác nhận" },
   PENDING_DEPOSIT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ đặt cọc" },
   QR_EXPIRED: { bg: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", label: "QR hết hạn" },
@@ -189,6 +192,17 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
 
         {displayMode === "WAITING_PAYMENT" ? (
           <WaitingPaymentAction sessionId={item.sessionId} onError={onError} />
+        ) : displayMode === "WAITING_PAYMENT_PENDING_SESSION" ? (
+          <>
+            <p className="text-sm font-semibold text-foreground">Chờ thanh toán phí đỗ xe</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+              Booking đã chuyển sang trạng thái chờ thanh toán nhưng danh sách session chưa đồng bộ kịp. Tải lại để lấy phiên thanh toán mới nhất.
+            </p>
+            <button type="button" onClick={onReload}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500">
+              <RefreshCw size={14} /> Tải lại trạng thái
+            </button>
+          </>
         ) : displayMode === "EXIT_QR" ? (
           exitQr?.qrToken ? (
             <>
@@ -281,7 +295,12 @@ export default function CurrentSessionPage() {
         driverSessionApi.getMySessions(),
         bookingApi.getMyBookings(),
       ]);
-      setItems(buildDisplayItems(unwrapApiData(sessionRes.data, []), unwrapApiData(bookingRes.data, [])));
+      const nextItems = buildDisplayItems(unwrapApiData(sessionRes.data, []), unwrapApiData(bookingRes.data, []));
+      const pendingSync = getPaymentSync("parking_fee");
+      if (pendingSync && !nextItems.some((item) => item.sessionId === pendingSync.targetId)) {
+        clearPaymentSync("parking_fee");
+      }
+      setItems(nextItems);
     } catch (loadError) {
       console.error("Failed to load current session", loadError);
       setItems([]);
@@ -294,6 +313,22 @@ export default function CurrentSessionPage() {
   useEffect(() => {
     void loadSession();
     const interval = setInterval(loadSession, 15000);
+    return () => clearInterval(interval);
+  }, [loadSession]);
+
+  useEffect(() => {
+    const pendingSync = getPaymentSync("parking_fee");
+    if (!pendingSync) return undefined;
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      void loadSession();
+      if (attempts >= 6 || !getPaymentSync("parking_fee")) {
+        clearInterval(interval);
+      }
+    }, 1500);
+
     return () => clearInterval(interval);
   }, [loadSession]);
 

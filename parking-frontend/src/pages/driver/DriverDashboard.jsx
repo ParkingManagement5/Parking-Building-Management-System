@@ -155,6 +155,7 @@ export default function DriverDashboard() {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const monthlyExpenses = payments
+          .filter((p) => String(p.paymentStatus || "").toUpperCase() === "PAID")
           .filter((p) => new Date(p.paidAt || p.createdAt || 0) >= monthStart)
           .reduce((sum, p) => sum + Number(p.amount || p.totalAmount || 0), 0);
 

@@ -978,3 +978,44 @@ Da update truc tiep `parking_db.pricing_policy`:
 - Runtime DB `parking_db.pricing_policy`: da verify lai sau update
   - co day du policy `WEEKDAY/WEEKEND` + `DAY/NIGHT`
   - da co them `WEEKEND night` cho `MOTORBIKE`, `CAR`, `ELECTRIC_CAR`
+
+## Cap nhat DB va seed layout public map
+
+### Pham vi thay doi
+
+- Da bo sung `latitude` va `longitude` cho `parking_building` trong `parking-backend/docs/parking_db_schema.sql`.
+- Da them / chuan hoa danh sach building demo quanh TP.HCM de phuc vu map public va map driver.
+- Da bo sung seed runtime trong `parking-backend/src/main/java/com/swp391/parking/config/DataInitializer.java` de khi backend khoi dong lai se tu dong chuan hoa du lieu demo.
+
+### Layout demo moi cho tung bai
+
+- Moi building duoc quan ly boi seed runtime se duoc chuan hoa thanh:
+  - `2 tang`
+  - ca `2 tang` deu la `O to`
+  - moi tang `6 zone`
+  - moi zone `6 slot`
+- Quy uoc du lieu:
+  - floor: `Tang 1 - O to`, `Tang 2 - O to`
+  - zone: `T1-A` -> `T1-F`, `T2-A` -> `T2-F`
+  - slot: `T1-A-01` -> `T1-A-06` ... `T2-F-06`
+  - slot size: `LARGE`
+  - status mac dinh: `AVAILABLE`
+
+### Co che chuan hoa runtime
+
+- Neu trong DB da co floor / zone / slot nhung khong dung layout demo tren thi seed runtime se:
+  - tao bo du lieu thieu
+  - giu active cho du lieu dung layout
+  - `set is_active = false` cho floor / zone / slot du hoac sai mau
+- Muc tieu la tranh hien thi public slot bi vo bo cuc khi mot bai co cau truc lech voi cac bai con lai.
+
+### Pi Pink
+
+- Da them building `Bai xe Pi Pink` vao bo seed TP.HCM.
+- Pi Pink duoc chuan hoa cung layout voi cac bai demo con lai de tranh giao dien public slot bi sai do floor / zone / slot khong dong nhat.
+
+### Luu y van hanh
+
+- DB runtime hien tai chi duoc cap nhat sau khi restart backend.
+- File SQL schema / seed da duoc cap nhat de DB moi dung lai se co truong toa do cho building.
+- Seed runtime hien tai la nguon chuan de map va public slot co cung mot quy uoc du lieu demo.

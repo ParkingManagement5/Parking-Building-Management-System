@@ -13,6 +13,8 @@ import java.util.Set;
 @AllArgsConstructor
 public class AuthResponse {
     private String token;
+    private boolean requiresOtp;
+    private String otpPurpose;
     private Integer userId;
     private String username;
     private String fullName;

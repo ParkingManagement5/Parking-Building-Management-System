@@ -11,19 +11,19 @@ public interface ExceptionCaseService {
 
     ExceptionCaseResponse createExceptionCase(CreateExceptionCaseRequest request);
 
-    ExceptionCaseResponse getById(Integer exceptionId);
+    ExceptionCaseResponse getById(Integer exceptionId, Integer currentUserId, boolean staffScoped);
 
-    List<ExceptionCaseResponse> getBySessionId(Integer sessionId);
+    List<ExceptionCaseResponse> getBySessionId(Integer sessionId, Integer currentUserId, boolean staffScoped);
 
-    List<ExceptionCaseResponse> getByRequestId(Integer requestId);
+    List<ExceptionCaseResponse> getByRequestId(Integer requestId, Integer currentUserId, boolean staffScoped);
 
-    List<ExceptionCaseResponse> getByStatus(ExceptionStatus status);
+    List<ExceptionCaseResponse> getByStatus(ExceptionStatus status, Integer currentUserId, boolean staffScoped);
 
 
-    List<ExceptionCaseResponse> getByType(ExceptionType exceptionType);
-    ExceptionCaseResponse assignToStaff(Integer exceptionId, Integer staffId);
+    List<ExceptionCaseResponse> getByType(ExceptionType exceptionType, Integer currentUserId, boolean staffScoped);
+    ExceptionCaseResponse assignToStaff(Integer exceptionId, Integer staffId, Integer currentUserId, boolean staffScoped);
 
-    ExceptionCaseResponse resolveExceptionCase(Integer exceptionId);
+    ExceptionCaseResponse resolveExceptionCase(Integer exceptionId, Integer currentUserId, boolean staffScoped);
 
-    ExceptionCaseResponse closeExceptionCase(Integer exceptionId);
+    ExceptionCaseResponse closeExceptionCase(Integer exceptionId, Integer currentUserId, boolean staffScoped);
 }
