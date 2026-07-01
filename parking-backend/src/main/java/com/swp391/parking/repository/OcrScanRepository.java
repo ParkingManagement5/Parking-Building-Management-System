@@ -7,4 +7,5 @@ import java.util.List;
 public interface OcrScanRepository extends JpaRepository<OcrScan, Long> {
     List<OcrScan> findBySession_Id(Long sessionId);
     List<OcrScan> findByProcessStatus(OcrScan.ProcessStatus processStatus);
+    List<OcrScan> findByProcessStatusAndGate_Building_Id(OcrScan.ProcessStatus processStatus, Long buildingId);
 }

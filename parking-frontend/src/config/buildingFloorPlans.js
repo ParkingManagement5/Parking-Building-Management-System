@@ -157,5 +157,19 @@ export const FLOOR_PLANS = {
  */
 export function getFloorPlan(buildingName, floorNumber) {
   const key = `${buildingName}|${floorNumber}`;
-  return FLOOR_PLANS[key] || null;
+  if (FLOOR_PLANS[key]) {
+    return FLOOR_PLANS[key];
+  }
+
+  const normalize = (value) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9|]+/g, " ")
+      .trim()
+      .toLowerCase();
+
+  const normalizedTarget = normalize(key);
+  const matched = Object.entries(FLOOR_PLANS).find(([planKey]) => normalize(planKey) === normalizedTarget);
+  return matched?.[1] || null;
 }

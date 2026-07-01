@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import { buildingApi } from "../../api/manager/buildingApi";
-import { floorApi } from "../../api/manager/floorApi";
-import { zoneApi } from "../../api/manager/zoneApi";
-import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
-import { gateApi } from "../../api/manager/gateApi";
-import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
-import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
-import { staffShiftApi } from "../../api/manager/staffShiftApi";
+import { dashboardApi } from "../../api/manager/dashboardApi";
 import { notificationApi } from "../../api/notificationApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
@@ -33,19 +26,11 @@ import {
 } from "lucide-react";
 
 function asArray(payload) {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
+  if (Array.isArray(payload)) return payload;
   return unwrapApiData(payload, []);
 }
 
 const PIE_COLORS = ["#4F46E5", "#06B6D4", "#22C55E", "#F59E0B", "#EF4444"];
-
-const getBuildingId = (item) => item?.buildingId ?? item?.id;
-const getFloorId = (item) => item?.floorId ?? item?.id;
-const getZoneId = (item) => item?.zoneId ?? item?.id;
-const getVehicleTypeId = (item) => item?.vehicleTypeId ?? item?.id;
 
 export default function ManagerDashboard() {
   const [stats, setStats] = useState([
@@ -65,65 +50,39 @@ export default function ManagerDashboard() {
 
     async function loadDashboard() {
       try {
-        const [buildingRes, vehicleTypeRes, pricingRes, staffShiftRes] =
-          await Promise.all([
-            buildingApi.getAll(),
-            vehicleTypeApi.getAll(),
-            pricingPolicyApi.getAll(),
-            staffShiftApi.getAll(),
-          ]);
-
-        const buildings = asArray(buildingRes.data);
-        const vehicleTypes = asArray(vehicleTypeRes.data);
-        const pricingPolicies = asArray(pricingRes.data);
-        const staffShifts = asArray(staffShiftRes.data);
-
-        const [floorResponses, gateResponses] = await Promise.all([
-          Promise.all(buildings.map((item) => floorApi.getByBuilding(getBuildingId(item)))),
-          Promise.all(buildings.map((item) => gateApi.getByBuilding(getBuildingId(item)))),
+        const [dashRes, notifications] = await Promise.all([
+          dashboardApi.getManagerStats(),
+          getUserId()
+            ? notificationApi.getByUser(getUserId()).then((r) => asArray(r.data))
+            : Promise.resolve([]),
         ]);
 
-        const floors = floorResponses.flatMap((res) => asArray(res.data));
-        const gates = gateResponses.flatMap((res) => asArray(res.data));
+        if (cancelled) return;
 
-        const zoneResponses = await Promise.all(
-          floors.map((item) => zoneApi.getByFloor(getFloorId(item)))
-        );
-        const zones = zoneResponses.flatMap((res) => asArray(res.data));
+        const d = dashRes.data?.data ?? dashRes.data ?? {};
 
-        const slotResponses = await Promise.all(
-          zones.map((item) => parkingSlotApi.getByZone(getZoneId(item)))
-        );
-        const slots = slotResponses.flatMap((res) => asArray(res.data));
-
-        const userId = getUserId();
-        const notifications = userId
-          ? asArray((await notificationApi.getByUser(userId)).data)
-          : [];
-
-        if (cancelled) {
-          return;
-        }
-
-        const availableCount = slots.filter((item) =>
-          String(item.status || "").toUpperCase().includes("AVAILABLE")
-        ).length;
-        const occupancyRate = slots.length
-          ? Math.round(((slots.length - availableCount) / slots.length) * 100)
-          : 0;
+        const totalSlots = d.totalSlots ?? 0;
+        const availableSlots = d.availableSlots ?? 0;
+        const occupancyRate = d.occupancyRatePercent ?? 0;
+        const totalBuildings = d.totalBuildings ?? 0;
+        const activePricingCount = d.activePricingCount ?? 0;
+        const activeGateCount = d.activeGateCount ?? 0;
+        const staffShifts = d.staffShiftCount ?? 0;
+        const slotsByBuilding = d.slotsByBuilding ?? [];
+        const vehicleTypeMix = d.vehicleTypeMix ?? [];
 
         setStats([
           {
             label: "Occupancy Rate",
             value: `${occupancyRate}%`,
-            change: `${availableCount} slots available`,
+            change: `${availableSlots} slots available`,
             trend: "up",
             icon: TrendingUp,
             color: "bg-indigo-50 text-indigo-600",
           },
           {
             label: "Parking Slots",
-            value: String(slots.length),
+            value: String(totalSlots),
             change: "Configured in system",
             trend: "up",
             icon: Grid3x3,
@@ -131,16 +90,16 @@ export default function ManagerDashboard() {
           },
           {
             label: "Buildings",
-            value: String(buildings.length),
-            change: `${gates.filter((item) => item.isActive !== false).length} active gates`,
+            value: String(totalBuildings),
+            change: `${activeGateCount} active gates`,
             trend: "up",
             icon: Building2,
             color: "bg-blue-50 text-blue-600",
           },
           {
             label: "Active Pricing",
-            value: String(pricingPolicies.filter((item) => item.isActive).length),
-            change: `${vehicleTypes.length} vehicle types`,
+            value: String(activePricingCount),
+            change: `${vehicleTypeMix.length} vehicle types`,
             trend: "down",
             icon: DollarSign,
             color: "bg-emerald-50 text-emerald-600",
@@ -148,68 +107,33 @@ export default function ManagerDashboard() {
         ]);
 
         setSlotTrend(
-          buildings.map((building) => {
-            const buildingId = getBuildingId(building);
-            const buildingSlots = slots.filter(
-              (slot) => (slot.zone?.floor?.building?.buildingId ?? slot.zone?.floor?.building?.id) === buildingId
-            );
-
-            return {
-              month: building.name,
-              revenue: buildingSlots.length,
-              target: buildingSlots.filter((slot) =>
-                String(slot.status || "").toUpperCase().includes("AVAILABLE")
-              ).length,
-            };
-          })
-        );
-
-        const vehicleTypeCounts = zones.reduce((acc, zone) => {
-          const vehicleTypeId = getVehicleTypeId(zone.vehicleType);
-          const apiVehicleType = vehicleTypes.find((item) => getVehicleTypeId(item) === vehicleTypeId);
-          const name = zone.vehicleType?.name || apiVehicleType?.name || "Unknown";
-          acc[name] = (acc[name] || 0) + 1;
-          return acc;
-        }, {});
-
-        setVehicleMix(
-          Object.entries(vehicleTypeCounts).map(([name, value]) => ({
-            name,
-            value,
+          slotsByBuilding.map((b) => ({
+            month: b.buildingName,
+            revenue: b.totalSlots,
+            target: b.availableSlots,
           }))
         );
 
-        setAvailabilityByBuilding(
-          buildings.map((building) => {
-            const buildingId = getBuildingId(building);
-            const buildingSlots = slots.filter(
-              (slot) => (slot.zone?.floor?.building?.buildingId ?? slot.zone?.floor?.building?.id) === buildingId
-            );
-            const available = buildingSlots.filter((slot) =>
-              String(slot.status || "").toUpperCase().includes("AVAILABLE")
-            ).length;
+        setVehicleMix(
+          vehicleTypeMix.map((v) => ({ name: v.name, value: v.zoneCount }))
+        );
 
-            return {
-              day: building.name,
-              rate: buildingSlots.length
-                ? Math.round((available / buildingSlots.length) * 100)
-                : 0,
-            };
-          })
+        setAvailabilityByBuilding(
+          slotsByBuilding.map((b) => ({
+            day: b.buildingName,
+            rate: b.availabilityRatePercent,
+          }))
         );
 
         setRecentNotifications(notifications.slice(0, 5));
-        setStaffShiftCount(staffShifts.length);
+        setStaffShiftCount(staffShifts);
       } catch (error) {
         console.error("Failed to load manager dashboard", error);
       }
     }
 
     void loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   return (
@@ -217,7 +141,6 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((item) => {
           const Icon = item.icon;
-
           return (
             <div key={item.label} className="bg-card border border-border rounded-2xl p-4">
               <div className={`size-9 rounded-xl flex items-center justify-center ${item.color} mb-3`}>

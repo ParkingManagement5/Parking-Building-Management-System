@@ -90,6 +90,20 @@ public class NotificationServiceImpl implements NotificationService {
         });
     }
 
+    @Override
+    public void notifyStaffInBuilding(Long buildingId, String title, String body, String type, String entityType, Integer entityId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<User> staffInBuilding = userRepository
+                .findByRolesRoleNameAndAssignedBuilding_Id(Role.RoleName.STAFF, buildingId);
+        staffInBuilding.forEach(user -> {
+            notificationRepository.save(Notification.builder()
+                    .user(user).title(title).body(body).type(type)
+                    .entityType(entityType).entityId(entityId)
+                    .isRead(false).createdAt(now)
+                    .build());
+        });
+    }
+
     private NotificationResponse toResponse(Notification notification) {
         return NotificationResponse.builder()
                 .notificationId(notification.getNotificationId())

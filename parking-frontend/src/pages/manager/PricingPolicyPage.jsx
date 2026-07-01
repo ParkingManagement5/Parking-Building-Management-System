@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, Car, Clock3, Plus, X } from "lucide-react";
+import { Banknote, CalendarDays, Car, Clock3, Plus, Search, X } from "lucide-react";
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import {
@@ -27,6 +27,10 @@ export default function PricingPolicyPage() {
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [page, setPage] = useState(1);
+  const [filterVehicleType, setFilterVehicleType] = useState("");
+  const [filterTimeType, setFilterTimeType] = useState("");
+  const [filterDayType, setFilterDayType] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
     vehicleTypeId: "",
     timeType: "HOURLY",
@@ -152,9 +156,20 @@ export default function PricingPolicyPage() {
     }
   };
 
+  const filteredPolicies = useMemo(() => {
+    return policies.filter((p) => {
+      if (filterVehicleType && String(p.vehicleTypeId) !== String(filterVehicleType)) return false;
+      if (filterTimeType && p.timeType !== filterTimeType) return false;
+      if (filterDayType && p.dayType !== filterDayType) return false;
+      if (filterStatus === "active" && !p.isActive) return false;
+      if (filterStatus === "inactive" && p.isActive) return false;
+      return true;
+    });
+  }, [policies, filterVehicleType, filterTimeType, filterDayType, filterStatus]);
+
   const PAGE_SIZE = 10;
-  const pagedPolicies = useMemo(() => policies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [policies, page]);
-  const totalPages = Math.max(1, Math.ceil(policies.length / PAGE_SIZE));
+  const pagedPolicies = useMemo(() => filteredPolicies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredPolicies, page]);
+  const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PAGE_SIZE));
 
   const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")}d`;
 
@@ -176,9 +191,61 @@ export default function PricingPolicyPage() {
         <ManagerStatCard icon={CalendarDays} label="Active Policies" value={policies.filter((item) => item.isActive).length} hint="Rules currently available for use" tone="amber" />
       </ManagerStatsRow>
 
-      <ManagerPanel title="Pricing Directory" subtitle={`${policies.length} pricing records available`}>
-        {policies.length === 0 ? (
-          <ManagerEmptyState title="No pricing policies yet" description="Create a policy to prepare the pricing engine for bookings and payments." />
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+        <select
+          value={filterVehicleType}
+          onChange={(e) => { setFilterVehicleType(e.target.value); setPage(1); }}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="">Tất cả loại xe</option>
+          {vehicleTypes.map((v) => (
+            <option key={v.id ?? v.vehicleTypeId} value={v.id ?? v.vehicleTypeId}>{v.name}</option>
+          ))}
+        </select>
+        <select
+          value={filterTimeType}
+          onChange={(e) => { setFilterTimeType(e.target.value); setPage(1); }}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="">Tất cả time type</option>
+          <option value="HOURLY">HOURLY</option>
+          <option value="DAILY">DAILY</option>
+          <option value="MONTHLY">MONTHLY</option>
+        </select>
+        <select
+          value={filterDayType}
+          onChange={(e) => { setFilterDayType(e.target.value); setPage(1); }}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="">Tất cả day type</option>
+          <option value="WEEKDAY">WEEKDAY</option>
+          <option value="WEEKEND">WEEKEND</option>
+          <option value="HOLIDAY">HOLIDAY</option>
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {(filterVehicleType || filterTimeType || filterDayType || filterStatus !== "all") && (
+          <button
+            onClick={() => { setFilterVehicleType(""); setFilterTimeType(""); setFilterDayType(""); setFilterStatus("all"); setPage(1); }}
+            className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={12} /> Xóa lọc
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">{filteredPolicies.length} / {policies.length} chính sách</span>
+      </div>
+
+      <ManagerPanel title="Pricing Directory" subtitle={`${filteredPolicies.length} pricing records`}>
+        {filteredPolicies.length === 0 ? (
+          <ManagerEmptyState title="No pricing policies found" description="Create a policy to prepare the pricing engine for bookings and payments." />
         ) : (
           <ManagerDataTable columns={["Vehicle Type", "Time Type", "Day Type", "Hour Range", "Price", "Status", "Actions"]}>
             {pagedPolicies.map((item) => (
