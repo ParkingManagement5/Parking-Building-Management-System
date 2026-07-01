@@ -192,7 +192,9 @@ export default function VehicleExitPage() {
     return Number(policy?.pricePerHour ?? 20000);
   }
 
-  const totalFee = foundSession ? computeSessionFee(foundSession.entryTime, new Date(), resolveHourlyRate(foundSession)) : 0;
+  const totalFee = foundSession
+    ? Number(foundSession.calculatedFee ?? computeSessionFee(foundSession.entryTime, new Date(), resolveHourlyRate(foundSession)))
+    : 0;
 
   const handleConfirmExit = async () => {
     if (!foundSession || !gateId) return;
@@ -207,7 +209,7 @@ export default function VehicleExitPage() {
       const exitedSession = unwrapApiData(exitRes.data, null);
       setConfirmed({
         ...exitedSession,
-        amount: computeSessionFee(exitedSession?.entryTime, exitedSession?.exitTime),
+        amount: Number(exitedSession?.calculatedFee ?? 0),
         exitTime: exitedSession?.exitTime || new Date().toISOString(),
       });
       setQuery("");
@@ -233,7 +235,7 @@ export default function VehicleExitPage() {
       const exitedSession = unwrapApiData(exitRes.data, null);
       setConfirmed({
         ...exitedSession,
-        amount: computeSessionFee(exitedSession?.entryTime, exitedSession?.exitTime),
+        amount: Number(exitedSession?.calculatedFee ?? 0),
         exitTime: exitedSession?.exitTime || new Date().toISOString(),
       });
       setExitQrToken("");
@@ -491,7 +493,7 @@ export default function VehicleExitPage() {
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {formatStaffCurrency(computeSessionFee(item.entryTime, item.exitTime, resolveHourlyRate(item)))}
+                      {formatStaffCurrency(Number(item.calculatedFee ?? computeSessionFee(item.entryTime, item.exitTime, resolveHourlyRate(item))))}
                     </span>
                     <StaffSecondaryButton type="button" onClick={() => navigate("/staff/payments")} className="flex items-center gap-2">
                       <CreditCard size={14} />

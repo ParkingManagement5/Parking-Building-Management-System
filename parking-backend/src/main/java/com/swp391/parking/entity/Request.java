@@ -3,6 +3,7 @@ package com.swp391.parking.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import com.swp391.parking.entity.ParkingBuilding;
 
 @Entity
 @Table(name = "request")
@@ -21,6 +22,10 @@ public class Request extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_staff_id")
     private User assignedStaff;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "building_id")
+    private ParkingBuilding building;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "request_type", nullable = false, length = 30)

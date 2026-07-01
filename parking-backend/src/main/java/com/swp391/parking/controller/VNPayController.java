@@ -103,18 +103,18 @@ public class VNPayController {
 
     @Operation(summary = "Tao URL thanh toan phi do xe qua VNPay")
     @PostMapping("/create-parking-fee/{sessionId}")
-    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createParkingFeeUrl(
             @PathVariable Integer sessionId,
             HttpServletRequest request,
             Authentication authentication) {
-        boolean isDriver = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
-        if (isDriver) {
+        boolean isStaff = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+        if (isStaff) {
             Long userId = userRepository.findByUsername(authentication.getName())
                     .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
                     .getUserId().longValue();
-            paymentService.enforceSessionOwnership(sessionId, userId);
+            paymentService.enforceSessionBuildingScope(sessionId, userId, true);
         }
 
         PaymentResponse payment = paymentService.createParkingFee(

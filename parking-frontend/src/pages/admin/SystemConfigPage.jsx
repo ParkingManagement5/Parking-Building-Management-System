@@ -8,6 +8,7 @@ import {
   ManagerField,
   ManagerForm,
   ManagerInput,
+  ManagerPageHeader,
   ManagerPrimaryButton,
   ManagerSecondaryButton,
 } from "../../ui/components/manager/ManagerUi";
@@ -110,6 +111,13 @@ export default function SystemConfigPage() {
   const PAGE_SIZE = 10;
   const pagedConfigs = useMemo(() => configs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [configs, page]);
   const totalPages = Math.max(1, Math.ceil(configs.length / PAGE_SIZE));
+  const summary = useMemo(() => {
+    const total = configs.length;
+    const changed = configs.filter(
+      (item) => String(draftValues[item.configId] ?? "") !== String(item.configValue ?? "")
+    ).length;
+    return { total, changed };
+  }, [configs, draftValues]);
 
   const groupedConfigs = useMemo(() => {
     const groups = {
@@ -291,41 +299,65 @@ export default function SystemConfigPage() {
           groupKey === "OTHER" ? "xl:col-span-2" : ""
         }`}
       >
-        <h3 className="text-xl font-semibold text-foreground">{GROUP_META[groupKey].title}</h3>
-        <div className="mt-4 space-y-5 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">{GROUP_META[groupKey].title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{items.length} cấu hình</p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
           {items.map((item) => {
             const fieldType = detectFieldType(item.configKey, item.configValue);
             const currentValue = draftValues[item.configId] ?? "";
+            const hasChanged = String(currentValue ?? "") !== String(item.configValue ?? "");
 
             return (
-              <div key={item.configId} className="flex items-center justify-between gap-4">
-                <div className="min-w-0 flex-1 pr-2">
-                  <p className="text-base text-foreground">
-                    {item.description?.trim() || prettifyKey(item.configKey)}
-                  </p>
-                </div>
+              <div
+                key={item.configId}
+                className={`rounded-2xl border px-4 py-3 transition-colors ${
+                  hasChanged ? "border-primary/40 bg-primary/5" : "border-border bg-muted/20"
+                }`}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-6 text-foreground">
+                      {item.description?.trim() || prettifyKey(item.configKey)}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {item.configKey}
+                    </p>
+                  </div>
 
-                {fieldType === "toggle" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChange(item, !normalizeToggleValue(currentValue))}
-                    className={`relative inline-flex h-9 w-11 shrink-0 rounded-full transition-colors ${
-                      normalizeToggleValue(currentValue) ? "bg-primary" : "bg-muted"
-                    }`}
-                  >
-                    <span
-                      className={`m-0.5 inline-block size-8 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
-                        normalizeToggleValue(currentValue) ? "translate-x-2.5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                ) : (
-                  <input
-                    value={currentValue}
-                    onChange={(event) => handleInputChange(item.configId, event.target.value)}
-                    className="w-32 shrink-0 rounded-full border border-border bg-muted px-4 py-2 text-right text-sm text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
-                  />
-                )}
+                  <div className="flex items-center gap-3 self-start lg:self-center">
+                    {hasChanged ? (
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                        Đã sửa
+                      </span>
+                    ) : null}
+
+                    {fieldType === "toggle" ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleChange(item, !normalizeToggleValue(currentValue))}
+                        className={`relative inline-flex h-8 w-11 shrink-0 rounded-full transition-colors ${
+                          normalizeToggleValue(currentValue) ? "bg-primary" : "bg-muted"
+                        }`}
+                      >
+                        <span
+                          className={`m-0.5 inline-block size-7 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
+                            normalizeToggleValue(currentValue) ? "translate-x-3" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    ) : (
+                      <input
+                        value={currentValue}
+                        onChange={(event) => handleInputChange(item.configId, event.target.value)}
+                        className="h-11 w-24 shrink-0 rounded-2xl border border-border bg-muted px-4 text-right text-sm font-semibold text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -354,6 +386,45 @@ export default function SystemConfigPage() {
 
   return (
     <div className="space-y-5">
+      <ManagerPageHeader
+        title="System Configuration"
+        description="Quản lý nhanh các mốc thời gian, toggle hệ thống và cấu hình vận hành cốt lõi."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              {summary.total} cấu hình
+            </span>
+            <span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary">
+              {summary.changed} thay đổi
+            </span>
+          </div>
+        }
+      />
+
+      <div className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2">
+            <Plus size={14} />
+            Add Config
+          </ManagerPrimaryButton>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="rounded-2xl border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            Reset
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveChanges}
+          disabled={!hasChanges || saving}
+          className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+
       <div className="grid auto-rows-fr gap-5 xl:grid-cols-2">
         {["OCR", "BOOKING", "NOTIFICATION", "SECURITY", "OTHER"]
           .map((groupKey) => renderCard(groupKey, groupedConfigs[groupKey]))
@@ -378,30 +449,6 @@ export default function SystemConfigPage() {
           </button>
         </div>
       )}
-
-      <div className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 sm:justify-start">
-          <Plus size={14} />
-          Add Config
-        </ManagerPrimaryButton>
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-2xl border border-border px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            Reset Defaults
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveChanges}
-            disabled={!hasChanges || saving}
-            className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </div>
 
       {addConfigModal}
     </div>

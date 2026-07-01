@@ -12,4 +12,6 @@ public interface SystemConfigService {
     SystemConfigResponse getByKey(String configKey);
     List<SystemConfigResponse> getAll();
     void delete(Long configId);
+
+    long getLongValue(String key, long defaultValue);
 }

@@ -81,6 +81,19 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         systemConfigRepository.deleteById(configId);
     }
 
+    @Override
+    public long getLongValue(String key, long defaultValue) {
+        return systemConfigRepository.findByConfigKey(key)
+                .map(cfg -> {
+                    try {
+                        return Long.parseLong(cfg.getConfigValue().trim());
+                    } catch (Exception e) {
+                        return defaultValue;
+                    }
+                })
+                .orElse(defaultValue);
+    }
+
     private SystemConfigResponse toResponse(SystemConfig config) {
         return SystemConfigResponse.builder()
                 .configId(config.getConfigId())

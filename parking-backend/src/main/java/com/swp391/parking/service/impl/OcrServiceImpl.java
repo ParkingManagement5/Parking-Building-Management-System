@@ -126,6 +126,13 @@ public class OcrServiceImpl implements OcrService {
     }
 
     @Override
+    public List<OcrScanResponse> getPendingReviews(Long buildingId) {
+        return ocrScanRepository
+                .findByProcessStatusAndGate_Building_Id(OcrScan.ProcessStatus.MANUAL_REVIEW, buildingId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Override
     @Transactional
     public OcrScanResponse reviewScan(Long scanId, String correctedPlate, Long staffUserId) {
         OcrScan scan = ocrScanRepository.findById(scanId)
@@ -238,10 +245,15 @@ public class OcrServiceImpl implements OcrService {
     private OcrScanResponse toResponse(OcrScan s) {
         String effective = (s.getIsCorrected() && s.getCorrectedPlate() != null)
                 ? s.getCorrectedPlate() : s.getDetectedPlate();
+        Long buildingId = null;
+        if (s.getGate() != null && s.getGate().getBuilding() != null) {
+            buildingId = s.getGate().getBuilding().getId();
+        }
         return OcrScanResponse.builder()
                 .scanId(s.getId())
                 .sessionId(s.getSession() != null ? s.getSession().getId() : null)
                 .gateId(s.getGate() != null ? s.getGate().getId() : null)
+                .buildingId(buildingId)
                 .imagePath(s.getImagePath())
                 .detectedPlate(s.getDetectedPlate())
                 .plateConfidenceScore(s.getPlateConfidenceScore())
