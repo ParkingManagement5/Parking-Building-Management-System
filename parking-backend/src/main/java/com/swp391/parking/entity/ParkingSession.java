@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ParkingSession extends BaseEntity {
 
-    public enum EntryMode { BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL }
+    public enum EntryMode { BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL, BOOKING_STAFF_OVERRIDE }
     public enum SessionStatus { ACTIVE, WAITING_PAYMENT, COMPLETED }
 
     @Id

@@ -74,9 +74,14 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "entryMode khong hop le: " + request.getEntryMode() + ". Dung: BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL");
         }
-        ParkingSession session = (mode == ParkingSession.EntryMode.BOOKING)
-                ? processBookingEntry(request, gate)
-                : processWalkInEntry(request, gate, mode);
+        ParkingSession session;
+        if (mode == ParkingSession.EntryMode.BOOKING) {
+            session = processBookingEntry(request, gate);
+        } else if (mode == ParkingSession.EntryMode.BOOKING_STAFF_OVERRIDE) {
+            session = processBookingStaffOverride(request, gate);
+        } else {
+            session = processWalkInEntry(request, gate, mode);
+        }
 
         saveGateLog(gate, session, request.getLicensePlate(),
                 GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
@@ -170,6 +175,52 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .build();
 
         return sessionRepository.save(session);
+    }
+
+    /**
+     * Staff override: cho xe vào khi QR entry thất bại.
+     * Bỏ qua QR, tìm booking CONFIRMED theo biển số, tạo session gắn booking bình thường.
+     * Exit vẫn cần QR (generateExitQr từ app driver), payment vẫn tính đủ.
+     */
+    private ParkingSession processBookingStaffOverride(SessionEntryRequest request, Gate gate) {
+        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe để tìm booking");
+        }
+
+        Vehicle vehicle = findByEquivalentLicensePlate(request.getLicensePlate())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy xe biển số " + request.getLicensePlate() + " trong hệ thống"));
+
+        Booking booking = bookingRepository.findByVehicle_IdAndStatusIn(
+                vehicle.getId(), List.of(Booking.BookingStatus.CONFIRMED))
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                        "Không tìm thấy booking CONFIRMED cho xe " + vehicle.getLicensePlate()
+                        + ". Dùng Walk-in nếu xe không có booking."));
+
+        boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
+                vehicle.getId(),
+                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT));
+        if (hasOpenSession) {
+            throw new AppException(HttpStatus.CONFLICT, "Xe đang có phiên đỗ xe chưa hoàn tất");
+        }
+
+        booking.setStatus(Booking.BookingStatus.CHECKED_IN);
+        bookingRepository.save(booking);
+
+        ParkingSlot slot = booking.getSlot();
+        slot.setStatus(ParkingSlot.Status.OCCUPIED);
+        parkingSlotRepository.save(slot);
+
+        return sessionRepository.save(ParkingSession.builder()
+                .booking(booking)
+                .slot(slot)
+                .userId(booking.getUserId())
+                .vehicle(vehicle)
+                .entryGate(gate)
+                .entryTime(LocalDateTime.now())
+                .entryMode(ParkingSession.EntryMode.BOOKING_STAFF_OVERRIDE)
+                .status(ParkingSession.SessionStatus.ACTIVE)
+                .build());
     }
 
 //    private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
@@ -281,7 +332,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
         boolean isWalkIn = session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_AUTO
                 || session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_MANUAL;
-        if (!isWalkIn && !Boolean.TRUE.equals(request.getQrVerified())) {
+        boolean staffForceExit = Boolean.TRUE.equals(request.getStaffForceExit());
+        if (!isWalkIn && !Boolean.TRUE.equals(request.getQrVerified()) && !staffForceExit) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Exit requires a valid driver Exit QR");
         }
@@ -453,6 +505,25 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 : sessionRepository.findAllByOrderByCreatedAtDesc();
         return sessions
                 .stream().map(this::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<SessionResponse> findActiveByPlate(String plate) {
+        List<ParkingSession.SessionStatus> activeStatuses = List.of(
+                ParkingSession.SessionStatus.ACTIVE,
+                ParkingSession.SessionStatus.WAITING_PAYMENT);
+        for (String candidate : LicensePlateUtil.lookupCandidates(plate)) {
+            for (ParkingSession.SessionStatus status : activeStatuses) {
+                List<ParkingSession> found = sessionRepository.searchByPlateOrIdAndStatus(candidate, status);
+                Optional<ParkingSession> match = found.stream()
+                        .filter(s -> s.getVehicle() != null
+                                && LicensePlateUtil.equivalent(s.getVehicle().getLicensePlate(), plate))
+                        .findFirst();
+                if (match.isPresent()) return match.map(this::toResponse);
+            }
+        }
+        return Optional.empty();
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
