@@ -131,6 +131,14 @@ public class ParkingSessionController {
                 sessionService.getSessions(status, keyword, currentUserId, staffScoped)));
     }
 
+    @GetMapping("/by-plate/{plate}")
+    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
+    @Operation(summary = "Tim session dang active hoac waiting_payment theo bien so (khong gioi han building)")
+    public ResponseEntity<ApiResponse<SessionResponse>> getActiveByPlate(@PathVariable String plate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                sessionService.findActiveByPlate(plate).orElse(null)));
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasRole('DRIVER')")
     @Operation(summary = "Lịch sử đỗ xe của tôi")
