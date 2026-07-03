@@ -11,4 +11,7 @@ public class SessionExitRequest {
     private Long staffUserId;
 
     private Boolean qrVerified;
+
+    // Staff override: bypass QR requirement khi xe không scan được QR (mất QR, lỗi hệ thống)
+    private Boolean staffForceExit;
 }
