@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { exceptionApi } from "../../api/staff/exceptionApi";
 import { gateApi } from "../../api/manager/gateApi";
 import { sessionApi } from "../../api/staff/sessionApi";
-import { formatStaffDateTime } from "./staffPortalState";
+import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { unwrapApiData } from "../../utils/api";
 import { getAssignedBuildingId } from "../../utils/auth";
 import {
-  StaffEmptyState, StaffPageSection, StaffPrimaryButton,
+  StaffEmptyState, StaffInput, StaffPageSection, StaffPrimaryButton,
   StaffSecondaryButton, StaffStatusBadge, StaffSelect,
 } from "./StaffUi";
 import OcrCorrectionPage from "./OcrCorrectionPage";
@@ -75,9 +75,86 @@ export default function ExceptionCasePage() {
   const paged = useMemo(() => activeCases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [activeCases, page]);
   const totalPages = Math.max(1, Math.ceil(activeCases.length / PAGE_SIZE));
 
-  // Force Exit state
+  // Force Exit state (existing exception cards)
   const [gates, setGates] = useState([]);
   const [forceExitGateId, setForceExitGateId] = useState({});
+
+  // ─── Báo cáo & Cho xe ra ──────────────────────────────────────────────
+  const REPORT_TYPES = [
+    { value: "LOST_QR",                  label: "Mất QR — xe không scan được QR ra" },
+    { value: "EXIT_VERIFICATION_FAILED", label: "QR lỗi — scan thất bại hoặc QR hỏng" },
+    { value: "SYSTEM_ERROR",             label: "Lỗi hệ thống — không xử lý được tự động" },
+    { value: "OTHER",                    label: "Khác" },
+  ];
+  const [rPlate, setRPlate]         = useState("");
+  const [rSession, setRSession]     = useState(null);
+  const [rSearching, setRSearching] = useState(false);
+  const [rSearchErr, setRSearchErr] = useState("");
+  const [rType, setRType]           = useState("LOST_QR");
+  const [rDesc, setRDesc]           = useState("");
+  const [rGateId, setRGateId]       = useState("");
+  const [rSubmitting, setRSubmitting] = useState(false);
+  const [rResult, setRResult]       = useState(null);
+  const [rError, setRError]         = useState("");
+  const searchTimer = useRef(null);
+
+  const exitGates = useMemo(
+    () => gates.filter((g) => ["EXIT", "BOTH"].includes(String(g.gateType || "").toUpperCase())),
+    [gates],
+  );
+
+  // Tìm session ACTIVE theo biển số (debounce 300ms)
+  useEffect(() => {
+    const raw = rPlate.trim().toUpperCase();
+    if (raw.length < 3) { setRSession(null); setRSearchErr(""); return; }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      setRSearching(true); setRSearchErr(""); setRSession(null);
+      try {
+        const res = await sessionApi.getSessions({ status: "ACTIVE", keyword: raw });
+        const list = unwrapApiData(res.data, []);
+        const canonical = (s) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+        const match = list.find((s) => canonical(s.licensePlate) === canonical(raw))
+                   ?? list.find((s) => canonical(s.licensePlate).includes(canonical(raw)));
+        if (match) { setRSession(match); }
+        else { setRSearchErr("Không tìm thấy session ACTIVE cho biển số này."); }
+      } catch { setRSearchErr("Lỗi khi tìm session."); }
+      finally { setRSearching(false); }
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [rPlate]);
+
+  async function handleReportAndExit(e) {
+    e.preventDefault();
+    if (!rSession) { setRError("Chưa tìm thấy session."); return; }
+    if (!rGateId)  { setRError("Chọn cổng ra."); return; }
+    setRSubmitting(true); setRError("");
+    try {
+      const staffId = Number(localStorage.getItem("userId")) || 0;
+      // 1. Force exit — bypass QR
+      await sessionApi.exit(rSession.sessionId, {
+        gateId: Number(rGateId),
+        staffUserId: staffId,
+        qrVerified: false,
+        staffForceExit: true,
+      });
+      // 2. Tạo exception case để lưu lịch sử báo cáo
+      await exceptionApi.create({
+        sessionId: rSession.sessionId,
+        bookingId: rSession.bookingId ?? null,
+        exceptionType: rType,
+        description: `[Staff báo cáo thủ công] ${rDesc || REPORT_TYPES.find((t) => t.value === rType)?.label || rType}`,
+      });
+      const fee = computeSessionFee(rSession.entryTime);
+      setRResult({ licensePlate: rSession.licensePlate, sessionId: rSession.sessionId, fee });
+      setRPlate(""); setRSession(null); setRDesc(""); setRGateId("");
+      await loadCases();
+    } catch (err) {
+      setRError(err.response?.data?.message || "Xử lý thất bại.");
+    } finally {
+      setRSubmitting(false);
+    }
+  }
 
   useEffect(() => {
     void loadCases();
@@ -178,6 +255,127 @@ export default function ExceptionCasePage() {
 
   return (
     <div className="space-y-5">
+
+      {/* ══════════════════════════════════════════════════════════════
+          BÁO CÁO SỰ CỐ XE RA — nhập biển → tính phí → cho xe ra
+      ══════════════════════════════════════════════════════════════ */}
+      <StaffPageSection
+        title="Báo cáo sự cố & Cho xe ra"
+        subtitle="Dùng khi xe không scan được QR ra cổng hoặc gặp lỗi hệ thống — staff xác nhận thủ công"
+      >
+        {rResult ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/20 dark:bg-emerald-500/10 space-y-3">
+            <p className="font-semibold text-emerald-700 dark:text-emerald-300">Xe đã ra cổng thành công</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <span className="text-muted-foreground">Biển số</span>
+              <span className="font-mono font-bold text-foreground">{rResult.licensePlate}</span>
+              <span className="text-muted-foreground">Session</span>
+              <span className="text-foreground">#{rResult.sessionId}</span>
+              <span className="text-muted-foreground">Tổng tiền cần thanh toán</span>
+              <span className="font-bold text-rose-600 dark:text-rose-400">{formatStaffCurrency(rResult.fee)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Báo cáo đã được lưu. Yêu cầu driver thanh toán tại quầy hoặc qua VNPay.</p>
+            <div className="flex gap-3">
+              <StaffSecondaryButton type="button" onClick={() => setRResult(null)}>Báo cáo xe khác</StaffSecondaryButton>
+              <StaffPrimaryButton type="button" onClick={() => navigate("/staff/payments")}>Đến trang thanh toán</StaffPrimaryButton>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleReportAndExit} className="space-y-4">
+            {/* Tìm xe */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Biển số xe</label>
+              <div className="flex gap-2">
+                <StaffInput
+                  value={rPlate}
+                  onChange={(e) => setRPlate(e.target.value.toUpperCase())}
+                  placeholder="VD: 51A12345"
+                  className="flex-1"
+                />
+                {rSearching && <span className="self-center text-xs text-muted-foreground">Đang tìm...</span>}
+              </div>
+              {rSearchErr && <p className="mt-1 text-xs text-rose-600">{rSearchErr}</p>}
+            </div>
+
+            {/* Thông tin session */}
+            {rSession && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/20 dark:bg-blue-500/10 grid grid-cols-2 gap-2 text-sm">
+                <span className="text-muted-foreground">Session</span>
+                <span className="font-medium text-foreground">#{rSession.sessionId}</span>
+                <span className="text-muted-foreground">Biển số</span>
+                <span className="font-mono font-bold text-foreground">{rSession.licensePlate}</span>
+                <span className="text-muted-foreground">Vào lúc</span>
+                <span className="text-foreground">{formatStaffDateTime(rSession.entryTime)}</span>
+                <span className="text-muted-foreground">Slot</span>
+                <span className="text-foreground">{rSession.slotCode || "—"}</span>
+                {rSession.bookingId && (
+                  <>
+                    <span className="text-muted-foreground">Booking</span>
+                    <span className="text-foreground">#{rSession.bookingId}</span>
+                  </>
+                )}
+                <span className="text-muted-foreground font-semibold">Phí ước tính</span>
+                <span className="font-bold text-rose-600 dark:text-rose-400">
+                  {formatStaffCurrency(computeSessionFee(rSession.entryTime))}
+                </span>
+              </div>
+            )}
+
+            {/* Loại sự cố */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Loại sự cố</label>
+              <StaffSelect value={rType} onChange={(e) => setRType(e.target.value)}>
+                {REPORT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </StaffSelect>
+            </div>
+
+            {/* Mô tả */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Mô tả chi tiết <span className="text-muted-foreground font-normal">(không bắt buộc)</span>
+              </label>
+              <textarea
+                value={rDesc}
+                onChange={(e) => setRDesc(e.target.value)}
+                rows={2}
+                placeholder="VD: Driver trình bày mất điện thoại, không có QR. Staff xác nhận biển số khớp."
+                className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            </div>
+
+            {/* Cổng ra */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Cổng ra</label>
+              <StaffSelect value={rGateId} onChange={(e) => setRGateId(e.target.value)}>
+                <option value="">— Chọn cổng ra —</option>
+                {exitGates.map((g) => (
+                  <option key={g.gateId || g.id} value={g.gateId || g.id}>
+                    {g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`}
+                  </option>
+                ))}
+                {exitGates.length === 0 && <option disabled>Không có cổng ra (chưa gán building)</option>}
+              </StaffSelect>
+            </div>
+
+            {rError && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {rError}
+              </div>
+            )}
+
+            <StaffPrimaryButton
+              type="submit"
+              disabled={rSubmitting || !rSession || !rGateId}
+              className="w-full"
+            >
+              {rSubmitting ? "Đang xử lý..." : "Gửi báo cáo & Cho xe ra"}
+            </StaffPrimaryButton>
+          </form>
+        )}
+      </StaffPageSection>
+
       <StaffPageSection title="Operational Exceptions" subtitle="Review abnormal gate, plate, and session situations from backend">
         <div className="mb-4 flex justify-end">
           <StaffSecondaryButton type="button" onClick={loadCases} disabled={loading}>Refresh</StaffSecondaryButton>
