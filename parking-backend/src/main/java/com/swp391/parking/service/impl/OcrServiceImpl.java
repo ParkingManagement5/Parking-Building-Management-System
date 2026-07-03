@@ -120,12 +120,14 @@ public class OcrServiceImpl implements OcrService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OcrScanResponse> getPendingReviews() {
         return ocrScanRepository.findByProcessStatus(OcrScan.ProcessStatus.MANUAL_REVIEW)
                 .stream().map(this::toResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OcrScanResponse> getPendingReviews(Long buildingId) {
         return ocrScanRepository
                 .findByProcessStatusAndGate_Building_Id(OcrScan.ProcessStatus.MANUAL_REVIEW, buildingId)
@@ -159,6 +161,7 @@ public class OcrServiceImpl implements OcrService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OcrScanResponse getScan(Long scanId) {
         return toResponse(ocrScanRepository.findById(scanId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,

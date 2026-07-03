@@ -214,6 +214,16 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setDepositDeducted(serverDeposit);
         payment.setTotalAmount(serverTotal);
 
+        // Miễn phí (grace period hoặc deposit đã cover hết): auto-complete ngay
+        if (serverTotal.compareTo(BigDecimal.ZERO) == 0) {
+            payment.setPaymentStatus(PaymentStatus.PAID);
+            payment.setPaidAt(LocalDateTime.now());
+            payment.setTransactionRef("FREE-GRACE-" + sessionId);
+            Payment saved = paymentRepository.save(payment);
+            completeSessionAfterParkingFee(saved);
+            return toResponse(saved);
+        }
+
         return toResponse(paymentRepository.save(payment));
     }
 
@@ -471,13 +481,17 @@ public class PaymentServiceImpl implements PaymentService {
             parkingSlotRepository.save(slot);
         }
 
-        notificationService.notify(session.getUserId(),
-                "Thanh toan hoan tat",
-                "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
-                "success", "PAYMENT", payment.getPaymentId());
+        try {
+            notificationService.notify(session.getUserId(),
+                    "Thanh toan hoan tat",
+                    "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
+                    "success", "PAYMENT", payment.getPaymentId());
+        } catch (Exception ignored) {}
 
-        userRepository.findById(session.getUserId().intValue())
-                .ifPresent(user -> emailService.sendParkingReceiptEmail(user, session, payment));
+        try {
+            userRepository.findById(session.getUserId().intValue())
+                    .ifPresent(user -> emailService.sendParkingReceiptEmail(user, session, payment));
+        } catch (Exception ignored) {}
     }
 
     private Long resolveScopedBuildingId(Long currentUserId, boolean staffScoped) {

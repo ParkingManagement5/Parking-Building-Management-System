@@ -408,12 +408,24 @@ export default function UnifiedScanPage() {
   async function autoLookup(p) {
     setLookupLoading(true);
     try {
-      // Active session? → EXIT
-      const sRes = await sessionApi.getSessions({ status: "ACTIVE", keyword: p });
-      const sessions = unwrapApiData(sRes.data, []);
-      const plateKey = canonicalPlate(p);
-      const match = plateKey ? sessions.find((s) => canonicalPlate(s.licensePlate) === plateKey) : null;
-      if (match) { setLookupType("EXIT"); setLookupData(match); return; }
+      // Active/waiting session? (dedicated endpoint, no building scope restriction)
+      try {
+        const sRes = await sessionApi.getActiveByPlate(p);
+        const session = unwrapApiData(sRes.data, null);
+        if (session) {
+          const sessionStatus = String(session.status || "").toUpperCase();
+          if (sessionStatus === "ACTIVE") {
+            // Xe đang trong bãi → EXIT
+            setLookupType("EXIT"); setLookupData(session); return;
+          }
+          if (sessionStatus === "WAITING_PAYMENT") {
+            // Xe đã ra nhưng chưa thanh toán → BLOCKED, không cho vào lại
+            setLookupType("BLOCKED");
+            setLookupData(`Xe co phien chua thanh toan (Session #${session.sessionId}). Thu tien truoc khi cho xe vao.`);
+            return;
+          }
+        }
+      } catch { /* ignore, fall through */ }
 
       // Has booking?
       try {
@@ -480,8 +492,9 @@ export default function UnifiedScanPage() {
         throw new Error("Booking chua thanh toan coc. Khong the cho xe vao.");
       } else if (isConfirmedBooking && qrToken.trim()) {
         res = await sessionApi.entry({ gateId: Number(gateId), entryMode: "BOOKING", qrToken: qrToken.trim(), licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
-      } else if (lookupType === "BOOKING") {
-        throw new Error("Can QR booking hop le de xac nhan xe vao.");
+      } else if (isConfirmedBooking) {
+        // Không có QR → Staff override: bypass QR, vẫn link booking
+        res = await sessionApi.entry({ gateId: Number(gateId), entryMode: "BOOKING_STAFF_OVERRIDE", licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
       } else {
         res = await sessionApi.entry({ gateId: Number(gateId), licensePlate: plate, entryMode: "WALK_IN_AUTO", staffUserId: Number(localStorage.getItem("userId")) || null });
       }
@@ -496,7 +509,18 @@ export default function UnifiedScanPage() {
       setResult(record);
       setHistory((prev) => [record, ...prev].slice(0, 10));
       setStep(3);
-    } catch (err) { setError(err.response?.data?.message || err.message || "Xu ly that bai."); }
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || "Xu ly that bai.";
+      // 409: xe đang có session active → tự động re-lookup và chuyển sang EXIT
+      if (err.response?.status === 409 || message.includes("phiên đỗ xe")) {
+        try {
+          const sRes = await sessionApi.getActiveByPlate(plate);
+          const session = unwrapApiData(sRes.data, null);
+          if (session) { setLookupType("EXIT"); setLookupData(session); setError("Xe dang trong bai — da chuyen sang che do xe ra."); return; }
+        } catch { /* ignore */ }
+      }
+      setError(message);
+    }
     finally { setProcessing(false); }
   }
 
@@ -717,7 +741,7 @@ export default function UnifiedScanPage() {
                   {(isConfirmedBooking || lookupType === "EXIT") && (
                     <div className="rounded-2xl border border-border bg-muted/20 p-4">
                       <p className="text-sm font-semibold text-foreground mb-2">
-                        {isConfirmedBooking ? "Scan QR booking cua driver (bat buoc)" : "Exit QR cua driver (neu co)"}
+                        {isConfirmedBooking ? "Scan QR booking cua driver (khuyen nghi – co the bo qua)" : "Exit QR cua driver (neu co)"}
                       </p>
                       <div className="flex gap-2">
                         <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
@@ -754,34 +778,45 @@ export default function UnifiedScanPage() {
 
                       {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">{error}</div>}
 
+                      {isConfirmedBooking && !qrToken.trim() && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                          Khong co QR — he thong se dung <strong>Staff Override</strong>: xe vao khong can QR, booking van duoc lien ket. Driver van dung Exit QR tren app de ra binh thuong.
+                        </div>
+                      )}
+
                       <StaffPrimaryButton type="button" onClick={handleProcess}
-                        disabled={processing || !gateId || isPendingPaymentBooking || (isConfirmedBooking && !qrToken.trim())}
+                        disabled={processing || !gateId || isPendingPaymentBooking}
                         className="flex w-full items-center justify-center gap-2">
                         {processing ? "Dang xu ly..." : lookupType === "EXIT" ? (
                           <><LogOut size={15} /> Xac nhan xe ra</>
+                        ) : isConfirmedBooking && !qrToken.trim() ? (
+                          <><LogIn size={15} /> Cho xe vao (Staff Override)</>
                         ) : (
                           <><LogIn size={15} /> Xac nhan xe vao</>
                         )}
                       </StaffPrimaryButton>
 
-                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 px-4 py-3">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Flow thuong khong chot duoc?</p>
-                            <p className="text-xs text-muted-foreground">
-                              Tao exception khi staff khong the xac minh bien so, QR, session, hoac booking de xu ly tiep tai cong.
-                            </p>
+                      {/* Chỉ cho tạo exception với SESSION_CONFLICT và BLOCKED — các trường hợp entry lỗi khác dùng manual plate + override */}
+                      {(lookupType === "BLOCKED") && (
+                        <div className="rounded-2xl border border-dashed border-border bg-muted/10 px-4 py-3">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">Xe bi khoa hoac xung dot session?</p>
+                              <p className="text-xs text-muted-foreground">
+                                Tao exception de ghi nhan va xu ly thu cong tai cong.
+                              </p>
+                            </div>
+                            <StaffSecondaryButton
+                              type="button"
+                              onClick={() => createExceptionCase(deriveExceptionType())}
+                              disabled={creatingException}
+                              className="shrink-0"
+                            >
+                              {creatingException ? "Dang tao..." : "Tao exception"}
+                            </StaffSecondaryButton>
                           </div>
-                          <StaffSecondaryButton
-                            type="button"
-                            onClick={() => createExceptionCase(deriveExceptionType())}
-                            disabled={creatingException}
-                            className="shrink-0"
-                          >
-                            {creatingException ? "Dang tao..." : "Khong xu ly duoc -> Tao exception"}
-                          </StaffSecondaryButton>
                         </div>
-                      </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -932,12 +967,8 @@ export default function UnifiedScanPage() {
                 )}
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <StaffSecondaryButton
-                    type="button"
-                    onClick={() => createExceptionCase("PLATE_UNVERIFIED", "OCR confidence thap va staff khong the xac nhan bien so tai cong.")}
-                    disabled={creatingException || scanning}
-                  >
-                    {creatingException ? "Dang tao..." : "Khong xac minh duoc -> Tao exception"}
+                  <StaffSecondaryButton type="button" onClick={closeLowConfidenceReview} disabled={scanning}>
+                    Huy
                   </StaffSecondaryButton>
                   <StaffPrimaryButton type="submit" disabled={scanning} className="flex items-center justify-center gap-2">
                     <CheckCircle2 size={15} />
@@ -1036,13 +1067,6 @@ export default function UnifiedScanPage() {
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <StaffSecondaryButton type="button" onClick={closeManualEntry}>
                   Huy
-                </StaffSecondaryButton>
-                <StaffSecondaryButton
-                  type="button"
-                  onClick={() => createExceptionCase("PLATE_UNVERIFIED", "Staff da mo nhap tay nhung van khong xac minh duoc bien so de tiep tuc flow.")}
-                  disabled={creatingException}
-                >
-                  {creatingException ? "Dang tao..." : "Khong xac minh duoc"}
                 </StaffSecondaryButton>
                 <StaffPrimaryButton type="submit" className="flex items-center justify-center gap-2">
                   <CheckCircle2 size={15} />
