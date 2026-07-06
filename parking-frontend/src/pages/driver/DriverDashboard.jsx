@@ -236,7 +236,7 @@ export default function DriverDashboard() {
         <div className="grid grid-cols-3 gap-3">
           {[
             ["Trạng thái", heroStatusLabel],
-            ["Phí ước tính", formatCurrency(heroRecord?.amount || heroRecord?.estimatedFee || heroRecord?.totalAmount || 0)],
+            ["Phí ước tính", formatCurrency((heroIsSession ? heroRecord?.calculatedFee : heroRecord?.depositAmount) || 0)],
             ["Biển số xe", heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Chưa gán"],
           ].map(([label, val]) => (
             <div key={label} className="rounded-xl bg-white/10 p-3">
@@ -269,7 +269,7 @@ export default function DriverDashboard() {
                 </div>
                 <div className="text-right shrink-0 ml-3">
                   <p className="text-sm font-semibold text-foreground">
-                    {formatCurrency(item.amount || item.totalAmount || item.estimatedFee || 0)}
+                    {formatCurrency(item.depositAmount || 0)}
                   </p>
                   <StatusBadge status={getBookingStatus(item)} />
                 </div>

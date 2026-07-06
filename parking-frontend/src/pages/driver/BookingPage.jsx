@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   Check,
@@ -77,6 +77,8 @@ const STEP_LABELS = ["Chọn vị trí", "Thời gian", "Xác nhận"];
 
 export default function BookingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preselectBuildingName = location.state?.buildingName || "";
 
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
@@ -156,6 +158,16 @@ export default function BookingPage() {
   );
 
   const buildingOptions = useMemo(() => Array.from(new Map(slotGrid.map((s) => [s.building, s.building])).values()), [slotGrid]);
+
+  // Tu chon toa nha khi vao tu nut "Dat cho" o trang Tim bai do xe (truyen
+  // buildingName qua router state) — chi ap dung sau khi da chon xe (buildingOptions
+  // chi co du lieu luc do) va nguoi dung chua tu chon toa nha khac.
+  useEffect(() => {
+    if (!preselectBuildingName || selection.building || !selection.vehicleId) return;
+    if (buildingOptions.includes(preselectBuildingName)) {
+      setSelection((p) => ({ ...p, building: preselectBuildingName }));
+    }
+  }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
   const floorOptions = useMemo(() => [...new Set(slotGrid.filter((s) => !selection.building || s.building === selection.building).map((s) => s.floor))], [slotGrid, selection.building]);
   const zoneOptions = useMemo(() => [...new Set(slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor)).map((s) => s.zone))], [slotGrid, selection.building, selection.floor]);
   const filteredSlotGrid = useMemo(() => slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor) && (!selection.zone || s.zone === selection.zone)), [slotGrid, selection.building, selection.floor, selection.zone]);

@@ -226,6 +226,11 @@ export default function MyVehiclesPage() {
             </div>
           );
         })}
+        {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
+          <div key={`filler-${index}`} aria-hidden="true" className="invisible min-h-[200px] rounded-2xl border border-border bg-card p-5">
+            &nbsp;
+          </div>
+        ))}
 
         {/* Add new card */}
         <button

@@ -3,6 +3,7 @@ package com.swp391.parking.util;
 import com.swp391.parking.entity.PricingPolicy;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -11,6 +12,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
 
 public class FeeCalculatorUtil {
 
@@ -21,37 +23,51 @@ public class FeeCalculatorUtil {
     /**
      * Chọn hourlyRate đúng theo BR-12:
      * PricingPolicy × vehicle_type × day_type × time_range
+     *
+     * "policies" có thể chứa NHIỀU PHIÊN BẢN của cùng 1 policy (do Manager sửa giá
+     * nhiều lần, mỗi lần sửa tạo 1 dòng mới với effectiveFrom mới). Với mỗi mức ưu
+     * tiên, ta chỉ xét các phiên bản đã "có hiệu lực" tại referenceTime
+     * (effectiveFrom <= referenceTime) và chọn phiên bản MỚI NHẤT trong số đó — để
+     * tính đúng giá đã áp dụng tại thời điểm đó, không bị ảnh hưởng bởi lần sửa giá
+     * sau này.
      */
     public static BigDecimal resolveHourlyRate(List<PricingPolicy> policies, LocalDateTime referenceTime) {
         if (policies == null || policies.isEmpty()) return DEFAULT_RATE;
-        if (referenceTime == null) referenceTime = LocalDateTime.now();
+        LocalDateTime refTime = referenceTime != null ? referenceTime : LocalDateTime.now();
 
-        String dayType = isWeekend(referenceTime) ? "WEEKEND" : "WEEKDAY";
-        int hour = referenceTime.getHour();
+        String dayType = isWeekend(refTime) ? "WEEKEND" : "WEEKDAY";
+        int hour = refTime.getHour();
+
+        BigDecimal rate;
 
         // Ưu tiên 1: match cả dayType + timeRange
-        for (PricingPolicy p : policies) {
-            if (dayType.equalsIgnoreCase(p.getDayType()) && isInTimeRange(hour, p.getStartHour(), p.getEndHour())) {
-                return p.getPricePerHour();
-            }
-        }
+        rate = latestEffectiveRate(policies, refTime,
+                p -> dayType.equalsIgnoreCase(p.getDayType()) && isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
+        if (rate != null) return rate;
 
         // Ưu tiên 2: match dayType (bỏ qua timeRange)
-        for (PricingPolicy p : policies) {
-            if (dayType.equalsIgnoreCase(p.getDayType())) {
-                return p.getPricePerHour();
-            }
-        }
+        rate = latestEffectiveRate(policies, refTime, p -> dayType.equalsIgnoreCase(p.getDayType()));
+        if (rate != null) return rate;
 
         // Ưu tiên 3: match timeRange (bỏ qua dayType)
-        for (PricingPolicy p : policies) {
-            if (isInTimeRange(hour, p.getStartHour(), p.getEndHour())) {
-                return p.getPricePerHour();
-            }
-        }
+        rate = latestEffectiveRate(policies, refTime, p -> isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
+        if (rate != null) return rate;
 
-        // Fallback: policy đầu tiên
-        return policies.get(0).getPricePerHour();
+        // Fallback: phiên bản mới nhất (tại referenceTime) trong toàn bộ danh sách,
+        // hoặc policy đầu tiên nếu không có phiên bản nào đã hiệu lực.
+        rate = latestEffectiveRate(policies, refTime, p -> true);
+        return rate != null ? rate : policies.get(0).getPricePerHour();
+    }
+
+    private static BigDecimal latestEffectiveRate(List<PricingPolicy> policies,
+                                                   LocalDateTime referenceTime,
+                                                   Predicate<PricingPolicy> matcher) {
+        return policies.stream()
+                .filter(matcher)
+                .filter(p -> p.getEffectiveFrom() == null || !p.getEffectiveFrom().isAfter(referenceTime))
+                .max(Comparator.comparing(p -> p.getEffectiveFrom() == null ? LocalDateTime.MIN : p.getEffectiveFrom()))
+                .map(PricingPolicy::getPricePerHour)
+                .orElse(null);
     }
 
     public static BigDecimal calculateSessionFee(LocalDateTime entryTime,
@@ -153,7 +169,14 @@ public class FeeCalculatorUtil {
         long totalSeconds = Duration.between(start, end).getSeconds();
         long blockSeconds = BILLING_BLOCK_MINUTES * 60;
         long blocks = Math.max(1, (long) Math.ceil(totalSeconds / (double) blockSeconds));
-        return blockRate.multiply(BigDecimal.valueOf(blocks));
+
+        // Moi block la 30 phut = nua gio — truoc day nhan thang blockRate (gia ca GIO)
+        // cho moi block 30 phut, khien phi bi tinh gap doi thuc te (vd 1h31p bi tinh
+        // thanh 4 block x gia/gio = 4 gio, trong khi dung ra chi ~1.5-2 gio).
+        BigDecimal perBlockRate = blockRate
+                .multiply(BigDecimal.valueOf(BILLING_BLOCK_MINUTES))
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        return perBlockRate.multiply(BigDecimal.valueOf(blocks));
     }
 
     private static LocalDateTime findNextPolicyBoundary(LocalDateTime current, List<PricingPolicy> policies) {
@@ -166,6 +189,21 @@ public class FeeCalculatorUtil {
             addBoundary(boundaries, today, policy.getEndHour());
             addBoundary(boundaries, tomorrow, policy.getStartHour());
             addBoundary(boundaries, tomorrow, policy.getEndHour());
+        }
+
+        // Ranh gioi nua dem - luon can thiet de phat hien doi ngay thuong/cuoi tuan,
+        // ke ca khi khong trung gio bat dau/ket thuc cua policy nao (VD: khung dem
+        // 22h-6h vat qua Chu nhat -> Thu 2 phai tach thanh 2 doan gia khac nhau).
+        boundaries.add(LocalDateTime.of(tomorrow, LocalTime.MIDNIGHT));
+
+        // Ranh gioi tai moi moc Manager doi gia (effectiveFrom cua tung phien ban
+        // policy) - dam bao khi dang tinh phi cho mot phien do da qua ma giua chung
+        // Manager sua gia, doan truoc/sau moc sua se duoc tach rieng va tinh dung
+        // theo gia da ap dung tai tung thoi diem.
+        for (PricingPolicy policy : policies) {
+            if (policy.getEffectiveFrom() != null) {
+                boundaries.add(policy.getEffectiveFrom());
+            }
         }
 
         return boundaries.stream()

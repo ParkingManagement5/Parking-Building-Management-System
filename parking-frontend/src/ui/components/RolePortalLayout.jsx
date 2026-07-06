@@ -75,11 +75,13 @@ const CONFIG = {
       {
         label: "Cơ sở hạ tầng",
         items: [
-          { id: "buildings", label: "Tòa nhà" },
-          { id: "floors", label: "Tầng" },
-          { id: "zones", label: "Zone" },
-          { id: "parking-slots", label: "Slot" },
-          { id: "gates", label: "Cổng" },
+          { id: "parking-structure", label: "Cấu trúc bãi xe" },
+        ],
+      },
+      {
+        label: "Báo cáo",
+        items: [
+          { id: "reports", label: "Doanh thu & Lượt xe" },
         ],
       },
       {
@@ -105,6 +107,7 @@ const CONFIG = {
           { id: "users", label: "Người dùng" },
           { id: "roles", label: "Vai trò" },
           { id: "system-config", label: "Cấu hình" },
+          { id: "activity-logs", label: "Nhật ký hoạt động" },
         ],
       },
     ],
@@ -143,6 +146,7 @@ export default function RolePortalLayout({ portal }) {
   const [notifications, setNotifications] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef(null);
 
@@ -152,6 +156,12 @@ export default function RolePortalLayout({ portal }) {
   const mobileTitle = flatMenuItems.find((item) => item.id === pageKey)?.label || "Trang chủ";
   const isDriverPortal = portal === "driver";
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  const todayNotifications = useMemo(() => {
+    const todayKey = new Date().toDateString();
+    return notifications
+      .filter((notification) => notification.createdAt && new Date(notification.createdAt).toDateString() === todayKey)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [notifications]);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +195,7 @@ export default function RolePortalLayout({ portal }) {
       if (!navRef.current?.contains(event.target)) {
         setOpenDropdown(null);
         setUserMenuOpen(false);
+        setNotifOpen(false);
         setMobileMenuOpen(false);
       }
     };
@@ -196,6 +207,7 @@ export default function RolePortalLayout({ portal }) {
   useEffect(() => {
     setOpenDropdown(null);
     setUserMenuOpen(false);
+    setNotifOpen(false);
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
@@ -209,6 +221,15 @@ export default function RolePortalLayout({ portal }) {
   function handleLogout() {
     localStorage.clear();
     navigate("/login");
+  }
+
+  function handleNotifItemClick(notification) {
+    if (!notification.isRead) {
+      setNotifications((prev) =>
+        prev.map((item) => (item.notificationId === notification.notificationId ? { ...item, isRead: true } : item))
+      );
+      notificationApi.markAsRead(notification.notificationId).catch(() => {});
+    }
   }
 
   const accentColor = ROLE_COLORS[portal] || "var(--accent)";
@@ -256,6 +277,7 @@ export default function RolePortalLayout({ portal }) {
                       event.stopPropagation();
                       setOpenDropdown(isOpen ? null : index);
                       setUserMenuOpen(false);
+                      setNotifOpen(false);
                       setMobileMenuOpen(false);
                     }}
                   >
@@ -313,13 +335,118 @@ export default function RolePortalLayout({ portal }) {
               )}
             </button>
 
-            <button className="dash-notif-btn" onClick={() => goTo("notifications")} title="Thông báo">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 01-3.46 0" />
-              </svg>
-              {unreadCount > 0 && <span className="dash-notif-dot" />}
-            </button>
+            <div style={{ position: "relative" }}>
+              <button
+                className="dash-notif-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setNotifOpen((prev) => !prev);
+                  setOpenDropdown(null);
+                  setUserMenuOpen(false);
+                  setMobileMenuOpen(false);
+                }}
+                title="Thông báo hôm nay"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 01-3.46 0" />
+                </svg>
+                {unreadCount > 0 && <span className="dash-notif-dot" />}
+              </button>
+
+              {notifOpen && (
+                <div
+                  className="dash-dropdown"
+                  style={{
+                    opacity: 1,
+                    visibility: "visible",
+                    transform: "translateY(0)",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    left: "auto",
+                    width: 340,
+                    maxWidth: "calc(100vw - 32px)",
+                    padding: 0,
+                  }}
+                >
+                  <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
+                    <p style={{ margin: 0, fontSize: "0.9rem", fontWeight: 600, color: "var(--text)" }}>Thông báo hôm nay</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {todayNotifications.length === 0 ? "Chưa có thông báo nào" : `${todayNotifications.length} thông báo`}
+                    </p>
+                  </div>
+
+                  <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                    {todayNotifications.length === 0 ? (
+                      <p style={{ margin: 0, padding: "24px 14px", textAlign: "center", fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                        Không có thông báo nào phát sinh hôm nay.
+                      </p>
+                    ) : (
+                      todayNotifications.slice(0, 8).map((notification) => (
+                        <a
+                          key={notification.notificationId}
+                          href="/"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            handleNotifItemClick(notification);
+                          }}
+                          style={{
+                            display: "block",
+                            padding: "10px 14px",
+                            borderBottom: "1px solid var(--border)",
+                            background: notification.isRead ? "transparent" : "rgba(16,185,129,0.06)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            {!notification.isRead && (
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+                            )}
+                            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text)" }}>{notification.title}</span>
+                          </div>
+                          {notification.body && (
+                            <p
+                              style={{
+                                margin: "4px 0 0",
+                                fontSize: "0.78rem",
+                                color: "var(--text-secondary)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                              }}
+                            >
+                              {notification.body}
+                            </p>
+                          )}
+                          <p style={{ margin: "4px 0 0", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                            {new Date(notification.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </a>
+                      ))
+                    )}
+                  </div>
+
+                  <a
+                    href="/"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      goTo("notifications");
+                    }}
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      padding: "10px 14px",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: "var(--accent)",
+                    }}
+                  >
+                    Xem tất cả thông báo
+                  </a>
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
@@ -331,6 +458,7 @@ export default function RolePortalLayout({ portal }) {
                 setMobileMenuOpen((prev) => !prev);
                 setOpenDropdown(null);
                 setUserMenuOpen(false);
+                setNotifOpen(false);
               }}
             >
               <span />
@@ -345,6 +473,7 @@ export default function RolePortalLayout({ portal }) {
                 event.stopPropagation();
                 setUserMenuOpen(!userMenuOpen);
                 setOpenDropdown(null);
+                setNotifOpen(false);
                 setMobileMenuOpen(false);
               }}
             >

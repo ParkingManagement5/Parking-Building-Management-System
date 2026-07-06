@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.ChangePasswordRequest;
 import com.swp391.parking.dto.request.ChangeUserRoleRequest;
+import com.swp391.parking.dto.request.ChangeUserStatusRequest;
 import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.UserProfileResponse;
@@ -59,6 +60,17 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Cap nhat role thanh cong",
                 userAdminService.changeUserRole(userId, request, authentication.getName())));
+    }
+
+    @PutMapping("/{userId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserSummaryResponse>> changeUserStatus(
+            @PathVariable Integer userId,
+            Authentication authentication,
+            @Valid @RequestBody ChangeUserStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Cap nhat trang thai thanh cong",
+                userAdminService.changeUserStatus(userId, request.getStatus(), authentication.getName())));
     }
 
     @GetMapping("/me")

@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, CheckCheck, MailWarning, ShieldAlert } from "lucide-react";
+import { X } from "lucide-react";
 import { notificationApi } from "../../api/notificationApi";
 import { getUserId } from "../../utils/auth";
 import {
   ManagerEmptyState,
-  ManagerPageHeader,
   ManagerPanel,
   ManagerPrimaryButton,
-  ManagerStatCard,
-  ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
@@ -16,6 +13,8 @@ import { unwrapApiData } from "../../utils/api";
 export default function ManagerNotificationPage() {
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState(1);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const PAGE_SIZE = 8;
 
   useEffect(() => {
@@ -54,34 +53,72 @@ export default function ManagerNotificationPage() {
     }
   };
 
-  const stats = useMemo(
-    () => ({
-      unread: notifications.filter((item) => !item.isRead).length,
-      read: notifications.filter((item) => item.isRead).length,
-      alert: notifications.filter((item) => String(item.type || "").toUpperCase().includes("ALERT")).length,
-    }),
-    [notifications]
-  );
+  const filteredNotifications = useMemo(() => {
+    if (!from && !to) return notifications;
+    const fromMs = from ? new Date(`${from}T00:00:00`).getTime() : null;
+    const toMs = to ? new Date(`${to}T23:59:59`).getTime() : null;
+    return notifications.filter((item) => {
+      const ts = item.createdAt ? new Date(item.createdAt).getTime() : null;
+      if (ts == null || Number.isNaN(ts)) return false;
+      if (fromMs != null && ts < fromMs) return false;
+      if (toMs != null && ts > toMs) return false;
+      return true;
+    });
+  }, [notifications, from, to]);
 
-  const paged = useMemo(() => notifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [notifications, page]);
-  const totalPages = Math.max(1, Math.ceil(notifications.length / PAGE_SIZE));
+  const paged = useMemo(
+    () => filteredNotifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredNotifications, page]
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / PAGE_SIZE));
 
   return (
-    <div className="space-y-5">
-      <ManagerPageHeader
-        title="Notification Center"
-        description="Monitor manager-facing system alerts and operational messages in one inbox."
-        action={<ManagerPrimaryButton type="button" onClick={handleMarkAllAsRead}>Mark All As Read</ManagerPrimaryButton>}
-      />
-      <ManagerStatsRow>
-        <ManagerStatCard icon={Bell} label="Total Notifications" value={notifications.length} hint="Messages returned for current manager" tone="violet" />
-        <ManagerStatCard icon={MailWarning} label="Unread" value={stats.unread} hint="Needs your attention" tone="amber" />
-        <ManagerStatCard icon={CheckCheck} label="Read" value={stats.read} hint="Already reviewed" tone="emerald" />
-        <ManagerStatCard icon={ShieldAlert} label="Alerts" value={stats.alert} hint="Alert-type notifications only" tone="rose" />
-      </ManagerStatsRow>
-      <ManagerPanel title="Manager Inbox" subtitle={`${notifications.length} notifications loaded`}>
-        {notifications.length === 0 ? (
-          <ManagerEmptyState title="No notifications" description="There are no notifications for the current manager account yet." />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Trung tâm thông báo</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Theo dõi cảnh báo hệ thống và thông báo vận hành dành cho quản lý tại một nơi.</p>
+        </div>
+        <ManagerPrimaryButton type="button" onClick={handleMarkAllAsRead}>Đánh dấu tất cả đã đọc</ManagerPrimaryButton>
+      </div>
+
+      <ManagerPanel>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Hộp thư quản lý</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{filteredNotifications.length} / {notifications.length} thông báo</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => { setFrom(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            />
+            <span className="text-xs text-muted-foreground">đến</span>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => { setTo(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            />
+            {(from || to) && (
+              <button
+                onClick={() => { setFrom(""); setTo(""); setPage(1); }}
+                className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={12} /> Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+        {filteredNotifications.length === 0 ? (
+          <ManagerEmptyState
+            title="Không có thông báo"
+            description={notifications.length === 0
+              ? "Tài khoản quản lý hiện chưa có thông báo nào."
+              : "Không có thông báo nào trong khoảng thời gian đã lọc."}
+          />
         ) : (
           <div className="space-y-3">
             {paged.map((item) => (
@@ -91,18 +128,29 @@ export default function ManagerNotificationPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
                       <ManagerStatusBadge tone={item.isRead ? "emerald" : "amber"}>
-                        {item.isRead ? "Read" : "Unread"}
+                        {item.isRead ? "Đã đọc" : "Chưa đọc"}
                       </ManagerStatusBadge>
                       <ManagerStatusBadge tone="blue">{item.type || "INFO"}</ManagerStatusBadge>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{item.body || item.message || "No content"}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{item.createdAt || "No timestamp"}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{item.body || item.message || "Không có nội dung"}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{item.createdAt || "Không rõ thời gian"}</p>
                   </div>
                   {!item.isRead ? (
                     <ManagerPrimaryButton type="button" onClick={() => handleMarkAsRead(item.notificationId)}>
-                      Mark as read
+                      Đánh dấu đã đọc
                     </ManagerPrimaryButton>
                   ) : null}
+                </div>
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
+              <div key={`filler-${index}`} aria-hidden="true" className="invisible rounded-2xl border border-border bg-muted/20 p-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold">&nbsp;</h3>
+                  </div>
+                  <p className="mt-2 text-sm">&nbsp;</p>
+                  <p className="mt-2 text-xs">&nbsp;</p>
                 </div>
               </div>
             ))}

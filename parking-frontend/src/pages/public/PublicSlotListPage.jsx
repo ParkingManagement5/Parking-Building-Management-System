@@ -151,10 +151,6 @@ export default function PublicSlotListPage() {
     setVehicleTypes(vtList);
     metaLoadedRef.current = true;
 
-    if (!filterBuilding && bList.length > 0) {
-      setFilterBuilding(String(getBuildingId(bList[0])));
-    }
-
     return bList;
   };
 
@@ -178,14 +174,14 @@ export default function PublicSlotListPage() {
         }
       }
 
-      const defaultBuildingId = availableBuildings[0] ? String(getBuildingId(availableBuildings[0])) : "";
+      // Khong chon bai cu the (buildingId/filterBuilding rong) -> tai TOAN BO he
+      // thong de thong ke dung tong so (truoc day chi tai bai dau tien, khien
+      // "Con trong"/"Dang do" hien thi sai lech so voi "Bai do").
       const targetBuildingIds = buildingId
         ? [buildingId]
         : filterBuilding
           ? [filterBuilding]
-          : defaultBuildingId
-            ? [defaultBuildingId]
-            : [];
+          : availableBuildings.map((b) => String(getBuildingId(b))).filter(Boolean);
       const cacheKey = buildingId || "__all__";
 
       if (!force && slotCacheRef.current.has(cacheKey)) {
