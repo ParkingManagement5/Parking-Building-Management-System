@@ -181,8 +181,9 @@ public class PaymentServiceImpl implements PaymentService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session #" + sessionId + " chua co thoi gian ra (exitTime null), khong the tinh phi");
         }
+        String bookingType = session.getBooking() != null ? session.getBooking().getBookingType() : null;
         BigDecimal serverBaseFee = FeeCalculatorUtil.calculateSessionFee(
-                session.getEntryTime(), session.getExitTime(), activePolicies, serverRate);
+                session.getEntryTime(), session.getExitTime(), activePolicies, serverRate, bookingType);
 
         BigDecimal serverDeposit = BigDecimal.ZERO;
         if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
