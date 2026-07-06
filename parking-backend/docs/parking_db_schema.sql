@@ -208,6 +208,7 @@ CREATE TABLE `pricing_policy` (
     `start_hour` int,
     `end_hour` int,
     `price_per_hour` decimal(10,2) NOT NULL,
+    `effective_from` datetime NOT NULL,
     `is_active` boolean NOT NULL DEFAULT true,
     `created_at` datetime,
     `updated_at` datetime
