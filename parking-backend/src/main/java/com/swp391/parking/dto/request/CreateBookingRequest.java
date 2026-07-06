@@ -18,4 +18,10 @@ public class CreateBookingRequest {
     private LocalDateTime bookingStartTime;
 
     private LocalDateTime bookingEndTime;
+
+    // HOURLY | DAILY | WEEKLY | MONTHLY — mac dinh HOURLY neu khong truyen
+    private String bookingType;
+
+    // So don vi (ngay/tuan/thang) khi bookingType khac HOURLY
+    private Integer durationUnits;
 }
