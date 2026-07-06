@@ -144,6 +144,7 @@ CREATE TABLE `booking` (
     `slot_id` int NOT NULL,
     `booking_start_time` datetime,
     `booking_end_time` datetime,
+    `booking_type` varchar(20) NOT NULL DEFAULT 'HOURLY', -- HOURLY, DAILY, WEEKLY, MONTHLY
     `reserved_at` datetime,
     `expired_at` datetime,
     `qr_token` varchar(500) UNIQUE,
