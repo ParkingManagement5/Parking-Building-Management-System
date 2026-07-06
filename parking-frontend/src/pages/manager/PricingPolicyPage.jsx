@@ -21,7 +21,7 @@ import {
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 
-const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", MONTHLY: "Theo tháng" };
+const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", WEEKLY: "Theo tuần", MONTHLY: "Theo tháng" };
 const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
 
 export default function PricingPolicyPage() {
@@ -214,6 +214,7 @@ export default function PricingPolicyPage() {
           <option value="">Tất cả loại thời gian</option>
           <option value="HOURLY">Theo giờ</option>
           <option value="DAILY">Theo ngày</option>
+          <option value="WEEKLY">Theo tuần</option>
           <option value="MONTHLY">Theo tháng</option>
         </select>
         <select
@@ -317,6 +318,7 @@ export default function PricingPolicyPage() {
                   <ManagerSelect name="timeType" value={form.timeType} onChange={handleChange}>
                     <option value="HOURLY">Theo giờ</option>
                     <option value="DAILY">Theo ngày</option>
+                    <option value="WEEKLY">Theo tuần</option>
                     <option value="MONTHLY">Theo tháng</option>
                   </ManagerSelect>
                 </ManagerField>
