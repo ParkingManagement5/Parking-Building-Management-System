@@ -724,8 +724,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     s.getVehicle().getVehicleType().getId());
         }
         LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
+        String bookingType = s.getBooking() != null ? s.getBooking().getBookingType() : null;
         BigDecimal calculatedFee = s.getEntryTime() != null
-                ? FeeCalculatorUtil.calculateSessionFee(s.getEntryTime(), endTime, activePolicies, hourlyRate)
+                ? FeeCalculatorUtil.calculateSessionFee(s.getEntryTime(), endTime, activePolicies, hourlyRate, bookingType)
                 : BigDecimal.ZERO;
         BigDecimal depositAmount = s.getBooking() != null ? s.getBooking().getDepositAmount() : BigDecimal.ZERO;
 
