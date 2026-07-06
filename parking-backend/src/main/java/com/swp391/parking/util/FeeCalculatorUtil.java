@@ -101,6 +101,56 @@ public class FeeCalculatorUtil {
         return total;
     }
 
+    /**
+     * Booking dai han (DAILY/WEEKLY/MONTHLY) tinh phi flat-rate theo so don vi,
+     * khong cong don theo block 30 phut nhu HOURLY — tranh hoa don phi thuc te
+     * khi xe gui nhieu ngay/tuan/thang.
+     */
+    public static BigDecimal calculateSessionFee(LocalDateTime entryTime,
+                                                  LocalDateTime exitTime,
+                                                  List<PricingPolicy> policies,
+                                                  BigDecimal fallbackRate,
+                                                  String bookingType) {
+        if (bookingType == null || "HOURLY".equalsIgnoreCase(bookingType)) {
+            return calculateSessionFee(entryTime, exitTime, policies, fallbackRate);
+        }
+        return calculateFlatFee(entryTime, exitTime, policies, fallbackRate, bookingType.toUpperCase());
+    }
+
+    private static final long DAILY_UNIT_HOURS = 24;
+    private static final long WEEKLY_UNIT_HOURS = 7 * 24;
+    private static final long MONTHLY_UNIT_HOURS = 30 * 24;
+
+    private static BigDecimal calculateFlatFee(LocalDateTime entryTime,
+                                                LocalDateTime exitTime,
+                                                List<PricingPolicy> policies,
+                                                BigDecimal fallbackRate,
+                                                String bookingType) {
+        if (entryTime == null || exitTime == null || !exitTime.isAfter(entryTime)) {
+            return BigDecimal.ZERO;
+        }
+
+        long unitHours = switch (bookingType) {
+            case "DAILY" -> DAILY_UNIT_HOURS;
+            case "WEEKLY" -> WEEKLY_UNIT_HOURS;
+            case "MONTHLY" -> MONTHLY_UNIT_HOURS;
+            default -> DAILY_UNIT_HOURS;
+        };
+
+        BigDecimal rate = resolveFlatRate(policies, bookingType, entryTime);
+        if (rate == null) rate = fallbackRate != null ? fallbackRate : DEFAULT_RATE;
+
+        long totalMinutes = Duration.between(entryTime, exitTime).toMinutes();
+        long units = Math.max(1, (long) Math.ceil(totalMinutes / (double) (unitHours * 60)));
+
+        return rate.multiply(BigDecimal.valueOf(units));
+    }
+
+    private static BigDecimal resolveFlatRate(List<PricingPolicy> policies, String bookingType, LocalDateTime referenceTime) {
+        if (policies == null || policies.isEmpty()) return null;
+        return latestEffectiveRate(policies, referenceTime, p -> bookingType.equalsIgnoreCase(p.getTimeType()));
+    }
+
     private static boolean isWeekend(LocalDateTime dt) {
         DayOfWeek day = dt.getDayOfWeek();
         return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
