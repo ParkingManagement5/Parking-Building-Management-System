@@ -133,8 +133,27 @@ public class BookingServiceImpl implements BookingService {
                     "Pháº£i Ä‘áº·t trÆ°á»›c Ã­t nháº¥t " + minAdvanceMinutes + " phÃºt.");
         }
 
-        LocalDateTime endTime = request.getBookingEndTime() != null
-                ? request.getBookingEndTime() : startTime.plusHours(2);
+        String bookingType = request.getBookingType() != null && !request.getBookingType().isBlank()
+                ? request.getBookingType().toUpperCase() : "HOURLY";
+
+        LocalDateTime endTime;
+        if ("HOURLY".equals(bookingType)) {
+            endTime = request.getBookingEndTime() != null
+                    ? request.getBookingEndTime() : startTime.plusHours(2);
+        } else {
+            Integer durationUnits = request.getDurationUnits();
+            if (durationUnits == null || durationUnits < 1) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "durationUnits phai >= 1 khi bookingType khac HOURLY");
+            }
+            endTime = switch (bookingType) {
+                case "DAILY" -> startTime.plusDays(durationUnits);
+                case "WEEKLY" -> startTime.plusWeeks(durationUnits);
+                case "MONTHLY" -> startTime.plusMonths(durationUnits);
+                default -> throw new AppException(HttpStatus.BAD_REQUEST,
+                        "bookingType khong hop le: " + bookingType);
+            };
+        }
 
         if (!endTime.isAfter(startTime)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -157,6 +176,7 @@ public class BookingServiceImpl implements BookingService {
                 .slot(slot)
                 .bookingStartTime(startTime)
                 .bookingEndTime(endTime)
+                .bookingType(bookingType)
                 .reservedAt(now)
                 .expiredAt(expiredAt)
                 .depositAmount(deposit)
@@ -476,6 +496,7 @@ public class BookingServiceImpl implements BookingService {
                 .buildingName(building.getName())
                 .bookingStartTime(b.getBookingStartTime())
                 .bookingEndTime(b.getBookingEndTime())
+                .bookingType(b.getBookingType())
                 .reservedAt(b.getReservedAt())
                 .expiredAt(b.getExpiredAt())
                 .qrToken(b.getStatus() == Booking.BookingStatus.CONFIRMED
