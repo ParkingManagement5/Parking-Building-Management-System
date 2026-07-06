@@ -31,11 +31,8 @@ import RequestProcessingPage from "../pages/staff/RequestProcessingPage";
 import ExceptionCasePage from "../pages/staff/ExceptionCasePage";
 import ManagerDashboard from "../pages/manager/ManagerDashboard";
 import ManagerNotificationPage from "../pages/manager/ManagerNotificationPage";
-import BuildingPage from "../pages/parking/BuildingPage";
-import FloorPage from "../pages/parking/FloorPage";
-import ZonePage from "../pages/parking/ZonePage";
-import ParkingSlotPage from "../pages/parking/ParkingSlotPage";
-import GatePage from "../pages/parking/GatePage";
+import ReportsPage from "../pages/manager/ReportsPage";
+import ParkingStructurePage from "../pages/parking/ParkingStructurePage";
 import VehicleTypePage from "../pages/parking/VehicleTypePage";
 import PricingPolicyPage from "../pages/manager/PricingPolicyPage";
 import StaffShiftPage from "../pages/manager/StaffShiftPage";
@@ -43,6 +40,7 @@ import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserManagementPage from "../pages/user/UserManagementPage";
 import RoleManagementPage from "../pages/admin/RoleManagementPage";
 import SystemConfigPage from "../pages/admin/SystemConfigPage";
+import ActivityLogPage from "../pages/admin/ActivityLogPage";
 import PortalSettingsPage from "../pages/user/PortalSettingsPage";
 import PaymentResultPage from "../pages/payment/PaymentResultPage";
 
@@ -104,14 +102,16 @@ export default function AppRoutes() {
         <Route element={<ProtectedRoute allowedRoles={["MANAGER", "ADMIN"]} />}>
           <Route path="/manager" element={<RolePortalLayout portal="manager" />}>
             <Route index element={<ManagerDashboard />} />
-            <Route path="buildings" element={<BuildingPage />} />
-            <Route path="floors" element={<FloorPage />} />
-            <Route path="zones" element={<ZonePage />} />
-            <Route path="parking-slots" element={<ParkingSlotPage />} />
-            <Route path="gates" element={<GatePage />} />
+            <Route path="parking-structure" element={<ParkingStructurePage />} />
+            <Route path="buildings" element={<Navigate to="/manager/parking-structure" replace />} />
+            <Route path="floors" element={<Navigate to="/manager/parking-structure" replace />} />
+            <Route path="zones" element={<Navigate to="/manager/parking-structure" replace />} />
+            <Route path="parking-slots" element={<Navigate to="/manager/parking-structure" replace />} />
+            <Route path="gates" element={<Navigate to="/manager/parking-structure" replace />} />
             <Route path="vehicle-types" element={<VehicleTypePage />} />
             <Route path="pricing-policies" element={<PricingPolicyPage />} />
             <Route path="staff-shifts" element={<StaffShiftPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="notifications" element={<ManagerNotificationPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="manager" />} />
           </Route>
@@ -123,6 +123,7 @@ export default function AppRoutes() {
             <Route path="users" element={<UserManagementPage />} />
             <Route path="roles" element={<RoleManagementPage />} />
             <Route path="system-config" element={<SystemConfigPage />} />
+            <Route path="activity-logs" element={<ActivityLogPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="admin" />} />
           </Route>
         </Route>

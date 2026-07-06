@@ -296,7 +296,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         ParkingSlot slot;
         if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
             // Tự động tìm slot theo slotSize của loại xe [BR-02]
-            slot = slotAssignmentService.assignBestSlot(null,
+            // Phai gioi han theo dung building cua gate — truoc day truyen null
+            // khien slot co the duoc gan tu MOT TOA NHA KHAC, lam session bi
+            // "bien mat" khoi danh sach cua staff (staff bi gioi han xem theo
+            // dung building duoc phan cong) du session/slot van luu dung.
+            Long entryBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
+            slot = slotAssignmentService.assignBestSlot(entryBuildingId,
                     vehicle.getVehicleType().getSlotSize());
         } else {
             // WALK_IN_MANUAL: staff chỉ định slot
@@ -703,7 +708,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             return new BigDecimal("20000");
         }
         Long vehicleTypeId = s.getVehicle().getVehicleType().getId();
-        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vehicleTypeId);
+        // Dung TAT CA phien ban gia (ke ca da bi Manager thay the) de resolve dung
+        // gia da ap dung tai thoi diem entryTime, khong bi anh huong boi lan sua gia
+        // sau nay.
+        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vehicleTypeId);
         LocalDateTime refTime = s.getEntryTime() != null ? s.getEntryTime() : LocalDateTime.now();
         return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }
@@ -712,7 +720,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         BigDecimal hourlyRate = resolveHourlyRate(s);
         List<PricingPolicy> activePolicies = List.of();
         if (s.getVehicle() != null && s.getVehicle().getVehicleType() != null) {
-            activePolicies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(
+            activePolicies = pricingPolicyRepository.findByVehicleType_Id(
                     s.getVehicle().getVehicleType().getId());
         }
         LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();

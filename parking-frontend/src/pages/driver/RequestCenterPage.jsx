@@ -193,6 +193,11 @@ export default function RequestCenterPage() {
               </p>
             </div>
           ))}
+          {requests.length > 0 && Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
+            <div key={`filler-${index}`} aria-hidden="true" className="invisible p-5">
+              &nbsp;
+            </div>
+          ))}
           {requests.length === 0 && (
             <div className="p-5 text-sm text-muted-foreground">
               No support requests returned from the backend.
