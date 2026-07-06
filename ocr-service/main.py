@@ -94,7 +94,11 @@ def crop_likely_plate(image):
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
         area = w * h
-        if area < image_area * 0.04:
+        # Anh chup nguyen xe (khong phai anh crop san bien so) thi bien so
+        # chi chiem mot phan rat nho khung hinh (~1-3%), nguong 4% truoc day
+        # loai bo luon vung bien so that, khien ham nay tra ve ca anh goc
+        # (xe + cay + troi) thay vi crop dung vao bien so.
+        if area < image_area * 0.006:
             continue
         ratio = w / max(h, 1)
         if 1.2 <= ratio <= 6.5:
@@ -117,6 +121,12 @@ def preprocess_variants(image) -> Iterable[np.ndarray]:
     if plate.shape[1] > 900:
         ratio = 900 / plate.shape[1]
         plate = cv2.resize(plate, None, fx=ratio, fy=ratio, interpolation=cv2.INTER_AREA)
+    elif plate.shape[1] < 400:
+        # Crop nho (bien so chi la 1 phan nho cua anh chup nguyen xe) can
+        # phong to truoc khi doc lan dau, khong doi den bien the enlarged
+        # (variant 2) moi phong to — vay se doc dung ngay tu lan dau, nhanh hon.
+        ratio = 400 / max(plate.shape[1], 1)
+        plate = cv2.resize(plate, None, fx=ratio, fy=ratio, interpolation=cv2.INTER_CUBIC)
 
     yield plate
 
@@ -152,6 +162,9 @@ def serial_confidence(results) -> float:
     return best
 
 
+EARLY_STOP_CONFIDENCE = 0.9
+
+
 def read_candidates(image):
     reader = get_reader()
     candidates = []
@@ -177,6 +190,11 @@ def read_candidates(image):
                     "serialConfidence": serial_confidence(results),
                 }
                 candidates.append(candidate)
+                # Anh ro net da doc dung ngay tu bien the dau — bo qua cac bien
+                # the con lai (CLAHE/otsu) de tranh goi EasyOCR thua, do la nguyen
+                # nhan chinh khien /recognize cham (~2s x 3 bien the = ~6s).
+                if candidate["confidence"] >= EARLY_STOP_CONFIDENCE:
+                    break
 
         if candidates:
             break
@@ -210,15 +228,18 @@ def read_candidates(image):
                 plate = normalize_plate(raw_text)
                 confidences = [float(conf) for _, _, conf in results]
                 confidence = sum(confidences) / len(confidences) if confidences else 0.0
+                found_confident = False
                 if plate:
-                    candidates.append(
-                        {
-                            "plate": plate,
-                            "confidence": min(confidence + 0.10, 1.0),
-                            "rawText": raw_text,
-                            "serialConfidence": serial_confidence(results),
-                        }
-                    )
+                    candidate = {
+                        "plate": plate,
+                        "confidence": min(confidence + 0.10, 1.0),
+                        "rawText": raw_text,
+                        "serialConfidence": serial_confidence(results),
+                    }
+                    candidates.append(candidate)
+                    found_confident = candidate["confidence"] >= EARLY_STOP_CONFIDENCE
+                if found_confident:
+                    break
             if candidates:
                 break
 

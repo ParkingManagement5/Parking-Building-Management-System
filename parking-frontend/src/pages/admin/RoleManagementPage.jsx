@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { roleApi } from "../../api/admin/roleApi";
 import { userApi } from "../../api/admin/userApi";
-import {
-  ManagerEmptyState,
-  ManagerStatusBadge,
-} from "../../ui/components/manager/ManagerUi";
+import { ManagerEmptyState } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 
 const ROLE_DESCRIPTIONS = {
-  ADMIN: "Full system administration, monitoring, and configuration access.",
-  MANAGER: "Manage buildings, pricing, slots, and staff assignment workflows.",
-  STAFF: "Handle parking operations, entry/exit, and operational tasks.",
-  DRIVER: "Book slots, manage vehicles, and track parking activity.",
+  ADMIN: "Toàn quyền quản trị hệ thống, giám sát và cấu hình.",
+  MANAGER: "Quản lý tòa nhà, bảng giá, slot đỗ xe và phân ca nhân viên.",
+  STAFF: "Xử lý vận hành bãi xe, ra/vào cổng và các tác vụ hằng ngày.",
+  DRIVER: "Đặt chỗ, quản lý xe và theo dõi hoạt động đỗ xe.",
 };
 
 const ROLE_PERMISSIONS = {
@@ -20,13 +17,6 @@ const ROLE_PERMISSIONS = {
   STAFF: ["process_entry", "process_exit", "verify_qr", "ocr_scan"],
   DRIVER: ["book_slot", "manage_vehicles", "view_sessions", "submit_requests"],
 };
-
-function roleTone(name) {
-  if (name === "ADMIN") return "border-border bg-card text-foreground";
-  if (name === "MANAGER") return "border-border bg-card text-foreground";
-  if (name === "STAFF") return "border-border bg-card text-foreground";
-  return "border-border bg-card text-foreground";
-}
 
 function roleAccent(name) {
   if (name === "ADMIN") return "#ef4444";
@@ -57,7 +47,7 @@ export default function RoleManagementPage() {
       } catch (err) {
         console.error("Failed to load roles", err);
         if (!cancelled) {
-          setError("Unable to load roles from backend.");
+          setError("Không tải được danh sách vai trò từ hệ thống.");
           setRoles([]);
           setUsers([]);
         }
@@ -77,7 +67,7 @@ export default function RoleManagementPage() {
         ...item,
         title: item.roleName,
         description:
-          ROLE_DESCRIPTIONS[item.roleName] || "System role available in the current backend.",
+          ROLE_DESCRIPTIONS[item.roleName] || "Vai trò hệ thống hiện có trong backend.",
         permissions: ROLE_PERMISSIONS[item.roleName] || ["system_role"],
       })),
     [roles]
@@ -95,9 +85,9 @@ export default function RoleManagementPage() {
   return (
     <div className="space-y-4">
       {error ? (
-        <ManagerEmptyState title="Cannot load roles" description={error} />
+        <ManagerEmptyState title="Không tải được vai trò" description={error} />
       ) : roleCards.length === 0 ? (
-        <ManagerEmptyState title="No roles available" description="The backend did not return any role definitions." />
+        <ManagerEmptyState title="Chưa có vai trò nào" description="Hệ thống chưa trả về vai trò nào." />
       ) : (
         <div className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -109,10 +99,10 @@ export default function RoleManagementPage() {
                       <span className="size-3 rounded-full" style={{ background: roleAccent(item.roleName) }} />
                       <h3 className="text-lg font-bold text-foreground">{item.roleName}</h3>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">Role ID: {item.roleId}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Mã vai trò: {item.roleId}</p>
                   </div>
                   <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${roleAccent(item.roleName)}20`, color: roleAccent(item.roleName) }}>
-                    {roleCounts.get(item.roleName) || 0} users
+                    {roleCounts.get(item.roleName) || 0} người dùng
                   </span>
                 </div>
                 <p className="mb-4 text-sm text-muted-foreground">{item.description}</p>

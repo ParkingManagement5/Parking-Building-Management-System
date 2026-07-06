@@ -65,6 +65,36 @@ class FeeCalculatorUtilTest {
         assertThat(fee).isEqualByComparingTo(new BigDecimal("30000"));
     }
 
+    @Test
+    void shouldUseOldRateBeforeManagerEditAndNewRateAfter() {
+        // Xe vao luc 8:00, Manager sua gia luc 12:00 (tu 15000 -> 20000), xe ra luc 14:00.
+        // 4 tieng dau (8:10-12:00, sau grace period) phai tinh theo gia CU (15000/h),
+        // 2 tieng sau (12:00-14:00) phai tinh theo gia MOI (20000/h).
+        PricingPolicy oldVersion = PricingPolicy.builder()
+                .dayType("WEEKDAY").timeType("NORMAL").startHour(6).endHour(22)
+                .pricePerHour(new BigDecimal("15000"))
+                .effectiveFrom(LocalDateTime.of(2026, 6, 1, 0, 0))
+                .isActive(false)
+                .build();
+        PricingPolicy newVersion = PricingPolicy.builder()
+                .dayType("WEEKDAY").timeType("NORMAL").startHour(6).endHour(22)
+                .pricePerHour(new BigDecimal("20000"))
+                .effectiveFrom(LocalDateTime.of(2026, 6, 30, 12, 0))
+                .isActive(true)
+                .build();
+        List<PricingPolicy> policies = List.of(oldVersion, newVersion);
+
+        BigDecimal fee = FeeCalculatorUtil.calculateSessionFee(
+                LocalDateTime.of(2026, 6, 30, 8, 0),
+                LocalDateTime.of(2026, 6, 30, 14, 0),
+                policies,
+                new BigDecimal("20000"));
+
+        // 3h50 (8:10->12:00) o gia cu 15000/h = ceil(230/30)=8 block x 7500 = 60000
+        // 2h (12:00->14:00) o gia moi 20000/h = 4 block x 10000 = 40000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("100000"));
+    }
+
     private PricingPolicy policy(String dayType, Integer startHour, Integer endHour, String pricePerHour) {
         return PricingPolicy.builder()
                 .dayType(dayType)
@@ -72,6 +102,7 @@ class FeeCalculatorUtilTest {
                 .startHour(startHour)
                 .endHour(endHour)
                 .pricePerHour(new BigDecimal(pricePerHour))
+                .effectiveFrom(LocalDateTime.of(2020, 1, 1, 0, 0))
                 .isActive(true)
                 .build();
     }

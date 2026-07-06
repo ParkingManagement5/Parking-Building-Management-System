@@ -52,6 +52,7 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",
                 "https://localhost:*",
+                "http://192.168.*.*:*",
                 "https://*.ngrok-free.app",
                 "https://*.ngrok-free.dev"
         ));
