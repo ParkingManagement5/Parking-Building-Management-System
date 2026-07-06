@@ -14,6 +14,7 @@ import {
 import { bookingApi } from "../../api/driver/bookingApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
+import { pricingPolicyApi } from "../../api/driver/pricingPolicyApi";
 import {
   Select,
   SelectContent,
@@ -43,6 +44,25 @@ function formatLocalDateTime(value) {
 
 function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback;
+}
+
+const BOOKING_TYPE_OPTIONS = [
+  { value: "HOURLY", label: "Theo giờ" },
+  { value: "DAILY", label: "Theo ngày" },
+  { value: "WEEKLY", label: "Theo tuần" },
+  { value: "MONTHLY", label: "Theo tháng" },
+];
+const DURATION_UNIT_LABELS = { DAILY: "ngày", WEEKLY: "tuần", MONTHLY: "tháng" };
+const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
+
+function computeBookingEnd(start, type, units) {
+  const d = new Date(start);
+  const n = Math.max(1, Number(units) || 1);
+  if (type === "DAILY") d.setDate(d.getDate() + n);
+  else if (type === "WEEKLY") d.setDate(d.getDate() + n * 7);
+  else if (type === "MONTHLY") d.setMonth(d.getMonth() + n);
+  else d.setHours(d.getHours() + 2);
+  return d;
 }
 
 function isOpenBooking(b) {
@@ -92,7 +112,10 @@ export default function BookingPage() {
   const [conflictLock, setConflictLock] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [bookingStart, setBookingStart] = useState(() => { const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0); return d; });
+  const [bookingType, setBookingType] = useState("HOURLY");
+  const [durationUnits, setDurationUnits] = useState(1);
   const [selection, setSelection] = useState({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
+  const [pricingPolicies, setPricingPolicies] = useState([]);
   const [payingDeposit, setPayingDeposit] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
   const [payError, setPayError] = useState("");
@@ -144,6 +167,27 @@ export default function BookingPage() {
       .finally(() => setLoadingSlots(false));
   }, [selectedVehicle]);
 
+  useEffect(() => {
+    if (!selectedVehicle) { setPricingPolicies([]); return; }
+    const vtId = selectedVehicle.vehicleType?.vehicleTypeId ?? selectedVehicle.vehicleType?.id ?? selectedVehicle.vehicleTypeId;
+    if (!vtId) { setPricingPolicies([]); return; }
+    pricingPolicyApi.getAll()
+      .then((r) => {
+        const all = unwrapApiData(r.data, []);
+        setPricingPolicies(all.filter((p) => p.isActive && String(p.vehicleTypeId) === String(vtId)));
+      })
+      .catch(() => setPricingPolicies([]));
+  }, [selectedVehicle]);
+
+  const priceByType = useMemo(() => {
+    const map = {};
+    for (const opt of BOOKING_TYPE_OPTIONS) {
+      const matches = pricingPolicies.filter((p) => p.timeType === opt.value);
+      map[opt.value] = matches;
+    }
+    return map;
+  }, [pricingPolicies]);
+
   const slotGrid = useMemo(
     () => backendSlots.map((s, i) => ({
       uiId: s.id || s.slotId || `${i}`,
@@ -193,7 +237,7 @@ export default function BookingPage() {
     setSubmitError("");
     try {
       const start = bookingStart;
-      const end = new Date(start.getTime() + 2 * 3600000);
+      const end = computeBookingEnd(start, bookingType, durationUnits);
       if ((start.getTime() - Date.now()) / 60000 < 10) {
         setSubmitError("Thời gian bắt đầu phải cách hiện tại ít nhất 10 phút.");
         setSubmitting(false);
@@ -203,7 +247,10 @@ export default function BookingPage() {
         vehicleId: Number(selection.vehicleId),
         slotId: Number(selectedSlot.slotId),
         bookingStartTime: formatLocalDateTime(start),
-        bookingEndTime: formatLocalDateTime(end),
+        bookingType,
+        ...(bookingType === "HOURLY"
+          ? { bookingEndTime: formatLocalDateTime(end) }
+          : { durationUnits: Number(durationUnits) }),
       });
       const p = unwrapApiData(res.data, {});
       setConfirmation({
@@ -536,8 +583,71 @@ export default function BookingPage() {
             <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
           </div>
 
+          {pricingPolicies.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá tham khảo</label>
+              <div className="rounded-xl border border-primary/30 overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold bg-primary/10! text-primary!">Hình thức</th>
+                      <th className="text-left px-3 py-2 font-semibold bg-primary/10! text-primary!">Chi tiết</th>
+                      <th className="text-right px-3 py-2 font-semibold bg-primary/10! text-primary!">Đơn giá</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BOOKING_TYPE_OPTIONS.filter((opt) => priceByType[opt.value]?.length > 0).flatMap((opt) =>
+                      priceByType[opt.value].map((p) => (
+                        <tr key={p.policyId} className="border-t border-primary/20">
+                          <td className="px-3 py-2 text-foreground!">{opt.label}</td>
+                          <td className="px-3 py-2 font-medium text-primary!">
+                            {DAY_TYPE_LABELS[p.dayType] || p.dayType}
+                            {p.startHour != null && p.endHour != null ? ` · ${p.startHour}h–${p.endHour}h` : ""}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-foreground!">
+                            {Number(p.pricePerHour).toLocaleString("vi-VN")}đ/{DURATION_UNIT_LABELS[opt.value] || "giờ"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Hình thức gửi xe</label>
+            <div className="grid grid-cols-4 gap-2">
+              {BOOKING_TYPE_OPTIONS.map((opt) => (
+                <button key={opt.value} type="button"
+                  onClick={() => { setBookingType(opt.value); setDurationUnits(1); }}
+                  className={`rounded-xl border py-2 text-xs font-medium transition-colors ${
+                    bookingType === opt.value
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-foreground hover:bg-muted"
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {bookingType !== "HOURLY" && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Số {DURATION_UNIT_LABELS[bookingType]}
+              </label>
+              <input type="number" min={1} value={durationUnits}
+                onChange={(e) => setDurationUnits(Math.max(1, Number(e.target.value) || 1))}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
+            </div>
+          )}
+
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-            Phí đỗ xe sẽ tính từ lúc xe vào bãi (entry) đến khi ra bãi (exit). Tiền cọc sẽ được trừ vào tổng phí.
+            {bookingType === "HOURLY"
+              ? "Phí đỗ xe sẽ tính từ lúc xe vào bãi (entry) đến khi ra bãi (exit). Tiền cọc sẽ được trừ vào tổng phí."
+              : `Dự kiến kết thúc: ${computeBookingEnd(bookingStart, bookingType, durationUnits).toLocaleString("vi-VN")}. Phí sẽ tính theo giá ${DURATION_UNIT_LABELS[bookingType]} do quản lý bãi cấu hình, không tính theo block giờ.`}
           </div>
 
           <div className="flex gap-3">
