@@ -8,6 +8,7 @@ import {
 import axiosClient from "../../api/axiosClient";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
+import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { exceptionApi } from "../../api/staff/exceptionApi";
 import { ocrApi } from "../../api/staff/ocrApi";
 import { sessionApi } from "../../api/staff/sessionApi";
@@ -31,10 +32,15 @@ function normalizePlateDisplay(value) {
   const canonical = canonicalPlate(value);
   if (!canonical) return "";
 
-  const match = canonical.match(/^(\d{2})([A-Z]\d|[A-Z]{1,2})(\d{4}|\d{5})$/);
+  // Lay 5 (uu tien) hoac 4 so cuoi lam serial, phan con lai la prefix nguyen ven —
+  // giong het logic backend (LicensePlateUtil.FIVE_DIGIT_SERIAL) de tranh regex
+  // co dinh so chu/so trong series nuot nham 1 chu so cua serial (vd "51L66666"
+  // truoc day ra "51-L6-6666" sai, dung phai la "51L-666.66").
+  const match =
+    canonical.match(/^(.+?)(\d{5})$/) ||
+    canonical.match(/^(.+?)(\d{4})$/);
   if (match) {
-    const [, province, series, serial] = match;
-    const prefix = series.length > 1 ? `${province}-${series}` : `${province}${series}`;
+    const [, prefix, serial] = match;
     if (serial.length === 5) {
       return `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`;
     }
@@ -78,6 +84,11 @@ export default function UnifiedScanPage() {
   // "EXIT" | "BOOKING" | "WALKIN" | "UNREGISTERED" | "BLOCKED"
   const [lookupData, setLookupData] = useState(null);
 
+  // Vehicle type — bat buoc chon cho xe walk-in chua dang ky, de phan loai
+  // dung slot size + dung bang gia (PricingPolicy theo vehicleTypeId).
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [walkInVehicleTypeId, setWalkInVehicleTypeId] = useState("");
+
   // QR (for booking entry + exit)
   const [qrToken, setQrToken] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
@@ -108,7 +119,17 @@ export default function UnifiedScanPage() {
   const isConfirmedBooking = lookupType === "BOOKING" && bookingStatus === "CONFIRMED";
   const isPendingPaymentBooking = lookupType === "BOOKING" && bookingStatus === "PENDING_PAYMENT";
 
-  useEffect(() => { loadBuildings(); return () => stopCamera(); }, []);
+  useEffect(() => { loadBuildings(); loadVehicleTypes(); return () => stopCamera(); }, []);
+
+  async function loadVehicleTypes() {
+    try {
+      const res = await vehicleTypeApi.getAll();
+      const types = unwrapApiData(res.data, []).filter((t) => t.isActive !== false);
+      setVehicleTypes(types);
+    } catch {
+      setVehicleTypes([]);
+    }
+  }
 
   useEffect(() => {
     if (!buildingId) return;
@@ -158,6 +179,7 @@ export default function UnifiedScanPage() {
     setQrToken("");
     setError("");
     setOcrError("");
+    setWalkInVehicleTypeId("");
     setPlate(normalizedPlate);
     setConfidence(nextConfidence);
     await autoLookup(normalizedPlate);
@@ -479,6 +501,10 @@ export default function UnifiedScanPage() {
   // ==================== PROCESS ====================
   async function handleProcess() {
     if (!gateId || !plate) return;
+    if (lookupType === "UNREGISTERED" && !walkInVehicleTypeId) {
+      setError("Chon loai xe truoc khi cho xe vao.");
+      return;
+    }
     setProcessing(true); setError("");
     try {
       let res;
@@ -496,7 +522,11 @@ export default function UnifiedScanPage() {
         // Không có QR → Staff override: bypass QR, vẫn link booking
         res = await sessionApi.entry({ gateId: Number(gateId), entryMode: "BOOKING_STAFF_OVERRIDE", licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
       } else {
-        res = await sessionApi.entry({ gateId: Number(gateId), licensePlate: plate, entryMode: "WALK_IN_AUTO", staffUserId: Number(localStorage.getItem("userId")) || null });
+        res = await sessionApi.entry({
+          gateId: Number(gateId), licensePlate: plate, entryMode: "WALK_IN_AUTO",
+          staffUserId: Number(localStorage.getItem("userId")) || null,
+          vehicleTypeId: walkInVehicleTypeId ? Number(walkInVehicleTypeId) : undefined,
+        });
       }
       const payload = unwrapApiData(res.data, {});
       const type = lookupType === "EXIT" ? "EXIT" : "ENTRY";
@@ -527,7 +557,7 @@ export default function UnifiedScanPage() {
   function resetAll() {
     stopCamera(); setStep(1); setPlate(""); setConfidence(null); setOcrError("");
     setPlatePreview((p) => { if (p) URL.revokeObjectURL(p); return ""; });
-    setLookupType(null); setLookupData(null); setQrToken(""); setError(""); setResult(null);
+    setLookupType(null); setLookupData(null); setQrToken(""); setError(""); setResult(null); setWalkInVehicleTypeId("");
     setPendingLowConfidenceScan(null); setLowConfidencePlate(""); setLowConfidenceError(""); setShowLowConfidenceReview(false);
     setShowManualEntry(false); setManualPlate(""); setManualEntryError(""); setManualExitSuggestions([]); setManualExitLoading(false);
   }
@@ -725,6 +755,22 @@ export default function UnifiedScanPage() {
                         <AlertTriangle size={20} className="text-amber-600" />
                         <p className="font-bold text-foreground">WALK-IN — Xe chua dang ky (tu tao khi entry)</p>
                       </div>
+                      <div className="mt-3">
+                        <label className="mb-1.5 block text-sm font-medium text-foreground">
+                          Loai xe <span className="text-rose-600">*</span>
+                        </label>
+                        <StaffSelect value={walkInVehicleTypeId} onChange={(e) => setWalkInVehicleTypeId(e.target.value)}>
+                          <option value="">— Chon loai xe —</option>
+                          {vehicleTypes.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.slotSize}) — {formatStaffCurrency(t.hourlyRate)}/gio
+                            </option>
+                          ))}
+                        </StaffSelect>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Bat buoc chon dung loai xe — quyet dinh slot size va bang gia ap dung khi tinh phi luc xe ra.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -785,7 +831,7 @@ export default function UnifiedScanPage() {
                       )}
 
                       <StaffPrimaryButton type="button" onClick={handleProcess}
-                        disabled={processing || !gateId || isPendingPaymentBooking}
+                        disabled={processing || !gateId || isPendingPaymentBooking || (lookupType === "UNREGISTERED" && !walkInVehicleTypeId)}
                         className="flex w-full items-center justify-center gap-2">
                         {processing ? "Dang xu ly..." : lookupType === "EXIT" ? (
                           <><LogOut size={15} /> Xac nhan xe ra</>

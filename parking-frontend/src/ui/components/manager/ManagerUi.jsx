@@ -144,7 +144,10 @@ export function ManagerStatusBadge({ children, tone = "slate" }) {
   );
 }
 
-export function ManagerDataTable({ columns, children }) {
+export function ManagerDataTable({ columns, children, minRows = 0 }) {
+  const rowCount = Array.isArray(children) ? children.filter(Boolean).length : (children ? 1 : 0);
+  const fillerCount = Math.max(0, minRows - rowCount);
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-separate border-spacing-0">
@@ -160,7 +163,16 @@ export function ManagerDataTable({ columns, children }) {
             ))}
           </tr>
         </thead>
-        <tbody>{children}</tbody>
+        <tbody>
+          {children}
+          {Array.from({ length: fillerCount }, (_, index) => (
+            <tr key={`filler-${index}`} aria-hidden="true">
+              <td colSpan={columns.length} className="border-b border-border px-4 py-3 text-sm">
+                &nbsp;
+              </td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     </div>
   );

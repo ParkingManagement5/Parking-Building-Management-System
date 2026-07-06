@@ -9,6 +9,7 @@ import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.UserRepository;
+import com.swp391.parking.service.ActivityLogService;
 import com.swp391.parking.service.UserAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class UserAdminServiceImpl implements UserAdminService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final ParkingBuildingRepository buildingRepository;
+    private final ActivityLogService activityLogService;
 
     @Override
     @Transactional
@@ -41,7 +43,36 @@ public class UserAdminServiceImpl implements UserAdminService {
         user.getRoles().add(role);
 
         User savedUser = userRepository.save(user);
+        activityLogService.log(savedUser.getUserId(), "USER_ROLE_CHANGE",
+                actorUsername + " da doi role cua " + savedUser.getUsername() + " thanh " + roleName.name());
         return toResponse(savedUser);
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse changeUserStatus(Integer userId, String status, String actorUsername) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay user voi id: " + userId));
+
+        if (user.getUsername().equalsIgnoreCase(actorUsername)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Khong the tu khoa/mo khoa chinh minh");
+        }
+
+        User.UserStatus newStatus = parseStatus(status);
+        user.setStatus(newStatus);
+
+        User savedUser = userRepository.save(user);
+        activityLogService.log(savedUser.getUserId(), "USER_STATUS_CHANGE",
+                actorUsername + " da doi trang thai cua " + savedUser.getUsername() + " thanh " + newStatus.name());
+        return toResponse(savedUser);
+    }
+
+    private User.UserStatus parseStatus(String status) {
+        try {
+            return User.UserStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Trang thai khong hop le: " + status);
+        }
     }
 
     @Override
