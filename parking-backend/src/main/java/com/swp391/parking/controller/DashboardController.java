@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.ManagerDashboardResponse;
+<<<<<<< HEAD
 import com.swp391.parking.dto.response.RevenueStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Role;
@@ -27,6 +28,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+=======
+import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.entity.Zone;
+import com.swp391.parking.repository.GateRepository;
+import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.PricingPolicyRepository;
+import com.swp391.parking.repository.StaffShiftRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,8 +58,11 @@ public class DashboardController {
     private final PricingPolicyRepository pricingPolicyRepository;
     private final StaffShiftRepository staffShiftRepository;
     private final GateRepository gateRepository;
+<<<<<<< HEAD
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+=======
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
 
     @GetMapping("/manager")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
@@ -58,8 +78,15 @@ public class DashboardController {
                 ? Math.round(((float) (totalSlots - availableSlots) / totalSlots) * 100)
                 : 0;
 
+<<<<<<< HEAD
         Map<Long, int[]> buildingTotals = new LinkedHashMap<>();
         Map<Long, String> buildingNames = new LinkedHashMap<>();
+=======
+        // Per-building stats — keyed by buildingId
+        Map<Long, int[]> buildingTotals = new LinkedHashMap<>();
+        Map<Long, String> buildingNames = new LinkedHashMap<>();
+        // Unique zones for vehicle type mix
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
         Map<Long, Zone> uniqueZones = new LinkedHashMap<>();
 
         for (ParkingSlot slot : slots) {
@@ -73,6 +100,10 @@ public class DashboardController {
             if (slot.getStatus() == ParkingSlot.Status.AVAILABLE) {
                 buildingTotals.get(buildingId)[1]++;
             }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
             uniqueZones.put(zone.getId(), zone);
         }
 
@@ -91,10 +122,18 @@ public class DashboardController {
                     .build());
         }
 
+<<<<<<< HEAD
         Map<String, Integer> vtCounts = new LinkedHashMap<>();
         for (Zone zone : uniqueZones.values()) {
             String vtName = zone.getVehicleType() != null ? zone.getVehicleType().getName() : "Unknown";
             vtCounts.merge(vtName, 1, Integer::sum);
+=======
+        // Vehicle type mix by unique zone count
+        Map<String, Integer> vtCounts = new LinkedHashMap<>();
+        for (Zone zone : uniqueZones.values()) {
+            String vtName = zone.getVehicleType() != null ? zone.getVehicleType().getName() : "Unknown";
+            vtCounts.merge(vtName, 1, (a, b) -> a + b);
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
         }
         List<ManagerDashboardResponse.VehicleTypeStat> vehicleTypeMix = new ArrayList<>();
         vtCounts.forEach((name, count) ->
@@ -121,6 +160,7 @@ public class DashboardController {
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+<<<<<<< HEAD
 
     // -----------------------------------------------------------------------
     // Thống kê doanh thu theo tháng/năm — MANAGER (scoped by building) / ADMIN
@@ -204,4 +244,6 @@ public class DashboardController {
 
         return ResponseEntity.ok(ApiResponse.success(builder.build()));
     }
+=======
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
 }

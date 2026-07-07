@@ -276,6 +276,7 @@ public class DataInitializer implements CommandLineRunner {
         Gate gate = existingGates.stream()
                 .filter(item -> normalizeKey(gateCode).equals(normalizeKey(item.getGateCode())))
                 .findFirst()
+<<<<<<< HEAD
                 .orElseGet(() -> gateRepository.findByGateCode(gateCode)
                         .orElseGet(() -> Gate.builder()
                                 .building(building)
@@ -283,6 +284,14 @@ public class DataInitializer implements CommandLineRunner {
                                 .gateType(gateType)
                                 .isActive(true)
                                 .build()));
+=======
+                .orElseGet(() -> Gate.builder()
+                        .building(building)
+                        .gateCode(gateCode)
+                        .gateType(gateType)
+                        .isActive(true)
+                        .build());
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
 
         gate.setBuilding(building);
         gate.setGateCode(gateCode);

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -h localhost -u root -p12345 parking_db -e \"SELECT building_id, name FROM parking_building;\")",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -h localhost -u root -p12345 --default-character-set=utf8mb4 parking_db -e \"SELECT building_id, name FROM parking_building WHERE building_id IN \\(2,3,14,15\\);\")"
+    ]
+  }
+}
