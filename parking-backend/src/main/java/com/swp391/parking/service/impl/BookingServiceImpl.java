@@ -1,4 +1,4 @@
-﻿package com.swp391.parking.service.impl;
+package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.CreateBookingRequest;
 import com.swp391.parking.dto.response.BookingResponse;
@@ -190,6 +190,13 @@ public class BookingServiceImpl implements BookingService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+
+        // Payment deadline (expiredAt) already passed - reject confirmation even
+        // if the gate-entry QR window (bookingStartTime + 30 min) is still open.
+        if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(now)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Booking #" + bookingId + " da qua han thanh toan, khong the xac nhan");
+        }
 
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);

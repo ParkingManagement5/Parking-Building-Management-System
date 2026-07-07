@@ -140,6 +140,11 @@ export default function DriverNotificationPage() {
             </span>
           </div>
         ))}
+        {notifications.length > 0 && Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
+          <div key={`filler-${index}`} aria-hidden="true" className="invisible flex items-start gap-3.5 p-4">
+            &nbsp;
+          </div>
+        ))}
 
         {notifications.length === 0 && (
           <div className="p-5 text-sm text-muted-foreground text-center">

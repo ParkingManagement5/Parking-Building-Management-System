@@ -12,11 +12,7 @@ export function asArray(payload) {
 
 export function formatCurrency(value) {
   const amount = Number(value || 0);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
+  return `${amount.toLocaleString("vi-VN")}đ`;
 }
 
 export function formatDateTime(value) {

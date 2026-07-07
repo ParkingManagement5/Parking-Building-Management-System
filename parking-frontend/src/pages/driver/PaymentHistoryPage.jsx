@@ -107,6 +107,11 @@ export default function PaymentHistoryPage() {
                   </td>
                 </tr>
               ))}
+              {payments.length > 0 && Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
+                <tr key={`filler-${index}`} aria-hidden="true">
+                  <td colSpan="5" className="px-5 py-3.5">&nbsp;</td>
+                </tr>
+              ))}
               {payments.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-5 py-10 text-center text-sm text-muted-foreground">
