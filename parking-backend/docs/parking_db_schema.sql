@@ -166,7 +166,11 @@ CREATE TABLE `parking_session` (
     `exit_gate_id` int,
     `entry_time` datetime,
     `exit_time` datetime,
+<<<<<<< HEAD
     `entry_mode` varchar(30) NOT NULL,
+=======
+    `entry_mode` varchar(20) NOT NULL,
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `status` varchar(30) NOT NULL,
     `created_at` datetime,
     `updated_at` datetime
@@ -250,7 +254,10 @@ CREATE TABLE `request` (
     `request_id` int PRIMARY KEY AUTO_INCREMENT,
     `user_id` int NOT NULL,
     `assigned_staff_id` int,
+<<<<<<< HEAD
     `building_id` int DEFAULT NULL,
+=======
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `request_type` varchar(30) NOT NULL,
     `subject` varchar(200),
     `description` text,
@@ -264,7 +271,10 @@ CREATE TABLE `exception_case` (
     `exception_id` int PRIMARY KEY AUTO_INCREMENT,
     `session_id` int,
     `request_id` int,
+<<<<<<< HEAD
     `booking_id` int DEFAULT NULL,
+=======
+>>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `exception_type` varchar(30) NOT NULL,
     `description` varchar(500),
     `status` varchar(20) NOT NULL,
