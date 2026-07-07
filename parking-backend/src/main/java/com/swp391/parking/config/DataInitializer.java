@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
@@ -30,7 +31,11 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+// Chi seed du lieu demo cho DB that (dev/prod). Khong chay o profile "test" vi
+// DB test (H2) khoi tao rong hoan toan moi lan chay - cac test class tu dung
+// AbstractIntegrationTestSupport de tao fixture rieng cho tung test.
 @Configuration
+@Profile("!test")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {

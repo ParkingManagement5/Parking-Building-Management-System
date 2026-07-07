@@ -1,24 +1,15 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { buildingApi } from "../../api/manager/buildingApi";
-import { floorApi } from "../../api/manager/floorApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
-import { zoneApi } from "../../api/manager/zoneApi";
 import { getFloorPlan } from "../../config/buildingFloorPlans";
 import { unwrapApiData } from "../../utils/api";
 import { usePublicTheme } from "../../utils/publicTheme";
 import "../../assets/css/landing.css";
 
 function getBuildingId(item) { return item?.buildingId ?? item?.id; }
-function getFloorId(item) { return item?.floorId ?? item?.id; }
-function getZoneId(item) { return item?.zoneId ?? item?.id; }
 function getVehicleTypeId(item) { return item?.vehicleTypeId ?? item?.id; }
-
-function getSettledData(result, fallback = []) {
-  if (result?.status !== "fulfilled") return fallback;
-  return unwrapApiData(result.value?.data, fallback);
-}
 
 function toDisplayStatus(status) {
   const normalized = String(status || "AVAILABLE").toUpperCase();
@@ -154,7 +145,11 @@ export default function PublicSlotListPage() {
     return bList;
   };
 
-  const loadData = async ({ silent = false, buildingId = "", force = false } = {}) => {
+  // Tai TOAN BO slot he thong trong 1 lan goi (thay vi truoc day phai goi rieng
+  // tung building -> floor -> zone, hang tram request rieng le, cham va de mat
+  // du lieu do timeout). Loc theo building/vehicle/tu khoa deu xu ly o client
+  // (xem "filtered" ben duoi), khong can goi lai server khi doi bo loc.
+  const loadData = async ({ silent = false, force = false } = {}) => {
     if (requestInFlightRef.current) return;
 
     requestInFlightRef.current = true;
@@ -165,38 +160,19 @@ export default function PublicSlotListPage() {
     }
 
     try {
-      let availableBuildings = buildings;
-
       if (!metaLoadedRef.current || !buildings.length || !vehicleTypes.length) {
-        const loadedBuildings = await loadMeta();
-        if (loadedBuildings) {
-          availableBuildings = loadedBuildings;
-        }
+        await loadMeta();
       }
 
-      // Khong chon bai cu the (buildingId/filterBuilding rong) -> tai TOAN BO he
-      // thong de thong ke dung tong so (truoc day chi tai bai dau tien, khien
-      // "Con trong"/"Dang do" hien thi sai lech so voi "Bai do").
-      const targetBuildingIds = buildingId
-        ? [buildingId]
-        : filterBuilding
-          ? [filterBuilding]
-          : availableBuildings.map((b) => String(getBuildingId(b))).filter(Boolean);
-      const cacheKey = buildingId || "__all__";
-
-      if (!force && slotCacheRef.current.has(cacheKey)) {
-        setSlots(slotCacheRef.current.get(cacheKey));
+      if (!force && slotCacheRef.current.has("__all__")) {
+        setSlots(slotCacheRef.current.get("__all__"));
         setError("");
         return;
       }
 
-      const floorRes = await Promise.allSettled(targetBuildingIds.map((id) => floorApi.getByBuilding(id)));
-      const floors = floorRes.flatMap((result) => getSettledData(result, []));
-      const zoneRes = await Promise.allSettled(floors.map((f) => zoneApi.getByFloor(getFloorId(f))));
-      const zones = zoneRes.flatMap((result) => getSettledData(result, []));
-      const slotRes = await Promise.allSettled(zones.map((z) => parkingSlotApi.getByZone(getZoneId(z))));
-      const slotList = slotRes.flatMap((result) => getSettledData(result, []).map(normalizeSlot));
-      slotCacheRef.current.set(cacheKey, slotList);
+      const res = await parkingSlotApi.getPublicOverview();
+      const slotList = unwrapApiData(res.data, []).map(normalizeSlot);
+      slotCacheRef.current.set("__all__", slotList);
       setSlots(slotList);
       setError("");
     } catch (e) {
@@ -214,18 +190,13 @@ export default function PublicSlotListPage() {
   }, []);
 
   useEffect(() => {
-    if (!metaLoadedRef.current || !filterBuilding) return;
-    loadData({ buildingId: filterBuilding, force: true });
-  }, [filterBuilding]);
-
-  useEffect(() => {
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      loadData({ silent: true, buildingId: filterBuilding || "", force: true });
+      loadData({ silent: true, force: true });
     }, 15000);
 
     return () => clearInterval(timerRef.current);
-  }, [filterBuilding]);
+  }, []);
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
