@@ -132,6 +132,11 @@ public abstract class AbstractIntegrationTestSupport {
         return objectMapper.writeValueAsString(value);
     }
 
+    protected User assignBuilding(User user, ParkingBuilding building) {
+        user.setAssignedBuilding(building);
+        return userRepository.save(user);
+    }
+
     protected Role createRole(Role.RoleName roleName) {
         return roleRepository.findByRoleName(roleName)
             .orElseGet(() -> roleRepository.save(Role.builder().roleName(roleName).build()));
@@ -150,7 +155,7 @@ public abstract class AbstractIntegrationTestSupport {
             .phone("0900000000")
             .passwordHash(passwordEncoder.encode(rawPassword))
             .status(User.UserStatus.ACTIVE)
-            .roles(Set.of(role))
+            .roles(new java.util.HashSet<>(Set.of(role)))
             .build();
         return userRepository.save(user);
     }
@@ -307,6 +312,7 @@ public abstract class AbstractIntegrationTestSupport {
             .startHour(6)
             .endHour(18)
             .pricePerHour(new BigDecimal("15000"))
+            .effectiveFrom(LocalDateTime.now().minusDays(1))
             .isActive(isActive)
             .build();
         return pricingPolicyRepository.save(policy);
