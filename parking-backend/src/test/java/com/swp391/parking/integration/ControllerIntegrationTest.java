@@ -22,6 +22,7 @@ import com.swp391.parking.entity.Shift;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.support.AbstractIntegrationTestSupport;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -41,6 +42,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WithMockUser(username = "admin1", roles = "ADMIN")
 class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
+
+    // @WithMockUser chi gia lap security context, khong tao user that trong DB.
+    // Mot so endpoint (vd FloorController.getByBuilding) tra cuu user that theo
+    // ten dang nhap de resolve staff scope - can co ban ghi that de tranh 401.
+    @BeforeEach
+    void ensureMockAdminUserExists() {
+        if (userRepository.findByUsername("admin1").isEmpty()) {
+            createUser("admin1", Role.RoleName.ADMIN);
+        }
+    }
 
     @Test
     void buildingControllerShouldCreateBuilding() throws Exception {
