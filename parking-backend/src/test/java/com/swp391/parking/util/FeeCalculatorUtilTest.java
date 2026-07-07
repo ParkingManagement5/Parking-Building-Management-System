@@ -30,7 +30,8 @@ class FeeCalculatorUtilTest {
                 List.of(),
                 new BigDecimal("15000"));
 
-        assertThat(fee).isEqualByComparingTo(new BigDecimal("30000"));
+        // 31 phut sau grace period = ceil(31/30)=2 block x (15000*30/60=7500) = 15000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("15000"));
     }
 
     @Test
@@ -46,7 +47,9 @@ class FeeCalculatorUtilTest {
                 policies,
                 new BigDecimal("15000"));
 
-        assertThat(fee).isEqualByComparingTo(new BigDecimal("27000"));
+        // 21:45->22:00 (15 phut, gia 15000/h) = 1 block x 7500 = 7500
+        // 22:00->22:20 (20 phut, gia 12000/h) = 1 block x 6000 = 6000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("13500"));
     }
 
     @Test
@@ -62,7 +65,8 @@ class FeeCalculatorUtilTest {
                 policies,
                 new BigDecimal("20000"));
 
-        assertThat(fee).isEqualByComparingTo(new BigDecimal("30000"));
+        // 22:15->22:50 (35 phut, gia cuoi tuan dem 15000/h) = ceil(35/30)=2 block x 7500 = 15000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("15000"));
     }
 
     @Test

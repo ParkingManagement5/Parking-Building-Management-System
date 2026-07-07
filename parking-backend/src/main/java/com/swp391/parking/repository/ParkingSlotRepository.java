@@ -83,4 +83,35 @@ List<ParkingSlot> findAvailableByBuildingAndSlotSize(
     ORDER BY f.floor_number, ps.slot_code
     """, nativeQuery = true)
 List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
+
+    // Toan bo slot he thong, JOIN FETCH mot lan de tranh N+1 (truoc day frontend
+    // phai goi rieng tung zone, hang tram request cho trang cong khai/landing).
+    @Query("""
+        SELECT ps FROM ParkingSlot ps
+        JOIN FETCH ps.zone z
+        JOIN FETCH z.floor f
+        JOIN FETCH f.building b
+        JOIN FETCH z.vehicleType
+        """)
+    List<ParkingSlot> findAllWithDetails();
+
+    @Query(value = """
+        SELECT
+            COUNT(DISTINCT b.building_id) AS buildingCount,
+            COUNT(*) AS total,
+            SUM(CASE WHEN ps.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS available,
+            SUM(CASE WHEN ps.status = 'OCCUPIED' THEN 1 ELSE 0 END) AS occupied
+        FROM parking_slot ps
+        JOIN zone z ON ps.zone_id = z.zone_id
+        JOIN floor f ON z.floor_id = f.floor_id
+        JOIN parking_building b ON f.building_id = b.building_id
+        """, nativeQuery = true)
+    PublicSlotStatsProjection getPublicStats();
+
+    interface PublicSlotStatsProjection {
+        Long getBuildingCount();
+        Long getTotal();
+        Long getAvailable();
+        Long getOccupied();
+    }
 }
