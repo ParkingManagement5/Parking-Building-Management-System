@@ -32,6 +32,7 @@ import ExceptionCasePage from "../pages/staff/ExceptionCasePage";
 import ManagerDashboard from "../pages/manager/ManagerDashboard";
 import ManagerNotificationPage from "../pages/manager/ManagerNotificationPage";
 import ReportsPage from "../pages/manager/ReportsPage";
+import RevenueReportPage from "../pages/manager/RevenueReportPage";
 import ParkingStructurePage from "../pages/parking/ParkingStructurePage";
 import VehicleTypePage from "../pages/parking/VehicleTypePage";
 import PricingPolicyPage from "../pages/manager/PricingPolicyPage";
@@ -112,6 +113,7 @@ export default function AppRoutes() {
             <Route path="pricing-policies" element={<PricingPolicyPage />} />
             <Route path="staff-shifts" element={<StaffShiftPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="reports/revenue" element={<RevenueReportPage />} />
             <Route path="notifications" element={<ManagerNotificationPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="manager" />} />
           </Route>
