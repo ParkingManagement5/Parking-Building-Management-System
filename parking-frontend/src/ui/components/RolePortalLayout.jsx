@@ -81,7 +81,8 @@ const CONFIG = {
       {
         label: "Báo cáo",
         items: [
-          { id: "reports", label: "Doanh thu & Lượt xe" },
+          { id: "reports", label: "Báo cáo & Thống kê" },
+          { id: "reports/revenue", label: "Doanh thu" },
         ],
       },
       {
