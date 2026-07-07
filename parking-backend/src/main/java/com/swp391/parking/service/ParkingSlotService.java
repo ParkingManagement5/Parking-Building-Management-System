@@ -1,6 +1,7 @@
 package com.swp391.parking.service;
 
 import com.swp391.parking.dto.request.SlotRequest;
+import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.ParkingSlot.Status;
 
@@ -18,4 +19,6 @@ public interface ParkingSlotService {
     List<ParkingSlot> searchAvailableSlots(Long buildingId, Long vehicleTypeId, Long floorId);
     void validateSelectable(Long slotId);
     void delete(Long id);
+    List<ParkingSlot> getPublicOverview();
+    PublicSlotStatsResponse getPublicStats();
 }

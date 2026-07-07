@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
@@ -30,7 +31,11 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+// Chi seed du lieu demo cho DB that (dev/prod). Khong chay o profile "test" vi
+// DB test (H2) khoi tao rong hoan toan moi lan chay - cac test class tu dung
+// AbstractIntegrationTestSupport de tao fixture rieng cho tung test.
 @Configuration
+@Profile("!test")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -47,7 +52,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private static final List<BuildingSeed> HCMC_BUILDINGS = List.of(
             new BuildingSeed("Bai xe FPT HCM", "Lo E2a-7, Duong D1, Long Thanh My, Thu Duc, TP.HCM", "0900000010", "parking@fpt.edu.vn", "Bai do xe demo 2 tang oto tai khu FPT HCM", 10.8413, 106.8098, "FPTHCM"),
-            new BuildingSeed("Bai xe Pi Pink", "53 Vo Van Tan, Phuong Vo Thi Sau, Quan 3, TP.HCM", "0900000011", "pipink@parking.vn", "Bai do xe Pi Pink duoc chuan hoa lai du lieu va giao dien", 10.7813, 106.6917, "PIPINK"),
+            new BuildingSeed("Bai xe Nhà Văn Hóa Sinh Viên", "53 Vo Van Tan, Phuong Vo Thi Sau, Quan 3, TP.HCM", "0900000011", "pipink@parking.vn", "Bai do xe Pi Pink duoc chuan hoa lai du lieu va giao dien", 10.7813, 106.6917, "PIPINK"),
             new BuildingSeed("Bai xe Ben Bach Dang", "Ton Duc Thang, Ben Nghe, Quan 1, TP.HCM", "0900000012", "bachdang@parking.vn", "Bai do xe oto gan pho di bo Nguyen Hue", 10.7729, 106.7053, "BACHDANG"),
             new BuildingSeed("Bai xe Tao Dan", "Truong Dinh, Phuong Ben Thanh, Quan 1, TP.HCM", "0900000013", "taodan@parking.vn", "Bai do xe oto phuc vu khu cong vien Tao Dan", 10.7774, 106.6922, "TAODAN"),
             new BuildingSeed("Bai xe Le Van Tam", "Hai Ba Trung, Da Kao, Quan 1, TP.HCM", "0900000014", "levantam@parking.vn", "Bai do xe oto gan cong vien Le Van Tam", 10.7873, 106.7001, "LEVANTAM"),

@@ -7,6 +7,7 @@ import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.SystemConfigRepository;
 import com.swp391.parking.repository.UserRepository;
+import com.swp391.parking.service.ActivityLogService;
 import com.swp391.parking.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class SystemConfigServiceImpl implements SystemConfigService {
 
     private final SystemConfigRepository systemConfigRepository;
     private final UserRepository userRepository;
+    private final ActivityLogService activityLogService;
 
     @Override
     public SystemConfigResponse create(SystemConfigRequest request, int updatedBy) {
@@ -37,7 +39,10 @@ public class SystemConfigServiceImpl implements SystemConfigService {
                 .updatedBy(user)
                 .updatedAt(LocalDateTime.now())
                 .build();
-        return toResponse(systemConfigRepository.save(config));
+        SystemConfig saved = systemConfigRepository.save(config);
+        activityLogService.log(user.getUserId(), "SYSTEM_CONFIG_CHANGE",
+                user.getUsername() + " da tao cau hinh " + saved.getConfigKey());
+        return toResponse(saved);
     }
 
     @Override
@@ -50,7 +55,10 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         config.setDescription(request.getDescription());
         config.setUpdatedBy(user);
         config.setUpdatedAt(LocalDateTime.now());
-        return toResponse(systemConfigRepository.save(config));
+        SystemConfig saved = systemConfigRepository.save(config);
+        activityLogService.log(user.getUserId(), "SYSTEM_CONFIG_CHANGE",
+                user.getUsername() + " da cap nhat cau hinh " + saved.getConfigKey() + " = " + saved.getConfigValue());
+        return toResponse(saved);
     }
 
     @Override
