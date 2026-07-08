@@ -158,6 +158,12 @@ public class NotificationServiceImpl implements NotificationService {
         if (targetGroup == BroadcastNotificationRequest.TargetGroup.MANAGERS) {
             return userRepository.findByRolesRoleName(Role.RoleName.MANAGER);
         }
+        if (targetGroup == BroadcastNotificationRequest.TargetGroup.DRIVERS) {
+            return userRepository.findByRolesRoleName(Role.RoleName.DRIVER);
+        }
+        if (targetGroup == BroadcastNotificationRequest.TargetGroup.ADMINS) {
+            return userRepository.findByRolesRoleName(Role.RoleName.ADMIN);
+        }
 
         throw new AppException(HttpStatus.BAD_REQUEST, "Unsupported target group");
     }

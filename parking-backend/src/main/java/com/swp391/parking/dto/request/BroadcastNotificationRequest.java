@@ -29,6 +29,8 @@ public class BroadcastNotificationRequest {
     public enum TargetGroup {
         ALL_USERS,
         STAFF,
-        MANAGERS
+        MANAGERS,
+        DRIVERS,
+        ADMINS
     }
 }
