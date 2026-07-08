@@ -9,6 +9,7 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import ManagerNotificationComposer from "./ManagerNotificationComposer";
 
 export default function ManagerNotificationPage() {
   const [notifications, setNotifications] = useState([]);
@@ -81,6 +82,8 @@ export default function ManagerNotificationPage() {
         </div>
         <ManagerPrimaryButton type="button" onClick={handleMarkAllAsRead}>Đánh dấu tất cả đã đọc</ManagerPrimaryButton>
       </div>
+
+      <ManagerNotificationComposer onSent={loadNotifications} />
 
       <ManagerPanel>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
