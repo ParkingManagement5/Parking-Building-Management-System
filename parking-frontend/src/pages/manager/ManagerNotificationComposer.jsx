@@ -18,6 +18,8 @@ const TARGET_OPTIONS = [
   { value: "ALL_USERS", label: "All Users" },
   { value: "STAFF", label: "Staff" },
   { value: "MANAGERS", label: "Managers" },
+  { value: "DRIVERS", label: "Drivers" },
+  { value: "ADMINS", label: "Admins" },
 ];
 
 const TYPE_OPTIONS = ["INFO", "WARNING", "MAINTENANCE", "SYSTEM"];
@@ -80,7 +82,7 @@ export default function ManagerNotificationComposer({ onSent }) {
     <ManagerPanel title="Create notification" subtitle="Manager creates announcements and sends them to selected user groups.">
       <form onSubmit={handleSubmit} className="space-y-4">
         <ManagerField label="Quick title">
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {QUICK_TITLES.map((title) => (
               <ManagerSecondaryButton
                 key={title}
