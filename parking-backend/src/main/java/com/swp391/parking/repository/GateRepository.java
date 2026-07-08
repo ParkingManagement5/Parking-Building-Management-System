@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface GateRepository extends JpaRepository<Gate, Long> {
@@ -17,6 +18,9 @@ public interface GateRepository extends JpaRepository<Gate, Long> {
     List<Gate> findByBuildingIdAndIsActiveTrue(Long buildingId);
 
     boolean existsByGateCode(String gateCode);
+
+    @EntityGraph(attributePaths = {"building"})
+    Optional<Gate> findByGateCodeIgnoreCase(String gateCode);
 
     @EntityGraph(attributePaths = {"building"})
     List<Gate> findByBuildingIdAndGateTypeAndIsActiveTrue(Long buildingId, GateType gateType);

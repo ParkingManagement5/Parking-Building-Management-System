@@ -299,23 +299,34 @@ public class DataInitializer implements CommandLineRunner {
         ensureGate(existingGates, building, buildingCode + "-BOTH", Gate.GateType.BOTH);
     }
 
-    private void ensureGate(List<Gate> existingGates, ParkingBuilding building, String gateCode, Gate.GateType gateType) {
-        Gate gate = existingGates.stream()
-                .filter(item -> normalizeKey(gateCode).equals(normalizeKey(item.getGateCode())))
-                .findFirst()
-                .orElseGet(() -> Gate.builder()
-                        .building(building)
-                        .gateCode(gateCode)
-                        .gateType(gateType)
-                        .isActive(true)
-                        .build());
+private void ensureGate(List<Gate> existingGates, ParkingBuilding building, String gateCode, Gate.GateType gateType) {
+    Gate gate = existingGates.stream()
+            .filter(item -> normalizeKey(gateCode).equals(normalizeKey(item.getGateCode())))
+            .findFirst()
+            .orElse(null);
 
-        gate.setBuilding(building);
-        gate.setGateCode(gateCode);
-        gate.setGateType(gateType);
-        gate.setIsActive(true);
-        gateRepository.save(gate);
+    if (gate == null) {
+        Gate globalGate = gateRepository.findByGateCodeIgnoreCase(gateCode).orElse(null);
+        if (globalGate != null) {
+            globalGate.setIsActive(true);
+            gateRepository.save(globalGate);
+            return;
+        }
+
+        gate = Gate.builder()
+                .building(building)
+                .gateCode(gateCode)
+                .gateType(gateType)
+                .isActive(true)
+                .build();
     }
+
+    gate.setBuilding(building);
+    gate.setGateCode(gateCode);
+    gate.setGateType(gateType);
+    gate.setIsActive(true);
+    gateRepository.save(gate);
+}
 
     private String buildFloorName(int floorNumber) {
         return "Tang " + floorNumber + " - O to";
