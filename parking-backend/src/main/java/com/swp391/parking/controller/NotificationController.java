@@ -1,5 +1,6 @@
 package com.swp391.parking.controller;
 
+import com.swp391.parking.dto.request.BroadcastNotificationRequest;
 import com.swp391.parking.dto.request.SendNotificationRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.NotificationResponse;
@@ -33,6 +34,14 @@ public class NotificationController {
     public ResponseEntity<ApiResponse<NotificationResponse>> send(
             @Valid @RequestBody SendNotificationRequest request) {
         return ResponseEntity.ok(ApiResponse.success(notificationService.sendNotification(request)));
+    }
+
+    @PostMapping("/broadcast")
+    @Operation(summary = "Broadcast notification to a user group")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<ApiResponse<List<NotificationResponse>>> broadcast(
+            @Valid @RequestBody BroadcastNotificationRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(notificationService.broadcastNotification(request)));
     }
 
     @GetMapping("/user/{userId}")

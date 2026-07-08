@@ -1,5 +1,6 @@
 package com.swp391.parking.service.impl;
 
+import com.swp391.parking.dto.request.BroadcastNotificationRequest;
 import com.swp391.parking.dto.request.SendNotificationRequest;
 import com.swp391.parking.dto.response.NotificationResponse;
 import com.swp391.parking.entity.Notification;
@@ -12,6 +13,7 @@ import com.swp391.parking.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +42,34 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
         notification = notificationRepository.save(notification);
         return toResponse(notification);
+    }
+
+    @Override
+    @Transactional
+    public List<NotificationResponse> broadcastNotification(BroadcastNotificationRequest request) {
+        List<User> recipients = resolveRecipients(request.getTargetGroup());
+        if (recipients.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "No recipients found for selected target group");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<Notification> notifications = recipients.stream()
+                .map(user -> Notification.builder()
+                        .user(user)
+                        .title(request.getTitle())
+                        .body(request.getBody())
+                        .type(request.getType())
+                        .entityType(request.getEntityType())
+                        .entityId(request.getEntityId())
+                        .isRead(false)
+                        .createdAt(now)
+                        .build())
+                .collect(Collectors.toList());
+
+        return notificationRepository.saveAll(notifications)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -116,5 +146,19 @@ public class NotificationServiceImpl implements NotificationService {
                 .isRead(notification.getIsRead())
                 .createdAt(notification.getCreatedAt())
                 .build();
+    }
+
+    private List<User> resolveRecipients(BroadcastNotificationRequest.TargetGroup targetGroup) {
+        if (targetGroup == BroadcastNotificationRequest.TargetGroup.ALL_USERS) {
+            return userRepository.findAll();
+        }
+        if (targetGroup == BroadcastNotificationRequest.TargetGroup.STAFF) {
+            return userRepository.findByRolesRoleName(Role.RoleName.STAFF);
+        }
+        if (targetGroup == BroadcastNotificationRequest.TargetGroup.MANAGERS) {
+            return userRepository.findByRolesRoleName(Role.RoleName.MANAGER);
+        }
+
+        throw new AppException(HttpStatus.BAD_REQUEST, "Unsupported target group");
     }
 }
