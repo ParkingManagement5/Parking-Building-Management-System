@@ -33,6 +33,32 @@ function settledData(result, failures, fallback = [], widgetName = "widget") {
   return unwrapApiData(result.value.data, fallback);
 }
 
+function buildDashboardError(failures) {
+  if (failures.length === 0) {
+    return "";
+  }
+
+  const failedNames = failures.join(", ");
+  if (!failures.some((failure) => failure.status === 403)) {
+    return `Some widgets failed to load: ${failedNames}. Data shown may be incomplete.`;
+  }
+  const hasForbidden = failures.some((failure) => failure.status === 403);
+  const mentionsBuilding = failures.some((failure) =>
+    String(failure.message).toLowerCase().includes("toa nha")
+    || String(failure.message).toLowerCase().includes("building")
+  );
+
+  if (hasForbidden && mentionsBuilding) {
+    return "Tài khoản staff chưa được gán tòa nhà nên một số dữ liệu vận hành chưa tải được. Admin/Manager cần gán building cho staff này.";
+  }
+
+  if (hasForbidden) {
+    return `Một số dữ liệu không tải được do tài khoản staff chưa có đủ quyền: ${failedNames}.`;
+  }
+
+  return `Một số dữ liệu chưa tải được: ${failedNames}. Dữ liệu hiển thị có thể chưa đầy đủ.`;
+}
+
 export default function StaffDashboard() {
   const navigate = useNavigate();
   const userId = getUserId();
@@ -89,9 +115,7 @@ export default function StaffDashboard() {
         setOpenExceptions(settledData(exceptionRes, failures, [], "exceptions"));
         setPricingPolicies(settledData(pricingRes, failures, [], "pricing"));
         setVehicleTypes(settledData(vehicleTypeRes, failures, [], "vehicle types"));
-        if (failures.length > 0) {
-          setError(`Some widgets failed to load: ${failures.join(", ")}. Data shown may be incomplete.`);
-        }
+        setError(buildDashboardError(failures));
       } catch (err) {
         console.error("Load staff dashboard failed:", err);
         if (!cancelled) {
