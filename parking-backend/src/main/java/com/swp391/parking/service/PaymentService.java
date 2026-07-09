@@ -35,6 +35,9 @@ public interface PaymentService {
 
     PaymentResponse confirmParkingFee(Integer paymentId, String transactionRef);
 
+    /** Tạo phí cuối kỳ cho booking WEEKLY/MONTHLY (pass model) — không cần session. */
+    PaymentResponse createPassBookingFinalFee(Long bookingId);
+
     PaymentResponse refundPayment(Integer paymentId, String transactionRef);
 
     PaymentResponse getById(Integer paymentId);

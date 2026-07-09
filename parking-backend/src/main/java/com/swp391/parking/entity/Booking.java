@@ -40,6 +40,11 @@ public class Booking extends BaseEntity {
     @Column(name = "booking_end_time")
     private LocalDateTime bookingEndTime;
 
+    // HOURLY | DAILY | WEEKLY | MONTHLY — quyet dinh cach tinh phi luc checkout
+    @Builder.Default
+    @Column(name = "booking_type", nullable = false, length = 20)
+    private String bookingType = "HOURLY";
+
     @Column(name = "reserved_at")
     private LocalDateTime reservedAt;
 
