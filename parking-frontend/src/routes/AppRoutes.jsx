@@ -14,11 +14,13 @@ import DriverNotificationPage from "../pages/driver/DriverNotificationPage";
 import DriverParkingSlotPage from "../pages/driver/DriverParkingSlotPage";
 import MyVehiclesPage from "../pages/driver/MyVehiclesPage";
 import BookingPage from "../pages/driver/BookingPage";
+import PackageBookingPage from "../pages/driver/PackageBookingPage";
 import BookingHistoryPage from "../pages/driver/BookingHistoryPage";
 import CurrentSessionPage from "../pages/driver/CurrentSessionPage";
 import DriverParkingMapPage from "../pages/driver/DriverParkingMapPage";
 import DriverFindBuildingPage from "../pages/driver/DriverFindBuildingPage";
 import PaymentHistoryPage from "../pages/driver/PaymentHistoryPage";
+import ParkingSessionHistoryPage from "../pages/driver/ParkingSessionHistoryPage";
 import RequestCenterPage from "../pages/driver/RequestCenterPage";
 import DriverProfilePage from "../pages/driver/DriverProfilePage";
 import StaffDashboard from "../pages/staff/StaffDashboard";
@@ -68,11 +70,13 @@ export default function AppRoutes() {
             <Route path="vehicles" element={<MyVehiclesPage />} />
             <Route path="parking-slots" element={<DriverParkingSlotPage />} />
             <Route path="booking" element={<BookingPage />} />
+            <Route path="package-booking" element={<PackageBookingPage />} />
             <Route path="bookings" element={<BookingHistoryPage />} />
             <Route path="current-session" element={<CurrentSessionPage />} />
             <Route path="parking-map" element={<DriverParkingMapPage />} />
             <Route path="find-building" element={<DriverFindBuildingPage />} />
             <Route path="payments" element={<PaymentHistoryPage />} />
+            <Route path="session-history" element={<ParkingSessionHistoryPage />} />
             <Route path="requests" element={<RequestCenterPage />} />
             <Route path="notifications" element={<DriverNotificationPage />} />
             <Route path="profile" element={<DriverProfilePage />} />

@@ -80,6 +80,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ExceptionCaseResponse getById(Integer exceptionId, Integer currentUserId, boolean staffScoped) {
         ExceptionCase exceptionCase = findById(exceptionId);
         enforceStaffAccess(exceptionCase, currentUserId, staffScoped);
@@ -87,6 +88,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ExceptionCaseResponse> getBySessionId(Integer sessionId, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findBySessionId(sessionId)
             .stream()
@@ -96,6 +98,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ExceptionCaseResponse> getByRequestId(Integer requestId, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByRequestId(requestId)
             .stream()
@@ -105,6 +108,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ExceptionCaseResponse> getByStatus(ExceptionStatus status, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByStatus(status)
             .stream()
@@ -114,6 +118,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ExceptionCaseResponse> getByType(ExceptionType exceptionType, Integer currentUserId, boolean staffScoped) {
         return exceptionCaseRepository.findByExceptionType(exceptionType)
             .stream()

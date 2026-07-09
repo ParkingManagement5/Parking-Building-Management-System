@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.RevenueReportResponse;
+import com.swp391.parking.dto.response.TimeSeriesReportResponse;
 import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.Payment;
 import com.swp391.parking.repository.ParkingSessionRepository;
@@ -16,13 +17,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Bao cao doanh thu + luot xe (turnover) theo toa nha va theo loai xe.
@@ -137,5 +143,106 @@ public class ReportController {
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Báo cáo doanh thu / lượt xe theo chuỗi thời gian.
+     *
+     * GET /api/v1/reports/revenue/time-series?from=2026-01-01&to=2026-07-09&groupBy=DAY
+     *
+     * groupBy: DAY (mặc định) | WEEK | MONTH
+     *
+     * Cách hoạt động:
+     *  - Lọc các Payment(PARKING_FEE, PAID) mà session.entryTime nằm trong [from, to]
+     *  - Nhóm theo ngày/tuần/tháng của entryTime
+     *  - Mỗi điểm trả về: period (nhãn thời gian), revenue (tổng tiền), sessions (lượt xe),
+     *    avgFeePerSession (phí trung bình / lượt)
+     *  - Series được sắp xếp từ sớm đến muộn (chronological) để frontend dễ vẽ chart
+     */
+    @GetMapping("/revenue/time-series")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<TimeSeriesReportResponse>> getTimeSeries(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(defaultValue = "DAY") String groupBy) {
+
+        LocalDateTime fromDt = from != null && !from.isBlank() ? LocalDate.parse(from).atStartOfDay() : null;
+        LocalDateTime toDt   = to   != null && !to.isBlank()   ? LocalDate.parse(to).atTime(23, 59, 59) : null;
+
+        // 1. Load sessions trong khoảng thời gian
+        List<ParkingSession> sessions = sessionRepository.findAllWithBuildingOrderByCreatedAtDesc().stream()
+                .filter(s -> s.getEntryTime() != null)
+                .filter(s -> fromDt == null || !s.getEntryTime().isBefore(fromDt))
+                .filter(s -> toDt   == null || !s.getEntryTime().isAfter(toDt))
+                .toList();
+
+        Map<Long, ParkingSession> sessionById = new LinkedHashMap<>();
+        sessions.forEach(s -> sessionById.put(s.getId(), s));
+
+        // 2. Load payments liên quan
+        List<Payment> revenuePayments = paymentRepository.findByPaymentStatus(Payment.PaymentStatus.PAID).stream()
+                .filter(p -> p.getPaymentType() == Payment.PaymentType.PARKING_FEE)
+                .filter(p -> p.getSessionId() != null && sessionById.containsKey(p.getSessionId().longValue()))
+                .toList();
+
+        // 3. Nhóm theo period key
+        Map<String, BigDecimal> revenueByPeriod  = new TreeMap<>();
+        Map<String, Integer>    sessionsByPeriod = new TreeMap<>();
+
+        for (Payment p : revenuePayments) {
+            ParkingSession s = sessionById.get(p.getSessionId().longValue());
+            String periodKey = toPeriodKey(s.getEntryTime(), groupBy);
+            BigDecimal amount = p.getTotalAmount() != null ? p.getTotalAmount() : BigDecimal.ZERO;
+            revenueByPeriod.merge(periodKey, amount, BigDecimal::add);
+            sessionsByPeriod.merge(periodKey, 1, Integer::sum);
+        }
+
+        // 4. Build series
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        List<TimeSeriesReportResponse.DataPoint> series = new ArrayList<>();
+
+        for (String period : revenueByPeriod.keySet()) {
+            BigDecimal rev = revenueByPeriod.get(period);
+            int cnt        = sessionsByPeriod.getOrDefault(period, 0);
+            BigDecimal avg = cnt > 0
+                    ? rev.divide(BigDecimal.valueOf(cnt), 0, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            totalRevenue = totalRevenue.add(rev);
+            series.add(TimeSeriesReportResponse.DataPoint.builder()
+                    .period(period)
+                    .revenue(rev)
+                    .sessions(cnt)
+                    .avgFeePerSession(avg)
+                    .build());
+        }
+
+        TimeSeriesReportResponse response = TimeSeriesReportResponse.builder()
+                .from(from)
+                .to(to)
+                .groupBy(groupBy.toUpperCase())
+                .totalRevenue(totalRevenue)
+                .totalSessions(sessions.size())
+                .series(series)
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Chuyển LocalDateTime thành period key tuỳ theo groupBy.
+     * DAY   → "2026-07-09"
+     * WEEK  → "2026-W27"   (ISO week)
+     * MONTH → "2026-07"
+     */
+    private String toPeriodKey(LocalDateTime dt, String groupBy) {
+        return switch (groupBy.toUpperCase()) {
+            case "WEEK" -> {
+                int week = dt.get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear());
+                yield dt.getYear() + "-W" + String.format("%02d", week);
+            }
+            case "MONTH" -> dt.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            default      -> dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        };
     }
 }

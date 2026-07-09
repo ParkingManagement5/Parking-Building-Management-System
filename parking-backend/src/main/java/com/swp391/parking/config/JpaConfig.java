@@ -2,11 +2,10 @@ package com.swp391.parking.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
-/**
- * Bật tính năng tự điền createdAt / updatedAt trong BaseEntity.
- */
 @Configuration
 @EnableJpaAuditing
+@EnableScheduling
 public class JpaConfig {
 }

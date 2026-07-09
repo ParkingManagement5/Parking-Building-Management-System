@@ -16,6 +16,8 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
 
     boolean existsByVehicle_IdAndStatusIn(Long vehicleId, List<ParkingSession.SessionStatus> statuses);
 
+    boolean existsByBooking_Id(Long bookingId);
+
     @Query("""
         select s
         from ParkingSession s
