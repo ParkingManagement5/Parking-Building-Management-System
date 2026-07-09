@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { MapPin, Navigation, RefreshCw, AlertCircle, Building2, ExternalLink, CalendarPlus } from "lucide-react";
+import { MapPin, Navigation, RefreshCw, AlertCircle, Building2, ExternalLink } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { unwrapApiData } from "../../utils/api";
 import "leaflet/dist/leaflet.css";
@@ -24,6 +23,10 @@ function formatDistance(km) {
 
 function googleMapsDirectionsUrl(fromLat, fromLon, toLat, toLon) {
   return `https://www.google.com/maps/dir/${fromLat},${fromLon}/${toLat},${toLon}`;
+}
+
+function googleMapsBuildingUrl(lat, lon, name) {
+  return `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lon},16z`;
 }
 
 function getBuildingId(building) {
@@ -79,7 +82,6 @@ function spreadNearbyBuildings(buildings) {
 }
 
 export default function DriverFindBuildingPage() {
-  const navigate = useNavigate();
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
@@ -286,17 +288,10 @@ export default function DriverFindBuildingPage() {
       bounds.push([driverPos.lat, driverPos.lon]);
     }
 
-    // Fit toan bo marker (tat ca bai + vi tri driver) vao khung hinh, giong
-    // hanh vi ban dau — dam bao luon thay het cac bai tren map thay vi chi
-    // thay vi tri driver khi driver o rat xa cac bai.
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [42, 42], maxZoom: 15 });
     }
   }, [mapReady, plottedBuildings, driverPos]);
-
-  function handleBooking(building) {
-    navigate("/driver/booking", { state: { buildingName: building.name } });
-  }
 
   const buildingsWithDistance = useMemo(() => {
     return [...buildings]
@@ -352,79 +347,111 @@ export default function DriverFindBuildingPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-border" style={{ height: 560 }}>
-        <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">5 bãi gần bạn nhất</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {loading ? "Dang phan tich vi tri..." : `Trong tong so ${buildingsWithDistance.length} bai dang hien thi tren map.`}
-            </p>
-          </div>
-          <div className="flex gap-3 text-xs text-muted-foreground">
-            <span>So bai: <strong className="text-foreground">{buildingsWithDistance.length}</strong></span>
-            <span>Marker tach: <strong className="text-foreground">{nearbyClusterCount}</strong></span>
-          </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="overflow-hidden rounded-2xl border border-border" style={{ height: 440 }}>
+          <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
         </div>
 
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Tong quan ban do</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {loading ? "Dang phan tich vi tri..." : `${buildingsWithDistance.length} bai do dang hien thi tren map.`}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border bg-background/70 p-3">
+              <div className="text-xs text-muted-foreground">So bai</div>
+              <div className="mt-1 text-lg font-semibold text-foreground">{buildingsWithDistance.length}</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-3">
+              <div className="text-xs text-muted-foreground">Marker tach</div>
+              <div className="mt-1 text-lg font-semibold text-foreground">{nearbyClusterCount}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+            Neu 2 bai o qua gan nhau, marker se duoc dan nhe thanh vong tron nho de de bam va de nhin hon.
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {buildingsWithDistance.slice(0, 5).map((building) => (
+              <div key={building.id} className="rounded-xl border border-border bg-background/60 p-3">
+                <div className="text-sm font-medium text-foreground">{building.name}</div>
+                <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{building.address}</div>
+                {building.distKm != null && (
+                  <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-300">
+                    <MapPin size={10} />
+                    {formatDistance(building.distKm)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">
+          {loading ? "Dang tai danh sach bai..." : `${buildingsWithDistance.length} bai co vi tri tren ban do`}
+        </h2>
+
         {!loading && buildingsWithDistance.length === 0 && (
-          <div className="rounded-2xl border border-border bg-background/60 p-6 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
             {dataError
               ? "Khong the hien thi danh sach bai do vi du lieu toa nha dang loi."
               : "Chua co bai do xe nao duoc cau hinh toa do. Manager co the them lat/lng trong muc toa nha."}
           </div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {buildingsWithDistance.slice(0, 5).map((building) => (
-            <div key={building.id} className="rounded-2xl border border-border bg-background/60 p-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-500/15">
-                  <Building2 size={16} className="text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{building.name}</p>
-                  <p className="line-clamp-2 text-xs text-muted-foreground">{building.address}</p>
-                  {building.distKm != null && (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                      <MapPin size={10} />
-                      {formatDistance(building.distKm)} tu ban
-                    </p>
-                  )}
-                </div>
+        {buildingsWithDistance.map((building) => (
+          <div
+            key={building.id}
+            className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 transition hover:border-emerald-300"
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-500/15">
+                <Building2 size={16} className="text-emerald-600 dark:text-emerald-400" />
               </div>
-
-              <div className="mt-3 flex items-center gap-2">
-                {driverPos && building.latitude && building.longitude && (
-                  <a
-                    href={googleMapsDirectionsUrl(driverPos.lat, driverPos.lon, building.latitude, building.longitude)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted"
-                  >
-                    <ExternalLink size={11} />
-                    Chỉ đường
-                  </a>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground">{building.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{building.address}</p>
+                {building.distKm != null && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    <MapPin size={10} />
+                    {formatDistance(building.distKm)} tu ban
+                  </p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleBooking(building)}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs text-white transition hover:bg-emerald-700"
-                >
-                  <CalendarPlus size={11} />
-                  Đặt chỗ
-                </button>
               </div>
             </div>
-          ))}
-        </div>
 
-        <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-200">
-          Neu 2 bai o qua gan nhau, marker se duoc dan nhe thanh vong tron nho de de bam va de nhin hon.
-        </div>
+            <div className="ml-3 flex shrink-0 items-center gap-2">
+              {driverPos && building.latitude && building.longitude && (
+                <a
+                  href={googleMapsDirectionsUrl(driverPos.lat, driverPos.lon, building.latitude, building.longitude)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-muted"
+                >
+                  <ExternalLink size={11} />
+                  Chi duong
+                </a>
+              )}
+              {building.latitude && building.longitude && (
+                <a
+                  href={googleMapsBuildingUrl(building.latitude, building.longitude, building.name)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs text-white transition hover:bg-emerald-700"
+                >
+                  <MapPin size={11} />
+                  Xem
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

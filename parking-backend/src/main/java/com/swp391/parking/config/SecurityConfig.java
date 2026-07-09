@@ -52,7 +52,6 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",
                 "https://localhost:*",
-                "http://192.168.*.*:*",
                 "https://*.ngrok-free.app",
                 "https://*.ngrok-free.dev"
         ));
@@ -82,8 +81,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/zones/floor/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/gates/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/slots/zone/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slots/public").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slots/public-stats").permitAll()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

@@ -34,8 +34,6 @@ function roleLabel(value) {
   return String(value || "UNKNOWN").replace(/^ROLE_/, "");
 }
 
-const USER_STATUS_LABELS = { ACTIVE: "Đang hoạt động", LOCKED: "Đã khóa", INACTIVE: "Ngừng hoạt động" };
-
 export default function UserManagementPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -47,7 +45,6 @@ export default function UserManagementPage() {
   const [savingRole, setSavingRole] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [statusChangingId, setStatusChangingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +84,7 @@ export default function UserManagementPage() {
       } catch (err) {
         console.error("Failed to load users", err);
         if (!cancelled) {
-          setError("Không tải được danh sách người dùng từ hệ thống.");
+          setError("Unable to load users from backend.");
           setAllUsers([]);
         }
       }
@@ -157,37 +154,12 @@ export default function UserManagementPage() {
     try {
       await userApi.changeRole(editingUser.userId, roleDraft);
       await loadUsers();
-      setActionMessage(`Đã đổi vai trò của ${editingUser.username} thành ${roleDraft}.`);
+      setActionMessage(`Updated role for ${editingUser.username} to ${roleDraft}.`);
       closeRoleEditor();
     } catch (err) {
       console.error("Failed to update user role", err);
-      setActionError(err.response?.data?.message || "Không thể cập nhật vai trò người dùng.");
+      setActionError(err.response?.data?.message || "Unable to update user role.");
       setSavingRole(false);
-    }
-  };
-
-  const handleToggleStatus = async (user) => {
-    const nextStatus = user.status === "LOCKED" ? "ACTIVE" : "LOCKED";
-    const confirmText =
-      nextStatus === "LOCKED"
-        ? `Khóa tài khoản ${user.username}? Người này sẽ không thể đăng nhập.`
-        : `Mở khóa tài khoản ${user.username}?`;
-    if (!window.confirm(confirmText)) return;
-
-    setStatusChangingId(user.userId);
-    setActionError("");
-    setActionMessage("");
-    try {
-      await userApi.changeStatus(user.userId, nextStatus);
-      await loadUsers();
-      setActionMessage(
-        nextStatus === "LOCKED" ? `Đã khóa tài khoản ${user.username}.` : `Đã mở khóa tài khoản ${user.username}.`
-      );
-    } catch (err) {
-      console.error("Failed to update user status", err);
-      setActionError(err.response?.data?.message || "Không thể cập nhật trạng thái người dùng.");
-    } finally {
-      setStatusChangingId(null);
     }
   };
 
@@ -200,7 +172,7 @@ export default function UserManagementPage() {
             <input
               value={search}
               onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-              placeholder="Tìm người dùng..."
+              placeholder="Search users..."
               className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -216,7 +188,7 @@ export default function UserManagementPage() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {item === "ALL" ? "Tất cả" : item}
+                {item === "ALL" ? "All" : item}
               </button>
             ))}
           </div>
@@ -235,11 +207,11 @@ export default function UserManagementPage() {
         ) : null}
 
         {error ? (
-          <ManagerEmptyState title="Không tải được người dùng" description={error} />
+          <ManagerEmptyState title="Cannot load users" description={error} />
         ) : users.length === 0 ? (
-          <ManagerEmptyState title="Không có người dùng nào" description="Không có người dùng nào khớp với bộ lọc vai trò hoặc từ khóa tìm kiếm hiện tại." />
+          <ManagerEmptyState title="No users available" description="No users matched the current role filter or search query." />
         ) : (
-          <ManagerDataTable columns={["Người dùng", "Vai trò", "Trạng thái", "Liên hệ", "Mã người dùng", "Thao tác"]} minRows={PAGE_SIZE}>
+          <ManagerDataTable columns={["User", "Role", "Status", "Contact", "User ID", "Actions"]}>
             {paged.map((item) => (
               <ManagerRow key={item.userId}>
                 <ManagerCell>
@@ -254,7 +226,7 @@ export default function UserManagementPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{item.fullName || item.username}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.email || "Chưa có email"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{item.email || "No email"}</p>
                     </div>
                   </div>
                 </ManagerCell>
@@ -262,7 +234,7 @@ export default function UserManagementPage() {
                   <ManagerStatusBadge tone={toneForRole(item.role)}>{roleLabel(item.role)}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
-                  <ManagerStatusBadge tone={toneForStatus(item.status)}>{USER_STATUS_LABELS[item.status] || item.status}</ManagerStatusBadge>
+                  <ManagerStatusBadge tone={toneForStatus(item.status)}>{item.status}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
                   <div>{item.phone || "-"}</div>
@@ -270,27 +242,13 @@ export default function UserManagementPage() {
                 </ManagerCell>
                 <ManagerCell className="font-mono text-xs">{item.userId}</ManagerCell>
                 <ManagerCell>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openRoleEditor(item)}
-                      className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
-                    >
-                      Đổi vai trò
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(item)}
-                      disabled={statusChangingId === item.userId}
-                      className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        item.status === "LOCKED"
-                          ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                          : "border-rose-200 text-rose-600 hover:bg-rose-50"
-                      }`}
-                    >
-                      {item.status === "LOCKED" ? "Mở khóa" : "Khóa"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openRoleEditor(item)}
+                    className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                  >
+                    Change Role
+                  </button>
                 </ManagerCell>
               </ManagerRow>
             ))}
@@ -320,20 +278,20 @@ export default function UserManagementPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl">
             <div className="mb-5">
-              <h3 className="text-lg font-semibold text-foreground">Đổi vai trò</h3>
+              <h3 className="text-lg font-semibold text-foreground">Change Role</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Cập nhật vai trò cho <span className="font-medium text-foreground">{editingUser.fullName || editingUser.username}</span>.
+                Update role for <span className="font-medium text-foreground">{editingUser.fullName || editingUser.username}</span>.
               </p>
             </div>
 
             <div className="space-y-3">
               <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm">
                 <div className="font-medium text-foreground">{editingUser.username}</div>
-                <div className="text-muted-foreground">{editingUser.email || "Chưa có email"}</div>
+                <div className="text-muted-foreground">{editingUser.email || "No email"}</div>
               </div>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-medium text-foreground">Vai trò mới</span>
+                <span className="mb-1.5 block text-xs font-medium text-foreground">Target Role</span>
                 <ManagerSelect value={roleDraft} onChange={(event) => setRoleDraft(event.target.value)}>
                   {roleOptions.map((role) => (
                     <option key={role} value={role}>
@@ -346,7 +304,7 @@ export default function UserManagementPage() {
 
             <div className="mt-6 flex gap-3">
               <ManagerSecondaryButton type="button" className="flex-1" onClick={closeRoleEditor}>
-                Hủy
+                Cancel
               </ManagerSecondaryButton>
               <ManagerPrimaryButton
                 type="button"
@@ -354,7 +312,7 @@ export default function UserManagementPage() {
                 onClick={handleRoleChange}
                 disabled={savingRole || !roleDraft || roleDraft === roleLabel(editingUser.role)}
               >
-                {savingRole ? "Đang lưu..." : "Lưu vai trò"}
+                {savingRole ? "Saving..." : "Save Role"}
               </ManagerPrimaryButton>
             </div>
           </div>

@@ -4,7 +4,6 @@ import { authApi } from "../../api/auth/authApi";
 import { usePublicTheme } from "../../utils/publicTheme";
 import { getRole, getToken } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
-import { fetchPublicParkingOverview } from "../../utils/publicStats";
 import "../../assets/css/landing.css";
 import "../../assets/css/auth.css";
 
@@ -67,7 +66,6 @@ export default function LoginPage() {
     username: "",
     password: "",
   });
-  const [overview, setOverview] = useState({ total: 0, available: 0, occupied: 0 });
 
   const isLocalhost = typeof window !== "undefined"
     && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -79,14 +77,6 @@ export default function LoginPage() {
       navigate(routeForRole(role), { replace: true });
     }
   }, [navigate]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPublicParkingOverview()
-      .then((stats) => { if (!cancelled) setOverview(stats); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -347,17 +337,43 @@ export default function LoginPage() {
             </div>
             <div className="auth-stat-grid">
               <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>{overview.total}</span>
+                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>72</span>
                 <span className="auth-stat-label">Tong slot</span>
               </div>
               <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>{overview.available}</span>
+                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>71</span>
                 <span className="auth-stat-label">Trong</span>
               </div>
               <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "#f97316" }}>{overview.occupied}</span>
+                <span className="auth-stat-value" style={{ color: "#f97316" }}>1</span>
                 <span className="auth-stat-label">Dang do</span>
               </div>
+            </div>
+            <div className="auth-stat-bars">
+              {[85, 40, 95, 60, 30, 75, 90, 20].map((height, index) => (
+                <div key={index} className="auth-bar" style={{ height: `${height}%`, animationDelay: `${index * 0.1}s` }} />
+              ))}
+            </div>
+          </div>
+
+          <div className="auth-stat-block" style={{ marginTop: 16 }}>
+            <div className="auth-stat-header">
+              <h3>Hoat dong gan day</h3>
+            </div>
+            <div className="auth-activity-list">
+              {[
+                { icon: "OK", color: "var(--accent)", text: "Xe 59F1-12345 vao bai", time: "Vua xong" },
+                { icon: "P", color: "#60a5fa", text: "Slot T1-A-01 da dat", time: "2 phut truoc" },
+                { icon: "$", color: "#a78bfa", text: "Thanh toan 15,000 VND", time: "5 phut truoc" },
+              ].map((item, index) => (
+                <div key={index} className="auth-activity-item">
+                  <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
+                  <div>
+                    <strong>{item.text}</strong>
+                    <small>{item.time}</small>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

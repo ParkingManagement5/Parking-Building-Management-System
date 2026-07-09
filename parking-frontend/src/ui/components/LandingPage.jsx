@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { buildingApi } from "../../api/manager/buildingApi";
+import { floorApi } from "../../api/manager/floorApi";
+import { zoneApi } from "../../api/manager/zoneApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { unwrapApiData } from "../../utils/api";
 import { usePublicTheme } from "../../utils/publicTheme";
@@ -71,6 +73,19 @@ function spreadNearbyBuildings(buildings) {
   });
 }
 
+function getFloorId(floor) {
+  return floor?.floorId ?? floor?.id;
+}
+
+function getZoneId(zone) {
+  return zone?.zoneId ?? zone?.id;
+}
+
+function getSettledData(result, fallback = []) {
+  if (result?.status !== "fulfilled") return fallback;
+  return unwrapApiData(result.value?.data, fallback);
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const { dark, toggle, className: themeClass } = usePublicTheme();
@@ -90,7 +105,7 @@ export default function LandingPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [bRes, statsRes] = await Promise.all([buildingApi.getAll(), parkingSlotApi.getPublicStats()]);
+        const bRes = await buildingApi.getAll();
         const buildings = unwrapApiData(bRes.data, []);
         setHeroBuildings(
           spreadNearbyBuildings(
@@ -99,15 +114,48 @@ export default function LandingPage() {
               .map(normalizeBuilding)
           )
         );
+        const buildingIds = buildings.map(getBuildingId).filter(Boolean);
 
-        const stats = unwrapApiData(statsRes.data, {});
+        if (!buildingIds.length) {
+          setLiveStats({ buildingCount: 0, available: 0, occupied: 0, total: 0 });
+          setStatsError("");
+          return;
+        }
+
+        const floorResults = await Promise.allSettled(
+          buildingIds.map((buildingId) => floorApi.getByBuilding(buildingId))
+        );
+        const floors = floorResults.flatMap((result) => getSettledData(result, []));
+
+        const zoneResults = await Promise.allSettled(
+          floors.map((floor) => {
+            const floorId = getFloorId(floor);
+            if (!floorId) return Promise.resolve({ data: { data: [] } });
+            return zoneApi.getByFloor(floorId);
+          })
+        );
+        const zones = zoneResults.flatMap((result) => getSettledData(result, []));
+
+        const slotResults = await Promise.allSettled(
+          zones.map((zone) => {
+            const zoneId = getZoneId(zone);
+            if (!zoneId) return Promise.resolve({ data: { data: [] } });
+            return parkingSlotApi.getByZone(zoneId);
+          })
+        );
+        const allSlots = slotResults.flatMap((result) => getSettledData(result, []));
+        const hasPartialFailure =
+          floorResults.some((result) => result.status === "rejected") ||
+          zoneResults.some((result) => result.status === "rejected") ||
+          slotResults.some((result) => result.status === "rejected");
+
         setLiveStats({
-          buildingCount: stats.buildingCount ?? 0,
-          total: stats.total ?? 0,
-          available: stats.available ?? 0,
-          occupied: stats.occupied ?? 0,
+          buildingCount: buildingIds.length,
+          total: allSlots.length,
+          available: allSlots.filter((s) => s.status === "AVAILABLE").length,
+          occupied: allSlots.filter((s) => s.status === "OCCUPIED").length,
         });
-        setStatsError("");
+        setStatsError(hasPartialFailure ? "Mot vai khu vuc chua tai du lieu day du, thong ke dang hien theo phan du lieu lay duoc." : "");
       } catch (err) {
         setStatsError(err.response?.data?.message || "Khong tai duoc thong ke bai do song.");
       }

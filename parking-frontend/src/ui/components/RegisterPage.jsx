@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../api/auth/authApi";
 import { usePublicTheme } from "../../utils/publicTheme";
-import { fetchPublicParkingOverview } from "../../utils/publicStats";
 import "../../assets/css/landing.css";
 import "../../assets/css/auth.css";
 
@@ -14,15 +13,6 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ username: "", fullName: "", email: "", phone: "", password: "", confirm: "" });
-  const [overview, setOverview] = useState({ buildingCount: 0, total: 0 });
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPublicParkingOverview()
-      .then((stats) => { if (!cancelled) setOverview(stats); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   const update = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
 
@@ -189,12 +179,16 @@ export default function RegisterPage() {
             </div>
             <div className="auth-stat-grid">
               <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>{overview.total}</span>
+                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>72</span>
                 <span className="auth-stat-label">Slot</span>
               </div>
               <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>{overview.buildingCount}</span>
-                <span className="auth-stat-label">Bãi đỗ</span>
+                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>5</span>
+                <span className="auth-stat-label">Tài khoản</span>
+              </div>
+              <div className="auth-stat-item">
+                <span className="auth-stat-value" style={{ color: "#f97316" }}>99%</span>
+                <span className="auth-stat-label">Uptime</span>
               </div>
             </div>
           </div>

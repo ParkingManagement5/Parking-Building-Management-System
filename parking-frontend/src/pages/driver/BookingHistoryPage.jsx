@@ -382,11 +382,6 @@ export default function BookingHistoryPage() {
                 </div>
               );
             })}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-              <div key={`filler-${index}`} aria-hidden="true" className="invisible px-5 py-4">
-                &nbsp;
-              </div>
-            ))}
           </div>
         )}
         {totalPages > 1 && (

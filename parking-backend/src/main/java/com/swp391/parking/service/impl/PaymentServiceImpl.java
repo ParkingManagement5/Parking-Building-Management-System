@@ -172,9 +172,7 @@ public class PaymentServiceImpl implements PaymentService {
         BigDecimal serverRate = resolveHourlyRate(session);
         List<PricingPolicy> activePolicies = List.of();
         if (session.getVehicle() != null && session.getVehicle().getVehicleType() != null) {
-            // Dung TAT CA phien ban gia de tinh dung phi cho tung doan thoi gian da
-            // qua, ke ca khi Manager da sua gia giua luc xe dang do.
-            activePolicies = pricingPolicyRepository.findByVehicleType_Id(
+            activePolicies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(
                     session.getVehicle().getVehicleType().getId());
         }
         if (session.getExitTime() == null) {
@@ -425,9 +423,7 @@ public class PaymentServiceImpl implements PaymentService {
             return new BigDecimal("20000");
         }
         Long vtId = session.getVehicle().getVehicleType().getId();
-        // Tat ca phien ban gia - resolveHourlyRate se tu chon dung phien ban theo
-        // effectiveFrom tai thoi diem entryTime.
-        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vtId);
+        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_IdAndIsActiveTrue(vtId);
         LocalDateTime refTime = session.getEntryTime() != null ? session.getEntryTime() : LocalDateTime.now();
         return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }

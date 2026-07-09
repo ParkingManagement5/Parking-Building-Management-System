@@ -11,6 +11,7 @@ import {
   StaffEmptyState, StaffInput, StaffPageSection, StaffPrimaryButton,
   StaffSecondaryButton, StaffStatusBadge, StaffSelect,
 } from "./StaffUi";
+import OcrCorrectionPage from "./OcrCorrectionPage";
 
 const EXIT_TYPES = ["EXIT_VERIFICATION_FAILED", "LOST_QR"];
 const ENTRY_TYPES = ["BOOKING_MISMATCH", "PLATE_UNVERIFIED", "SYSTEM_ERROR", "SESSION_CONFLICT"];
@@ -20,8 +21,8 @@ function exceptionMeta(type) {
     case "PLATE_UNVERIFIED":
       return {
         priority: "HIGH", priorityTone: "rose",
-        recommendation: "Xe dang cho xac nhan bien so. Quay lai trang Scan va nhap tay bien so de tiep tuc cho xe vao.",
-        resolutionGuide: "Vao trang Scan, dung Nhap tay de xac nhan bien so dung, sau do tiep tuc quy trinh cho xe vao.",
+        recommendation: "Xe dang cho xac nhan bien so. Sua bien so trong OCR Correction Queue bên dưới, sau đó tới cổng làm thủ công.",
+        resolutionGuide: "Chinh bien so trong form OCR ben duoi. Sau khi xac nhan, vao trang Scan de tiep tuc cho xe vao.",
       };
     case "BOOKING_MISMATCH":
       return {
@@ -502,11 +503,6 @@ export default function ExceptionCasePage() {
                 </div>
               );
             })}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-              <div key={`filler-${index}`} aria-hidden="true" className="invisible rounded-2xl border border-border p-4">
-                &nbsp;
-              </div>
-            ))}
           </div>
         )}
 
@@ -569,6 +565,8 @@ export default function ExceptionCasePage() {
           </div>
         )}
       </StaffPageSection>
+
+      <OcrCorrectionPage />
     </div>
   );
 }

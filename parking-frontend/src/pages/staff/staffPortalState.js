@@ -111,10 +111,7 @@ export function computeSessionFee(entryTime, endTimeOrHourlyRate = new Date(), h
   const billableMs = elapsedMs - graceMs;
   const blockMs = 30 * 60 * 1000;
   const blocks = Math.max(1, Math.ceil(billableMs / blockMs));
-  // Moi block la 30 phut = nua gio, phai tinh nua gia/gio moi block — khop voi
-  // FeeCalculatorUtil.calculateWindowFee ben backend (truoc day nhan ca gia/gio
-  // cho moi block 30 phut, uoc tinh gap doi so voi tien thuc te se bi tinh).
-  return blocks * resolvedHourlyRate * 0.5;
+  return blocks * resolvedHourlyRate;
 }
 
 export function createPortalId(prefix) {

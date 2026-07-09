@@ -14,11 +14,11 @@ import {
 } from "../../ui/components/manager/ManagerUi";
 
 const GROUP_META = {
-  OCR: { title: "Hệ thống OCR" },
-  BOOKING: { title: "Hệ thống đặt chỗ" },
-  NOTIFICATION: { title: "Thông báo" },
-  SECURITY: { title: "Bảo mật" },
-  OTHER: { title: "Cài đặt khác" },
+  OCR: { title: "OCR System" },
+  BOOKING: { title: "Booking System" },
+  NOTIFICATION: { title: "Notifications" },
+  SECURITY: { title: "Security" },
+  OTHER: { title: "Other Settings" },
 };
 
 function prettifyKey(key) {
@@ -102,7 +102,7 @@ export default function SystemConfigPage() {
       );
     } catch (error) {
       console.error("Failed to load system configs", error);
-      alert("Không tải được cấu hình hệ thống");
+      alert("Cannot load system configurations");
       setConfigs([]);
       setDraftValues({});
     }
@@ -168,7 +168,7 @@ export default function SystemConfigPage() {
   const handleSaveChanges = async () => {
     const userId = getUserId();
     if (!userId) {
-      alert("Vui lòng đăng nhập lại để quản lý cấu hình hệ thống");
+      alert("Please login again to manage system configs");
       return;
     }
 
@@ -199,7 +199,7 @@ export default function SystemConfigPage() {
       await loadConfigs();
     } catch (error) {
       console.error("Failed to save system configs", error);
-      alert("Lưu cấu hình hệ thống thất bại");
+      alert("Save system configuration failed");
     } finally {
       setSaving(false);
     }
@@ -230,12 +230,12 @@ export default function SystemConfigPage() {
 
     const userId = getUserId();
     if (!userId) {
-      alert("Vui lòng đăng nhập lại để quản lý cấu hình hệ thống");
+      alert("Please login again to manage system configs");
       return;
     }
 
     if (!createForm.configKey.trim()) {
-      alert("Khóa cấu hình là bắt buộc");
+      alert("Config key is required");
       return;
     }
 
@@ -252,7 +252,7 @@ export default function SystemConfigPage() {
       closeAddModal();
     } catch (error) {
       console.error("Failed to create system config", error);
-      alert("Tạo cấu hình hệ thống thất bại");
+      alert("Create system configuration failed");
     }
   };
 
@@ -261,26 +261,26 @@ export default function SystemConfigPage() {
       <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Thêm cấu hình</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Tạo một bản ghi cấu hình hệ thống mới.</p>
+            <h3 className="text-lg font-semibold text-foreground">Add Config</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Create a new system configuration record.</p>
           </div>
           <button type="button" onClick={closeAddModal} className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted">
             <X size={18} />
           </button>
         </div>
         <ManagerForm onSubmit={handleCreateConfig}>
-          <ManagerField label="Khóa cấu hình">
+          <ManagerField label="Config Key">
             <ManagerInput name="configKey" value={createForm.configKey} onChange={handleCreateChange} placeholder="QR_EXPIRE_MINUTES" />
           </ManagerField>
-          <ManagerField label="Giá trị">
+          <ManagerField label="Config Value">
             <ManagerInput name="configValue" value={createForm.configValue} onChange={handleCreateChange} placeholder="30" />
           </ManagerField>
-          <ManagerField label="Mô tả">
-            <ManagerInput name="description" value={createForm.description} onChange={handleCreateChange} placeholder="Mô tả ngắn gọn" />
+          <ManagerField label="Description">
+            <ManagerInput name="description" value={createForm.description} onChange={handleCreateChange} placeholder="Short explanation" />
           </ManagerField>
           <div className="flex gap-3">
-            <ManagerPrimaryButton type="submit" className="flex-1">Tạo cấu hình</ManagerPrimaryButton>
-            <ManagerSecondaryButton type="button" className="flex-1" onClick={closeAddModal}>Hủy</ManagerSecondaryButton>
+            <ManagerPrimaryButton type="submit" className="flex-1">Create Config</ManagerPrimaryButton>
+            <ManagerSecondaryButton type="button" className="flex-1" onClick={closeAddModal}>Cancel</ManagerSecondaryButton>
           </div>
         </ManagerForm>
       </div>
@@ -370,13 +370,13 @@ export default function SystemConfigPage() {
     return (
       <div className="space-y-4">
         <ManagerEmptyState
-          title="Chưa có cấu hình hệ thống nào"
-          description="Hệ thống chưa trả về bản ghi cấu hình nào."
+          title="No system configurations found"
+          description="The backend did not return any system config entries yet."
         />
         <div className="flex justify-end">
           <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
             <Plus size={14} />
-            Thêm cấu hình
+            Add Config
           </ManagerPrimaryButton>
         </div>
         {addConfigModal}
@@ -387,7 +387,7 @@ export default function SystemConfigPage() {
   return (
     <div className="space-y-5">
       <ManagerPageHeader
-        title="Cấu hình hệ thống"
+        title="System Configuration"
         description="Quản lý nhanh các mốc thời gian, toggle hệ thống và cấu hình vận hành cốt lõi."
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -405,14 +405,14 @@ export default function SystemConfigPage() {
         <div className="flex flex-wrap items-center gap-2">
           <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2">
             <Plus size={14} />
-            Thêm cấu hình
+            Add Config
           </ManagerPrimaryButton>
           <button
             type="button"
             onClick={handleReset}
             className="rounded-2xl border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
-            Đặt lại
+            Reset
           </button>
         </div>
         <button
@@ -421,11 +421,11 @@ export default function SystemConfigPage() {
           disabled={!hasChanges || saving}
           className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
-      <div className="grid auto-rows-fr gap-5 xl:grid-cols-2" style={{ minHeight: totalPages > 1 ? 420 : undefined }}>
+      <div className="grid auto-rows-fr gap-5 xl:grid-cols-2">
         {["OCR", "BOOKING", "NOTIFICATION", "SECURITY", "OTHER"]
           .map((groupKey) => renderCard(groupKey, groupedConfigs[groupKey]))
           .filter(Boolean)}

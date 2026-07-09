@@ -129,7 +129,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
           {[
             [isSession ? "Giờ vào" : "Hẹn đến", isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)],
             [isSession ? "Phí tạm tính" : "Tính phí", isSession && item.calculatedFee != null ? formatCurrency(item.calculatedFee) : "Tính khi ra bãi"],
-            ["Đơn giá", item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/giờ` : "Theo loại xe"],
+            ["Đơn giá", item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/30 phut` : "Theo loại xe"],
           ].map(([label, val]) => (
             <div key={label} className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-white/60">{label}</p>

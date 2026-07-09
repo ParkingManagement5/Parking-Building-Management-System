@@ -1,7 +1,6 @@
 package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.SlotRequest;
-import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.ParkingSlot.Status;
 import com.swp391.parking.entity.User;
@@ -30,24 +29,6 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     @Transactional(readOnly = true)
     public List<ParkingSlot> getAll() {
         return slotRepo.findAll();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ParkingSlot> getPublicOverview() {
-        return slotRepo.findAllWithDetails();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public PublicSlotStatsResponse getPublicStats() {
-        var row = slotRepo.getPublicStats();
-        return PublicSlotStatsResponse.builder()
-                .buildingCount(row.getBuildingCount() != null ? row.getBuildingCount() : 0)
-                .total(row.getTotal() != null ? row.getTotal() : 0)
-                .available(row.getAvailable() != null ? row.getAvailable() : 0)
-                .occupied(row.getOccupied() != null ? row.getOccupied() : 0)
-                .build();
     }
 
     @Override

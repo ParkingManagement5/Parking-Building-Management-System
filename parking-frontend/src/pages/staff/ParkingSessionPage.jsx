@@ -139,11 +139,6 @@ export default function ParkingSessionPage() {
                 </div>
               </div>
             ))}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-              <div key={`filler-${index}`} aria-hidden="true" className="invisible rounded-2xl border border-border px-4 py-4">
-                &nbsp;
-              </div>
-            ))}
           </div>
         )}
         {totalPages > 1 && (

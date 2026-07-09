@@ -74,9 +74,6 @@ public class VNPayController {
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking khong o trang thai cho thanh toan");
         }
-        if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(LocalDateTime.now())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da qua han thanh toan, khong the tao thanh toan moi");
-        }
 
         BigDecimal depositAmount = booking.getDepositAmount();
         if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {

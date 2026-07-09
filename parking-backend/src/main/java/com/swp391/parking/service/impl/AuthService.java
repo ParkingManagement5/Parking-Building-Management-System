@@ -15,7 +15,6 @@ import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.security.jwt.JwtUtil;
-import com.swp391.parking.service.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,7 +52,6 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
-    private final ActivityLogService activityLogService;
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -111,7 +109,6 @@ public class AuthService {
         }
 
         resetLoginLock(user);
-        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " da dang nhap");
         String token = jwtUtil.generateToken(user.getUsername());
         return buildAuthResponse(user, token);
     }
@@ -223,7 +220,6 @@ public class AuthService {
             userRepository.save(user);
         }
 
-        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " da dang nhap bang Google");
         String token = jwtUtil.generateToken(user.getUsername());
         return buildAuthResponse(user, token);
     }

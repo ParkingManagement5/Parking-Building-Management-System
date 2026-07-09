@@ -138,7 +138,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     void exitShouldKeepSlotOccupiedUntilParkingFeeIsPaid() throws Exception {
         User staff = createUser("staff-exit", Role.RoleName.STAFF);
         ParkingBuilding building = createBuilding("Exit Tower");
-        staff = assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Exit Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "Exit Zone");
@@ -194,7 +193,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     void walkInLifecycleShouldReachCompletedWithoutBookingOrQr() throws Exception {
         User staff = createUser("staff-walkin-lifecycle", Role.RoleName.STAFF);
         ParkingBuilding building = createBuilding("WalkIn Tower");
-        staff = assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("WalkIn Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "WalkIn Zone");
@@ -230,9 +228,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         assertThat(vehicleRepository.count()).isEqualTo(vehiclesBefore + 1);
         assertThat(activeSession.getVehicle().getLicensePlate()).isEqualTo("59A-123.45");
 
-        // Vao-ra gan nhu tuc thi (0 phut) => phi tinh duoc = 0d, nam trong grace
-        // period => "/exit" tu dong hoan tat luon session (tinh nang co san,
-        // khong phai loi), khong con buoc WAITING_PAYMENT rieng nua.
         mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -243,22 +238,43 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                     """.formatted(exitGate.getId())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.data.status").value("WAITING_PAYMENT"))
             .andExpect(jsonPath("$.data.exitGateCode").value("EXIT-WI"));
 
-        ParkingSession completedSession = parkingSessionRepository.findById(activeSession.getId()).orElseThrow();
-        ParkingSlot releasedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
-        assertThat(completedSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.COMPLETED);
-        assertThat(completedSession.getBooking()).isNull();
-        assertThat(releasedSlot.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
+        ParkingSession waitingPaymentSession = parkingSessionRepository.findById(activeSession.getId()).orElseThrow();
+        ParkingSlot slotAfterExit = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        assertThat(waitingPaymentSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.WAITING_PAYMENT);
+        assertThat(waitingPaymentSession.getBooking()).isNull();
+        assertThat(slotAfterExit.getStatus()).isEqualTo(ParkingSlot.Status.OCCUPIED);
 
-        Payment autoPayment = paymentRepository.findAll().stream()
+        mockMvc.perform(post("/api/v1/payments/parking-fee")
+                .param("sessionId", waitingPaymentSession.getId().toString())
+                .param("totalAmount", "15000")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.sessionId").value(waitingPaymentSession.getId()))
+            .andExpect(jsonPath("$.data.bookingId").isEmpty())
+            .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"));
+
+        Payment payment = paymentRepository.findAll().stream()
             .filter(savedPayment -> savedPayment.getPaymentType() == Payment.PaymentType.PARKING_FEE)
             .findFirst()
             .orElseThrow();
-        assertThat(autoPayment.getPaymentStatus()).isEqualTo(Payment.PaymentStatus.PAID);
-        assertThat(autoPayment.getBookingId()).isNull();
-        assertThat(autoPayment.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        mockMvc.perform(put("/api/v1/payments/parking-fee/{paymentId}/confirm", payment.getPaymentId()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.paymentStatus").value("PAID"));
+
+        ParkingSession completedSession = parkingSessionRepository.findById(activeSession.getId()).orElseThrow();
+        ParkingSlot releasedSlot = parkingSlotRepository.findById(slot.getId()).orElseThrow();
+        Payment paidPayment = paymentRepository.findById(payment.getPaymentId()).orElseThrow();
+        assertThat(completedSession.getStatus()).isEqualTo(ParkingSession.SessionStatus.COMPLETED);
+        assertThat(completedSession.getBooking()).isNull();
+        assertThat(releasedSlot.getStatus()).isEqualTo(ParkingSlot.Status.AVAILABLE);
+        assertThat(paidPayment.getPaymentStatus()).isEqualTo(Payment.PaymentStatus.PAID);
+        assertThat(paidPayment.getBookingId()).isNull();
     }
 
     @Test
@@ -266,7 +282,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     void parkingFeeShouldUseGracePeriodThirtyMinuteBlocksAndWindowSplit() throws Exception {
         User staff = createUser("staff-pricing-blocks", Role.RoleName.STAFF);
         ParkingBuilding building = createBuilding("Pricing Tower");
-        staff = assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Pricing Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "Pricing Zone");
@@ -274,11 +289,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         Gate entryGate = createGate(building, "ENTRY-PR", Gate.GateType.ENTRY);
         Vehicle vehicle = createVehicle(staff, vehicleType, "51H-99999");
 
-        // effectiveFrom phai truoc thoi diem session mo phong (2026-06-30), khong
-        // phai truoc "now" luc chay test - neu khong policy se bi coi la "chua co
-        // hieu luc" tai thoi diem session va rot ve fallback phang (khong tach
-        // ngay/dem).
-        LocalDateTime policyEffectiveFrom = LocalDateTime.of(2020, 1, 1, 0, 0);
         pricingPolicyRepository.save(PricingPolicy.builder()
                 .vehicleType(vehicleType)
                 .dayType("WEEKDAY")
@@ -286,7 +296,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                 .startHour(6)
                 .endHour(22)
                 .pricePerHour(new BigDecimal("15000"))
-                .effectiveFrom(policyEffectiveFrom)
                 .isActive(true)
                 .build());
         pricingPolicyRepository.save(PricingPolicy.builder()
@@ -296,7 +305,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                 .startHour(22)
                 .endHour(6)
                 .pricePerHour(new BigDecimal("12000"))
-                .effectiveFrom(policyEffectiveFrom)
                 .isActive(true)
                 .build());
 
@@ -313,10 +321,8 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                 .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            // 21:45->22:00 (15p, 15000/h) = 1 block x 7500 = 7500
-            // 22:00->22:20 (20p, 12000/h) = 1 block x 6000 = 6000 => tong 13500
-            .andExpect(jsonPath("$.data.baseFee").value(13500))
-            .andExpect(jsonPath("$.data.totalAmount").value(13500))
+            .andExpect(jsonPath("$.data.baseFee").value(27000))
+            .andExpect(jsonPath("$.data.totalAmount").value(27000))
             .andExpect(jsonPath("$.data.appliedRate").value(15000));
     }
 
@@ -380,7 +386,6 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         User staff = createUser("staff-plate-entry", Role.RoleName.STAFF);
         User driver = createUser("driver-plate-entry", Role.RoleName.DRIVER);
         ParkingBuilding building = createBuilding("Plate Entry Tower");
-        staff = assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Plate Entry Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "Plate Entry Zone");
@@ -454,9 +459,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                     """.formatted(exitQr, exitGate.getId(), staff.getUserId())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
-            // Vao-ra tuc thi => phi = 0d => tu dong hoan tat, khong dung o
-            // WAITING_PAYMENT (tinh nang co san, khong phai loi).
-            .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+            .andExpect(jsonPath("$.data.status").value("WAITING_PAYMENT"));
     }
 
     @Test
@@ -500,9 +503,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                     }
                     """.formatted(exitGate.getId(), staff.getUserId())))
             .andExpect(status().isOk())
-            // Vao-ra tuc thi => phi = 0d => tu dong hoan tat, khong dung o
-            // WAITING_PAYMENT (tinh nang co san, khong phai loi).
-            .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+            .andExpect(jsonPath("$.data.status").value("WAITING_PAYMENT"));
     }
 
     @Test
@@ -530,10 +531,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
 
     @Test
     @WithMockUser(username = "driver-cancel-window-block", roles = "DRIVER")
-    void confirmedBookingShouldAllowCancelAfterTenMinutesButForfeitDeposit() throws Exception {
-        // Dung theo dung BR: driver van duoc huy booking CONFIRMED cho den luc
-        // check-in, chi khac la sau 10 phut ke tu luc coc duoc thanh toan thi
-        // khong duoc hoan coc (mat coc) - khong phai bi tu choi huy.
+    void confirmedBookingShouldRejectCancelAfterTenMinutesFromDepositPayment() throws Exception {
         User driver = createUser("driver-cancel-window-block", Role.RoleName.DRIVER);
         ParkingBuilding building = createBuilding("No Show Tower");
         var floor = createFloor(building, 1);
@@ -544,21 +542,19 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         Booking booking = createConfirmedBooking(driver, vehicle, slot, LocalDateTime.now().minusMinutes(11));
 
         mockMvc.perform(put("/api/v1/bookings/{id}/cancel", booking.getId()))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false));
 
         assertThat(bookingRepository.findById(booking.getId()).orElseThrow().getStatus())
-            .isEqualTo(Booking.BookingStatus.CANCELLED);
+            .isEqualTo(Booking.BookingStatus.CONFIRMED);
         assertThat(parkingSlotRepository.findById(slot.getId()).orElseThrow().getStatus())
-            .isEqualTo(ParkingSlot.Status.AVAILABLE);
+            .isEqualTo(ParkingSlot.Status.RESERVED);
     }
 
     @Test
     @WithMockUser(username = "staff-exception-close", roles = "STAFF")
     void exceptionLifecycleShouldRequireResolvedBeforeClose() throws Exception {
         User staff = createUser("staff-exception-close", Role.RoleName.STAFF);
-        assignBuilding(staff, createBuilding("Exception Close Tower"));
         ExceptionCase exceptionCase = createExceptionCase(
             ExceptionCase.ExceptionType.PLATE_UNVERIFIED,
             ExceptionCase.ExceptionStatus.OPEN,
@@ -566,17 +562,14 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
             101
         );
 
-        // Chua assign cho staff nao thi phai bi tu choi truoc khi kip cham toi
-        // kiem tra trang thai RESOLVED (enforceAssignedStaff chay truoc).
+        mockMvc.perform(put("/api/v1/exceptions/{id}/close", exceptionCase.getExceptionId()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false));
+
         mockMvc.perform(put("/api/v1/exceptions/{id}/assign", exceptionCase.getExceptionId())
                 .param("staffId", String.valueOf(staff.getUserId())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
-
-        // Da assign cho dung staff nay nhung chua RESOLVED -> phai bi tu choi 400.
-        mockMvc.perform(put("/api/v1/exceptions/{id}/close", exceptionCase.getExceptionId()))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false));
 
         mockMvc.perform(put("/api/v1/exceptions/{id}/resolve", exceptionCase.getExceptionId()))
             .andExpect(status().isOk())
@@ -785,9 +778,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     @WithMockUser(username = "staff-payment-failed", roles = "STAFF")
     void pendingDepositShouldBeMarkableAsFailedAndAllowRecreate() throws Exception {
         User driver = createUser("driver-payment-failed", Role.RoleName.DRIVER);
-        User staff = createUser("staff-payment-failed", Role.RoleName.STAFF);
         ParkingBuilding building = createBuilding("Failed Payment Tower");
-        assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Failed Payment Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "Failed Payment Zone");
@@ -848,9 +839,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     @WithMockUser(username = "staff-payment-refund", roles = "STAFF")
     void paidDepositShouldBeRefundableAfterBookingCancelled() throws Exception {
         User driver = createUser("driver-payment-refund", Role.RoleName.DRIVER);
-        User staff = createUser("staff-payment-refund", Role.RoleName.STAFF);
         ParkingBuilding building = createBuilding("Refund Payment Tower");
-        assignBuilding(staff, building);
         var floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Refund Payment Car", VehicleType.SlotSize.MEDIUM);
         var zone = createZone(floor, vehicleType, "Refund Payment Zone");

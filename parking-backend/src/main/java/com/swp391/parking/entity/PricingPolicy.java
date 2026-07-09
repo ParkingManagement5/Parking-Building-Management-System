@@ -3,7 +3,6 @@ package com.swp391.parking.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "pricing_policy")
@@ -33,9 +32,6 @@ public class PricingPolicy extends BaseEntity {
 
     @Column(name = "price_per_hour", nullable = false, precision = 10, scale = 2)
     private BigDecimal pricePerHour;
-
-    @Column(name = "effective_from", nullable = false)
-    private LocalDateTime effectiveFrom;
 
    @Builder.Default
 @Column(name = "is_active", nullable = false)
