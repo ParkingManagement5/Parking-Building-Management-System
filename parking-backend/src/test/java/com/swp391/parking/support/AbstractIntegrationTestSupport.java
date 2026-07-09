@@ -3,13 +3,10 @@ package com.swp391.parking.support;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.swp391.parking.entity.Floor;
-import com.swp391.parking.entity.ExceptionCase;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.Notification;
 import com.swp391.parking.entity.ParkingBuilding;
-import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.ParkingSlot;
-import com.swp391.parking.entity.Payment;
 import com.swp391.parking.entity.PricingPolicy;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Shift;
@@ -20,15 +17,10 @@ import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.entity.Zone;
 import com.swp391.parking.repository.FloorRepository;
-import com.swp391.parking.repository.ExceptionCaseRepository;
 import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.NotificationRepository;
-import com.swp391.parking.repository.OcrScanRepository;
 import com.swp391.parking.repository.ParkingBuildingRepository;
-import com.swp391.parking.repository.BookingRepository;
-import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
-import com.swp391.parking.repository.PaymentRepository;
 import com.swp391.parking.repository.PricingPolicyRepository;
 import com.swp391.parking.repository.RoleRepository;
 import com.swp391.parking.repository.ShiftRepository;
@@ -38,7 +30,6 @@ import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.repository.VehicleTypeRepository;
 import com.swp391.parking.repository.ZoneRepository;
-import com.swp391.parking.scheduler.BookingScheduler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,13 +63,7 @@ public abstract class AbstractIntegrationTestSupport {
     protected ParkingBuildingRepository buildingRepository;
 
     @Autowired
-    protected BookingRepository bookingRepository;
-
-    @Autowired
     protected FloorRepository floorRepository;
-
-    @Autowired
-    protected ExceptionCaseRepository exceptionCaseRepository;
 
     @Autowired
     protected GateRepository gateRepository;
@@ -90,12 +75,6 @@ public abstract class AbstractIntegrationTestSupport {
     protected ParkingSlotRepository parkingSlotRepository;
 
     @Autowired
-    protected ParkingSessionRepository parkingSessionRepository;
-
-    @Autowired
-    protected PaymentRepository paymentRepository;
-
-    @Autowired
     protected VehicleTypeRepository vehicleTypeRepository;
 
     @Autowired
@@ -103,9 +82,6 @@ public abstract class AbstractIntegrationTestSupport {
 
     @Autowired
     protected NotificationRepository notificationRepository;
-
-    @Autowired
-    protected OcrScanRepository ocrScanRepository;
 
     @Autowired
     protected PricingPolicyRepository pricingPolicyRepository;
@@ -125,16 +101,8 @@ public abstract class AbstractIntegrationTestSupport {
     @Autowired
     protected RoleRepository roleRepository;
 
-    @Autowired
-    protected BookingScheduler bookingScheduler;
-
     protected String json(Object value) throws JsonProcessingException {
         return objectMapper.writeValueAsString(value);
-    }
-
-    protected User assignBuilding(User user, ParkingBuilding building) {
-        user.setAssignedBuilding(building);
-        return userRepository.save(user);
     }
 
     protected Role createRole(Role.RoleName roleName) {
@@ -143,19 +111,15 @@ public abstract class AbstractIntegrationTestSupport {
     }
 
     protected User createUser(String username, Role.RoleName roleName) {
-        return createUser(username, "password", roleName);
-    }
-
-    protected User createUser(String username, String rawPassword, Role.RoleName roleName) {
         Role role = createRole(roleName);
         User user = User.builder()
             .username(username)
             .fullName(username + " Fullname")
             .email(username + "@example.com")
             .phone("0900000000")
-            .passwordHash(passwordEncoder.encode(rawPassword))
+            .passwordHash(passwordEncoder.encode("password"))
             .status(User.UserStatus.ACTIVE)
-            .roles(new java.util.HashSet<>(Set.of(role)))
+            .roles(Set.of(role))
             .build();
         return userRepository.save(user);
     }
@@ -245,36 +209,6 @@ public abstract class AbstractIntegrationTestSupport {
         return vehicleRepository.save(vehicle);
     }
 
-    protected ParkingSession createSession(
-            User user,
-            Vehicle vehicle,
-            ParkingSlot slot,
-            Gate entryGate,
-            ParkingSession.EntryMode entryMode,
-            ParkingSession.SessionStatus status) {
-        ParkingSession session = ParkingSession.builder()
-            .slot(slot)
-            .userId(user.getUserId().longValue())
-            .vehicle(vehicle)
-            .entryGate(entryGate)
-            .entryTime(LocalDateTime.now().minusHours(1))
-            .entryMode(entryMode)
-            .status(status)
-            .build();
-        return parkingSessionRepository.save(session);
-    }
-
-    protected Payment createParkingFeePayment(ParkingSession session, Payment.PaymentMethod paymentMethod) {
-        Payment payment = Payment.builder()
-            .sessionId(session.getId().intValue())
-            .paymentType(Payment.PaymentType.PARKING_FEE)
-            .paymentMethod(paymentMethod)
-            .paymentStatus(Payment.PaymentStatus.PENDING)
-            .totalAmount(new BigDecimal("10000"))
-            .build();
-        return paymentRepository.save(payment);
-    }
-
     protected Notification createNotification(User user, String title, boolean isRead) {
         Notification notification = Notification.builder()
             .user(user)
@@ -289,21 +223,6 @@ public abstract class AbstractIntegrationTestSupport {
         return notificationRepository.save(notification);
     }
 
-    protected ExceptionCase createExceptionCase(
-            ExceptionCase.ExceptionType type,
-            ExceptionCase.ExceptionStatus status,
-            Integer sessionId,
-            Integer requestId) {
-        ExceptionCase exceptionCase = ExceptionCase.builder()
-            .exceptionType(type)
-            .description(type.name() + " test case")
-            .status(status)
-            .sessionId(sessionId)
-            .requestId(requestId)
-            .build();
-        return exceptionCaseRepository.save(exceptionCase);
-    }
-
     protected PricingPolicy createPricingPolicy(VehicleType vehicleType, boolean isActive) {
         PricingPolicy policy = PricingPolicy.builder()
             .vehicleType(vehicleType)
@@ -312,7 +231,6 @@ public abstract class AbstractIntegrationTestSupport {
             .startHour(6)
             .endHour(18)
             .pricePerHour(new BigDecimal("15000"))
-            .effectiveFrom(LocalDateTime.now().minusDays(1))
             .isActive(isActive)
             .build();
         return pricingPolicyRepository.save(policy);

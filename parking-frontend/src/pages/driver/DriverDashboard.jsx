@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
+import {
+  Bell,
+  BookOpen,
+  Car,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  MapPin,
+  Wallet,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/driver/bookingApi";
-import { driverSessionApi } from "../../api/driver/sessionApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { notificationApi } from "../../api/notificationApi";
@@ -18,109 +27,55 @@ import {
 function StatusBadge({ status }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(status)}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(
+        status
+      )}`}
     >
       {String(status || "pending").toLowerCase()}
     </span>
   );
 }
 
-function isOpenBooking(item) {
-  const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
-  const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
-  return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
-}
-
-function resolveSessionStart(item) {
-  return item?.entryTime || item?.startTime || item?.checkInTime || item?.createdAt || item?.bookingStartTime;
-}
-
-function resolveSessionEnd(item) {
-  return item?.exitTime || item?.endTime || item?.checkOutTime || null;
-}
-
-function resolveBookingStart(item) {
-  return item?.bookingStartTime || item?.reservedAt || item?.createdAt || null;
-}
-
-function bookingPriority(item) {
-  const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return 0;
-  if (status === "CONFIRMED") return 1;
-  return 2;
-}
-
-function pickActiveBooking(bookings) {
-  const openBookings = bookings.filter(isOpenBooking);
-  if (!openBookings.length) return null;
-
-  return [...openBookings].sort((a, b) => {
-    const priorityDiff = bookingPriority(a) - bookingPriority(b);
-    if (priorityDiff !== 0) return priorityDiff;
-
-    const startA = resolveBookingStart(a) ? new Date(resolveBookingStart(a)).getTime() : Number.MAX_SAFE_INTEGER;
-    const startB = resolveBookingStart(b) ? new Date(resolveBookingStart(b)).getTime() : Number.MAX_SAFE_INTEGER;
-    if (startA !== startB) return startA - startB;
-
-    const createdA = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const createdB = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return createdB - createdA;
-  })[0];
-}
-
-function resolveHeroMetric(record, isSessionRecord) {
-  if (!record) return "--:--";
-  if (isSessionRecord) {
-    return formatDuration(resolveSessionStart(record), resolveSessionEnd(record) || new Date().toISOString());
-  }
-
-  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Cho coc";
-  if (status === "CONFIRMED") return "Cho vao";
-  return "--:--";
-}
-
-function resolveHeroMetricLabel(record, isSessionRecord) {
-  if (isSessionRecord) return "Thoi gian";
-
-  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Trang thai";
-  if (status === "CONFIRMED") return "Dieu kien";
-  return "Thoi gian";
-}
-
-function resolveHeroTitle(record, isSessionRecord) {
-  if (!record) return "Chua co phien do xe";
-  if (isSessionRecord) {
-    return record?.slotCode ? `Xe dang do tai ${record.slotCode}` : "Xe dang do trong bai";
-  }
-  return record?.buildingName || record?.parkingBuildingName || "Cho xe vao bai";
-}
-
-function resolveHeroSubtitle(record, isSessionRecord) {
-  if (!record) return "Tao booking de xem phien do xe hien tai tai day";
-  const slotLabel = record?.slotCode || record?.parkingSlotCode || "Cho cho xac nhan";
-  const plateLabel = record?.licensePlate || record?.vehiclePlate || "Xe da lien ket";
-
-  if (isSessionRecord) {
-    return `${slotLabel} - ${plateLabel}`;
-  }
-
-  const startLabel = resolveBookingStart(record) ? formatRelativeTime(resolveBookingStart(record)) : "Sap den luot";
-  return `${slotLabel} - ${plateLabel} - ${startLabel}`;
-}
-
 export default function DriverDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState([
-    { label: "Xe đã đăng ký", value: "0", action: "/driver/vehicles" },
-    { label: "Booking đang mở", value: "0", action: "/driver/booking" },
-    { label: "Phiên hiện tại", value: "--:--", action: "/driver/current-session" },
-    { label: "Thông báo", value: "0", action: "/driver/notifications" },
-    { label: "Chi tiêu tháng", value: "$0", action: "/driver/payments" },
+    {
+      label: "Registered Vehicles",
+      value: "0",
+      icon: Car,
+      color: "bg-blue-50 text-blue-600",
+      action: "/driver/vehicles",
+    },
+    {
+      label: "Active Booking",
+      value: "0",
+      icon: BookOpen,
+      color: "bg-emerald-50 text-emerald-600",
+      action: "/driver/booking",
+    },
+    {
+      label: "Current Session",
+      value: "--:--",
+      icon: Clock,
+      color: "bg-indigo-50 text-indigo-600",
+      action: "/driver/current-session",
+    },
+    {
+      label: "Notifications",
+      value: "0",
+      icon: Bell,
+      color: "bg-amber-50 text-amber-600",
+      action: "/driver/notifications",
+    },
+    {
+      label: "Monthly Expenses",
+      value: "$0",
+      icon: Wallet,
+      color: "bg-violet-50 text-violet-600",
+      action: "/driver/payments",
+    },
   ]);
   const [activeBooking, setActiveBooking] = useState(null);
-  const [currentDriverSession, setCurrentDriverSession] = useState(null);
   const [recentBookings, setRecentBookings] = useState([]);
   const [recentNotifications, setRecentNotifications] = useState([]);
 
@@ -130,51 +85,96 @@ export default function DriverDashboard() {
     async function loadDashboard() {
       try {
         const userId = getUserId();
-        const [vehiclesRes, bookingsRes, sessionsRes, paymentsRes, notificationsRes] =
+        const [vehiclesRes, bookingsRes, paymentsRes, notificationsRes] =
           await Promise.allSettled([
             driverVehicleApi.getMyVehicles(),
             bookingApi.getMyBookings(),
-            driverSessionApi.getMySessions(),
             paymentApi.getMyPayments(),
             userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
           ]);
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
-        const vehicles = vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
-        const bookings = bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
-        const sessions = sessionsRes.status === "fulfilled" ? unwrapApiData(sessionsRes.value.data, []) : [];
-        const payments = paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
-        const notifications = notificationsRes.status === "fulfilled" ? unwrapApiData(notificationsRes.value.data, []) : [];
+        const vehicles =
+          vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
+        const bookings =
+          bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
+        const payments =
+          paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
+        const notifications =
+          notificationsRes.status === "fulfilled"
+            ? unwrapApiData(notificationsRes.value.data, [])
+            : [];
 
-        const active = pickActiveBooking(bookings);
-        const activeSession = sessions.find((s) => String(s.status || "").toUpperCase() === "ACTIVE") || null;
-        const waitingPaymentSession = sessions.find((s) => String(s.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
-        const currentSession = activeSession || waitingPaymentSession || null;
+        const active = bookings.find((item) => {
+          const status = getBookingStatus(item);
+          return (
+            status.includes("active") ||
+            status.includes("confirmed") ||
+            status.includes("pending")
+          );
+        }) || null;
 
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthlyExpenses = payments
-          .filter((p) => String(p.paymentStatus || "").toUpperCase() === "PAID")
-          .filter((p) => new Date(p.paidAt || p.createdAt || 0) >= monthStart)
-          .reduce((sum, p) => sum + Number(p.amount || p.totalAmount || 0), 0);
+        const monthlyExpenses = payments.reduce(
+          (sum, item) => sum + Number(item.amount || item.totalAmount || item.fee || 0),
+          0
+        );
 
         setStats([
-          { label: "Xe đã đăng ký", value: String(vehicles.length), action: "/driver/vehicles" },
-          { label: "Booking đang mở", value: String(bookings.filter(isOpenBooking).length), action: "/driver/booking" },
           {
-            label: "Phiên hiện tại",
-            value: currentSession
-              ? formatDuration(resolveSessionStart(currentSession), resolveSessionEnd(currentSession) || new Date().toISOString())
+            label: "Registered Vehicles",
+            value: String(vehicles.length),
+            icon: Car,
+            color: "bg-blue-50 text-blue-600",
+            action: "/driver/vehicles",
+          },
+          {
+            label: "Active Booking",
+            value: String(
+              bookings.filter((item) => {
+                const status = getBookingStatus(item);
+                return (
+                  status.includes("active") ||
+                  status.includes("confirmed") ||
+                  status.includes("pending")
+                );
+              }).length
+            ),
+            icon: BookOpen,
+            color: "bg-emerald-50 text-emerald-600",
+            action: "/driver/booking",
+          },
+          {
+            label: "Current Session",
+            value: active
+              ? formatDuration(
+                  active.checkInTime || active.startTime || active.createdAt,
+                  active.checkOutTime || active.endTime || new Date().toISOString()
+                )
               : "--:--",
+            icon: Clock,
+            color: "bg-indigo-50 text-indigo-600",
             action: "/driver/current-session",
           },
-          { label: "Thông báo", value: String(notifications.filter((n) => !n.isRead).length), action: "/driver/notifications" },
-          { label: "Chi tiêu tháng", value: formatCurrency(monthlyExpenses), action: "/driver/payments" },
+          {
+            label: "Notifications",
+            value: String(notifications.filter((item) => !item.isRead).length),
+            icon: Bell,
+            color: "bg-amber-50 text-amber-600",
+            action: "/driver/notifications",
+          },
+          {
+            label: "Monthly Expenses",
+            value: formatCurrency(monthlyExpenses),
+            icon: CreditCard,
+            color: "bg-violet-50 text-violet-600",
+            action: "/driver/payments",
+          },
         ]);
 
         setActiveBooking(active);
-        setCurrentDriverSession(currentSession);
         setRecentBookings(bookings.slice(0, 3));
         setRecentNotifications(notifications.slice(0, 4));
       } catch (error) {
@@ -183,130 +183,199 @@ export default function DriverDashboard() {
     }
 
     void loadDashboard();
-    return () => { cancelled = true; };
-  }, []);
 
-  const heroRecord = currentDriverSession || activeBooking;
-  const heroIsSession = Boolean(currentDriverSession);
-  const heroStatus = currentDriverSession
-    ? String(currentDriverSession.status || "").toUpperCase()
-    : getBookingStatus(activeBooking);
-  const heroTitle = heroRecord?.buildingName || heroRecord?.parkingBuildingName || "Chưa có phiên đỗ xe";
-  const heroSubtitle = heroRecord
-    ? `${heroRecord.slotCode || heroRecord.parkingSlotCode || "Chỗ chờ xác nhận"} - ${heroRecord.licensePlate || heroRecord.vehiclePlate || "Xe đã liên kết"}`
-    : "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
-  const heroDuration = resolveHeroMetric(heroRecord, heroIsSession);
-  const heroDurationLabel = resolveHeroMetricLabel(heroRecord, heroIsSession);
-  const heroStatusLabel = currentDriverSession
-    ? heroStatus.toLowerCase()
-    : activeBooking ? getBookingStatus(activeBooking) : "waiting";
-  const heroDisplayTitle = resolveHeroTitle(heroRecord, heroIsSession);
-  const heroDisplaySubtitle = resolveHeroSubtitle(heroRecord, heroIsSession);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-5">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {stats.map((item) => (
-          <button
-            key={item.label}
-            onClick={() => navigate(item.action)}
-            className="rounded-2xl border border-border bg-card p-4 text-left transition hover:border-emerald-300 hover:shadow-sm"
-          >
-            <div className="text-2xl font-bold text-foreground">{item.value}</div>
-            <div className="text-xs text-muted-foreground mt-1">{item.label}</div>
-          </button>
-        ))}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {stats.map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <button
+              key={item.label}
+              onClick={() => navigate(item.action)}
+              className="bg-card border border-border rounded-2xl p-4 text-left hover:shadow-md hover:shadow-primary/5 transition-all"
+            >
+              <div
+                className={`size-9 rounded-xl flex items-center justify-center ${item.color} mb-3`}
+              >
+                <Icon size={16} />
+              </div>
+              <div className="text-xl font-bold text-foreground">{item.value}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{item.label}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Hero active session */}
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-600 p-6 text-white dark:border-emerald-500/20 dark:bg-emerald-900">
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+      <div className="bg-gradient-to-r from-primary to-[#4338CA] rounded-2xl p-6 text-white">
+        <div className="flex items-start justify-between mb-4 gap-4 flex-wrap">
           <div>
-            <p className="text-xs text-white/70 mb-1">Phiên đỗ xe hiện tại</p>
-            <h2 className="text-xl font-bold">{heroDisplayTitle}</h2>
-            <p className="text-sm text-white/80 mt-0.5">{heroDisplaySubtitle}</p>
+            <p className="text-white/70 text-xs mb-1">Active Parking Session</p>
+            <h2 className="font-bold mb-0.5 text-xl">
+              {activeBooking?.buildingName ||
+                activeBooking?.parkingBuildingName ||
+                "No active session"}
+            </h2>
+            <p className="text-white/70 text-sm">
+              {activeBooking
+                ? `${
+                    activeBooking.slotCode ||
+                    activeBooking.parkingSlotCode ||
+                    "Slot pending"
+                  } - ${
+                    activeBooking.licensePlate ||
+                    activeBooking.vehiclePlate ||
+                    "Vehicle linked"
+                  }`
+                : "Create a booking to see your current parking session here"}
+            </p>
           </div>
-          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center">
-            <div className="text-2xl font-bold font-mono">{heroDuration}</div>
-            <div className="text-xs text-white/60">{heroDurationLabel}</div>
+
+          <div className="bg-white/20 rounded-xl px-4 py-2 text-center min-w-[92px]">
+            <div className="text-2xl font-bold font-mono">
+              {activeBooking
+                ? formatDuration(
+                    activeBooking.checkInTime ||
+                      activeBooking.startTime ||
+                      activeBooking.createdAt,
+                    activeBooking.checkOutTime ||
+                      activeBooking.endTime ||
+                      new Date().toISOString()
+                  )
+                : "--:--"}
+            </div>
+            <div className="text-xs text-white/70">Duration</div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          {[
-            ["Trạng thái", heroStatusLabel],
-            ["Phí ước tính", formatCurrency((heroIsSession ? heroRecord?.calculatedFee : heroRecord?.depositAmount) || 0)],
-            ["Biển số xe", heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Chưa gán"],
-          ].map(([label, val]) => (
-            <div key={label} className="rounded-xl bg-white/10 p-3">
-              <p className="text-xs text-white/60">{label}</p>
-              <p className="text-sm font-semibold mt-0.5 capitalize">{val}</p>
-            </div>
-          ))}
+          <div className="bg-white/10 rounded-xl p-3">
+            <p className="text-white/60 text-xs">Booking Status</p>
+            <p className="font-semibold text-sm mt-0.5 capitalize">
+              {activeBooking ? getBookingStatus(activeBooking) : "waiting"}
+            </p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-3">
+            <p className="text-white/60 text-xs">Estimated Fee</p>
+            <p className="font-semibold text-sm mt-0.5">
+              {formatCurrency(
+                activeBooking?.amount ||
+                  activeBooking?.estimatedFee ||
+                  activeBooking?.totalAmount ||
+                  0
+              )}
+            </p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-3">
+            <p className="text-white/60 text-xs">Vehicle</p>
+            <p className="font-semibold text-sm mt-0.5">
+              {activeBooking?.licensePlate || activeBooking?.vehiclePlate || "Not assigned"}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Recent bookings + notifications */}
       <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-5">
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground text-sm">Booking gần đây</h3>
-            <button onClick={() => navigate("/driver/bookings")} className="text-xs text-emerald-600 hover:underline">
-              Xem tất cả
+        <div className="bg-card border border-border rounded-2xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="font-semibold text-foreground text-sm">Recent Bookings</h3>
+            <button
+              onClick={() => navigate("/driver/booking")}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View all <ChevronRight size={12} />
             </button>
           </div>
           <div className="divide-y divide-border">
             {recentBookings.map((item, index) => (
-              <div key={item.bookingId || item.id || index} className="flex items-center justify-between py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {item.buildingName || item.parkingBuildingName || "Parking Building"} - {item.slotCode || item.parkingSlotCode || "Slot"}
+              <div
+                key={item.bookingId || item.id || index}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 transition-colors"
+              >
+                <div className="size-9 bg-muted rounded-xl flex items-center justify-center shrink-0">
+                  <MapPin size={14} className="text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {item.buildingName ||
+                      item.parkingBuildingName ||
+                      "Parking Building"}{" "}
+                    - {item.slotCode || item.parkingSlotCode || "Slot"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {item.bookingDate || item.createdAt || "Vừa tạo"}
+                  <p className="text-xs text-muted-foreground">
+                    {item.bookingDate || item.createdAt || "Recently created"}
                   </p>
                 </div>
-                <div className="text-right shrink-0 ml-3">
+                <div className="text-right">
                   <p className="text-sm font-semibold text-foreground">
-                    {formatCurrency(item.depositAmount || 0)}
+                    {formatCurrency(item.amount || item.totalAmount || item.estimatedFee || 0)}
                   </p>
                   <StatusBadge status={getBookingStatus(item)} />
                 </div>
               </div>
             ))}
             {recentBookings.length === 0 && (
-              <p className="py-6 text-sm text-muted-foreground">Chưa có booking nào.</p>
+              <div className="px-5 py-8 text-sm text-muted-foreground">
+                No bookings returned from the backend yet.
+              </div>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground text-sm">Thông báo gần đây</h3>
-            <button onClick={() => navigate("/driver/notifications")} className="text-xs text-emerald-600 hover:underline">
-              Xem tất cả
+        <div className="bg-card border border-border rounded-2xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="font-semibold text-foreground text-sm">Recent Notifications</h3>
+            <button
+              onClick={() => navigate("/driver/notifications")}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              View all <ChevronRight size={12} />
             </button>
           </div>
           <div className="divide-y divide-border">
             {recentNotifications.map((item, index) => (
-              <div key={item.notificationId || index} className="py-3">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {item.title || "Thông báo"}
-                  </p>
-                  {!item.isRead && <span className="size-2 rounded-full bg-emerald-500 shrink-0" />}
+              <div
+                key={item.notificationId || index}
+                className="px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`size-8 rounded-full flex items-center justify-center shrink-0 ${
+                      item.isRead ? "bg-slate-100 text-slate-500" : "bg-amber-100 text-amber-600"
+                    }`}
+                  >
+                    <Bell size={14} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {item.title || "Notification"}
+                      </p>
+                      {!item.isRead && (
+                        <span className="inline-block size-2 rounded-full bg-primary shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {item.body || item.message || item.content || "No details"}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 text-[11px] text-muted-foreground">
+                      <Clock size={11} />
+                      {formatRelativeTime(item.createdAt || item.sentAt)}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {item.body || item.message || item.content || "Không có chi tiết"}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  {formatRelativeTime(item.createdAt || item.sentAt)}
-                </p>
               </div>
             ))}
             {recentNotifications.length === 0 && (
-              <p className="py-6 text-sm text-muted-foreground">Chưa có thông báo nào.</p>
+              <div className="px-5 py-8 text-sm text-muted-foreground">
+                No notifications returned from the backend yet.
+              </div>
             )}
           </div>
         </div>

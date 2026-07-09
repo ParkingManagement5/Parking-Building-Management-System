@@ -3,17 +3,11 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.request.FloorRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.Floor;
-import com.swp391.parking.exception.AppException;
-import com.swp391.parking.repository.FloorRepository;
-import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.FloorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,26 +18,16 @@ import java.util.List;
 public class FloorController {
 
     private final FloorService floorService;
-    private final FloorRepository floorRepository;
-    private final UserRepository userRepository;
-
-    @GetMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<Floor>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(floorRepository.findAll()));
-    }
 
     @GetMapping("/building/{buildingId}")
-    public ResponseEntity<ApiResponse<List<Floor>>> getByBuilding(@PathVariable Long buildingId, Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(
-                floorService.getByBuilding(buildingId, resolveUserId(authentication), isStaff(authentication))));
+    public ResponseEntity<ApiResponse<List<Floor>>> getByBuilding(@PathVariable Long buildingId) {
+        return ResponseEntity.ok(ApiResponse.success(floorService.getByBuilding(buildingId)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Floor>> getById(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(
-                floorService.getById(id, resolveUserId(authentication), isStaff(authentication))));
+    public ResponseEntity<ApiResponse<Floor>> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(floorService.getById(id)));
     }
 
     @PostMapping
@@ -67,24 +51,5 @@ public class FloorController {
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         floorService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa tang khoi DB"));
-    }
-
-    private boolean isAuthenticated(Authentication authentication) {
-        return authentication != null
-                && !(authentication instanceof AnonymousAuthenticationToken)
-                && authentication.isAuthenticated();
-    }
-
-    private boolean isStaff(Authentication authentication) {
-        if (!isAuthenticated(authentication)) return false;
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
-    }
-
-    private Long resolveUserId(Authentication authentication) {
-        if (!isAuthenticated(authentication)) return null;
-        return userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
-                .getUserId().longValue();
     }
 }

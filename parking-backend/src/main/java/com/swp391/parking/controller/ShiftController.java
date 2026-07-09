@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +28,6 @@ public class ShiftController {
     private final ShiftService shiftService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     @Operation(summary = "Create shift")
     public ResponseEntity<ShiftResponse> create(@Valid @RequestBody ShiftRequest request) {
         return ResponseEntity.ok(shiftService.createShift(request));
@@ -48,7 +46,6 @@ public class ShiftController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     @Operation(summary = "Update shift")
     public ResponseEntity<ShiftResponse> update(
             @PathVariable Long id,
@@ -57,7 +54,6 @@ public class ShiftController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     @Operation(summary = "Delete shift")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         shiftService.deleteShift(id);

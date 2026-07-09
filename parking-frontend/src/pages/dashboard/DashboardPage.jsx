@@ -30,53 +30,51 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Parking Building Management System overview</p>
+    <div className="dashboard-page">
+      <div className="page-title">
+        <h1>Dashboard</h1>
+        <p>Parking Building Management System overview</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="stats-grid">
         {stats.map((item) => (
-          <div className="rounded-3xl border border-border bg-card p-5" key={item.title}>
-            <h3 className="text-sm font-medium text-muted-foreground">{item.title}</h3>
-            <p className="mt-2 text-3xl font-bold text-foreground">{item.value}</p>
-            <span className="mt-1 block text-xs text-muted-foreground">{item.description}</span>
+          <div className="stat-card" key={item.title}>
+            <h3>{item.title}</h3>
+            <p>{item.value}</p>
+            <span>{item.description}</span>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <h3 className="text-lg font-semibold text-foreground">Parking Status</h3>
+      <div className="dashboard-section">
+        <div className="panel">
+          <h3>Parking Status</h3>
 
-          <div className="mt-5 space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Available</span>
-              <strong className="text-foreground">70%</strong>
+          <div className="status-list">
+            <div>
+              <span>Available</span>
+              <strong>70%</strong>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-emerald-500" style={{ width: "70%" }}></div>
+            <div className="progress">
+              <div style={{ width: "70%" }}></div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Occupied</span>
-              <strong className="text-foreground">30%</strong>
+            <div>
+              <span>Occupied</span>
+              <strong>30%</strong>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-rose-500" style={{ width: "30%" }}></div>
+            <div className="progress">
+              <div style={{ width: "30%" }}></div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <h3 className="text-lg font-semibold text-foreground">Recent Activities</h3>
+        <div className="panel">
+          <h3>Recent Activities</h3>
 
-          <ul className="mt-5 space-y-3">
+          <ul className="activity-list">
             {activities.map((item, index) => (
-              <li key={index} className="rounded-2xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                {item}
-              </li>
+              <li key={index}>{item}</li>
             ))}
           </ul>
         </div>

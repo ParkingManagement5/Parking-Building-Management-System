@@ -46,7 +46,6 @@ import java.time.LocalTime;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,9 +184,10 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         vehicleTypeService.deactivate(vehicleType.getId());
 
-        VehicleType deactivated = vehicleTypeRepository.findById(vehicleType.getId()).orElse(null);
-        assertNotNull(deactivated);
-        assertFalse(deactivated.getIsActive());
+        assertTrue(vehicleTypeRepository.findById(vehicleType.getId()).isEmpty());
+        assertTrue(vehicleRepository.findByVehicleTypeId(vehicleType.getId()).isEmpty());
+        assertTrue(zoneRepository.findByVehicleTypeId(vehicleType.getId()).isEmpty());
+        assertTrue(parkingSlotRepository.findByZoneId(zone.getId()).isEmpty());
     }
 
     @Test
@@ -268,11 +268,11 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .build());
 
         assertEquals(1, vehicleService.getByUser(driver.getUserId()).size());
-        assertEquals("51G-123.45", vehicleService.getByLicensePlate("51G-12345").getLicensePlate());
+        assertEquals("51G-12345", vehicleService.getByLicensePlate("51G-12345").getLicensePlate());
         assertEquals("Mazda", updated.getBrand());
 
         vehicleService.deactivate(created.getId());
-        assertTrue(vehicleRepository.findById(created.getId()).orElseThrow().getIsActive().equals(false));
+        assertTrue(vehicleRepository.findById(created.getId()).isEmpty());
     }
 
     @Test
@@ -291,7 +291,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertFalse(created.getIsRead());
         assertEquals(1, notificationService.getNotifications(user.getUserId().longValue()).size());
 
-        notificationService.markAsRead(created.getNotificationId(), null, true);
+        notificationService.markAsRead(created.getNotificationId());
         assertTrue(notificationRepository.findById(created.getNotificationId()).orElseThrow().getIsRead());
 
         var second = notificationService.sendNotification(SendNotificationRequest.builder()

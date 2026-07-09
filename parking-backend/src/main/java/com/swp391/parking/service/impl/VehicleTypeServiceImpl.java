@@ -61,7 +61,7 @@ public class VehicleTypeServiceImpl implements VehicleTypeService {
     public VehicleType update(Long id, VehicleTypeRequest req) {
         VehicleType vt = getById(id);
 
-        if (!vt.getName().equalsIgnoreCase(req.getName()) && vehicleTypeRepo.existsByName(req.getName())) {
+        if (!vt.getName().equals(req.getName()) && vehicleTypeRepo.existsByName(req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
                 "Loai xe '" + req.getName() + "' da ton tai");
         }
@@ -79,7 +79,13 @@ public class VehicleTypeServiceImpl implements VehicleTypeService {
     @Transactional
     public void deactivate(Long id) {
         VehicleType vt = getById(id);
-        vt.setIsActive(false);
-        vehicleTypeRepo.save(vt);
+
+        vehicleRepo.deleteAllInBatch(vehicleRepo.findByVehicleTypeId(vt.getId()));
+
+        var zones = zoneRepo.findByVehicleTypeId(vt.getId());
+        zones.forEach(zone -> parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId())));
+        zoneRepo.deleteAllInBatch(zones);
+
+        vehicleTypeRepo.delete(vt);
     }
 }

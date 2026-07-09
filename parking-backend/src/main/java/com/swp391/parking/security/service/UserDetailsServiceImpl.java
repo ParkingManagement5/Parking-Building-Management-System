@@ -11,6 +11,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.stream.Collectors;
 
+/**
+ * Spring Security dùng class này để load user khi xác thực.
+ * Load theo username (hoặc email tùy bạn chọn).
+ */
 @Service
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -20,9 +24,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
-                .or(() -> userRepository.findByEmail(username))
-                .orElseThrow(() -> new UsernameNotFoundException("Khong tim thay user: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException(
+                        "Không tìm thấy user: " + username));
 
+        // Convert Role enum → GrantedAuthority với prefix "ROLE_"
+        // Ví dụ: ADMIN → ROLE_ADMIN → dùng @PreAuthorize("hasRole('ADMIN')")
         var authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getRoleName().name()))
                 .collect(Collectors.toList());
@@ -30,10 +36,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPasswordHash(),
-                User.UserStatus.ACTIVE.equals(user.getStatus()),
-                true,
-                true,
-                !User.UserStatus.LOCKED.equals(user.getStatus()),
+                User.UserStatus.ACTIVE.equals(user.getStatus()),  // enabled
+                true,  // accountNonExpired
+                true,  // credentialsNonExpired
+                !User.UserStatus.LOCKED.equals(user.getStatus()), // accountNonLocked
                 authorities
         );
     }

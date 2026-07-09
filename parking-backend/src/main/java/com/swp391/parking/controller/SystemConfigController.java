@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,7 +22,6 @@ public class SystemConfigController {
 
     @PostMapping
     @Operation(summary = "Create config")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SystemConfigResponse> create(
             @Valid @RequestBody SystemConfigRequest request,
             @RequestParam int updatedBy) {
@@ -32,7 +30,6 @@ public class SystemConfigController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update config")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SystemConfigResponse> update(
             @PathVariable Long id,
             @Valid @RequestBody SystemConfigRequest request,
@@ -42,28 +39,24 @@ public class SystemConfigController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get config by ID")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SystemConfigResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(systemConfigService.getById(id));
     }
 
     @GetMapping("/key/{configKey}")
     @Operation(summary = "Get config by key")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SystemConfigResponse> getByKey(@PathVariable String configKey) {
         return ResponseEntity.ok(systemConfigService.getByKey(configKey));
     }
 
     @GetMapping
     @Operation(summary = "Get all configs")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<SystemConfigResponse>> getAll() {
         return ResponseEntity.ok(systemConfigService.getAll());
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete config")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         systemConfigService.delete(id);
         return ResponseEntity.noContent().build();

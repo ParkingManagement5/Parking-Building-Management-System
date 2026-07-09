@@ -2,7 +2,6 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.AssignStaffShiftRequest;
 import com.swp391.parking.dto.response.StaffShiftResponse;
-import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Shift;
 import com.swp391.parking.entity.StaffShift;
 import com.swp391.parking.entity.User;
@@ -31,7 +30,6 @@ public class StaffShiftServiceImpl implements StaffShiftService {
     public StaffShiftResponse assignShift(AssignStaffShiftRequest request) {
         User user = userRepository.findById((int)(long) request.getUserId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
-        ensureStaffUser(user);
         Shift shift = shiftRepository.findById(request.getShiftId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Shift not found"));
         StaffShift staffShift = StaffShift.builder()
@@ -81,7 +79,6 @@ public List<StaffShiftResponse> getByUser(Long userId) {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "StaffShift not found"));
         User user = userRepository.findById((int)(long) request.getUserId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
-        ensureStaffUser(user);
         Shift shift = shiftRepository.findById(request.getShiftId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Shift not found"));
         staffShift.setUser(user);
@@ -98,14 +95,6 @@ public List<StaffShiftResponse> getByUser(Long userId) {
         staffShiftRepository.delete(staffShift);
     }
 
-    private void ensureStaffUser(User user) {
-        boolean isStaff = user.getRoles() != null
-                && user.getRoles().stream().anyMatch(role -> role.getRoleName() == Role.RoleName.STAFF);
-        if (!isStaff) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the gan ca lam cho tai khoan STAFF");
-        }
-    }
-
     private StaffShiftResponse toResponse(StaffShift staffShift) {
         return StaffShiftResponse.builder()
                 .staffShiftId(staffShift.getStaffShiftId())
@@ -114,8 +103,6 @@ public List<StaffShiftResponse> getByUser(Long userId) {
                 .shiftId(staffShift.getShift().getShiftId())
                 .shiftName(staffShift.getShift().getShiftName())
                 .workingDate(staffShift.getWorkingDate())
-                .startTime(staffShift.getShift().getStartTime())
-                .endTime(staffShift.getShift().getEndTime())
                 .build();
     }
 }

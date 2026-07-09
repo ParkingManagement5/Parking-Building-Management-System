@@ -17,41 +17,36 @@ export function StaffPageSection({ title, subtitle, action, children, className 
   );
 }
 
-export function StaffStatCard({ icon: Icon, label, value, hint, tone = "violet", onClick }) {
+export function StaffStatCard({ icon: Icon, label, value, hint, tone = "violet" }) {
   const tones = {
-    violet: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
-    emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
-    amber: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-    blue: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
-    rose: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
-    slate: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    violet: "bg-violet-50 text-violet-600",
+    emerald: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+    blue: "bg-blue-50 text-blue-600",
+    rose: "bg-rose-50 text-rose-600",
+    slate: "bg-slate-100 text-slate-600",
   };
-  const Tag = onClick ? "button" : "div";
 
   return (
-    <Tag
-      type={onClick ? "button" : undefined}
-      onClick={onClick}
-      className={`w-full rounded-3xl border border-border bg-card p-5 text-left transition-colors ${onClick ? "cursor-pointer hover:bg-muted" : ""}`}
-    >
+    <div className="rounded-3xl border border-border bg-card p-5">
       <div className={`mb-4 flex size-11 items-center justify-center rounded-2xl ${tones[tone] || tones.violet}`}>
         {Icon ? <Icon size={18} /> : null}
       </div>
       <div className="text-2xl font-bold text-foreground">{value}</div>
       <div className="mt-1 text-sm font-medium text-foreground">{label}</div>
       <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
-    </Tag>
+    </div>
   );
 }
 
 export function StaffStatusBadge({ children, tone = "slate" }) {
   const tones = {
-    emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-    rose: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
-    blue: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-    violet: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-    slate: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    emerald: "bg-emerald-100 text-emerald-700",
+    amber: "bg-amber-100 text-amber-700",
+    rose: "bg-rose-100 text-rose-700",
+    blue: "bg-blue-100 text-blue-700",
+    violet: "bg-violet-100 text-violet-700",
+    slate: "bg-slate-100 text-slate-600",
   };
 
   return (
@@ -125,7 +120,7 @@ export function StaffEmptyState({ title, description, tone = "neutral" }) {
     tone === "success" ? (
       <CheckCircle2 size={18} className="text-emerald-500" />
     ) : (
-      <AlertCircle size={18} className="text-slate-400 dark:text-slate-500" />
+      <AlertCircle size={18} className="text-slate-400" />
     );
 
   return (

@@ -3,6 +3,14 @@ import axiosClient from "../axiosClient";
 export const userApi = {
   getAll: (role) =>
     role ? axiosClient.get(`/users?role=${role}`) : axiosClient.get("/users"),
-  changeRole: (id, roleName) => axiosClient.put(`/users/${id}/role`, { roleName }),
-  changeStatus: (id, status) => axiosClient.put(`/users/${id}/status`, { status }),
+
+  getById: (id) => axiosClient.get(`/users/${id}`),
+
+  create: (data) => axiosClient.post("/users", data),
+
+  update: (id, data) => axiosClient.put(`/users/${id}`, data),
+
+  lock: (id) => axiosClient.put(`/users/${id}/lock`),
+
+  unlock: (id) => axiosClient.put(`/users/${id}/unlock`),
 };

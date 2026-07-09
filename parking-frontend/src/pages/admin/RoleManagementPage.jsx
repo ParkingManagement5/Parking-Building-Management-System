@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { roleApi } from "../../api/admin/roleApi";
-import { userApi } from "../../api/admin/userApi";
-import { ManagerEmptyState } from "../../ui/components/manager/ManagerUi";
+import {
+  ManagerEmptyState,
+  ManagerPageHeader,
+} from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 
 const ROLE_DESCRIPTIONS = {
-  ADMIN: "Toàn quyền quản trị hệ thống, giám sát và cấu hình.",
-  MANAGER: "Quản lý tòa nhà, bảng giá, slot đỗ xe và phân ca nhân viên.",
-  STAFF: "Xử lý vận hành bãi xe, ra/vào cổng và các tác vụ hằng ngày.",
-  DRIVER: "Đặt chỗ, quản lý xe và theo dõi hoạt động đỗ xe.",
+  ADMIN: "Full system administration, monitoring, and configuration access.",
+  MANAGER: "Manage buildings, pricing, slots, and staff assignment workflows.",
+  STAFF: "Handle parking operations, entry/exit, and operational tasks.",
+  DRIVER: "Book slots, manage vehicles, and track parking activity.",
 };
 
 const ROLE_PERMISSIONS = {
@@ -18,43 +20,37 @@ const ROLE_PERMISSIONS = {
   DRIVER: ["book_slot", "manage_vehicles", "view_sessions", "submit_requests"],
 };
 
-function roleAccent(name) {
-  if (name === "ADMIN") return "#ef4444";
-  if (name === "MANAGER") return "#8b5cf6";
-  if (name === "STAFF") return "#10b981";
-  return "#3b82f6";
+function roleTone(name) {
+  if (name === "ADMIN") return "border-rose-200 bg-rose-50 text-rose-700";
+  if (name === "MANAGER") return "border-violet-200 bg-violet-50 text-violet-700";
+  if (name === "STAFF") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-blue-200 bg-blue-50 text-blue-700";
 }
 
 export default function RoleManagementPage() {
   const [roles, setRoles] = useState([]);
-  const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadRoleData() {
+    async function loadRoles() {
       try {
-        const [roleRes, userRes] = await Promise.all([roleApi.getAll(), userApi.getAll()]);
-        const roleList = unwrapApiData(roleRes.data, []);
-        const userList = unwrapApiData(userRes.data, []);
-
+        const res = await roleApi.getAll();
         if (!cancelled) {
           setError("");
-          setRoles(roleList);
-          setUsers(userList);
+          setRoles(unwrapApiData(res.data, []));
         }
       } catch (err) {
         console.error("Failed to load roles", err);
         if (!cancelled) {
-          setError("Không tải được danh sách vai trò từ hệ thống.");
+          setError("Unable to load roles from backend.");
           setRoles([]);
-          setUsers([]);
         }
       }
     }
 
-    void loadRoleData();
+    void loadRoles();
 
     return () => {
       cancelled = true;
@@ -67,55 +63,47 @@ export default function RoleManagementPage() {
         ...item,
         title: item.roleName,
         description:
-          ROLE_DESCRIPTIONS[item.roleName] || "Vai trò hệ thống hiện có trong backend.",
+          ROLE_DESCRIPTIONS[item.roleName] || "System role available in the current backend.",
         permissions: ROLE_PERMISSIONS[item.roleName] || ["system_role"],
       })),
     [roles]
   );
 
-  const roleCounts = useMemo(() => {
-    const counts = new Map();
-    roles.forEach((role) => counts.set(role.roleName, 0));
-    users.forEach((user) => {
-      const roleName = String(user.role || "").replace(/^ROLE_/, "");
-      counts.set(roleName, (counts.get(roleName) || 0) + 1);
-    });
-    return counts;
-  }, [roles, users]);
   return (
     <div className="space-y-4">
+      <ManagerPageHeader
+        title="Role Management"
+        description="Inspect real role definitions returned by the backend. Role editing is not available because the backend currently only exposes `GET /roles`."
+      />
+
       {error ? (
-        <ManagerEmptyState title="Không tải được vai trò" description={error} />
+        <ManagerEmptyState title="Cannot load roles" description={error} />
       ) : roleCards.length === 0 ? (
-        <ManagerEmptyState title="Chưa có vai trò nào" description="Hệ thống chưa trả về vai trò nào." />
+        <ManagerEmptyState title="No roles available" description="The backend did not return any role definitions." />
       ) : (
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            {roleCards.map((item) => (
-              <div key={item.roleId} className="rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-md">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <span className="size-3 rounded-full" style={{ background: roleAccent(item.roleName) }} />
-                      <h3 className="text-lg font-bold text-foreground">{item.roleName}</h3>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">Mã vai trò: {item.roleId}</p>
-                  </div>
-                  <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: `${roleAccent(item.roleName)}20`, color: roleAccent(item.roleName) }}>
-                    {roleCounts.get(item.roleName) || 0} người dùng
-                  </span>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {roleCards.map((item) => (
+            <div key={item.roleId} className={`rounded-3xl border p-5 transition-all hover:shadow-sm ${roleTone(item.roleName)}`}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">{item.roleName}</h3>
+                  <p className="mt-1 text-xs opacity-80">Role ID: {item.roleId}</p>
                 </div>
-                <p className="mb-4 text-sm text-muted-foreground">{item.description}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {item.permissions.map((permission) => (
-                    <span key={permission} className="rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-mono text-muted-foreground">
-                      {permission}
-                    </span>
-                  ))}
-                </div>
+                <span className="rounded-full border border-current/20 px-2.5 py-1 text-xs font-medium">View only</span>
               </div>
-            ))}
-          </div>
+              <p className="mb-4 text-sm opacity-90">{item.description}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {item.permissions.map((permission) => (
+                  <span
+                    key={permission}
+                    className="rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-mono"
+                  >
+                    {permission}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -99,41 +99,29 @@ export default function FeeCalculationPage() {
         </div>
 
         {fee && (
-          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-            <table className="w-full">
-              <tbody className="divide-y divide-border">
+          <div className="table-card">
+            <table>
+              <tbody>
                 <tr>
-                  <th className="w-1/2 bg-muted/30 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    License Plate
-                  </th>
-                  <td className="px-5 py-4 text-sm text-foreground">{fee.licensePlate}</td>
+                  <th>License Plate</th>
+                  <td>{fee.licensePlate}</td>
                 </tr>
                 <tr>
-                  <th className="w-1/2 bg-muted/30 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Vehicle Type
-                  </th>
-                  <td className="px-5 py-4 text-sm text-foreground">{fee.vehicleType}</td>
+                  <th>Vehicle Type</th>
+                  <td>{fee.vehicleType}</td>
                 </tr>
                 <tr>
-                  <th className="w-1/2 bg-muted/30 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Duration
-                  </th>
-                  <td className="px-5 py-4 text-sm text-foreground">{fee.durationHours} hours</td>
+                  <th>Duration</th>
+                  <td>{fee.durationHours} hours</td>
                 </tr>
                 <tr>
-                  <th className="w-1/2 bg-muted/30 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Price / Hour
-                  </th>
-                  <td className="px-5 py-4 text-sm text-foreground">
-                    {formatCurrency(fee.pricePerHour)}
-                  </td>
+                  <th>Price / Hour</th>
+                  <td>{formatCurrency(fee.pricePerHour)}</td>
                 </tr>
                 <tr>
-                  <th className="w-1/2 bg-muted/30 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Total Amount
-                  </th>
-                  <td className="px-5 py-4 text-sm font-semibold text-foreground">
-                    {formatCurrency(fee.totalAmount)}
+                  <th>Total Amount</th>
+                  <td>
+                    <strong>{formatCurrency(fee.totalAmount)}</strong>
                   </td>
                 </tr>
               </tbody>

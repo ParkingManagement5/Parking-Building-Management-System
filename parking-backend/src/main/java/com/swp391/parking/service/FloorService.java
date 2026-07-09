@@ -6,8 +6,7 @@ import java.util.List;
 
 public interface FloorService {
     List<Floor> getByBuilding(Long buildingId);
-    List<Floor> getByBuilding(Long buildingId, Long currentUserId, boolean staffScoped);
-    Floor getById(Long id, Long currentUserId, boolean staffScoped);
+    Floor getById(Long id);
     Floor create(FloorRequest req);
     Floor update(Long id, FloorRequest req);
     void deactivate(Long id);

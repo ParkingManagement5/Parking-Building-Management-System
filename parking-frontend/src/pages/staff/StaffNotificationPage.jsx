@@ -22,8 +22,6 @@ export default function StaffNotificationPage() {
   const userId = getUserId();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 8;
 
   async function loadNotifications() {
     if (!userId) {
@@ -75,9 +73,6 @@ export default function StaffNotificationPage() {
     () => notifications.filter((item) => !item.isRead).length,
     [notifications]
   );
-
-  const paged = useMemo(() => notifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [notifications, page]);
-  const totalPages = Math.max(1, Math.ceil(notifications.length / PAGE_SIZE));
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -133,7 +128,7 @@ export default function StaffNotificationPage() {
           />
         ) : (
           <div className="space-y-3">
-            {paged.map((item) => (
+            {notifications.map((item) => (
               <div
                 key={item.notificationId}
                 className={`rounded-2xl border px-4 py-4 transition-colors ${
@@ -141,8 +136,8 @@ export default function StaffNotificationPage() {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="mt-1 flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm dark:bg-white/5">
-                    <BellRing size={16} className={item.isRead ? "text-slate-500 dark:text-slate-300" : "text-primary"} />
+                  <div className="mt-1 flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm">
+                    <BellRing size={16} className={item.isRead ? "text-slate-500" : "text-primary"} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -167,29 +162,6 @@ export default function StaffNotificationPage() {
                 </div>
               </div>
             ))}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-              <div key={`filler-${index}`} aria-hidden="true" className="invisible rounded-2xl border px-4 py-4">
-                &nbsp;
-              </div>
-            ))}
-          </div>
-        )}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              ← Trước
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setPage(p)}
-                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              Sau →
-            </button>
           </div>
         )}
       </StaffPageSection>

@@ -53,7 +53,7 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Sign in</h1>
+        <h1>Login</h1>
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
@@ -66,7 +66,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label>Password</label>     
+            <label>Password</label>
             <input
               type="password"
               name="password"
@@ -76,7 +76,7 @@ export default function LoginPage() {
           </div>
 
           <button type="submit" className="primary-btn">
-            Sign in
+            Login
           </button>
         </form>
       </div>

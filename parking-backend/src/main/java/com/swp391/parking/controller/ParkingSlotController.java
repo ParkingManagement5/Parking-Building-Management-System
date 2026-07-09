@@ -2,18 +2,12 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.SlotRequest;
 import com.swp391.parking.dto.response.ApiResponse;
-import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
-import com.swp391.parking.exception.AppException;
-import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ParkingSlotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,13 +18,6 @@ import java.util.List;
 public class ParkingSlotController {
 
     private final ParkingSlotService slotService;
-    private final UserRepository userRepository;
-
-    @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getAll()));
-    }
 
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> searchAvailable(
@@ -47,30 +34,15 @@ public class ParkingSlotController {
             slotService.getAvailableByVehicleType(vehicleTypeId)));
     }
 
-    // Cong khai, khong can auth - 1 query gop toan bo slot he thong, thay the cho
-    // viec frontend truoc day phai goi rieng tung zone (hang tram request, cham
-    // va de mat du lieu do timeout khi so luong toa nha lon).
-    @GetMapping("/public")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getPublicOverview() {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getPublicOverview()));
-    }
-
-    @GetMapping("/public-stats")
-    public ResponseEntity<ApiResponse<PublicSlotStatsResponse>> getPublicStats() {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getPublicStats()));
-    }
-
     @GetMapping("/zone/{zoneId}")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId, Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(
-                slotService.getByZone(zoneId, resolveUserId(authentication), isStaff(authentication))));
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId) {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getByZone(zoneId)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ParkingSlot>> getById(@PathVariable Long id, Authentication authentication) {
-        return ResponseEntity.ok(ApiResponse.success(
-                slotService.getById(id, resolveUserId(authentication), isStaff(authentication))));
+    public ResponseEntity<ApiResponse<ParkingSlot>> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getById(id)));
     }
 
     @PostMapping
@@ -94,24 +66,5 @@ public class ParkingSlotController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         slotService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa slot khoi DB"));
-    }
-
-    private boolean isAuthenticated(Authentication authentication) {
-        return authentication != null
-                && !(authentication instanceof AnonymousAuthenticationToken)
-                && authentication.isAuthenticated();
-    }
-
-    private boolean isStaff(Authentication authentication) {
-        if (!isAuthenticated(authentication)) return false;
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
-    }
-
-    private Long resolveUserId(Authentication authentication) {
-        if (!isAuthenticated(authentication)) return null;
-        return userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
-                .getUserId().longValue();
     }
 }

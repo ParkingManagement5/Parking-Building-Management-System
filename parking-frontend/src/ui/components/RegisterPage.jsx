@@ -1,205 +1,184 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { authApi } from "../../api/auth/authApi";
-import { usePublicTheme } from "../../utils/publicTheme";
-import { fetchPublicParkingOverview } from "../../utils/publicStats";
-import "../../assets/css/landing.css";
-import "../../assets/css/auth.css";
-
+import { useState } from 'react';
+import { authApi } from '../../api/auth/authApi';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, ArrowRight, CheckCircle2 } from 'lucide-react';
+const ROLES = ['Driver', 'Staff', 'Manager', 'Admin'];
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const { dark, toggle, className: themeClass } = usePublicTheme();
-  const [showPw, setShowPw] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({ username: "", fullName: "", email: "", phone: "", password: "", confirm: "" });
-  const [overview, setOverview] = useState({ buildingCount: 0, total: 0 });
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPublicParkingOverview()
-      .then((stats) => { if (!cancelled) setOverview(stats); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  const update = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
-
-  const passwordStrength = useMemo(() => {
-    if (!form.password) return 0;
-    if (form.password.length >= 12) return 4;
-    if (form.password.length >= 10) return 3;
-    if (form.password.length >= 8) return 2;
-    return 1;
-  }, [form.password]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (form.password !== form.confirm) return;
-    setLoading(true);
-    setError("");
-    try {
-      await authApi.register({ username: form.username, fullName: form.fullName, email: form.email, phone: form.phone, password: form.password });
-      navigate("/verify-email", { state: { username: form.username, email: form.email } });
-    } catch (err) {
-      setError(err.response?.data?.message || "Đăng ký that bai. Vui long thu lai.");
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className={`auth-layout ${themeClass}`}>
-      {/* LEFT: form */}
-      <div className="auth-left">
-        <div className="auth-brand" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/" className="nav-logo" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-            <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
-            <span className="nav-logo-text">ParkSmart</span>
-          </a>
-          <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
-            {dark ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-            )}
+    const navigate = useNavigate();
+    const [showPw, setShowPw] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [done, setDone] = useState(false);
+    const [form, setForm] = useState({
+        username: '', fullName: '', email: '', phone: '', role: 'Driver', password: '', confirm: '',
+    });
+    const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+    const [error, setError] = useState('');
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (form.password !== form.confirm) return;
+        setLoading(true);
+        setError('');
+        try {
+            await authApi.register({
+                username: form.username,
+                fullName: form.fullName,
+                email: form.email,
+                phone: form.phone,
+                password: form.password,
+                roleName: form.role.toUpperCase(),
+                role: form.role.toUpperCase(),
+            });
+            setDone(true);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+        } finally {
+            setLoading(false);
+        }
+    };
+    if (done) {
+        return (<div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center">
+          <div className="size-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 size={32} className="text-emerald-600"/>
+          </div>
+          <h2 className="text-foreground mb-2" style={{ fontSize: '1.5rem', fontWeight: 700 }}>Account created!</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            Welcome to ParkSmart, {form.fullName}. Your account is ready.
+          </p>
+          <button onClick={() => navigate('/login')} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-all">
+            Sign in now
           </button>
         </div>
+      </div>);
+    }
+    return (<div className="min-h-screen bg-background flex">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-[42%] bg-gradient-to-br from-[#4F46E5] to-[#06B6D4] flex-col justify-between p-12 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.06]">
+          {Array.from({ length: 20 }).map((_, i) => (<div key={i} className="absolute rounded-full border border-white" style={{ width: 80 + i * 30, height: 80 + i * 30, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}/>))}
+        </div>
 
-        <div className="auth-form-wrapper">
-          <h1>Tạo tài khoản</h1>
-          <p className="auth-subtitle">Đăng ký để bắt đầu sử dụng ParkSmart</p>
-
-          {error && (
-            <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "rgba(255,77,77,0.1)", border: "1px solid rgba(255,77,77,0.25)", color: "var(--danger)", fontSize: "0.85rem" }}>
-              {error}
+        <div className="relative">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 mb-12">
+            <div className="size-9 bg-white/20 rounded-xl flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9"/>
+                <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
+                <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7"/>
+                <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5"/>
+              </svg>
             </div>
-          )}
+            <span className="font-bold text-white text-lg">ParkSmart</span>
+          </button>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="username">Username *</label>
-                <input id="username" required value={form.username} onChange={update("username")} placeholder="username" />
+          <h1 className="text-white mb-4" style={{ fontSize: '1.875rem', fontWeight: 700, lineHeight: 1.2 }}>
+            Join 50,000+ parking users
+          </h1>
+          <p className="text-white/70 leading-relaxed">
+            Create your account and start managing or using parking services today.
+          </p>
+        </div>
+
+        <div className="relative space-y-3">
+          {[
+            'Book parking slots in seconds',
+            'Real-time availability updates',
+            'Secure digital payments',
+            'QR code entry system',
+        ].map(f => (<div key={f} className="flex items-center gap-3">
+              <div className="size-5 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+                <CheckCircle2 size={12} className="text-white"/>
               </div>
-              <div className="form-group">
-                <label htmlFor="fullName">Họ tên *</label>
-                <input id="fullName" required value={form.fullName} onChange={update("fullName")} placeholder="Nguyen Van A" />
+              <span className="text-white/80 text-sm">{f}</span>
+            </div>))}
+        </div>
+      </div>
+
+      {/* Right — form */}
+      <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-16 overflow-y-auto">
+        <div className="w-full max-w-md mx-auto">
+          <h2 className="text-foreground mb-1" style={{ fontSize: '1.5rem', fontWeight: 700 }}>Create your account</h2>
+          <p className="text-muted-foreground text-sm mb-7">
+            Already have an account?{' '}
+            <button onClick={() => navigate('/login')} className="text-primary hover:underline font-medium">
+              Sign in
+            </button>
+          </p>
+
+          {error && <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">{error}</div>}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Username *</label>
+                <input required value={form.username} onChange={update('username')} placeholder="jdoe123" className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"/>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Full Name *</label>
+                <input required value={form.fullName} onChange={update('fullName')} placeholder="John Doe" className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"/>
               </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="email">Email *</label>
-              <input id="email" type="email" required value={form.email} onChange={update("email")} placeholder="email@example.com" />
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Email Address *</label>
+              <input required type="email" value={form.email} onChange={update('email')} placeholder="john@example.com" className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"/>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="phone">Số điện thoại</label>
-              <input id="phone" value={form.phone} onChange={update("phone")} placeholder="0909 123 456" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Phone Number</label>
+                <input type="tel" value={form.phone} onChange={update('phone')} placeholder="+1 555 0100" className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"/>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1.5">Role *</label>
+                <select required value={form.role} onChange={update('role')} className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none">
+                  {ROLES.map(r => <option key={r}>{r}</option>)}
+                </select>
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="password">Mật khẩu *</label>
-              <div className="input-password">
-                <input id="password" type={showPw ? "text" : "password"} required value={form.password} onChange={update("password")} placeholder="Tối thiểu 8 ký tự" />
-                <button type="button" className="toggle-pw" onClick={() => setShowPw((v) => !v)}>
-                  {showPw ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  )}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Password *</label>
+              <div className="relative">
+                <input required type={showPw ? 'text' : 'password'} value={form.password} onChange={update('password')} placeholder="Minimum 8 characters" className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"/>
+                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {showPw ? <EyeOff size={15}/> : <Eye size={15}/>}
                 </button>
               </div>
-              {form.password && (
-                <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                  {[1, 2, 3, 4].map((level) => (
-                    <div key={level} style={{
-                      flex: 1, height: 5, borderRadius: 3,
-                      background: passwordStrength >= level
-                        ? passwordStrength >= 4 ? "var(--accent)" : "var(--warning)"
-                        : "var(--border)",
-                      transition: "background 0.3s",
-                    }} />
-                  ))}
-                </div>
-              )}
+              {form.password && (<div className="flex gap-1 mt-2">
+                  {[1, 2, 3, 4].map(l => (<div key={l} className={`flex-1 h-1 rounded-full transition-colors ${form.password.length >= l * 2
+                    ? form.password.length >= 8 ? 'bg-emerald-500' : 'bg-amber-400'
+                    : 'bg-muted'}`}/>))}
+                </div>)}
             </div>
 
-            <div className="form-group">
-              <label htmlFor="confirm">Xác nhận mật khẩu *</label>
-              <div className="input-password">
-                <input id="confirm" type={showConfirm ? "text" : "password"} required value={form.confirm} onChange={update("confirm")} placeholder="Nhập lại mật khẩu"
-                  style={form.confirm && form.confirm !== form.password ? { borderColor: "var(--danger)" } : {}} />
-                <button type="button" className="toggle-pw" onClick={() => setShowConfirm((v) => !v)}>
-                  {showConfirm ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  )}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Confirm Password *</label>
+              <div className="relative">
+                <input required type={showConfirm ? 'text' : 'password'} value={form.confirm} onChange={update('confirm')} placeholder="Re-enter your password" className={`w-full bg-muted border rounded-xl px-3 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 transition-all ${form.confirm && form.confirm !== form.password
+            ? 'border-destructive focus:ring-destructive/10 focus:border-destructive'
+            : 'border-border focus:border-primary focus:ring-primary/10'}`}/>
+                <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {showConfirm ? <EyeOff size={15}/> : <Eye size={15}/>}
                 </button>
               </div>
-              {form.confirm && form.confirm !== form.password && (
-                <p style={{ fontSize: "0.78rem", color: "var(--danger)", marginTop: 4 }}>Mật khẩu không khớp.</p>
-              )}
+              {form.confirm && form.confirm !== form.password && (<p className="text-xs text-destructive mt-1">Passwords do not match</p>)}
             </div>
 
-            <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading || (!!form.confirm && form.confirm !== form.password)}>
-              {loading ? "Đang tạo tài khoản..." : "Đăng ký"}
+            <button type="submit" disabled={loading || (!!form.confirm && form.confirm !== form.password)} className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-all disabled:opacity-60 mt-2">
+              {loading
+            ? <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+            : <><ArrowRight size={16}/> Create account</>}
             </button>
           </form>
 
-          <p className="auth-footer-text">
-            Đã có tài khoản?{" "}
-            <button type="button" className="text-link" onClick={() => navigate("/login")}
-              style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}>
-              Đăng nhập
-            </button>
+          <p className="text-xs text-muted-foreground mt-5 text-center">
+            By registering you agree to our{' '}
+            <a href="#" className="text-primary hover:underline">Terms of Service</a>
+            {' '}and{' '}
+            <a href="#" className="text-primary hover:underline">Privacy Policy</a>.
           </p>
         </div>
       </div>
-
-      {/* RIGHT: stats */}
-      <div className="auth-right">
-        <div className="auth-illustration">
-          <div className="auth-stat-block">
-            <div className="auth-stat-header">
-              <h3>Quyền lợi thành viên</h3>
-            </div>
-            <div className="auth-activity-list">
-              {[
-                { icon: "✓", color: "var(--accent)", text: "Đặt chỗ trước, giữ slot", time: "Booking" },
-                { icon: "⚡", color: "#60a5fa", text: "Scan QR vào/ra nhanh", time: "QR Code" },
-                { icon: "📱", color: "#a78bfa", text: "Theo dõi xe realtime", time: "Tracking" },
-                { icon: "$", color: "#f59e0b", text: "Thanh toán online tiện lợi", time: "Payment" },
-              ].map((item, i) => (
-                <div key={i} className="auth-activity-item">
-                  <span className="auth-activity-icon" style={{ background: `${item.color}22`, color: item.color }}>{item.icon}</span>
-                  <div>
-                    <strong>{item.text}</strong>
-                    <small>{item.time}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="auth-stat-block" style={{ marginTop: 16 }}>
-            <div className="auth-stat-header">
-              <h3>Thống kê</h3>
-              <span className="auth-live-badge"><span className="auth-live-dot" /> Live</span>
-            </div>
-            <div className="auth-stat-grid">
-              <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "var(--accent)" }}>{overview.total}</span>
-                <span className="auth-stat-label">Slot</span>
-              </div>
-              <div className="auth-stat-item">
-                <span className="auth-stat-value" style={{ color: "#60a5fa" }}>{overview.buildingCount}</span>
-                <span className="auth-stat-label">Bãi đỗ</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    </div>);
 }

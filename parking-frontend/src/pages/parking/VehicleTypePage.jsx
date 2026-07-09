@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Car, CircleDollarSign, LayoutGrid, Plus, ScanSearch, X } from "lucide-react";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import {
   ManagerCell,
@@ -8,16 +8,17 @@ import {
   ManagerField,
   ManagerForm,
   ManagerInput,
+  ManagerPageHeader,
   ManagerPanel,
   ManagerPrimaryButton,
   ManagerRow,
   ManagerSecondaryButton,
   ManagerSelect,
+  ManagerStatCard,
+  ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
-
-const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
 
 export default function VehicleTypePage() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
@@ -41,9 +42,19 @@ export default function VehicleTypePage() {
       setVehicleTypes(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to fetch vehicle types", error);
-      alert("Không tải được danh sách loại xe");
+      alert("Cannot load vehicle types");
     }
   }
+
+  const stats = useMemo(() => {
+    const avgHourly = vehicleTypes.length
+      ? Math.round(vehicleTypes.reduce((sum, item) => sum + Number(item.hourlyRate || 0), 0) / vehicleTypes.length)
+      : 0;
+    return {
+      large: vehicleTypes.filter((item) => item.slotSize === "LARGE").length,
+      avgHourly,
+    };
+  }, [vehicleTypes]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -69,7 +80,7 @@ export default function VehicleTypePage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      alert("Tên loại xe là bắt buộc");
+      alert("Vehicle type name is required");
       return;
     }
 
@@ -91,7 +102,7 @@ export default function VehicleTypePage() {
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save vehicle type", error);
-      alert("Lưu loại xe thất bại");
+      alert("Save vehicle type failed");
     }
   };
 
@@ -108,43 +119,50 @@ export default function VehicleTypePage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Xóa loại xe này?")) return;
+    if (!window.confirm("Delete this vehicle type?")) return;
     try {
       await vehicleTypeApi.delete(id);
       await fetchVehicleTypes();
     } catch (error) {
       console.error("Failed to delete vehicle type", error);
-      alert("Xóa loại xe thất bại");
+      alert("Delete vehicle type failed");
     }
   };
 
   return (
     <div className="space-y-5">
-      <ManagerPanel>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Loại xe</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{vehicleTypes.length} loại xe</p>
-          </div>
+      <ManagerPageHeader
+        title="Vehicle Type Management"
+        description="Define slot sizing and pricing defaults for each supported vehicle category."
+        action={
           <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
-            <Plus size={14} /> Thêm loại xe
+            <Plus size={14} /> Add Vehicle Type
           </ManagerPrimaryButton>
-        </div>
+        }
+      />
+      <ManagerStatsRow>
+        <ManagerStatCard icon={Car} label="Vehicle Types" value={vehicleTypes.length} hint="Categories available for zoning" tone="violet" />
+        <ManagerStatCard icon={LayoutGrid} label="Large Slot Types" value={stats.large} hint="Categories needing large parking slots" tone="blue" />
+        <ManagerStatCard icon={CircleDollarSign} label="Avg Hourly Rate" value={`${stats.avgHourly.toLocaleString("vi-VN")}d`} hint="Average default hourly fee" tone="emerald" />
+        <ManagerStatCard icon={ScanSearch} label="Slot Sizes" value={new Set(vehicleTypes.map((item) => item.slotSize)).size} hint="Different slot size groups in use" tone="amber" />
+      </ManagerStatsRow>
+
+      <ManagerPanel title="Vehicle Type Directory" subtitle={`${vehicleTypes.length} vehicle type records available`}>
         {vehicleTypes.length === 0 ? (
-          <ManagerEmptyState title="Chưa có loại xe nào" description="Tạo loại xe trước khi cấu hình zone, slot hoặc bảng giá." />
+          <ManagerEmptyState title="No vehicle types yet" description="Create a vehicle type before configuring zones, slots, or pricing policies." />
         ) : (
-          <ManagerDataTable columns={["Tên", "Mô tả", "Kích cỡ slot", "Giá/giờ", "Giá/ngày", "Thao tác"]}>
+          <ManagerDataTable columns={["Name", "Description", "Slot Size", "Hourly", "Daily", "Actions"]}>
             {vehicleTypes.map((item) => (
               <ManagerRow key={item.vehicleTypeId || item.id}>
                 <ManagerCell className="font-medium">{item.name}</ManagerCell>
-                <ManagerCell>{item.description || "Không có mô tả"}</ManagerCell>
-                <ManagerCell><ManagerStatusBadge tone="blue">{SLOT_SIZE_LABELS[item.slotSize] || item.slotSize}</ManagerStatusBadge></ManagerCell>
-                <ManagerCell>{Number(item.hourlyRate || 0).toLocaleString("vi-VN")}đ</ManagerCell>
-                <ManagerCell>{Number(item.dailyRate || 0).toLocaleString("vi-VN")}đ</ManagerCell>
+                <ManagerCell>{item.description || "No description"}</ManagerCell>
+                <ManagerCell><ManagerStatusBadge tone="blue">{item.slotSize}</ManagerStatusBadge></ManagerCell>
+                <ManagerCell>{Number(item.hourlyRate || 0).toLocaleString("vi-VN")}d</ManagerCell>
+                <ManagerCell>{Number(item.dailyRate || 0).toLocaleString("vi-VN")}d</ManagerCell>
                 <ManagerCell>
                   <div className="flex gap-2">
-                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
-                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.vehicleTypeId || item.id)}>Xóa</ManagerSecondaryButton>
+                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Edit</ManagerSecondaryButton>
+                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.vehicleTypeId || item.id)}>Delete</ManagerSecondaryButton>
                   </div>
                 </ManagerCell>
               </ManagerRow>
@@ -158,38 +176,38 @@ export default function VehicleTypePage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{editingId ? "Cập nhật loại xe" : "Thêm loại xe"}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Đảm bảo kích cỡ và giá mặc định khớp với cấu hình bảng giá.</p>
+                <h3 className="text-lg font-semibold text-foreground">{editingId ? "Update Vehicle Type" : "Add Vehicle Type"}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Keep vehicle dimensions and default rates aligned with policy setup.</p>
               </div>
               <button type="button" onClick={handleCloseModal} className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted">
                 <X size={18} />
               </button>
             </div>
             <ManagerForm onSubmit={handleSubmit}>
-              <ManagerField label="Tên loại xe">
-                <ManagerInput value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ô tô" />
+              <ManagerField label="Vehicle Type Name">
+                <ManagerInput value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Car" />
               </ManagerField>
-              <ManagerField label="Mô tả">
-                <ManagerInput value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Xe chở khách tiêu chuẩn" />
+              <ManagerField label="Description">
+                <ManagerInput value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Standard passenger vehicle" />
               </ManagerField>
-              <ManagerField label="Kích cỡ slot">
+              <ManagerField label="Slot Size">
                 <ManagerSelect value={form.slotSize} onChange={(event) => setForm({ ...form, slotSize: event.target.value })}>
-                  <option value="SMALL">Nhỏ</option>
-                  <option value="MEDIUM">Vừa</option>
-                  <option value="LARGE">Lớn</option>
+                  <option value="SMALL">SMALL</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="LARGE">LARGE</option>
                 </ManagerSelect>
               </ManagerField>
               <div className="grid gap-4 md:grid-cols-2">
-                <ManagerField label="Giá theo giờ">
+                <ManagerField label="Hourly Rate">
                   <ManagerInput type="number" value={form.hourlyRate} onChange={(event) => setForm({ ...form, hourlyRate: event.target.value })} />
                 </ManagerField>
-                <ManagerField label="Giá theo ngày">
+                <ManagerField label="Daily Rate">
                   <ManagerInput type="number" value={form.dailyRate} onChange={(event) => setForm({ ...form, dailyRate: event.target.value })} />
                 </ManagerField>
               </div>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{editingId ? "Lưu thay đổi" : "Tạo loại xe"}</ManagerPrimaryButton>
-                <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Hủy</ManagerSecondaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">{editingId ? "Save Changes" : "Create Type"}</ManagerPrimaryButton>
+                <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Cancel</ManagerSecondaryButton>
               </div>
             </ManagerForm>
           </div>
