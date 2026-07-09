@@ -8,12 +8,14 @@ import {
   Car,
   LoaderCircle,
   MapPin,
+  Package,
   SquareParking,
   History,
 } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
+import { pricingPolicyApi } from "../../api/driver/pricingPolicyApi";
 import {
   Select,
   SelectContent,
@@ -43,6 +45,20 @@ function formatLocalDateTime(value) {
 
 function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback;
+}
+
+const DURATION_UNIT_LABELS = { HOURLY: "giờ", DAILY: "ngày", WEEKLY: "tuần", MONTHLY: "tháng" };
+const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
+const BOOKING_TYPE_DAYS = { HOURLY: null, DAILY: 1, WEEKLY: 7, MONTHLY: 30 };
+
+function computeBookingEnd(start, type, units) {
+  const d = new Date(start);
+  const n = Math.max(1, Number(units) || 1);
+  if (type === "DAILY") d.setDate(d.getDate() + n);
+  else if (type === "WEEKLY") d.setDate(d.getDate() + n * 7);
+  else if (type === "MONTHLY") d.setMonth(d.getMonth() + n);
+  else d.setHours(d.getHours() + n); // HOURLY
+  return d;
 }
 
 function isOpenBooking(b) {
@@ -92,7 +108,10 @@ export default function BookingPage() {
   const [conflictLock, setConflictLock] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [bookingStart, setBookingStart] = useState(() => { const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0); return d; });
+  const [bookingType] = useState("HOURLY");
+  const [durationUnits, setDurationUnits] = useState(1);
   const [selection, setSelection] = useState({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
+  const [pricingPolicies, setPricingPolicies] = useState([]);
   const [payingDeposit, setPayingDeposit] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
   const [payError, setPayError] = useState("");
@@ -144,6 +163,36 @@ export default function BookingPage() {
       .finally(() => setLoadingSlots(false));
   }, [selectedVehicle]);
 
+  useEffect(() => {
+    if (!selectedVehicle) { setPricingPolicies([]); return; }
+    const vtId = selectedVehicle.vehicleType?.vehicleTypeId ?? selectedVehicle.vehicleType?.id ?? selectedVehicle.vehicleTypeId;
+    if (!vtId) { setPricingPolicies([]); return; }
+    pricingPolicyApi.getAll()
+      .then((r) => {
+        const all = unwrapApiData(r.data, []);
+        setPricingPolicies(all.filter((p) => p.isActive && String(p.vehicleTypeId) === String(vtId)));
+      })
+      .catch(() => setPricingPolicies([]));
+  }, [selectedVehicle]);
+
+  const hourlyPolicies = useMemo(
+    () => pricingPolicies.filter((p) => !["DAILY","WEEKLY","MONTHLY"].includes(p.timeType)),
+    [pricingPolicies],
+  );
+
+  const estimatedCost = useMemo(() => {
+    if (!hourlyPolicies.length) return null;
+    const dow = bookingStart.getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const policy = hourlyPolicies.find((p) => p.dayType === (isWeekend ? "WEEKEND" : "WEEKDAY")) || hourlyPolicies[0];
+    return Number(policy.pricePerHour) * Number(durationUnits);
+  }, [hourlyPolicies, durationUnits, bookingStart]);
+
+  const effectiveDayType = useMemo(() => {
+    const dow = bookingStart.getDay();
+    return dow === 0 || dow === 6 ? "WEEKEND" : "WEEKDAY";
+  }, [bookingStart]);
+
   const slotGrid = useMemo(
     () => backendSlots.map((s, i) => ({
       uiId: s.id || s.slotId || `${i}`,
@@ -193,7 +242,7 @@ export default function BookingPage() {
     setSubmitError("");
     try {
       const start = bookingStart;
-      const end = new Date(start.getTime() + 2 * 3600000);
+      const end = computeBookingEnd(start, bookingType, durationUnits);
       if ((start.getTime() - Date.now()) / 60000 < 10) {
         setSubmitError("Thời gian bắt đầu phải cách hiện tại ít nhất 10 phút.");
         setSubmitting(false);
@@ -203,7 +252,7 @@ export default function BookingPage() {
         vehicleId: Number(selection.vehicleId),
         slotId: Number(selectedSlot.slotId),
         bookingStartTime: formatLocalDateTime(start),
-        bookingEndTime: formatLocalDateTime(end),
+        bookingType,
       });
       const p = unwrapApiData(res.data, {});
       setConfirmation({
@@ -214,6 +263,9 @@ export default function BookingPage() {
         building: selectedSlot.building, floor: selectedSlot.floor, zone: selectedSlot.zone,
         slotCode: p.slotCode || selectedSlot.slotCode,
         vehiclePlate: p.licensePlate || selectedVehicle?.licensePlate || "Xe",
+        bookingType,
+        durationUnits: Number(durationUnits),
+        estimatedCost,
       });
       setStep(3);
     } catch (error) {
@@ -281,10 +333,10 @@ export default function BookingPage() {
       ["Toà nhà", confirmation.building],
       ["Tầng", confirmation.floor],
       ["Vị trí", `${confirmation.zone} — ${confirmation.slotCode}`],
+      ["Hình thức", "Theo giờ (tính khi ra)"],
       ["Hẹn đến bãi", formatDateTime(confirmation.bookingStartTime)],
-      ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`],
-      ["Tính phí", "Entry → Exit (trừ cọc)", "text-emerald-600"],
-      ["Hạn thanh toán cọc", formatDateTime(confirmation.expiredAt)],
+      ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"],
+      ["Hạn TT cọc", formatDateTime(confirmation.expiredAt)],
       ["Xe", confirmation.vehiclePlate],
     ];
     return (
@@ -296,16 +348,12 @@ export default function BookingPage() {
           <h3 className="font-bold text-foreground mb-1 text-xl">
             {depositPaid
               ? "Đặt chỗ thành công — QR sẵn sàng"
-              : confirmation.depositAmount > 0
-                ? "Đặt chỗ thành công — Cần thanh toán cọc"
-                : "Đặt chỗ thành công"}
+              : "Đặt chỗ thành công — Cần thanh toán cọc"}
           </h3>
           <p className="text-muted-foreground text-sm mb-6">
             {depositPaid
               ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
-              : confirmation.depositAmount > 0
-                ? "Booking đã tạo. Thanh toán cọc qua VNPay để xác nhận giữ chỗ."
-                : "Booking đã tạo (miễn cọc). Nhấn xác nhận để lấy mã QR check-in."}
+              : "Thanh toán cọc qua VNPay để xác nhận giữ chỗ. Phần còn lại trả khi ra."}
           </p>
           <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2 mb-6">
             {rows.map(([label, value, cls]) => (
@@ -321,9 +369,7 @@ export default function BookingPage() {
               <button onClick={handlePayDeposit} disabled={payingDeposit} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60">
                 {payingDeposit
                   ? "Đang xử lý..."
-                  : confirmation.depositAmount > 0
-                    ? `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND qua VNPay`
-                    : "Xác nhận đặt chỗ (miễn cọc)"}
+                  : `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND qua VNPay`}
               </button>
             ) : (
               <button onClick={() => navigate("/driver/bookings")} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-colors">
@@ -342,9 +388,10 @@ export default function BookingPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         {[
           { to: "/driver/parking-slots", icon: SquareParking, title: "Xem slot trống", desc: "Tra cứu slot theo loại xe" },
+          { to: "/driver/package-booking", icon: Package, title: "Đăng ký gói", desc: "Gói ngày / tuần / tháng" },
           { to: "/driver/bookings", icon: History, title: "Lịch sử đặt chỗ", desc: "Xem cọc, QR, trạng thái booking" },
         ].map(({ to, icon: Icon, title, desc }) => (
           <button key={to} type="button" onClick={() => navigate(to)} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-muted/40">
@@ -536,8 +583,58 @@ export default function BookingPage() {
             <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
           </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-            Phí đỗ xe sẽ tính từ lúc xe vào bãi (entry) đến khi ra bãi (exit). Tiền cọc sẽ được trừ vào tổng phí.
+          {/* Bảng giá tham khảo */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá tham khảo</label>
+            {hourlyPolicies.length > 0 ? (
+              <div className="rounded-xl border border-primary/30 overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-primary/10">
+                      <th className="text-left px-3 py-2 font-semibold text-primary">Loại ngày</th>
+                      <th className="text-right px-3 py-2 font-semibold text-primary">Đơn giá</th>
+                      <th className="text-right px-3 py-2 font-semibold text-primary">Tính theo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hourlyPolicies.map((p) => {
+                      const isActive = effectiveDayType === p.dayType || hourlyPolicies.length === 1;
+                      return (
+                        <tr key={p.policyId} className={`border-t border-primary/20 ${isActive ? "bg-primary/5" : ""}`}>
+                          <td className="px-3 py-2 text-foreground">
+                            {DAY_TYPE_LABELS[p.dayType] || p.dayType}
+                            {isActive && <span className="ml-1.5 text-[10px] text-primary font-semibold">◀ hôm nay</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-foreground">
+                            {Number(p.pricePerHour).toLocaleString("vi-VN")}đ/giờ
+                          </td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">mỗi 30 phút</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Chưa có bảng giá. Vui lòng liên hệ quản lý bãi.</p>
+            )}
+          </div>
+
+          {/* Tóm tắt */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span>Thời gian đến bãi</span>
+              <span className="font-medium">{bookingStart.toLocaleString("vi-VN")}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>{effectiveDayType === "WEEKEND" ? "Cuối tuần" : "Ngày thường"}</span>
+              <span className="font-medium">{effectiveDayType === "WEEKEND" ? "Áp dụng giá cuối tuần" : "Áp dụng giá ngày thường"}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-500/30 mt-1">
+              <span className="font-semibold">Tiền cọc giữ chỗ</span>
+              <span className="font-bold text-base">10.000 – 30.000đ</span>
+            </div>
+            <p className="text-xs opacity-75">Phí tính theo thời gian thực khi ra. Cọc được trừ vào tổng phí.</p>
           </div>
 
           <div className="flex gap-3">
@@ -564,6 +661,7 @@ export default function BookingPage() {
               ["Toà nhà", selectedSlot?.building || "--"],
               ["Tầng / Khu vực", `${selectedSlot?.floor || "--"} — ${selectedSlot?.zone || "--"}`],
               ["Slot", selectedSlot?.slotCode || "--"],
+              ["Hình thức", "Theo giờ (tính khi ra)"],
               ["Hẹn đến bãi", formatDateTime(bookingStart)],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between">
@@ -571,6 +669,10 @@ export default function BookingPage() {
                 <span className="font-medium text-foreground">{value}</span>
               </div>
             ))}
+            <div className="flex justify-between pt-2 border-t border-border">
+              <span className="text-muted-foreground">Tiền cọc giữ chỗ</span>
+              <span className="font-bold text-primary">10.000 – 30.000đ</span>
+            </div>
           </div>
 
           <AlertBox>{submitError}</AlertBox>
