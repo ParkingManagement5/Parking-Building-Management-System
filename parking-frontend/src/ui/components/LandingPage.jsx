@@ -1,626 +1,425 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  BarChart3,
+  Car,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Globe,
+  QrCode,
+  ScanLine,
+  Shield,
+  Smartphone,
+  Building2,
+  DoorOpen,
+  Layers,
+  SquareParking,
+  Zap,
+} from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
+import { floorApi } from "../../api/manager/floorApi";
+import { gateApi } from "../../api/manager/gateApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
+import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
+import { zoneApi } from "../../api/manager/zoneApi";
 import { unwrapApiData } from "../../utils/api";
-import { usePublicTheme } from "../../utils/publicTheme";
-import "leaflet/dist/leaflet.css";
-import "../../assets/css/landing.css";
 
-function getBuildingId(building) {
-  return building?.buildingId ?? building?.id;
+const FEATURES = [
+  {
+    icon: QrCode,
+    title: "Smart QR Booking",
+    desc: "Reserve your slot in seconds with a QR code that works as your parking ticket.",
+    color: "bg-indigo-50 text-indigo-600",
+  },
+  {
+    icon: ScanLine,
+    title: "License Plate OCR",
+    desc: "AI-powered camera systems automatically detect and log vehicles as they enter and exit.",
+    color: "bg-cyan-50 text-cyan-600",
+  },
+  {
+    icon: BarChart3,
+    title: "Revenue Analytics",
+    desc: "Real-time dashboards for revenue, occupancy, peak hours, and vehicle type trends.",
+    color: "bg-violet-50 text-violet-600",
+  },
+  {
+    icon: Shield,
+    title: "Role-Based Access",
+    desc: "Four distinct roles with tailored interfaces and permissions.",
+    color: "bg-emerald-50 text-emerald-600",
+  },
+  {
+    icon: Clock,
+    title: "Real-time Tracking",
+    desc: "Live occupancy maps, session timers, and instant notifications keep everyone informed.",
+    color: "bg-amber-50 text-amber-600",
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile Ready",
+    desc: "Fully responsive design works seamlessly on desktop, tablet, and mobile devices.",
+    color: "bg-rose-50 text-rose-600",
+  },
+];
+
+const PLANS = [
+  {
+    name: "Basic",
+    price: "$29",
+    period: "/month",
+    desc: "Perfect for small parking lots",
+    features: ["Up to 100 slots", "2 staff accounts", "QR booking", "Basic reports", "Email support"],
+    cta: "Get started",
+    highlight: false,
+  },
+  {
+    name: "Pro",
+    price: "$79",
+    period: "/month",
+    desc: "For growing multi-floor facilities",
+    features: ["Up to 500 slots", "10 staff accounts", "OCR scanning", "Advanced analytics", "Priority support", "API access"],
+    cta: "Start free trial",
+    highlight: true,
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    period: "",
+    desc: "For large-scale deployments",
+    features: ["Unlimited slots", "Unlimited accounts", "White-label option", "SLA guarantee", "Dedicated support", "Custom integrations"],
+    cta: "Contact sales",
+    highlight: false,
+  },
+];
+
+function getBuildingId(item) {
+  return item?.buildingId ?? item?.id;
 }
 
-function normalizeBuilding(building) {
-  return {
-    ...building,
-    id: getBuildingId(building),
-    latitude: Number(building.latitude),
-    longitude: Number(building.longitude),
-  };
+function getFloorId(item) {
+  return item?.floorId ?? item?.id;
 }
 
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const earthRadiusKm = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function getZoneId(item) {
+  return item?.zoneId ?? item?.id;
 }
 
-function spreadNearbyBuildings(buildings) {
-  const thresholdKm = 0.09;
-  const groups = [];
+function getSettledData(result, fallback = []) {
+  if (result?.status !== "fulfilled") {
+    return fallback;
+  }
 
-  buildings.forEach((building) => {
-    const matchedGroup = groups.find((group) =>
-      haversineKm(group.anchor.latitude, group.anchor.longitude, building.latitude, building.longitude) <= thresholdKm
-    );
-
-    if (matchedGroup) {
-      matchedGroup.items.push(building);
-    } else {
-      groups.push({ anchor: building, items: [building] });
-    }
-  });
-
-  return groups.flatMap((group) => {
-    if (group.items.length === 1) {
-      return group.items.map((building) => ({
-        ...building,
-        markerLat: building.latitude,
-        markerLon: building.longitude,
-        nearbyCount: 1,
-      }));
-    }
-
-    const radius = 0.00026;
-    return group.items.map((building, index) => {
-      const angle = (Math.PI * 2 * index) / group.items.length;
-      return {
-        ...building,
-        markerLat: building.latitude + Math.sin(angle) * radius,
-        markerLon: building.longitude + Math.cos(angle) * radius,
-        nearbyCount: group.items.length,
-      };
-    });
-  });
+  return unwrapApiData(result.value?.data, fallback);
 }
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { dark, toggle, className: themeClass } = usePublicTheme();
-  const navRef = useRef(null);
-  const navLinksRef = useRef(null);
-  const mobileBtnRef = useRef(null);
-  const heroMapRef = useRef(null);
-  const heroLeafletRef = useRef(null);
-  const heroMarkersRef = useRef([]);
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [liveStats, setLiveStats] = useState({ buildingCount: 0, available: 0, occupied: 0, total: 0 });
-  const [statsError, setStatsError] = useState("");
-  const [heroBuildings, setHeroBuildings] = useState([]);
-  const [heroMapReady, setHeroMapReady] = useState(false);
+  const [liveData, setLiveData] = useState({
+    buildings: [],
+    vehicleTypes: [],
+    gates: [],
+    slots: [],
+  });
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    async function loadPublicData() {
       try {
-        const [bRes, statsRes] = await Promise.all([buildingApi.getAll(), parkingSlotApi.getPublicStats()]);
-        const buildings = unwrapApiData(bRes.data, []);
-        setHeroBuildings(
-          spreadNearbyBuildings(
-            buildings
-              .filter((building) => building.latitude != null && building.longitude != null)
-              .map(normalizeBuilding)
-          )
+        const [buildingRes, vehicleTypeRes] = await Promise.all([
+          buildingApi.getAll(),
+          vehicleTypeApi.getAll(),
+        ]);
+
+        const buildings = unwrapApiData(buildingRes.data, []);
+        const vehicleTypes = unwrapApiData(vehicleTypeRes.data, []);
+
+        const [floorResponses, gateResponses] = await Promise.all([
+          Promise.allSettled(buildings.map((item) => floorApi.getByBuilding(getBuildingId(item)))),
+          Promise.allSettled(buildings.map((item) => gateApi.getByBuilding(getBuildingId(item)))),
+        ]);
+
+        const floors = floorResponses.flatMap((result) => getSettledData(result, []));
+        const gates = gateResponses.flatMap((result) => getSettledData(result, []));
+
+        const zoneResponses = await Promise.allSettled(
+          floors.map((item) => zoneApi.getByFloor(getFloorId(item)))
         );
+        const zones = zoneResponses.flatMap((result) => getSettledData(result, []));
 
-        const stats = unwrapApiData(statsRes.data, {});
-        setLiveStats({
-          buildingCount: stats.buildingCount ?? 0,
-          total: stats.total ?? 0,
-          available: stats.available ?? 0,
-          occupied: stats.occupied ?? 0,
-        });
-        setStatsError("");
-      } catch (err) {
-        setStatsError(err.response?.data?.message || "Khong tai duoc thong ke bai do song.");
-      }
-    })();
-  }, []);
+        const slotResponses = await Promise.allSettled(
+          zones.map((item) => parkingSlotApi.getByZone(getZoneId(item)))
+        );
+        const slots = slotResponses.flatMap((result) => getSettledData(result, []));
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    import("leaflet").then((leafletModule) => {
-      const leaflet = leafletModule.default || leafletModule;
-
-      if (!heroMapRef.current || heroLeafletRef.current) return;
-
-      const map = leaflet.map(heroMapRef.current, {
-        center: [10.7769, 106.7009],
-        zoom: 11,
-        zoomControl: false,
-        attributionControl: false,
-        dragging: false,
-        scrollWheelZoom: false,
-        doubleClickZoom: false,
-        boxZoom: false,
-        keyboard: false,
-        touchZoom: false,
-      });
-
-      leaflet
-        .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        })
-        .addTo(map);
-
-      heroLeafletRef.current = { map, leaflet };
-      setHeroMapReady(true);
-      window.setTimeout(() => map.invalidateSize(), 0);
-    });
-
-    return () => {
-      heroMarkersRef.current.forEach((marker) => marker.remove());
-      heroMarkersRef.current = [];
-      setHeroMapReady(false);
-      if (heroLeafletRef.current?.map) {
-        heroLeafletRef.current.map.remove();
-        heroLeafletRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!heroMapReady || !heroLeafletRef.current) return;
-
-    const { map, leaflet } = heroLeafletRef.current;
-    heroMarkersRef.current.forEach((marker) => marker.remove());
-    heroMarkersRef.current = [];
-
-    if (!heroBuildings.length) {
-      map.setView([10.7769, 106.7009], 11);
-      return;
-    }
-
-    const bounds = [];
-
-    heroBuildings.forEach((building) => {
-      const icon = leaflet.divIcon({
-        className: "landing-map-marker",
-        html: `
-          <div class="landing-map-marker__pin"></div>
-          <div class="landing-map-marker__label">
-            <span>${building.name || "Parking"}</span>
-            ${building.nearbyCount > 1 ? `<b>+${building.nearbyCount - 1}</b>` : ""}
-          </div>
-        `,
-        iconSize: [116, 52],
-        iconAnchor: [18, 44],
-      });
-
-      const marker = leaflet
-        .marker([building.markerLat, building.markerLon], { icon })
-        .addTo(map)
-        .bindTooltip(building.address || building.name || "Parking", {
-          direction: "top",
-          offset: [0, -22],
-          opacity: 0.95,
-        });
-
-      heroMarkersRef.current.push(marker);
-      bounds.push([building.latitude, building.longitude]);
-    });
-
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 13);
-    } else {
-      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 12 });
-    }
-    window.setTimeout(() => map.invalidateSize(), 0);
-  }, [heroBuildings, heroMapReady]);
-
-  // Scroll reveal, nav scroll state, counter animations, tilt, spotlight, parallax
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    // ===== Scroll Reveal (IntersectionObserver) =====
-    const revealElements = document.querySelectorAll(".reveal-up");
-    const revealObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("visible");
-            revealObserver.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -60px 0px" }
-    );
-    revealElements.forEach((el) => revealObserver.observe(el));
-
-    // ===== Nav scroll state =====
-    let navSentinel = null;
-    let navObserver = null;
-    const nav = navRef.current;
-    if (nav) {
-      navSentinel = document.createElement("div");
-      navSentinel.style.cssText =
-        "position:absolute;top:0;left:0;width:1px;height:80px;pointer-events:none;";
-      document.body.prepend(navSentinel);
-      navObserver = new IntersectionObserver(
-        ([entry]) => {
-          nav.classList.toggle("scrolled", !entry.isIntersecting);
-        },
-        { threshold: 0 }
-      );
-      navObserver.observe(navSentinel);
-    }
-
-    // ===== Smooth scroll for anchor links =====
-    const anchorLinks = document.querySelectorAll('a[href^="#"]');
-    const handleAnchorClick = (e) => {
-      const href = e.currentTarget.getAttribute("href");
-      const target = document.querySelector(href);
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    };
-    anchorLinks.forEach((link) => {
-      link.addEventListener("click", handleAnchorClick);
-    });
-
-    // ===== Counter animation =====
-    function animateNum(el, from, to, duration, isFloat, suffix) {
-      suffix = suffix || "";
-      const start = performance.now();
-      const tick = (now) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const current = from + (to - from) * eased;
-        if (to >= 10000) {
-          el.textContent = Math.floor(current).toLocaleString() + suffix;
-        } else if (isFloat) {
-          el.textContent = current.toFixed(1) + suffix;
-        } else {
-          el.textContent = Math.floor(current) + suffix;
+        if (!cancelled) {
+          setLiveData({ buildings, vehicleTypes, gates, slots });
         }
-        if (progress < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
+      } catch (error) {
+        console.error("Failed to load public landing data", error);
+        if (!cancelled) {
+          setLiveData({ buildings: [], vehicleTypes: [], gates: [], slots: [] });
+        }
+      }
     }
 
-    const counterEls = document.querySelectorAll("[data-count], .pill-num");
-    const counterObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const el = entry.target;
-          counterObserver.unobserve(el);
-
-          const dataCount = el.dataset.count;
-          if (dataCount) {
-            const target = parseInt(dataCount);
-            animateNum(el, 0, target, 2000, false);
-            return;
-          }
-
-          const text = el.textContent;
-          const numMatch = text.match(/[\d.]+/);
-          if (numMatch) {
-            const target = parseFloat(numMatch[0]);
-            const suffix = text.replace(numMatch[0], "");
-            const isFloat = text.includes(".");
-            animateNum(el, 0, target, 1500, isFloat, suffix);
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
-    counterEls.forEach((el) => counterObserver.observe(el));
-
-    // ===== Card tilt =====
-    const tiltCards = document.querySelectorAll("[data-tilt]");
-    const tiltMoveHandlers = [];
-    const tiltLeaveHandlers = [];
-    if (!reducedMotion) {
-      tiltCards.forEach((card) => {
-        const onMove = (e) => {
-          const rect = card.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          const rotateX = ((y - rect.height / 2) / (rect.height / 2)) * -3;
-          const rotateY = ((x - rect.width / 2) / (rect.width / 2)) * 3;
-          card.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
-        };
-        const onLeave = () => {
-          card.style.transform = "";
-        };
-        card.addEventListener("pointermove", onMove);
-        card.addEventListener("pointerleave", onLeave);
-        tiltMoveHandlers.push({ card, handler: onMove });
-        tiltLeaveHandlers.push({ card, handler: onLeave });
-      });
-    }
-
-    // ===== Spotlight effect on bento cards =====
-    const bentoCells = document.querySelectorAll(".bento-cell:not(.bento-accent)");
-    const spotlightMoveHandlers = [];
-    const spotlightLeaveHandlers = [];
-    if (!reducedMotion) {
-      bentoCells.forEach((card) => {
-        const onMove = (e) => {
-          const rect = card.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          card.style.background = `radial-gradient(500px circle at ${x}px ${y}px, rgba(0,230,118,0.03), transparent 50%), var(--bg-elevated)`;
-        };
-        const onLeave = () => {
-          card.style.background = "";
-        };
-        card.addEventListener("pointermove", onMove);
-        card.addEventListener("pointerleave", onLeave);
-        spotlightMoveHandlers.push({ card, handler: onMove });
-        spotlightLeaveHandlers.push({ card, handler: onLeave });
-      });
-    }
-
-    // ===== Image parallax on scroll =====
-    let parallaxObserver = null;
-    let scrollObserverForParallax = null;
-    let onScroll = null;
-    if (!reducedMotion) {
-      const parallaxImgs = document.querySelectorAll(".showcase-inner");
-      parallaxObserver = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.dataset.parallax = "true";
-            } else {
-              delete entry.target.dataset.parallax;
-            }
-          });
-        },
-        { threshold: 0 }
-      );
-      parallaxImgs.forEach((el) => parallaxObserver.observe(el));
-
-      let ticking = false;
-      onScroll = () => {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(() => {
-          document.querySelectorAll('[data-parallax="true"]').forEach((el) => {
-            const rect = el.getBoundingClientRect();
-            const viewH = window.innerHeight;
-            const progress = (rect.top + rect.height / 2) / viewH;
-            const offset = (progress - 0.5) * 20;
-            const img = el.querySelector("img");
-            if (img) img.style.transform = `translateY(${offset}px) scale(1.05)`;
-          });
-          ticking = false;
-        });
-      };
-
-      scrollObserverForParallax = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            document.addEventListener("scroll", onScroll, { passive: true });
-          }
-        },
-        { threshold: 0 }
-      );
-      const firstParallax = parallaxImgs[0];
-      if (firstParallax) scrollObserverForParallax.observe(firstParallax);
-    }
-
-    // ===== Cleanup =====
+    void loadPublicData();
     return () => {
-      revealObserver.disconnect();
-      counterObserver.disconnect();
-
-      if (navObserver) navObserver.disconnect();
-      if (navSentinel && navSentinel.parentNode) navSentinel.parentNode.removeChild(navSentinel);
-
-      anchorLinks.forEach((link) => {
-        link.removeEventListener("click", handleAnchorClick);
-      });
-
-      tiltMoveHandlers.forEach(({ card, handler }) => card.removeEventListener("pointermove", handler));
-      tiltLeaveHandlers.forEach(({ card, handler }) => card.removeEventListener("pointerleave", handler));
-      spotlightMoveHandlers.forEach(({ card, handler }) => card.removeEventListener("pointermove", handler));
-      spotlightLeaveHandlers.forEach(({ card, handler }) => card.removeEventListener("pointerleave", handler));
-
-      if (parallaxObserver) parallaxObserver.disconnect();
-      if (scrollObserverForParallax) scrollObserverForParallax.disconnect();
-      if (onScroll) document.removeEventListener("scroll", onScroll);
-
+      cancelled = true;
     };
   }, []);
 
-  const handleLogin = useCallback(() => navigate("/login"), [navigate]);
-  const handleRegister = useCallback(() => navigate("/register"), [navigate]);
-  const handleDashboard = useCallback(() => navigate("/login"), [navigate]);
-  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+  const slotSummary = useMemo(() => {
+    const summary = { available: 0, occupied: 0, reserved: 0, maintenance: 0 };
+    liveData.slots.forEach((item) => {
+      const status = String(item.status || "").toUpperCase();
+      if (status === "AVAILABLE") summary.available += 1;
+      else if (status === "OCCUPIED") summary.occupied += 1;
+      else if (status === "RESERVED") summary.reserved += 1;
+      else summary.maintenance += 1;
+    });
+    return summary;
+  }, [liveData.slots]);
+
+  const stats = useMemo(
+    () => [
+      { value: String(liveData.buildings.length), label: "Parking Buildings" },
+      { value: String(liveData.slots.length), label: "Configured Slots" },
+      { value: String(liveData.vehicleTypes.length), label: "Vehicle Types" },
+      { value: String(liveData.gates.filter((item) => item.isActive !== false).length), label: "Active Gates" },
+    ],
+    [liveData]
+  );
+
+  const previewActivity = useMemo(() => {
+    const items = [];
+    if (liveData.buildings[0]) {
+      items.push({
+        plate: liveData.buildings[0].name,
+        action: `${slotSummary.available} slots available right now`,
+        time: `Open ${liveData.buildings[0].openTime?.slice(0, 5) || "--:--"}`,
+        status: "bg-emerald-100 text-emerald-700",
+      });
+    }
+    if (liveData.buildings[1]) {
+      items.push({
+        plate: liveData.buildings[1].name,
+        action: `${slotSummary.occupied} occupied slots in the system`,
+        time: `Close ${liveData.buildings[1].closeTime?.slice(0, 5) || "--:--"}`,
+        status: "bg-blue-100 text-blue-700",
+      });
+    }
+    if (liveData.vehicleTypes[0]) {
+      items.push({
+        plate: liveData.vehicleTypes[0].name,
+        action: `${liveData.vehicleTypes.length} supported vehicle categories`,
+        time: `${liveData.gates.length} gates`,
+        status: "bg-amber-100 text-amber-700",
+      });
+    }
+    return items;
+  }, [liveData, slotSummary]);
+
+  const liveHighlights = useMemo(
+    () => [
+      {
+        title: "Facility Coverage",
+        value: liveData.buildings.length,
+        hint: "Buildings currently configured in the system",
+        icon: Building2,
+        tone: "bg-blue-50 text-blue-600",
+      },
+      {
+        title: "Floor Structure",
+        value: liveData.slots.length ? new Set(liveData.slots.map((item) => item.zone?.floor?.floorId ?? item.zone?.floor?.id)).size : 0,
+        hint: "Distinct floors currently carrying slot inventory",
+        icon: Layers,
+        tone: "bg-violet-50 text-violet-600",
+      },
+      {
+        title: "Access Points",
+        value: liveData.gates.length,
+        hint: "Entry and exit gates now active in backend data",
+        icon: DoorOpen,
+        tone: "bg-emerald-50 text-emerald-600",
+      },
+      {
+        title: "Live Capacity",
+        value: slotSummary.available,
+        hint: "Slots currently marked AVAILABLE in the database",
+        icon: SquareParking,
+        tone: "bg-amber-50 text-amber-600",
+      },
+    ],
+    [liveData, slotSummary]
+  );
+
+  const buildingCards = useMemo(
+    () =>
+      liveData.buildings.slice(0, 3).map((building) => ({
+        id: getBuildingId(building),
+        name: building.name,
+        address: building.address,
+        openTime: building.openTime?.slice(0, 5) || "--:--",
+        closeTime: building.closeTime?.slice(0, 5) || "--:--",
+      })),
+    [liveData.buildings]
+  );
 
   return (
-    <div className={`ps-landing ${themeClass}`}>
-      {/* NAV */}
-      <nav className="nav" id="nav" ref={navRef}>
-        <div className="container nav-inner">
-          <a href="#" className="nav-logo" onClick={(e) => e.preventDefault()}>
-            <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
-            <span className="nav-logo-text">ParkSmart</span>
-          </a>
-          <div className="nav-links" id="navLinks" ref={navLinksRef}>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
+    <div className="min-h-screen bg-background">
+      <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9" />
+                <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7" />
+                <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7" />
+                <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5" />
+              </svg>
+            </div>
+            <span className="font-bold text-foreground">ParkSmart</span>
           </div>
-          <div className="nav-actions">
-            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
-              {dark ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-              )}
-            </button>
-            <button className="btn btn-ghost" onClick={handleLogin}>
-              Đăng nhập
-            </button>
-            <button className="btn btn-accent" onClick={handleRegister}>
-              Đăng ký
-            </button>
-          </div>
-          <button
-            className={`nav-mobile-btn ${mobileMenuOpen ? "active" : ""}`}
-            id="navMobileBtn"
-            ref={mobileBtnRef}
-            aria-label="Menu"
-            aria-expanded={mobileMenuOpen}
-            type="button"
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-        </div>
-        <div className={`nav-mobile-panel ${mobileMenuOpen ? "show" : ""}`}>
-          <div className="container nav-mobile-panel-inner">
-            <a
-              href="#"
-              className="nav-mobile-link"
-              onClick={(e) => {
-                e.preventDefault();
-                closeMobileMenu();
-                navigate("/public-slots");
-              }}
-            >
-              Bản đồ slot
+          <div className="hidden md:flex items-center gap-6 flex-1">
+            <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Features
             </a>
-            <button
-              className="nav-mobile-action nav-mobile-action-secondary"
-              type="button"
-              onClick={() => {
-                closeMobileMenu();
-                handleLogin();
-              }}
-            >
-              Đăng nhập
+            <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Pricing
+            </a>
+            <button onClick={() => navigate("/parking-info")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Parking Info
             </button>
-            <button
-              className="nav-mobile-action nav-mobile-action-primary"
-              type="button"
-              onClick={() => {
-                closeMobileMenu();
-                handleRegister();
-              }}
-            >
-              Đăng ký
+            <button onClick={() => navigate("/public-slots")} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Public Slots
+            </button>
+          </div>
+          <div className="hidden md:flex items-center gap-3 ml-auto">
+            <button onClick={() => navigate("/login")} className="px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Sign in
+            </button>
+            <button onClick={() => navigate("/register")} className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+              Get started
             </button>
           </div>
         </div>
       </nav>
 
-      {/* HERO */}
-      <section className="hero" id="hero">
-        <div className="hero-bg-image">
-          <img
-            src="https://images.unsplash.com/photo-1534996858221-380b92700493?w=1920&q=80&auto=format"
-            alt=""
-            loading="eager"
-          />
-        </div>
-        <div className="hero-glow glow-1"></div>
-        <div className="hero-glow glow-2"></div>
-        <div className="container hero-grid">
-          <div className="hero-content">
-            <h1 className="hero-title reveal-up">
-              Quản lý bãi đỗ xe,
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-50 via-background to-cyan-50/40" />
+        <div className="absolute right-0 top-20 -z-10 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute bottom-0 left-20 -z-10 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+
+        <div className="mx-auto grid max-w-6xl items-center gap-16 px-6 py-24 lg:grid-cols-2">
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+              <Zap size={12} />
+              Smart Parking Platform
+            </div>
+            <h1 className="mb-5 text-5xl font-bold leading-tight text-foreground" style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1.15 }}>
+              Intelligent Parking
+              <span className="text-primary"> Management</span>
               <br />
-              <span className="hero-title-accent">không còn đau đầu.</span>
+              for Modern Cities
             </h1>
-            <p className="hero-sub reveal-up delay-1">
-              Theo dõi trạng thái, tự động nhận diện biển số, thanh toán online. Tất cả trong một nền tảng duy nhất.
+            <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
+              Streamline your entire parking operation from slot booking and OCR entry to real-time analytics and multi-role management.
             </p>
-            <div className="hero-ctas reveal-up delay-2">
-              <button className="btn btn-accent btn-lg" onClick={handleDashboard}>
-                Đăng nhập
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
+            <div className="flex flex-wrap items-center gap-4">
+              <button onClick={() => navigate("/register")} className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30">
+                Start for free
+                <ArrowRight size={16} />
               </button>
-              <button className="btn btn-outline btn-lg" onClick={() => navigate("/public-slots")}>
-                Xem slot trống
+              <button onClick={() => navigate("/public-slots")} className="flex items-center gap-2 rounded-xl border border-primary/20 bg-card px-6 py-3 font-medium text-primary transition-colors hover:bg-primary/5">
+                Browse public slots
+                <ChevronRight size={16} />
+              </button>
+              <button onClick={() => navigate("/login")} className="flex items-center gap-2 rounded-xl border border-border px-6 py-3 font-medium text-foreground transition-colors hover:bg-muted">
+                View demo
+                <ChevronRight size={16} />
               </button>
             </div>
-            <div className="hero-metrics reveal-up delay-3">
-              <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.buildingCount ?? 0}>
-                  {liveStats.buildingCount ?? 0}
-                </span>
-                <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Bãi đỗ</span>
-              </div>
-              <div className="hero-metric-divider"></div>
-              <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.available ?? 0}>
-                  {liveStats.available ?? 0}
-                </span>
-                <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Slot trống</span>
-              </div>
-              <div className="hero-metric-divider"></div>
-              <div className="hero-metric">
-                <span className="hero-metric-num" data-count={liveStats.occupied ?? 0}>
-                  {liveStats.occupied ?? 0}
-                </span>
-                <span className="hero-metric-suffix"></span>
-                <span className="hero-metric-label">Xe đang đỗ</span>
-              </div>
-            </div>
-            {statsError ? <p className="mt-3 text-xs text-amber-200">{statsError}</p> : null}
-          </div>
-          <div className="hero-visual reveal-up delay-2">
-            <div className="hero-img-wrapper hero-map-wrapper">
-              <div ref={heroMapRef} className="hero-map-canvas" />
-              <div className="hero-map-overlay"></div>
-            </div>
-            <div className="hero-pills-row">
-              <div className="hero-float-pill hero-pill-static reveal-up delay-3">
-                <span className="pill-icon green">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                </span>
-                <div>
-                  <span className="pill-num">{liveStats.available || 0}</span>
-                  <span className="pill-label">chỗ trống</span>
+            <div className="mt-8 flex flex-wrap items-center gap-6">
+              {["No credit card required", "Free 14-day trial", "Cancel anytime"].map((text) => (
+                <div key={text} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CheckCircle2 size={13} className="text-emerald-500" />
+                  {text}
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative hidden lg:block">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10">
+              <div className="flex items-center gap-2 bg-[#4F46E5] p-4">
+                <div className="size-2.5 rounded-full bg-white/30" />
+                <div className="size-2.5 rounded-full bg-white/30" />
+                <div className="size-2.5 rounded-full bg-white/30" />
+                <span className="ml-2 text-xs text-white/70">ParkSmart Dashboard</span>
               </div>
-              <div className="hero-float-pill hero-pill-static reveal-up delay-4">
-                <span className="pill-icon blue">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <rect x="1" y="3" width="15" height="13" rx="2" />
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                    <circle cx="5.5" cy="18.5" r="2.5" />
-                    <circle cx="18.5" cy="18.5" r="2.5" />
-                  </svg>
-                </span>
-                <div>
-                  <span className="pill-num">{liveStats.occupied || 0}</span>
-                  <span className="pill-label">xe đang đỗ</span>
+              <div className="p-5">
+                <div className="mb-4 grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Available", value: String(slotSummary.available), color: "text-emerald-600", bg: "bg-emerald-50" },
+                    { label: "Occupied", value: String(slotSummary.occupied), color: "text-rose-600", bg: "bg-rose-50" },
+                    { label: "Reserved", value: String(slotSummary.reserved), color: "text-amber-600", bg: "bg-amber-50" },
+                  ].map((item) => (
+                    <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center`}>
+                      <div className={`text-xl font-bold ${item.color}`}>{item.value}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl bg-muted/50 p-3">
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {liveData.buildings[0]?.name || "Live parking map"} - current slot status
+                  </p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {Array.from({ length: Math.max(32, Math.min(40, liveData.slots.length || 32)) }, (_, i) => {
+                      const slot = liveData.slots[i];
+                      const status = String(slot?.status || "").toUpperCase();
+                      const color =
+                        status === "OCCUPIED"
+                          ? "bg-rose-400"
+                          : status === "RESERVED"
+                            ? "bg-amber-400"
+                            : status && status !== "AVAILABLE"
+                              ? "bg-slate-400"
+                              : "bg-emerald-400";
+                      return <div key={i} className={`${color} aspect-[1.6] rounded-sm`} />;
+                    })}
+                  </div>
+                  <div className="mt-2 flex items-center gap-3">
+                    {[["bg-emerald-400", "Available"], ["bg-rose-400", "Occupied"], ["bg-amber-400", "Reserved"]].map(([color, label]) => (
+                      <div key={label} className="flex items-center gap-1">
+                        <div className={`size-2 rounded-sm ${color}`} />
+                        <span className="text-[10px] text-muted-foreground">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {previewActivity.map((item) => (
+                    <div key={item.plate} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+                      <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+                        <Car size={13} className="text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-foreground">{item.plate}</p>
+                        <p className="text-[11px] text-muted-foreground">{item.action}</p>
+                      </div>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${item.status}`}>{item.time}</span>
+                    </div>
+                  ))}
+                  {previewActivity.length === 0 ? (
+                    <div className="p-2 text-xs text-muted-foreground">Public preview updates when backend data is available.</div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -628,276 +427,226 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="features" id="features">
-        <div className="section-bg">
-          <img
-            src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1920&q=80&auto=format"
-            alt=""
-            loading="lazy"
-          />
+      <section className="border-y border-border bg-card py-10">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-6 md:grid-cols-4">
+          {stats.map((item) => (
+            <div key={item.label} className="text-center">
+              <div className="mb-1 text-3xl font-bold text-primary">{item.value}</div>
+              <div className="text-sm text-muted-foreground">{item.label}</div>
+            </div>
+          ))}
         </div>
-        <div className="container">
-          <h2 className="section-title reveal-up">
-            Mọi thứ bạn cần để vận hành hiệu quả
-          </h2>
-          <div className="bento reveal-up delay-1">
-            <div className="bento-cell bento-wide bento-has-img" data-tilt="">
-              <div className="bento-text">
-                <div className="bento-icon">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                  </svg>
-                </div>
-                <h3>Quản lý chỗ đỗ realtime</h3>
-                <p>
-                  Theo dõi trạng thái từng vị trí đỗ xe theo thời gian thực với bản đồ trực quan.
-                </p>
-              </div>
-              <div className="bento-img-box">
-                <img
-                  src="https://images.unsplash.com/photo-1611348586804-61bf6c080437?w=480&q=80&auto=format"
-                  alt="Bản đồ bãi đỗ xe"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="bento-cell" data-tilt="">
-              <div className="bento-icon green">
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-              </div>
-              <h3>Nhận diện biển số AI</h3>
-              <p>Tự động đọc biển số xe bằng AI, giảm thao tác thủ công.</p>
-              <div className="bento-img-small">
-                <img
-                  src="https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=320&q=80&auto=format"
-                  alt="Camera nhận diện biển số"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="bento-cell bento-accent" data-tilt="">
-              <div className="bento-icon white">
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M21 12V7H5a2 2 0 010-4h14v4" />
-                  <path d="M3 5v14a2 2 0 002 2h16v-5" />
-                  <path d="M18 12a2 2 0 000 4h4v-4h-4z" />
-                </svg>
-              </div>
-              <h3>Thanh toán online</h3>
-              <p>VNPay, MoMo, ZaloPay tích hợp sẵn.</p>
-            </div>
-            <div className="bento-cell" data-tilt="">
-              <div className="bento-icon orange">
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </div>
-              <h3>Báo cáo thông minh</h3>
-              <p>Dashboard trực quan với biểu đồ doanh thu và hiệu suất.</p>
-            </div>
-            <div className="bento-cell bento-wide bento-has-img" data-tilt="">
-              <div className="bento-text">
-                <div className="bento-icon pink">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 01-3.46 0" />
-                  </svg>
-                </div>
-                <h3>Thông báo và cảnh báo</h3>
-                <p>
-                  Cảnh báo tức thì khi bãi sắp đầy, xe quá hạn, hoặc phát sinh sự cố.
-                </p>
-              </div>
-              <div className="bento-img-box">
-                <img
-                  src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=480&q=80&auto=format"
-                  alt="Dashboard analytics"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="how-it-works" id="how-it-works">
-        <div className="section-bg">
-          <img
-            src="https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=1920&q=80&auto=format"
-            alt=""
-            loading="lazy"
-          />
-        </div>
-        <div className="container">
-          <h2 className="section-title reveal-up">Đơn giản chỉ với 3 bước</h2>
-          <div className="steps-track reveal-up delay-1">
-            <div className="step-card">
-              <div className="step-num">01</div>
-              <h3>Đăng ký tài khoản</h3>
-              <p>Tạo tài khoản miễn phí trong 2 phút, không cần thẻ tín dụng.</p>
-              <div className="step-img">
-                <img
-                  src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&q=80&auto=format"
-                  alt="Đăng ký tài khoản"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="step-card">
-              <div className="step-num">02</div>
-              <h3>Cài đặt bãi đỗ xe</h3>
-              <p>Nhập sơ đồ bãi, số tầng, số chỗ. Hệ thống tự tạo bản đồ.</p>
-              <div className="step-img">
-                <img
-                  src="https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=400&q=80&auto=format"
-                  alt="Cài đặt bãi đỗ xe"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-            <div className="step-card">
-              <div className="step-num">03</div>
-              <h3>Bắt đầu vận hành</h3>
-              <p>Mọi thứ tự động. Xe vào, xe ra, thanh toán, báo cáo.</p>
-              <div className="step-img">
-                <img
-                  src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80&auto=format"
-                  alt="Dashboard vận hành"
-                  loading="lazy"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SHOWCASE IMAGE SECTION */}
-      <section className="showcase">
-        <div className="container">
-          <div className="showcase-inner reveal-up">
-            <img
-              src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1400&q=80&auto=format"
-              alt="Bãi đỗ xe hiện đại"
-              loading="lazy"
-              className="showcase-img"
-            />
-            <div className="showcase-overlay">
-              <div className="showcase-stat">
-                <span className="showcase-stat-num">500+</span>
-                <span className="showcase-stat-label">
-                  Bãi đỗ xe đang sử dụng ParkSmart trên toàn quốc
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
-
-      {/* CTA */}
-      <section className="cta-section">
-        <div className="cta-bg">
-          <img
-            src="https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1600&q=80&auto=format"
-            alt=""
-            loading="lazy"
-          />
-        </div>
-        <div className="container cta-inner reveal-up">
-          <h2>Sẵn sàng nâng cấp bãi đỗ xe của bạn?</h2>
-          <p>Dùng thử miễn phí 14 ngày, không cần thẻ tín dụng.</p>
-          <button className="btn btn-accent btn-lg" onClick={handleRegister}>
-            Bắt đầu ngay
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <path d="M5 12h14" />
-              <path d="m12 5 7 7-7 7" />
-            </svg>
+        <div className="mx-auto mt-8 flex max-w-6xl flex-wrap items-center justify-center gap-3 px-6">
+          <button onClick={() => navigate("/parking-info")} className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+            View Parking Information
+          </button>
+          <button onClick={() => navigate("/public-slots")} className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+            Check Public Slot Availability
           </button>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="footer" id="contact">
-        <div className="container footer-grid">
-          <div className="footer-brand">
-            <a href="#" className="nav-logo" onClick={(e) => e.preventDefault()}>
-              <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
-              <span className="nav-logo-text">ParkSmart</span>
-            </a>
-            <p>Giải pháp quản lý bãi đỗ xe thông minh hàng đầu Việt Nam.</p>
+      <section id="features" className="py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-14 text-center">
+            <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+              <Globe size={12} />
+              Platform Features
+            </span>
+            <h2 className="mb-4 text-3xl font-bold text-foreground" style={{ fontSize: "1.875rem", fontWeight: 700 }}>
+              Everything you need to manage parking
+            </h2>
+            <p className="mx-auto max-w-xl text-muted-foreground">
+              A complete suite of tools built for parking operators, staff, and drivers alike.
+            </p>
           </div>
-          <div className="footer-col">
-            <h4>Sản phẩm</h4>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
-          </div>
-          <div className="footer-col">
-            <h4>Tài khoản</h4>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/login"); }}>Đăng nhập</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/register"); }}>Đăng ký</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate("/forgot-password"); }}>Quên mật khẩu</a>
-          </div>
-          <div className="footer-col">
-            <h4>Liên hệ</h4>
-            <a href="#">parking@fpt.edu.vn</a>
-            <a href="#">0900 000 010</a>
-            <a href="#">FPT University HCM</a>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div key={feature.title} className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-md hover:shadow-primary/5">
+                  <div className={`mb-4 flex size-10 items-center justify-center rounded-xl ${feature.color}`}>
+                    <Icon size={18} />
+                  </div>
+                  <h3 className="mb-2 font-semibold text-foreground" style={{ fontSize: "1rem", fontWeight: 600 }}>
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{feature.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
-        <div className="container footer-bottom">
-          <p>2026 ParkSmart. All rights reserved.</p>
+      </section>
+
+      <section className="bg-primary/5 py-16">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-10 text-center">
+            <h2 className="mb-3 text-2xl font-bold text-foreground" style={{ fontWeight: 700 }}>Live System Coverage</h2>
+            <p className="text-muted-foreground">These figures are pulled from the parking data currently available in the backend.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {liveHighlights.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="group rounded-2xl border border-border bg-card p-5 text-left transition-all hover:shadow-md">
+                  <div className={`mb-3 flex size-10 items-center justify-center rounded-xl ${item.tone}`}>
+                    <Icon size={18} />
+                  </div>
+                  <div className="text-3xl font-bold text-foreground">{item.value}</div>
+                  <div className="mt-1 font-semibold text-foreground">{item.title}</div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.hint}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-card py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="text-2xl font-bold text-foreground" style={{ fontWeight: 700 }}>What The Current System Already Supports</h2>
+            <p className="mt-3 text-muted-foreground">A quick overview of the real parking facilities and operational setup already loaded into the platform.</p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {buildingCards.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-border bg-background p-5">
+                  <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Building2 size={18} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.address}</p>
+                  <p className="mt-4 text-xs font-medium text-foreground">
+                    Operating hours: <span className="text-muted-foreground">{item.openTime} - {item.closeTime}</span>
+                  </p>
+                </div>
+              ))}
+              {buildingCards.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-background p-5 text-sm text-muted-foreground">
+                  No building data is currently available from the backend.
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background p-6">
+              <h3 className="text-lg font-semibold text-foreground">Operational Snapshot</h3>
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Available Slots</p>
+                    <p className="text-xs text-muted-foreground">Ready for immediate use</p>
+                  </div>
+                  <span className="text-2xl font-bold text-emerald-600">{slotSummary.available}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Occupied Slots</p>
+                    <p className="text-xs text-muted-foreground">Already in use right now</p>
+                  </div>
+                  <span className="text-2xl font-bold text-rose-600">{slotSummary.occupied}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Reserved Slots</p>
+                    <p className="text-xs text-muted-foreground">Held for existing assignments</p>
+                  </div>
+                  <span className="text-2xl font-bold text-amber-600">{slotSummary.reserved}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Vehicle Profiles</p>
+                    <p className="text-xs text-muted-foreground">Types already configured in backend</p>
+                  </div>
+                  <span className="text-2xl font-bold text-primary">{liveData.vehicleTypes.length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="py-20">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-14 text-center">
+            <h2 className="mb-3 text-3xl font-bold text-foreground" style={{ fontWeight: 700 }}>Simple, transparent pricing</h2>
+            <p className="text-muted-foreground">No hidden fees. Scale as you grow.</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {PLANS.map((plan) => (
+              <div key={plan.name} className={`rounded-2xl border p-7 ${plan.highlight ? "scale-[1.02] border-primary bg-primary text-primary-foreground shadow-2xl shadow-primary/30" : "border-border bg-card"}`}>
+                {plan.highlight ? (
+                  <span className="mb-3 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white">
+                    <Zap size={10} />
+                    Most popular
+                  </span>
+                ) : null}
+                <h3 className={`mb-1 font-bold ${plan.highlight ? "text-white" : "text-foreground"}`}>{plan.name}</h3>
+                <p className={`mb-5 text-xs ${plan.highlight ? "text-white/70" : "text-muted-foreground"}`}>{plan.desc}</p>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className={`text-4xl font-bold ${plan.highlight ? "text-white" : "text-foreground"}`}>{plan.price}</span>
+                  <span className={`text-sm ${plan.highlight ? "text-white/70" : "text-muted-foreground"}`}>{plan.period}</span>
+                </div>
+                <ul className="mb-7 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className={`flex items-center gap-2 text-sm ${plan.highlight ? "text-white/90" : "text-muted-foreground"}`}>
+                      <CheckCircle2 size={14} className={plan.highlight ? "text-white" : "text-emerald-500"} />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={() => navigate("/register")} className={`w-full rounded-xl py-2.5 text-sm font-medium transition-all ${plan.highlight ? "bg-white text-primary hover:bg-white/90" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                  {plan.cta}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-primary py-20">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="mb-4 text-3xl font-bold text-white" style={{ fontWeight: 700 }}>
+            Ready to transform your parking?
+          </h2>
+          <p className="mb-8 text-lg text-white/70">
+            Join facilities already using ParkSmart to modernize their operations.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <button onClick={() => navigate("/register")} className="flex items-center gap-2 rounded-xl bg-white px-8 py-3 font-semibold text-primary shadow-lg transition-all hover:bg-white/90">
+              Get started free <ArrowRight size={16} />
+            </button>
+            <button onClick={() => navigate("/login")} className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-8 py-3 font-medium text-white transition-all hover:bg-white/20">
+              Sign in
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <footer className="bg-foreground py-12 text-white/60">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="1" width="5" height="5" rx="1" fill="white" opacity="0.9" />
+                  <rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.7" />
+                  <rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.7" />
+                  <rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.5" />
+                </svg>
+              </div>
+              <span className="font-semibold text-white">ParkSmart</span>
+            </div>
+            <p className="text-sm">© 2026 ParkSmart. All rights reserved.</p>
+            <div className="flex gap-6 text-sm">
+              {["Privacy", "Terms", "Contact"].map((item) => (
+                <a key={item} href="#" className="transition-colors hover:text-white">
+                  {item}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </footer>
     </div>

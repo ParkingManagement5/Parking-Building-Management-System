@@ -60,8 +60,6 @@ public class BuildingServiceImpl implements BuildingService {
             .description(req.getDescription())
             .openTime(req.getOpenTime())
             .closeTime(req.getCloseTime())
-            .latitude(req.getLatitude())
-            .longitude(req.getLongitude())
             .status(req.getStatus() != null ? req.getStatus() : Status.ACTIVE)
             .isActive(true)
             .build();
@@ -92,8 +90,6 @@ public class BuildingServiceImpl implements BuildingService {
         building.setDescription(req.getDescription());
         building.setOpenTime(req.getOpenTime());
         building.setCloseTime(req.getCloseTime());
-        building.setLatitude(req.getLatitude());
-        building.setLongitude(req.getLongitude());
         if (req.getStatus() != null) {
             building.setStatus(req.getStatus());
         }

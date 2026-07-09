@@ -21,8 +21,6 @@ import {
   YAxis,
 } from "recharts";
 
-const STATUS_LABELS = { ACTIVE: "Đang hoạt động", INACTIVE: "Ngừng hoạt động", SUSPENDED: "Đã khóa" };
-
 function formatRoleLabel(value) {
   return String(value || "UNKNOWN").replace(/^ROLE_/, "");
 }
@@ -33,10 +31,10 @@ function formatStatusLabel(value) {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState([
-    { label: "Tổng người dùng", value: "0", change: "Dữ liệu trực tiếp từ backend", icon: Users, color: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300" },
-    { label: "Người dùng hoạt động", value: "0", change: "Tài khoản đang ở trạng thái Đang hoạt động", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" },
-    { label: "Vai trò", value: "0", change: "Vai trò lấy từ API", icon: Shield, color: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" },
-    { label: "Người dùng ngừng hoạt động", value: "0", change: "Cần rà soát lại", icon: AlertTriangle, color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300" },
+    { label: "Total Users", value: "0", change: "Live from backend", icon: Users, color: "bg-blue-50 text-blue-600" },
+    { label: "Active Users", value: "0", change: "Accounts with ACTIVE status", icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600" },
+    { label: "Roles", value: "0", change: "Roles returned by API", icon: Shield, color: "bg-violet-50 text-violet-600" },
+    { label: "Inactive Users", value: "0", change: "Need review", icon: AlertTriangle, color: "bg-amber-50 text-amber-600" },
   ]);
   const [roleChart, setRoleChart] = useState([]);
   const [statusChart, setStatusChart] = useState([]);
@@ -73,32 +71,32 @@ export default function AdminDashboard() {
 
         setStats([
           {
-            label: "Tổng người dùng",
+            label: "Total Users",
             value: String(users.length),
-            change: "Dữ liệu trực tiếp từ backend",
+            change: "Live from backend",
             icon: Users,
-            color: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+            color: "bg-blue-50 text-blue-600",
           },
           {
-            label: "Người dùng hoạt động",
+            label: "Active Users",
             value: String(users.filter((item) => item.status === "ACTIVE").length),
-            change: "Tài khoản đang ở trạng thái Đang hoạt động",
+            change: "Accounts with ACTIVE status",
             icon: CheckCircle2,
-            color: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+            color: "bg-emerald-50 text-emerald-600",
           },
           {
-            label: "Vai trò",
+            label: "Roles",
             value: String(roles.length),
-            change: "Vai trò lấy từ API",
+            change: "Roles returned by API",
             icon: Shield,
-            color: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+            color: "bg-violet-50 text-violet-600",
           },
           {
-            label: "Người dùng ngừng hoạt động",
+            label: "Inactive Users",
             value: String(users.filter((item) => item.status !== "ACTIVE").length),
-            change: "Cần rà soát lại",
+            change: "Need review",
             icon: AlertTriangle,
-            color: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+            color: "bg-amber-50 text-amber-600",
           },
         ]);
 
@@ -148,7 +146,7 @@ export default function AdminDashboard() {
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-5">
         <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="font-semibold text-foreground text-sm mb-5">Phân bổ người dùng theo vai trò</h3>
+          <h3 className="font-semibold text-foreground text-sm mb-5">User Distribution By Role</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={roleChart}>
               <defs>
@@ -161,14 +159,14 @@ export default function AdminDashboard() {
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
-              <Area type="monotone" dataKey="users" stroke="#4F46E5" strokeWidth={2.5} fill="url(#adminRoleGrad)" name="Người dùng" />
+              <Area type="monotone" dataKey="users" stroke="#4F46E5" strokeWidth={2.5} fill="url(#adminRoleGrad)" name="Users" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground text-sm">Trạng thái tài khoản</h3>
+            <h3 className="font-semibold text-foreground text-sm">Account Status</h3>
             <Activity size={13} className="text-muted-foreground" />
           </div>
           <div style={{ width: "100%", height: 180 }}>
@@ -195,8 +193,8 @@ export default function AdminDashboard() {
                   }`}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{STATUS_LABELS[item.status] || item.status}</p>
-                  <p className="text-[10px] text-muted-foreground">{item.total} tài khoản</p>
+                  <p className="text-xs font-medium text-foreground truncate">{item.status}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.total} accounts</p>
                 </div>
                 <span className="text-xs font-semibold text-foreground">{item.total}</span>
               </div>
@@ -207,8 +205,8 @@ export default function AdminDashboard() {
 
       <div className="bg-card border border-border rounded-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="font-semibold text-foreground text-sm">Người dùng gần đây</h3>
-          <span className="text-xs text-muted-foreground">Cập nhật trực tiếp</span>
+          <h3 className="font-semibold text-foreground text-sm">Recent Users</h3>
+          <span className="text-xs text-muted-foreground">Directly from `/users`</span>
         </div>
         <div className="divide-y divide-border">
           {recentUsers.map((user) => (
@@ -228,17 +226,17 @@ export default function AdminDashboard() {
                   <p className="text-xs text-muted-foreground">{formatRoleLabel(user.role)}</p>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                  {user.email || "Chưa có email"} · {STATUS_LABELS[formatStatusLabel(user.status)] || formatStatusLabel(user.status)}
+                  {user.email || "No email"} · {formatStatusLabel(user.status)}
                 </p>
               </div>
               <span className="text-xs text-emerald-600 whitespace-nowrap flex items-center gap-1">
                 <TrendingUp size={11} />
-                Trực tiếp
+                Live
               </span>
             </div>
           ))}
           {recentUsers.length === 0 && (
-            <div className="px-5 py-8 text-sm text-muted-foreground">Chưa có dữ liệu người dùng.</div>
+            <div className="px-5 py-8 text-sm text-muted-foreground">No users returned from backend.</div>
           )}
         </div>
       </div>

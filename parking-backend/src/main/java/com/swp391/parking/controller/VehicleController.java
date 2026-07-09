@@ -42,17 +42,8 @@ public class VehicleController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Vehicle>> getById(@PathVariable Long id, Authentication authentication) {
-        Vehicle vehicle = vehicleService.getById(id);
-        boolean isDriver = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
-        if (isDriver) {
-            User user = resolveUser(authentication);
-            if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem xe cua nguoi khac");
-            }
-        }
-        return ResponseEntity.ok(ApiResponse.success(vehicle));
+    public ResponseEntity<ApiResponse<Vehicle>> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(vehicleService.getById(id)));
     }
 
     @PostMapping
@@ -69,32 +60,16 @@ public class VehicleController {
     @PreAuthorize("hasRole('DRIVER')")
     public ResponseEntity<ApiResponse<Vehicle>> update(
             @PathVariable Long id,
-            Authentication authentication,
             @Valid @RequestBody VehicleRequest req) {
-        User user = resolveUser(authentication);
-        Vehicle vehicle = vehicleService.getById(id);
-        if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen sua xe cua nguoi khac");
-        }
         return ResponseEntity.ok(ApiResponse.success("Cap nhat xe thanh cong",
             vehicleService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('DRIVER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(
-            @PathVariable Long id, Authentication authentication) {
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin) {
-            User user = resolveUser(authentication);
-            Vehicle vehicle = vehicleService.getById(id);
-            if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xoa xe cua nguoi khac");
-            }
-        }
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         vehicleService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da vo hieu hoa xe"));
+        return ResponseEntity.ok(ApiResponse.success("Da xoa xe khoi DB"));
     }
 
     private User resolveUser(Authentication authentication) {

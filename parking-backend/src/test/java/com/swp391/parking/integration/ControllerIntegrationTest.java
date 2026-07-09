@@ -16,20 +16,17 @@ import com.swp391.parking.entity.Floor;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.ParkingSlot;
-import com.swp391.parking.entity.Booking;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Shift;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.support.AbstractIntegrationTestSupport;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -42,16 +39,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WithMockUser(username = "admin1", roles = "ADMIN")
 class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
-
-    // @WithMockUser chi gia lap security context, khong tao user that trong DB.
-    // Mot so endpoint (vd FloorController.getByBuilding) tra cuu user that theo
-    // ten dang nhap de resolve staff scope - can co ban ghi that de tranh 401.
-    @BeforeEach
-    void ensureMockAdminUserExists() {
-        if (userRepository.findByUsername("admin1").isEmpty()) {
-            createUser("admin1", Role.RoleName.ADMIN);
-        }
-    }
 
     @Test
     void buildingControllerShouldCreateBuilding() throws Exception {
@@ -200,42 +187,11 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.licensePlate").value("59A-123.45"));
+            .andExpect(jsonPath("$.data.licensePlate").value("59A-12345"));
 
         mockMvc.perform(get("/api/v1/vehicles/my"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].licensePlate").value("59A-123.45"));
-    }
-
-    @Test
-    @WithMockUser(username = "driver-booking", roles = "DRIVER")
-    void bookingControllerShouldReturnCurrentUsersBookings() throws Exception {
-        User driver = createUser("driver-booking", Role.RoleName.DRIVER);
-        ParkingBuilding building = createBuilding("Booking Tower");
-        Floor floor = createFloor(building, 1);
-        VehicleType vehicleType = createVehicleType("Booking Car", VehicleType.SlotSize.MEDIUM);
-        var zone = createZone(floor, vehicleType, "Booking Zone");
-        ParkingSlot slot = createSlot(zone, "BK-01", ParkingSlot.Status.AVAILABLE);
-        var vehicle = createVehicle(driver, vehicleType, "77A-12345");
-
-        bookingRepository.save(Booking.builder()
-            .userId(driver.getUserId().longValue())
-            .vehicle(vehicle)
-            .slot(slot)
-            .bookingStartTime(LocalDateTime.now().plusHours(1))
-            .bookingEndTime(LocalDateTime.now().plusHours(3))
-            .reservedAt(LocalDateTime.now())
-            .expiredAt(LocalDateTime.now().plusMinutes(15))
-            .depositAmount(BigDecimal.ZERO)
-            .status(Booking.BookingStatus.PENDING_PAYMENT)
-            .build());
-
-        mockMvc.perform(get("/api/bookings/my"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data[0].licensePlate").value("77A-12345"))
-            .andExpect(jsonPath("$.data[0].slotCode").value("BK-01"))
-            .andExpect(jsonPath("$.data[0].status").value("PENDING_PAYMENT"));
+            .andExpect(jsonPath("$.data[0].licensePlate").value("59A-12345"));
     }
 
     @Test
@@ -252,14 +208,14 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.title").value("Ping"))
-            .andExpect(jsonPath("$.data.isRead").value(false));
+            .andExpect(jsonPath("$.title").value("Ping"))
+            .andExpect(jsonPath("$.isRead").value(false));
 
         Long notificationId = notificationRepository.findAll().get(0).getNotificationId();
 
         mockMvc.perform(get("/api/v1/notifications/user/{userId}", user.getUserId()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].title").value("Ping"));
+            .andExpect(jsonPath("$[0].title").value("Ping"));
 
         mockMvc.perform(patch("/api/v1/notifications/{id}/read", notificationId))
             .andExpect(status().isNoContent());
@@ -281,14 +237,14 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.vehicleTypeId").value(vehicleType.getId()))
-            .andExpect(jsonPath("$.data.isActive").value(false));
+            .andExpect(jsonPath("$.vehicleTypeId").value(vehicleType.getId()))
+            .andExpect(jsonPath("$.isActive").value(false));
 
         Long policyId = pricingPolicyRepository.findAll().get(0).getPolicyId();
 
         mockMvc.perform(patch("/api/v1/pricing/{id}/activate", policyId))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.isActive").value(true));
+            .andExpect(jsonPath("$.isActive").value(true));
     }
 
     @Test

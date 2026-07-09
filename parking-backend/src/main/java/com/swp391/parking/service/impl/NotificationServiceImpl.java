@@ -3,7 +3,6 @@ package com.swp391.parking.service.impl;
 import com.swp391.parking.dto.request.SendNotificationRequest;
 import com.swp391.parking.dto.response.NotificationResponse;
 import com.swp391.parking.entity.Notification;
-import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.NotificationRepository;
@@ -51,13 +50,9 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void markAsRead(Long notificationId, Long currentUserId, boolean privileged) {
+    public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Notification not found"));
-        Long ownerUserId = notification.getUser() != null ? notification.getUser().getUserId().longValue() : null;
-        if (!privileged && (ownerUserId == null || !ownerUserId.equals(currentUserId))) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen danh dau notification cua nguoi khac");
-        }
         notification.setIsRead(true);
         notificationRepository.save(notification);
     }
@@ -65,43 +60,6 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public void markAllAsRead(Long userId) {
         notificationRepository.markAllAsRead((int)(long) userId);
-    }
-
-    @Override
-    public void notify(Long userId, String title, String body, String type, String entityType, Integer entityId) {
-        userRepository.findById((int)(long) userId).ifPresent(user -> {
-            notificationRepository.save(Notification.builder()
-                    .user(user).title(title).body(body).type(type)
-                    .entityType(entityType).entityId(entityId)
-                    .isRead(false).createdAt(LocalDateTime.now())
-                    .build());
-        });
-    }
-
-    @Override
-    public void notifyAllStaff(String title, String body, String type, String entityType, Integer entityId) {
-        LocalDateTime now = LocalDateTime.now();
-        userRepository.findByRolesRoleName(Role.RoleName.STAFF).forEach(user -> {
-            notificationRepository.save(Notification.builder()
-                    .user(user).title(title).body(body).type(type)
-                    .entityType(entityType).entityId(entityId)
-                    .isRead(false).createdAt(now)
-                    .build());
-        });
-    }
-
-    @Override
-    public void notifyStaffInBuilding(Long buildingId, String title, String body, String type, String entityType, Integer entityId) {
-        LocalDateTime now = LocalDateTime.now();
-        List<User> staffInBuilding = userRepository
-                .findByRolesRoleNameAndAssignedBuilding_Id(Role.RoleName.STAFF, buildingId);
-        staffInBuilding.forEach(user -> {
-            notificationRepository.save(Notification.builder()
-                    .user(user).title(title).body(body).type(type)
-                    .entityType(entityType).entityId(entityId)
-                    .isRead(false).createdAt(now)
-                    .build());
-        });
     }
 
     private NotificationResponse toResponse(Notification notification) {

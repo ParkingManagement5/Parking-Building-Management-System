@@ -21,19 +21,11 @@ import {
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 
-const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", MONTHLY: "Theo tháng" };
-const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
-
 export default function PricingPolicyPage() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [page, setPage] = useState(1);
-  const [filterVehicleType, setFilterVehicleType] = useState("");
-  const [filterTimeType, setFilterTimeType] = useState("");
-  const [filterDayType, setFilterDayType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
     vehicleTypeId: "",
     timeType: "HOURLY",
@@ -63,7 +55,7 @@ export default function PricingPolicyPage() {
       setPolicies(unwrapApiData(policyRes.data, []));
     } catch (error) {
       console.error("Failed to load pricing data", error);
-      alert("Không tải được danh sách bảng giá");
+      alert("Cannot load pricing policies");
     }
   }
 
@@ -98,7 +90,7 @@ export default function PricingPolicyPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.vehicleTypeId || !form.pricePerHour) {
-      alert("Loại xe và giá là bắt buộc");
+      alert("Vehicle type and price are required");
       return;
     }
 
@@ -130,7 +122,7 @@ export default function PricingPolicyPage() {
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save pricing policy", error);
-      alert("Lưu bảng giá thất bại");
+      alert("Save pricing policy failed");
     }
   };
 
@@ -149,145 +141,60 @@ export default function PricingPolicyPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bảng giá này?")) return;
+    if (!window.confirm("Are you sure you want to delete this pricing policy?")) return;
     try {
       await pricingPolicyApi.delete(id);
       await loadInitialData();
     } catch (error) {
       console.error("Failed to delete pricing policy", error);
-      alert("Xóa bảng giá thất bại");
+      alert("Delete pricing policy failed");
     }
   };
 
-  const filteredPolicies = useMemo(() => {
-    return policies.filter((p) => {
-      if (filterVehicleType && String(p.vehicleTypeId) !== String(filterVehicleType)) return false;
-      if (filterTimeType && p.timeType !== filterTimeType) return false;
-      if (filterDayType && p.dayType !== filterDayType) return false;
-      if (filterStatus === "active" && !p.isActive) return false;
-      if (filterStatus === "inactive" && p.isActive) return false;
-      return true;
-    });
-  }, [policies, filterVehicleType, filterTimeType, filterDayType, filterStatus]);
-
-  const PAGE_SIZE = 10;
-  const pagedPolicies = useMemo(() => filteredPolicies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredPolicies, page]);
-  const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PAGE_SIZE));
-
-  const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")}đ`;
+  const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")}d`;
 
   return (
     <div className="space-y-5">
       <ManagerPageHeader
-        title="Quản lý bảng giá"
-        description="Thiết lập giá theo loại xe, loại ngày và khung giờ."
+        title="Pricing Policy Management"
+        description="Define rate rules by vehicle type, day type, and hourly windows."
         action={
           <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
-            <Plus size={14} /> Thêm bảng giá
+            <Plus size={14} /> Add Policy
           </ManagerPrimaryButton>
         }
       />
       <ManagerStatsRow>
-        <ManagerStatCard icon={Banknote} label="Số bảng giá" value={policies.length} hint="Tổng số quy tắc giá đã cấu hình" tone="violet" />
-        <ManagerStatCard icon={Car} label="Loại xe được áp dụng" value={new Set(policies.map((item) => item.vehicleTypeId)).size} hint="Loại xe đã có quy tắc giá" tone="blue" />
-        <ManagerStatCard icon={Clock3} label="Bảng giá theo giờ" value={policies.filter((item) => item.timeType === "HOURLY").length} hint="Tính phí theo giờ" tone="emerald" />
-        <ManagerStatCard icon={CalendarDays} label="Bảng giá đang bật" value={policies.filter((item) => item.isActive).length} hint="Đang được áp dụng" tone="amber" />
+        <ManagerStatCard icon={Banknote} label="Pricing Policies" value={policies.length} hint="Total pricing rules configured" tone="violet" />
+        <ManagerStatCard icon={Car} label="Covered Vehicle Types" value={new Set(policies.map((item) => item.vehicleTypeId)).size} hint="Vehicle categories with rate rules" tone="blue" />
+        <ManagerStatCard icon={Clock3} label="Hourly Policies" value={policies.filter((item) => item.timeType === "HOURLY").length} hint="Policies billed by hour" tone="emerald" />
+        <ManagerStatCard icon={CalendarDays} label="Active Policies" value={policies.filter((item) => item.isActive).length} hint="Rules currently available for use" tone="amber" />
       </ManagerStatsRow>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-        <select
-          value={filterVehicleType}
-          onChange={(e) => { setFilterVehicleType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại xe</option>
-          {vehicleTypes.map((v) => (
-            <option key={v.id ?? v.vehicleTypeId} value={v.id ?? v.vehicleTypeId}>{v.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterTimeType}
-          onChange={(e) => { setFilterTimeType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại thời gian</option>
-          <option value="HOURLY">Theo giờ</option>
-          <option value="DAILY">Theo ngày</option>
-          <option value="MONTHLY">Theo tháng</option>
-        </select>
-        <select
-          value={filterDayType}
-          onChange={(e) => { setFilterDayType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại ngày</option>
-          <option value="WEEKDAY">Ngày thường</option>
-          <option value="WEEKEND">Cuối tuần</option>
-          <option value="HOLIDAY">Ngày lễ</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="all">Tất cả trạng thái</option>
-          <option value="active">Đang bật</option>
-          <option value="inactive">Đã tắt</option>
-        </select>
-        {(filterVehicleType || filterTimeType || filterDayType || filterStatus !== "all") && (
-          <button
-            onClick={() => { setFilterVehicleType(""); setFilterTimeType(""); setFilterDayType(""); setFilterStatus("all"); setPage(1); }}
-            className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X size={12} /> Xóa lọc
-          </button>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground">{filteredPolicies.length} / {policies.length} chính sách</span>
-      </div>
-
-      <ManagerPanel title="Danh sách bảng giá" subtitle={`${filteredPolicies.length} bảng giá`}>
-        {filteredPolicies.length === 0 ? (
-          <ManagerEmptyState title="Chưa có bảng giá nào" description="Tạo bảng giá để hệ thống tính phí đặt chỗ và thanh toán." />
+      <ManagerPanel title="Pricing Directory" subtitle={`${policies.length} pricing records available`}>
+        {policies.length === 0 ? (
+          <ManagerEmptyState title="No pricing policies yet" description="Create a policy to prepare the pricing engine for bookings and payments." />
         ) : (
-          <ManagerDataTable columns={["Loại xe", "Loại thời gian", "Loại ngày", "Khung giờ", "Giá", "Trạng thái", "Thao tác"]} minRows={PAGE_SIZE}>
-            {pagedPolicies.map((item) => (
+          <ManagerDataTable columns={["Vehicle Type", "Time Type", "Day Type", "Hour Range", "Price", "Status", "Actions"]}>
+            {policies.map((item) => (
               <ManagerRow key={item.policyId}>
                 <ManagerCell>{vehicleTypeMap[item.vehicleTypeId] || item.vehicleTypeId}</ManagerCell>
-                <ManagerCell><ManagerStatusBadge tone="blue">{TIME_TYPE_LABELS[item.timeType] || item.timeType}</ManagerStatusBadge></ManagerCell>
-                <ManagerCell>{DAY_TYPE_LABELS[item.dayType] || item.dayType}</ManagerCell>
+                <ManagerCell><ManagerStatusBadge tone="blue">{item.timeType}</ManagerStatusBadge></ManagerCell>
+                <ManagerCell>{item.dayType}</ManagerCell>
                 <ManagerCell>{item.startHour ?? "-"} - {item.endHour ?? "-"}</ManagerCell>
                 <ManagerCell className="font-medium">{formatCurrency(item.pricePerHour)}</ManagerCell>
                 <ManagerCell>
-                  <ManagerStatusBadge tone={item.isActive ? "emerald" : "amber"}>{item.isActive ? "Đang bật" : "Đã tắt"}</ManagerStatusBadge>
+                  <ManagerStatusBadge tone={item.isActive ? "emerald" : "amber"}>{item.isActive ? "Active" : "Inactive"}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
                   <div className="flex gap-2">
-                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
-                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.policyId)}>Xóa</ManagerSecondaryButton>
+                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Edit</ManagerSecondaryButton>
+                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.policyId)}>Delete</ManagerSecondaryButton>
                   </div>
                 </ManagerCell>
               </ManagerRow>
             ))}
           </ManagerDataTable>
-        )}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              ← Trước
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button key={p} onClick={() => setPage(p)}
-                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              Sau →
-            </button>
-          </div>
         )}
       </ManagerPanel>
 
@@ -296,56 +203,56 @@ export default function PricingPolicyPage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{editingId ? "Cập nhật bảng giá" : "Thêm bảng giá"}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Thiết lập rõ ràng để đặt chỗ và báo cáo luôn nhất quán.</p>
+                <h3 className="text-lg font-semibold text-foreground">{editingId ? "Update Pricing Policy" : "Add Pricing Policy"}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Set billing logic clearly so bookings and reports stay consistent.</p>
               </div>
               <button type="button" onClick={handleCloseModal} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors">
                 <X size={18} />
               </button>
             </div>
             <ManagerForm onSubmit={handleSubmit}>
-              <ManagerField label="Loại xe">
+              <ManagerField label="Vehicle Type">
                 <ManagerSelect name="vehicleTypeId" value={form.vehicleTypeId} onChange={handleChange}>
-                  <option value="">Chọn loại xe</option>
+                  <option value="">Select vehicle type</option>
                   {vehicleTypes.map((item) => (
                     <option key={item.id ?? item.vehicleTypeId} value={item.id ?? item.vehicleTypeId}>{item.name}</option>
                   ))}
                 </ManagerSelect>
               </ManagerField>
               <div className="grid gap-4 md:grid-cols-2">
-                <ManagerField label="Loại thời gian">
+                <ManagerField label="Time Type">
                   <ManagerSelect name="timeType" value={form.timeType} onChange={handleChange}>
-                    <option value="HOURLY">Theo giờ</option>
-                    <option value="DAILY">Theo ngày</option>
-                    <option value="MONTHLY">Theo tháng</option>
+                    <option value="HOURLY">HOURLY</option>
+                    <option value="DAILY">DAILY</option>
+                    <option value="MONTHLY">MONTHLY</option>
                   </ManagerSelect>
                 </ManagerField>
-                <ManagerField label="Loại ngày">
+                <ManagerField label="Day Type">
                   <ManagerSelect name="dayType" value={form.dayType} onChange={handleChange}>
-                    <option value="WEEKDAY">Ngày thường</option>
-                    <option value="WEEKEND">Cuối tuần</option>
-                    <option value="HOLIDAY">Ngày lễ</option>
+                    <option value="WEEKDAY">WEEKDAY</option>
+                    <option value="WEEKEND">WEEKEND</option>
+                    <option value="HOLIDAY">HOLIDAY</option>
                   </ManagerSelect>
                 </ManagerField>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <ManagerField label="Giờ bắt đầu">
+                <ManagerField label="Start Hour">
                   <ManagerInput type="number" name="startHour" value={form.startHour} onChange={handleChange} placeholder="7" />
                 </ManagerField>
-                <ManagerField label="Giờ kết thúc">
+                <ManagerField label="End Hour">
                   <ManagerInput type="number" name="endHour" value={form.endHour} onChange={handleChange} placeholder="22" />
                 </ManagerField>
               </div>
-              <ManagerField label="Giá theo giờ">
+              <ManagerField label="Price Per Hour">
                 <ManagerInput type="number" name="pricePerHour" value={form.pricePerHour} onChange={handleChange} placeholder="20000" />
               </ManagerField>
               <label className="flex items-center gap-2 rounded-2xl border border-border bg-muted px-3 py-3 text-sm text-foreground">
                 <input type="checkbox" name="isActive" checked={form.isActive} onChange={handleChange} />
-                Đang áp dụng
+                Active policy
               </label>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{editingId ? "Lưu thay đổi" : "Tạo bảng giá"}</ManagerPrimaryButton>
-                <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Hủy</ManagerSecondaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">{editingId ? "Save Changes" : "Create Policy"}</ManagerPrimaryButton>
+                <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Cancel</ManagerSecondaryButton>
               </div>
             </ManagerForm>
           </div>

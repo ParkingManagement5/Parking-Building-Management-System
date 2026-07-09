@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Building2, Clock3, DoorOpen, Layers, MapPin, SquareParking } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
 import { gateApi } from "../../api/manager/gateApi";
@@ -7,138 +7,187 @@ import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { unwrapApiData } from "../../utils/api";
 
-function getBuildingId(item) { return item?.buildingId ?? item?.id; }
-function getFloorId(item) { return item?.floorId ?? item?.id; }
-function getZoneId(item) { return item?.zoneId ?? item?.id; }
-function getSettledData(result, fallback = []) {
-  return result?.status === "fulfilled" ? unwrapApiData(result.value?.data, fallback) : fallback;
+function getBuildingId(item) {
+  return item?.buildingId ?? item?.id;
 }
-function formatTime(value) { return value?.slice(0, 5) || "--:--"; }
 
-const card = { background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 24 };
+function getFloorId(item) {
+  return item?.floorId ?? item?.id;
+}
+
+function getZoneId(item) {
+  return item?.zoneId ?? item?.id;
+}
+
+function getSettledData(result, fallback = []) {
+  if (result?.status !== "fulfilled") {
+    return fallback;
+  }
+
+  return unwrapApiData(result.value?.data, fallback);
+}
+
+function formatTime(value) {
+  return value?.slice(0, 5) || "--:--";
+}
 
 export default function ParkingInfoPage() {
-  const navigate = useNavigate();
   const [buildings, setBuildings] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    async function loadBuildings() {
       try {
         const res = await buildingApi.getAll();
-        const list = unwrapApiData(res.data, []);
-        const summaries = await Promise.all(list.map(async (b) => {
-          const bid = getBuildingId(b);
-          const [floorRes, gateRes] = await Promise.allSettled([floorApi.getByBuilding(bid), gateApi.getByBuilding(bid)]);
-          const floors = getSettledData(floorRes); const gates = getSettledData(gateRes);
-          const zoneRes = await Promise.allSettled(floors.map((f) => zoneApi.getByFloor(getFloorId(f))));
-          const zones = zoneRes.flatMap((r) => getSettledData(r));
-          const slotRes = await Promise.allSettled(zones.map((z) => parkingSlotApi.getByZone(getZoneId(z))));
-          const slots = slotRes.flatMap((r) => getSettledData(r));
-          return { ...b, id: bid, floorCount: floors.length, gateCount: gates.length, slotCount: slots.length,
-            availableSlots: slots.filter((s) => String(s.status || "").toUpperCase() === "AVAILABLE").length };
-        }));
-        if (!cancelled) setBuildings(summaries);
-      } catch { if (!cancelled) setBuildings([]); }
-      finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
+        const buildingList = unwrapApiData(res.data, []);
+
+        const summaryList = await Promise.all(
+          buildingList.map(async (building) => {
+            const buildingId = getBuildingId(building);
+            const [floorRes, gateRes] = await Promise.allSettled([
+              floorApi.getByBuilding(buildingId),
+              gateApi.getByBuilding(buildingId),
+            ]);
+
+            const floors = getSettledData(floorRes, []);
+            const gates = getSettledData(gateRes, []);
+
+            const zoneResponses = await Promise.allSettled(
+              floors.map((floor) => zoneApi.getByFloor(getFloorId(floor)))
+            );
+            const zones = zoneResponses.flatMap((response) => getSettledData(response, []));
+
+            const slotResponses = await Promise.allSettled(
+              zones.map((zone) => parkingSlotApi.getByZone(getZoneId(zone)))
+            );
+            const slots = slotResponses.flatMap((response) => getSettledData(response, []));
+
+            const availableSlots = slots.filter(
+              (slot) => String(slot.status || "").toUpperCase() === "AVAILABLE"
+            ).length;
+
+            return {
+              ...building,
+              id: buildingId,
+              floorCount: floors.length,
+              gateCount: gates.length,
+              slotCount: slots.length,
+              availableSlots,
+            };
+          })
+        );
+
+        if (!cancelled) {
+          setBuildings(summaryList);
+        }
+      } catch (error) {
+        console.error("Failed to load parking info", error);
+        if (!cancelled) {
+          setBuildings([]);
+        }
+      }
+    }
+
+    void loadBuildings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
-          Thông tin bãi đỗ xe
-        </h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginTop: 6 }}>
-          Danh sách các tòa nhà bãi đỗ xe trong hệ thống — dữ liệu realtime từ backend
-        </p>
-      </div>
-
-      {loading && (
-        <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-          <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>Đang tải dữ liệu...</p>
-        </div>
-      )}
-
-      {!loading && buildings.length === 0 && (
-        <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Chưa có tòa nhà nào trong hệ thống.</p>
-        </div>
-      )}
-
-      {/* Building cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {buildings.map((item) => (
-          <div key={item.id} style={{ ...card }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 20 }}>
-              <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--text)" }}>{item.name}</h2>
-                <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginTop: 4 }}>
-                  📍 {item.address || "Chưa có địa chỉ"}
-                </p>
-              </div>
-              <span style={{
-                padding: "5px 14px", borderRadius: 100, fontSize: "0.75rem", fontWeight: 600,
-                background: item.isActive !== false ? "var(--accent-dim)" : "rgba(100,100,100,0.1)",
-                color: item.isActive !== false ? "var(--accent)" : "var(--text-muted)",
-              }}>
-                {item.isActive !== false ? "Đang hoạt động" : "Tạm đóng"}
-              </span>
+    <div className="min-h-screen bg-background">
+      <section className="border-b border-border bg-gradient-to-br from-sky-50 via-background to-emerald-50/40">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <div className="max-w-2xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+              <Building2 size={12} />
+              Public Parking Directory
             </div>
+            <h1 className="text-4xl font-bold text-foreground">Parking Information</h1>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Browse the parking buildings currently available in the system, together with live capacity-related data coming from the backend.
+            </p>
+          </div>
+        </div>
+      </section>
 
-            {/* Stats grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
-              {[
-                { label: "Tầng", value: item.floorCount, color: "var(--text)" },
-                { label: "Cổng", value: item.gateCount, color: "var(--text)" },
-                { label: "Tổng slot", value: item.slotCount, color: "var(--text)" },
-                { label: "Trống", value: item.availableSlots, color: "var(--accent)" },
-              ].map((s) => (
-                <div key={s.label} style={{
-                  background: s.label === "Trống" ? "var(--accent-dim)" : "var(--bg-section)",
-                  borderRadius: "var(--radius-sm)", padding: "14px 16px",
-                }}>
-                  <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: 4 }}>{s.label}</p>
-                  <p style={{ fontSize: "1.4rem", fontWeight: 700, color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
+      <section className="py-12">
+        <div className="mx-auto max-w-6xl px-6">
+          {buildings.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-border bg-card px-6 py-12 text-center">
+              <p className="text-base font-medium text-foreground">No parking buildings available</p>
+              <p className="mt-2 text-sm text-muted-foreground">The backend did not return any public building data.</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {buildings.map((item) => (
+                <div key={item.id} className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+                  <div className="mb-5 flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-foreground">{item.name}</h2>
+                      <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                        <MapPin size={15} className="mt-0.5 shrink-0" />
+                        <span>{item.address || "No address"}</span>
+                      </div>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.isActive !== false ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+                      {item.isActive !== false ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl bg-muted/30 p-4">
+                      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                        <Layers size={14} />
+                        <span className="text-xs">Floors</span>
+                      </div>
+                      <p className="text-xl font-bold text-foreground">{item.floorCount}</p>
+                    </div>
+                    <div className="rounded-2xl bg-muted/30 p-4">
+                      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                        <DoorOpen size={14} />
+                        <span className="text-xs">Gates</span>
+                      </div>
+                      <p className="text-xl font-bold text-foreground">{item.gateCount}</p>
+                    </div>
+                    <div className="rounded-2xl bg-muted/30 p-4">
+                      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                        <SquareParking size={14} />
+                        <span className="text-xs">Slots</span>
+                      </div>
+                      <p className="text-xl font-bold text-foreground">{item.slotCount}</p>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-50 p-4">
+                      <div className="mb-2 flex items-center gap-2 text-emerald-700">
+                        <SquareParking size={14} />
+                        <span className="text-xs">Available</span>
+                      </div>
+                      <p className="text-xl font-bold text-emerald-700">{item.availableSlots}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Clock3 size={15} />
+                      <span>
+                        {formatTime(item.openTime)} - {formatTime(item.closeTime)}
+                      </span>
+                    </div>
+                    {item.phone ? <span>{item.phone}</span> : null}
+                    {item.email ? <span>{item.email}</span> : null}
+                  </div>
+
+                  {item.description ? (
+                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
-
-            {/* Footer info */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 20, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              <span>🕐 {formatTime(item.openTime)} - {formatTime(item.closeTime)}</span>
-              {item.phone && <span>📞 {item.phone}</span>}
-              {item.email && <span>✉ {item.email}</span>}
-            </div>
-
-            {item.description && (
-              <p style={{ marginTop: 12, fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                {item.description}
-              </p>
-            )}
-
-            {/* Action */}
-            <div style={{ marginTop: 16 }}>
-              <button onClick={() => navigate("/public-slots")}
-                style={{
-                  padding: "10px 20px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--accent)",
-                  background: "transparent", color: "var(--accent)", fontWeight: 600, fontSize: "0.85rem",
-                  cursor: "pointer", fontFamily: "inherit", transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.color = "#000"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--accent)"; }}
-              >
-                Xem slot trống →
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

@@ -4,13 +4,11 @@ import com.swp391.parking.dto.request.GateRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.Gate.GateType;
-import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.service.GateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,13 +19,6 @@ import java.util.List;
 public class GateController {
 
     private final GateService gateService;
-    private final GateRepository gateRepository;
-
-    @GetMapping("/all")
-    @Transactional(readOnly = true)
-    public ResponseEntity<ApiResponse<List<Gate>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(gateRepository.findAll()));
-    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<Gate>>> getByBuilding(@RequestParam Long buildingId) {

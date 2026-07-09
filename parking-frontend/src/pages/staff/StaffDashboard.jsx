@@ -1,101 +1,71 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Bell, CreditCard, LogIn, ShieldAlert } from "lucide-react";
+import {
+  Bell,
+  Building2,
+  Clock3,
+  CreditCard,
+  LogIn,
+  MessageSquare,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 import { notificationApi } from "../../api/notificationApi";
+import { buildingApi } from "../../api/manager/buildingApi";
 import { staffShiftApi } from "../../api/manager/staffShiftApi";
-import { requestApi } from "../../api/driver/requestApi";
-import { ocrApi } from "../../api/staff/ocrApi";
-import { exceptionApi } from "../../api/staff/exceptionApi";
-import { sessionApi } from "../../api/staff/sessionApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
-import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
-import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
-import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
-import { StaffEmptyState, StaffPageSection, StaffStatCard, StaffStatusBadge } from "./StaffUi";
+import {
+  formatStaffCurrency,
+  formatStaffDateTime,
+  getStaffPortalState,
+} from "./staffPortalState";
+import {
+  StaffEmptyState,
+  StaffPageSection,
+  StaffStatCard,
+  StaffStatusBadge,
+} from "./StaffUi";
 
-function formatElapsed(entryTime) {
-  if (!entryTime) return "--";
-  const ms = Date.now() - new Date(entryTime).getTime();
-  if (!Number.isFinite(ms) || ms < 0) return "--";
-  const totalMinutes = Math.floor(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return hours > 0 ? `${hours}h ${minutes}p` : `${minutes}p`;
-}
-
-function settledData(result, failures, fallback = [], widgetName = "widget") {
-  if (result.status !== "fulfilled") {
-    console.warn(`Dashboard ${widgetName} failed:`, result.reason);
-    failures.push(widgetName);
-    return fallback;
-  }
-  return unwrapApiData(result.value.data, fallback);
+function activityTone(type) {
+  if (type === "entry") return "emerald";
+  if (type === "payment") return "violet";
+  if (type === "exception") return "rose";
+  return "blue";
 }
 
 export default function StaffDashboard() {
-  const navigate = useNavigate();
   const userId = getUserId();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notifications, setNotifications] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [staffShifts, setStaffShifts] = useState([]);
-  const [activeSessions, setActiveSessions] = useState([]);
-  const [waitingPayments, setWaitingPayments] = useState([]);
-  const [openRequests, setOpenRequests] = useState([]);
-  const [ocrReviews, setOcrReviews] = useState([]);
-  const [openExceptions, setOpenExceptions] = useState([]);
-  const [pricingPolicies, setPricingPolicies] = useState([]);
-  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [portalState, setPortalState] = useState(() => getStaffPortalState());
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadDashboard() {
       setLoading(true);
-      setError("");
       try {
-        const [
-          shiftRes,
-          notificationRes,
-          activeSessionRes,
-          waitingPaymentRes,
-          requestRes,
-          ocrRes,
-          exceptionRes,
-          pricingRes,
-          vehicleTypeRes,
-        ] = await Promise.allSettled([
+        const [buildingRes, shiftRes, notificationRes] = await Promise.all([
+          buildingApi.getAll(),
           userId ? staffShiftApi.getByUser(userId) : Promise.resolve({ data: [] }),
           userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
-          sessionApi.getSessions({ status: "ACTIVE" }),
-          sessionApi.getSessions({ status: "WAITING_PAYMENT" }),
-          requestApi.getByStatus("OPEN"),
-          ocrApi.getPendingReviews(),
-          exceptionApi.getByStatus("OPEN"),
-          pricingPolicyApi.getAll(),
-          vehicleTypeApi.getAll(),
         ]);
 
         if (cancelled) return;
 
-        const failures = [];
-        setStaffShifts(settledData(shiftRes, failures, [], "shifts"));
-        setNotifications(settledData(notificationRes, failures, [], "notifications"));
-        setActiveSessions(settledData(activeSessionRes, failures, [], "active sessions"));
-        setWaitingPayments(settledData(waitingPaymentRes, failures, [], "payments"));
-        setOpenRequests(settledData(requestRes, failures, [], "requests"));
-        setOcrReviews(settledData(ocrRes, failures, [], "OCR reviews"));
-        setOpenExceptions(settledData(exceptionRes, failures, [], "exceptions"));
-        setPricingPolicies(settledData(pricingRes, failures, [], "pricing"));
-        setVehicleTypes(settledData(vehicleTypeRes, failures, [], "vehicle types"));
-        if (failures.length > 0) {
-          setError(`Some widgets failed to load: ${failures.join(", ")}. Data shown may be incomplete.`);
-        }
-      } catch (err) {
-        console.error("Load staff dashboard failed:", err);
+        setBuildings(unwrapApiData(buildingRes.data, []));
+        setStaffShifts(Array.isArray(shiftRes.data) ? shiftRes.data : []);
+        setNotifications(unwrapApiData(notificationRes.data, []));
+        setPortalState(getStaffPortalState());
+      } catch (error) {
+        console.error("Load staff dashboard failed:", error);
         if (!cancelled) {
-          setError(err.response?.data?.message || "Khong tai duoc staff dashboard.");
+          setBuildings([]);
+          setStaffShifts([]);
+          setNotifications([]);
+          setPortalState(getStaffPortalState());
         }
       } finally {
         if (!cancelled) {
@@ -111,18 +81,25 @@ export default function StaffDashboard() {
     };
   }, [userId]);
 
-  function resolveHourlyRate(session) {
-    const policy = pricingPolicies.find(
-      (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
-    );
-    return Number(policy?.pricePerHour ?? 20000);
-  }
-
-  const pendingAmount = useMemo(
-    () => waitingPayments.reduce((sum, item) => sum + computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)), 0),
-    [waitingPayments, pricingPolicies]
+  const activeSessions = useMemo(
+    () => portalState.sessions.filter((item) => item.status === "ACTIVE"),
+    [portalState.sessions]
   );
-
+  const pendingRequests = useMemo(
+    () => portalState.requests.filter((item) => item.status === "PENDING"),
+    [portalState.requests]
+  );
+  const openExceptions = useMemo(
+    () => portalState.exceptions.filter((item) => item.status === "OPEN"),
+    [portalState.exceptions]
+  );
+  const todayRevenue = useMemo(
+    () =>
+      portalState.payments
+        .filter((item) => item.status === "PAID")
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    [portalState.payments]
+  );
   const upcomingShifts = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return staffShifts
@@ -130,181 +107,200 @@ export default function StaffDashboard() {
       .sort((a, b) => String(a.workingDate).localeCompare(String(b.workingDate)))
       .slice(0, 4);
   }, [staffShifts]);
-
-  const recentActivity = useMemo(() => {
-    const sessionActivities = activeSessions.slice(0, 4).map((item) => ({
-      id: `session-${item.sessionId}`,
-      plate: item.licensePlate,
-      action: `Entered slot ${item.slotCode}`,
-      type: "entry",
-      time: item.entryTime,
-    }));
-    const paymentActivities = waitingPayments.slice(0, 3).map((item) => ({
-      id: `payment-${item.sessionId}`,
-      plate: item.licensePlate,
-      action: `Waiting payment ${formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}`,
-      type: "payment",
-      time: item.exitTime || item.entryTime,
-    }));
-    const ocrActivities = ocrReviews.slice(0, 3).map((item) => ({
-      id: `ocr-${item.scanId}`,
-      plate: item.detectedPlate || "UNKNOWN",
-      action: "OCR scan needs staff review",
-      type: "exception",
-      time: item.scannedAt,
-    }));
-
-    return [...sessionActivities, ...paymentActivities, ...ocrActivities]
-      .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
-      .slice(0, 6);
-  }, [activeSessions, waitingPayments, ocrReviews, pricingPolicies]);
+  const recentActivity = useMemo(
+    () =>
+      [...portalState.activity]
+        .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
+        .slice(0, 6),
+    [portalState.activity]
+  );
 
   return (
     <div className="space-y-5">
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-          {error}
-        </div>
-      ) : null}
-
-      {/* KPI nhanh */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StaffStatCard icon={LogIn} label="Xe dang trong bai" value={activeSessions.length} hint="Phien dang ACTIVE" tone="emerald" />
-        <StaffStatCard icon={CreditCard} label="Cho thanh toan" value={waitingPayments.length} hint="Xe da ra, chua thu tien" tone="amber" />
-        <StaffStatCard icon={CreditCard} label="Tong tien cho thu" value={formatStaffCurrency(pendingAmount)} hint={`${waitingPayments.length} phien dang cho`} tone="violet" />
         <StaffStatCard
-          icon={ShieldAlert}
-          label="Su co can xu ly"
-          value={openExceptions.length + ocrReviews.length}
-          hint="Exception + OCR review — bam de xu ly"
-          tone="rose"
-          onClick={() => navigate("/staff/exceptions")}
+          icon={Users}
+          label="My Shifts"
+          value={staffShifts.length}
+          hint="Assignments from staff shift API"
+          tone="blue"
+        />
+        <StaffStatCard
+          icon={Clock3}
+          label="Current Sessions"
+          value={activeSessions.length}
+          hint="Live sessions being monitored"
+          tone="emerald"
+        />
+        <StaffStatCard
+          icon={MessageSquare}
+          label="Pending Requests"
+          value={pendingRequests.length}
+          hint="Requests waiting for staff handling"
+          tone="amber"
+        />
+        <StaffStatCard
+          icon={CreditCard}
+          label="Revenue Today"
+          value={formatStaffCurrency(todayRevenue)}
+          hint="Completed local payment records"
+          tone="violet"
         />
       </div>
 
-      {/* Trong tam 1: xe dang trong bai (chi tiet) + bang gia xe (tra cuu nhanh) */}
-      <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <StaffPageSection
-          title="Xe dang trong bai"
-          subtitle="Phien dang hoat dong — bien so, slot, gio vao va phi tam tinh"
-          action={
-            <button type="button" onClick={() => navigate("/staff/sessions")} className="text-xs font-medium text-primary hover:underline">
-              Xem tat ca &rarr;
-            </button>
-          }
+          title="Today's Activity Feed"
+          subtitle="Entry, payment, and exception actions are summarized here"
         >
-          {activeSessions.length === 0 ? (
-            <StaffEmptyState title="Chua co xe nao" description="Xe vao bai qua Scan se hien o day." />
-          ) : (
-            <div className="space-y-3">
-              {activeSessions.slice(0, 6).map((item) => (
-                <div key={item.sessionId} className="rounded-2xl border border-border px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-semibold text-foreground">{item.licensePlate}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Slot {item.slotCode} • {item.vehicleTypeName || "—"}
-                      </p>
-                    </div>
-                    <StaffStatusBadge tone="emerald">{formatElapsed(item.entryTime)}</StaffStatusBadge>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Vao luc {formatStaffDateTime(item.entryTime)}</span>
-                    <span className="font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </StaffPageSection>
-
-        <StaffPageSection title="Bang gia xe" subtitle="Gia theo gio / loai xe">
-          {vehicleTypes.length === 0 ? (
-            <StaffEmptyState title="Chua co loai xe" description="Manager chua cau hinh loai xe active." />
-          ) : (
-            <div className="space-y-2">
-              {vehicleTypes.map((t) => (
-                <div key={t.id} className="flex items-center justify-between gap-3 rounded-2xl bg-muted/30 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">Slot {t.slotSize}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-foreground">{formatStaffCurrency(t.hourlyRate)}/h</p>
-                    {t.dailyRate ? <p className="text-xs text-muted-foreground">{formatStaffCurrency(t.dailyRate)}/ngay</p> : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </StaffPageSection>
-      </div>
-
-      {/* Trong tam 2: hang cho thanh toan (chi tiet) + hoat dong gan day (rut gon) */}
-      <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
-        <StaffPageSection
-          title="Hang cho thanh toan"
-          subtitle="Xe da ra cong, can thu tien"
-          action={
-            <button type="button" onClick={() => navigate("/staff/payments")} className="text-xs font-medium text-primary hover:underline">
-              Xem tat ca &rarr;
-            </button>
-          }
-        >
-          {waitingPayments.length === 0 ? (
-            <StaffEmptyState title="Khong co khoan cho thu" description="Xe se xuat hien o day sau khi qua cong ra." tone="success" />
-          ) : (
-            <div className="space-y-3">
-              {waitingPayments.slice(0, 5).map((item) => {
-                const rate = resolveHourlyRate(item);
-                const fee = computeSessionFee(item.entryTime, new Date(), rate);
-                return (
-                  <button
-                    key={item.sessionId}
-                    type="button"
-                    onClick={() => navigate("/staff/payments")}
-                    className="w-full rounded-2xl border border-border px-4 py-3 text-left transition-colors hover:bg-muted"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Slot {item.slotCode} • {formatStaffCurrency(rate)}/h • {item.vehicleTypeName || "—"}
-                        </p>
-                      </div>
-                      <StaffStatusBadge tone="amber">cho thu</StaffStatusBadge>
-                    </div>
-                    <p className="mt-2 text-sm font-bold text-foreground">{formatStaffCurrency(fee)}</p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </StaffPageSection>
-
-        <StaffPageSection title="Hoat dong gan day" subtitle="Vao/ra/thanh toan/OCR moi nhat">
           {recentActivity.length === 0 ? (
-            <StaffEmptyState title="Chua co hoat dong" description="Xu ly entry/exit/OCR se hien o day." />
+            <StaffEmptyState
+              title="No activity recorded"
+              description="Process entry, exit, or OCR actions to populate the live feed."
+            />
           ) : (
-            <div className="space-y-2">
-              {recentActivity.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center gap-3 rounded-2xl bg-muted/20 px-3 py-2.5">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-background shadow-sm">
+            <div className="space-y-3">
+              {recentActivity.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-4 rounded-2xl border border-border bg-muted/20 px-4 py-3"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm">
                     {item.type === "entry" ? (
-                      <LogIn size={14} className="text-emerald-600" />
+                      <LogIn size={16} className="text-emerald-600" />
                     ) : item.type === "payment" ? (
-                      <CreditCard size={14} className="text-violet-600" />
+                      <CreditCard size={16} className="text-violet-600" />
                     ) : item.type === "exception" ? (
-                      <ShieldAlert size={14} className="text-rose-600" />
+                      <ShieldAlert size={16} className="text-rose-600" />
                     ) : (
-                      <Bell size={14} className="text-blue-600" />
+                      <Bell size={16} className="text-blue-600" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-foreground">{item.plate}</p>
-                    <p className="truncate text-xs text-muted-foreground">{item.action}</p>
+                    <p className="text-sm font-semibold text-foreground">{item.plate}</p>
+                    <p className="truncate text-sm text-muted-foreground">{item.action}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">{formatStaffDateTime(item.time)}</span>
+                  <div className="text-right">
+                    <StaffStatusBadge tone={activityTone(item.type)}>{item.type}</StaffStatusBadge>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatStaffDateTime(item.time)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </StaffPageSection>
+
+        <StaffPageSection
+          title="Operations Snapshot"
+          subtitle="Real notifications and locally tracked issues in one view"
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">Unread Notifications</p>
+                <p className="mt-1 text-2xl font-bold text-foreground">
+                  {notifications.filter((item) => !item.isRead).length}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">Open Exceptions</p>
+                <p className="mt-1 text-2xl font-bold text-foreground">{openExceptions.length}</p>
+              </div>
+              <div className="rounded-2xl bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">Buildings</p>
+                <p className="mt-1 text-2xl font-bold text-foreground">{buildings.length}</p>
+              </div>
+              <div className="rounded-2xl bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">QR Logs</p>
+                <p className="mt-1 text-2xl font-bold text-foreground">{portalState.qrLogs.length}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Building2 size={16} className="text-primary" />
+                <p className="text-sm font-semibold text-foreground">Upcoming Shift Coverage</p>
+              </div>
+              {upcomingShifts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No shift assignment found for this account.</p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingShifts.map((item) => (
+                    <div key={item.staffShiftId} className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{item.shiftName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatStaffDateTime(`${item.workingDate}T00:00:00`)}
+                        </p>
+                      </div>
+                      <StaffStatusBadge tone="blue">
+                        {item.startTime} - {item.endTime}
+                      </StaffStatusBadge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </StaffPageSection>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <StaffPageSection title="Active Sessions" subtitle="Current on-site vehicle sessions">
+          {activeSessions.length === 0 ? (
+            <StaffEmptyState
+              title="No active sessions"
+              description="Processed entries will appear here automatically."
+            />
+          ) : (
+            <div className="space-y-3">
+              {activeSessions.slice(0, 5).map((item) => (
+                <div key={item.sessionId} className="rounded-2xl border border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{item.sessionId}</p>
+                      <p className="text-base font-semibold text-foreground">{item.licensePlate}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.gateName} • {item.slotCode}
+                      </p>
+                    </div>
+                    <StaffStatusBadge tone="emerald">{item.paymentStatus}</StaffStatusBadge>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{formatStaffDateTime(item.entryTime)}</span>
+                    <span className="font-semibold text-foreground">
+                      {formatStaffCurrency(item.feeAmount)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </StaffPageSection>
+
+        <StaffPageSection title="Pending Requests" subtitle="Requests that still need staff resolution">
+          {pendingRequests.length === 0 ? (
+            <StaffEmptyState
+              title="No pending requests"
+              description="Driver support requests will show here when they arrive."
+              tone="success"
+            />
+          ) : (
+            <div className="space-y-3">
+              {pendingRequests.slice(0, 5).map((item) => (
+                <div key={item.requestId} className="rounded-2xl border border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{item.type}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.requestId} • {item.driverName} • {item.licensePlate}
+                      </p>
+                    </div>
+                    <StaffStatusBadge tone={item.priority === "HIGH" ? "rose" : "amber"}>
+                      {item.priority.toLowerCase()}
+                    </StaffStatusBadge>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{item.content}</p>
                 </div>
               ))}
             </div>
@@ -312,44 +308,7 @@ export default function StaffDashboard() {
         </StaffPageSection>
       </div>
 
-      {/* Thong tin phu — gom lai thanh 1 dai gon, khong chiem rieng section lon */}
-      <StaffPageSection title="Khac" subtitle="Ca lam, yeu cau ho tro, thong bao">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground">Ca lam sap toi</p>
-            {upcomingShifts[0] ? (
-              <>
-                <p className="mt-1 text-sm font-semibold text-foreground">{upcomingShifts[0].shiftName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatStaffDateTime(`${upcomingShifts[0].workingDate}T00:00:00`)} • {upcomingShifts[0].startTime}-{upcomingShifts[0].endTime}
-                </p>
-              </>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Chua co ca duoc gan.</p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => navigate("/staff/requests")}
-            className="rounded-2xl bg-muted/30 p-4 text-left transition-colors hover:bg-muted"
-          >
-            <p className="text-xs text-muted-foreground">Yeu cau ho tro mo</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{openRequests.length}</p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate("/staff/notifications")}
-            className="rounded-2xl bg-muted/30 p-4 text-left transition-colors hover:bg-muted"
-          >
-            <p className="text-xs text-muted-foreground">Thong bao chua doc</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">{notifications.filter((item) => !item.isRead).length}</p>
-          </button>
-        </div>
-      </StaffPageSection>
-
-      {loading ? <p className="text-sm text-muted-foreground">Dang tai staff dashboard...</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Loading staff dashboard...</p> : null}
     </div>
   );
 }

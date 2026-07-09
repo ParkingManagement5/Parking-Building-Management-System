@@ -1,339 +1,302 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  Clock,
-  Car,
-  LoaderCircle,
-  MapPin,
-  SquareParking,
-  History,
-} from "lucide-react";
+import { Check, CheckCircle2, MapPin } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
-import { paymentApi } from "../../api/driver/paymentApi";
 import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../ui/components/ui/select";
 import { unwrapApiData } from "../../utils/api";
 
-function slotClasses(status, active) {
-  if (active) return "bg-primary text-primary-foreground shadow-md shadow-primary/20 ring-2 ring-primary/40";
-  if (status === "occupied") return "bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400";
-  if (status === "reserved") return "bg-amber-400 text-white cursor-not-allowed dark:bg-amber-500/80";
-  return "bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-500/80 dark:hover:bg-emerald-400/90";
-}
+const BUILDING_OPTIONS = [
+  { id: "central-tower", name: "Central Tower", available: 120 },
+  { id: "north-plaza", name: "North Plaza", available: 120 },
+  { id: "east-wing", name: "East Wing", available: 120 },
+  { id: "west-gate", name: "West Gate", available: 120 },
+];
 
-function formatDateTime(value) {
-  if (!value) return "--";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString("vi-VN");
-}
+const FLOOR_OPTIONS = [
+  "B1 - Basement 1",
+  "G - Ground",
+  "1F - Floor 1",
+  "2F - Floor 2",
+  "3F - Floor 3",
+];
 
-function formatLocalDateTime(value) {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${value.getFullYear()}-${p(value.getMonth() + 1)}-${p(value.getDate())}T${p(value.getHours())}:${p(value.getMinutes())}:${p(value.getSeconds())}`;
-}
+const ZONE_OPTIONS = ["Zone A", "Zone B", "Zone C", "Zone D"];
 
-function getErrorMessage(error, fallback) {
-  return error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback;
-}
+function QRCodeMock({ value }) {
+  const grid = Array.from({ length: 10 }, (_, row) =>
+    Array.from({ length: 10 }, (_, col) => ((row * 3 + col * 7 + row * col) % 3) === 0)
+  );
 
-function isOpenBooking(b) {
-  const s = String(b?.status || b?.bookingStatus || "").toUpperCase();
-  const qrUsed = b?.qrUsed === true || Boolean(b?.qrUsedAt);
-  const exp = b?.expiredAt || b?.bookingEndTime;
-  const expiresAt = exp ? new Date(exp).getTime() : null;
-  return s === "PENDING_PAYMENT" || (s === "CONFIRMED" && !qrUsed && !(Number.isFinite(expiresAt) && expiresAt < Date.now()));
-}
-
-function isVehicleBlockingBooking(b) {
-  const s = String(b?.status || b?.bookingStatus || "").toUpperCase();
-  return isOpenBooking(b) || s === "CHECKED_IN" || s === "WAITING_PAYMENT";
-}
-
-const vnd = (v) => new Intl.NumberFormat("vi-VN").format(v ?? 0);
-
-const alertStyles = {
-  error: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200",
-  warn: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200",
-};
-function AlertBox({ variant = "error", children }) {
-  if (!children) return null;
   return (
-    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${alertStyles[variant]}`}>
-      <AlertCircle size={16} className="mt-0.5 shrink-0" /><span>{children}</span>
+    <div className="p-3 bg-white inline-block rounded-xl border border-border">
+      <div
+        className="grid gap-0.5"
+        style={{ gridTemplateColumns: "repeat(10, 1fr)", width: 100 }}
+      >
+        {grid.flat().map((filled, index) => (
+          <div
+            key={index}
+            className={filled ? "bg-slate-800 aspect-square" : "bg-white aspect-square"}
+            style={{ width: 9, height: 9 }}
+          />
+        ))}
+      </div>
+      <p className="text-[9px] text-muted-foreground text-center mt-1 font-mono">{value}</p>
     </div>
   );
 }
 
-const STEP_LABELS = ["Chọn vị trí", "Thời gian", "Xác nhận"];
+function buildFallbackSlots() {
+  const statuses = [
+    "available",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "reserved",
+    "available",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "reserved",
+    "available",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "reserved",
+    "available",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "occupied",
+    "available",
+    "available",
+    "reserved",
+  ];
+
+  return Array.from({ length: 40 }, (_, index) => {
+    const row = String.fromCharCode(65 + Math.floor(index / 8));
+    const col = String(index % 8 + 1).padStart(2, "0");
+    return {
+      uiId: `${row}${col}`,
+      slotCode: `${row}${col}`,
+      status: statuses[index] || "available",
+      floor: FLOOR_OPTIONS[Math.floor(index / 8)] || FLOOR_OPTIONS[0],
+      zone: ZONE_OPTIONS[index % ZONE_OPTIONS.length],
+      building: BUILDING_OPTIONS[0].name,
+      source: "ui-fallback",
+    };
+  });
+}
+
+function slotClasses(status, active) {
+  if (active) {
+    return "bg-[#5B4AE6] text-white shadow-md shadow-indigo-200";
+  }
+
+  if (status === "occupied") {
+    return "bg-[#EE7991] text-white cursor-not-allowed";
+  }
+
+  if (status === "reserved") {
+    return "bg-[#F8C933] text-white cursor-not-allowed";
+  }
+
+  return "bg-[#6BD4A5] text-white hover:brightness-95";
+}
 
 export default function BookingPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const preselectBuildingName = location.state?.buildingName || "";
-
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
-  const [myBookings, setMyBookings] = useState([]);
   const [backendSlots, setBackendSlots] = useState([]);
-  const [loadingVehicles, setLoadingVehicles] = useState(true);
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [loadError, setLoadError] = useState("");
-  const [submitError, setSubmitError] = useState("");
-  const [conflictLock, setConflictLock] = useState(null);
+  const [createMode, setCreateMode] = useState("pending");
   const [confirmation, setConfirmation] = useState(null);
-  const [bookingStart, setBookingStart] = useState(() => { const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0); return d; });
-  const [selection, setSelection] = useState({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
-  const [payingDeposit, setPayingDeposit] = useState(false);
-  const [depositPaid, setDepositPaid] = useState(false);
-  const [payError, setPayError] = useState("");
+  const [selection, setSelection] = useState({
+    building: "",
+    floor: "",
+    zone: "",
+    slotCode: "",
+    slotId: "",
+    vehicleId: "",
+  });
 
   useEffect(() => {
-    (async () => {
-      setLoadingVehicles(true);
-      setLoadError("");
+    async function loadData() {
       try {
-        const [vehiclesRes, bookingsRes] = await Promise.all([
+        const [vehiclesRes, slotsRes] = await Promise.all([
           driverVehicleApi.getMyVehicles(),
-          bookingApi.getMyBookings(),
+          bookingApi.getAvailableSlots(),
         ]);
+
         setVehicles(unwrapApiData(vehiclesRes.data, []));
-        setMyBookings(unwrapApiData(bookingsRes.data, []));
-      } catch {
-        setVehicles([]);
-        setMyBookings([]);
-        setLoadError("Không tải được danh sách xe của bạn.");
-      } finally {
-        setLoadingVehicles(false);
+        setBackendSlots(unwrapApiData(slotsRes.data, []));
+        setCreateMode("ready");
+      } catch (error) {
+        console.error("Failed to load booking sources", error);
+        setCreateMode("scaffold");
       }
-    })();
+    }
+
+    void loadData();
   }, []);
 
+  const slotGrid = useMemo(() => {
+    if (backendSlots.length === 0) {
+      return buildFallbackSlots().filter((item) => {
+        const floorOk = !selection.floor || item.floor === selection.floor;
+        const zoneOk = !selection.zone || item.zone === selection.zone;
+        return floorOk && zoneOk;
+      });
+    }
+
+    return backendSlots.map((item, index) => ({
+      uiId: item.id || item.slotId || `${index}`,
+      slotId: item.id || item.slotId || "",
+      slotCode: item.slotCode || `S${index + 1}`,
+      status: String(item.status || "available").toLowerCase(),
+      floor: item.zone?.floor?.name || selection.floor || FLOOR_OPTIONS[0],
+      zone: item.zone?.name || selection.zone || ZONE_OPTIONS[0],
+      building:
+        item.zone?.floor?.building?.name || selection.building || BUILDING_OPTIONS[0].name,
+      source: "backend",
+    }));
+  }, [backendSlots, selection.floor, selection.zone, selection.building]);
+
   const selectedVehicle = useMemo(
-    () => vehicles.find((v) => String(v.vehicleId || v.id) === String(selection.vehicleId)),
-    [vehicles, selection.vehicleId],
+    () =>
+      vehicles.find(
+        (item) => String(item.vehicleId || item.id) === String(selection.vehicleId)
+      ),
+    [vehicles, selection.vehicleId]
   );
 
-  const vehiclesWithStatus = useMemo(() => {
-    return vehicles.map((v) => {
-      const vid = v.vehicleId || v.id;
-      const active = myBookings.find((b) => String(b.vehicleId || b.vehicle?.id) === String(vid) && isVehicleBlockingBooking(b));
-      const conflict = String(conflictLock?.vehicleId || "") === String(vid) ? conflictLock : null;
-      return { ...v, vehicleId: vid, activeBooking: active || conflict, isLocked: Boolean(active || conflict) };
-    });
-  }, [conflictLock, vehicles, myBookings]);
-
-  useEffect(() => {
-    if (!selectedVehicle) { setBackendSlots([]); return; }
-    const vtId = selectedVehicle.vehicleType?.vehicleTypeId ?? selectedVehicle.vehicleType?.id ?? selectedVehicle.vehicleTypeId;
-    if (!vtId) { setBackendSlots([]); setLoadError("Không xác định được loại xe để tìm slot phù hợp."); return; }
-    setLoadingSlots(true);
-    setLoadError("");
-    bookingApi.getAvailableSlots(vtId)
-      .then((r) => setBackendSlots(unwrapApiData(r.data, [])))
-      .catch(() => { setBackendSlots([]); setLoadError("Không tải được danh sách slot trống."); })
-      .finally(() => setLoadingSlots(false));
-  }, [selectedVehicle]);
-
-  const slotGrid = useMemo(
-    () => backendSlots.map((s, i) => ({
-      uiId: s.id || s.slotId || `${i}`,
-      slotId: s.id || s.slotId || "",
-      slotCode: s.slotCode || `S${i + 1}`,
-      status: String(s.status || "available").toLowerCase(),
-      floor: s.zone?.floor?.floorName || s.zone?.floor?.name || "Tầng chưa rõ",
-      zone: s.zone?.zoneName || s.zone?.name || "Khu chưa rõ",
-      building: s.zone?.floor?.building?.name || "Toà chưa rõ",
-    })),
-    [backendSlots],
+  const selectedSlot = useMemo(
+    () =>
+      slotGrid.find(
+        (item) =>
+          String(item.slotId || item.uiId) === String(selection.slotId || selection.slotCode) ||
+          item.slotCode === selection.slotCode
+      ),
+    [slotGrid, selection.slotCode, selection.slotId]
   );
 
-  const buildingOptions = useMemo(() => Array.from(new Map(slotGrid.map((s) => [s.building, s.building])).values()), [slotGrid]);
+  const steps = ["Building", "Floor & Zone", "Select Slot", "Confirm"];
 
-  // Tu chon toa nha khi vao tu nut "Dat cho" o trang Tim bai do xe (truyen
-  // buildingName qua router state) — chi ap dung sau khi da chon xe (buildingOptions
-  // chi co du lieu luc do) va nguoi dung chua tu chon toa nha khac.
-  useEffect(() => {
-    if (!preselectBuildingName || selection.building || !selection.vehicleId) return;
-    if (buildingOptions.includes(preselectBuildingName)) {
-      setSelection((p) => ({ ...p, building: preselectBuildingName }));
+  const handleConfirm = async () => {
+    if (!selection.vehicleId || !selectedSlot) {
+      return;
     }
-  }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
-  const floorOptions = useMemo(() => [...new Set(slotGrid.filter((s) => !selection.building || s.building === selection.building).map((s) => s.floor))], [slotGrid, selection.building]);
-  const zoneOptions = useMemo(() => [...new Set(slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor)).map((s) => s.zone))], [slotGrid, selection.building, selection.floor]);
-  const filteredSlotGrid = useMemo(() => slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor) && (!selection.zone || s.zone === selection.zone)), [slotGrid, selection.building, selection.floor, selection.zone]);
-  const selectedSlot = useMemo(() => filteredSlotGrid.find((s) => String(s.slotId || s.uiId) === String(selection.slotId || selection.slotCode) || s.slotCode === selection.slotCode), [filteredSlotGrid, selection.slotCode, selection.slotId]);
 
-  const selectedVehicleBooking = vehiclesWithStatus.find((v) => String(v.vehicleId) === String(selection.vehicleId));
-  const lockedBooking = selectedVehicleBooking?.activeBooking || null;
-  const isSelectedVehicleLocked = Boolean(selectedVehicleBooking?.isLocked);
-  const effectiveStep = isSelectedVehicleLocked ? 0 : step;
+    const fallbackConfirmation = {
+      bookingCode: `BK-${Date.now().toString().slice(-6)}`,
+      building: selection.building,
+      floor: selection.floor,
+      zone: selection.zone,
+      slotCode: selectedSlot.slotCode,
+      vehiclePlate: selectedVehicle?.licensePlate || "Vehicle",
+    };
 
-  useEffect(() => {
-    if (!isSelectedVehicleLocked) return;
-    setSelection((p) => ({ ...p, building: "", floor: "", zone: "", slotCode: "", slotId: "" }));
-    setBackendSlots([]);
-    setSubmitError("");
-    setConfirmation(null);
-    setStep(0);
-  }, [isSelectedVehicleLocked]);
-
-  async function handleConfirm() {
-    if (!selection.vehicleId || !selectedSlot || isSelectedVehicleLocked) return;
-    setSubmitting(true);
-    setSubmitError("");
-    try {
-      const start = bookingStart;
-      const end = new Date(start.getTime() + 2 * 3600000);
-      if ((start.getTime() - Date.now()) / 60000 < 10) {
-        setSubmitError("Thời gian bắt đầu phải cách hiện tại ít nhất 10 phút.");
-        setSubmitting(false);
-        return;
-      }
-      const res = await bookingApi.create({
-        vehicleId: Number(selection.vehicleId),
-        slotId: Number(selectedSlot.slotId),
-        bookingStartTime: formatLocalDateTime(start),
-        bookingEndTime: formatLocalDateTime(end),
-      });
-      const p = unwrapApiData(res.data, {});
-      setConfirmation({
-        bookingId: p.bookingId, status: p.status, depositAmount: p.depositAmount,
-        expiredAt: p.expiredAt,
-        bookingStartTime: p.bookingStartTime || formatLocalDateTime(start),
-        bookingEndTime: p.bookingEndTime || formatLocalDateTime(end),
-        building: selectedSlot.building, floor: selectedSlot.floor, zone: selectedSlot.zone,
-        slotCode: p.slotCode || selectedSlot.slotCode,
-        vehiclePlate: p.licensePlate || selectedVehicle?.licensePlate || "Xe",
-      });
-      setStep(3);
-    } catch (error) {
-      const message = getErrorMessage(error, "Tạo booking thất bại. Vui lòng thử lại.");
-      setSubmitError(message);
-      if (error?.response?.status === 409 && /booking active/i.test(message)) {
-        setConflictLock({ bookingId: message.match(/#(\d+)/)?.[1], vehicleId: selection.vehicleId, status: "CONFLICT" });
-        setSelection((p) => ({ ...p, building: "", floor: "", zone: "", slotCode: "", slotId: "" }));
-        setBackendSlots([]);
-        setStep(0);
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handlePayDeposit() {
-    if (!confirmation?.bookingId) return;
-    setPayingDeposit(true);
-    setPayError("");
-    try {
-      const depositAmount = Number(confirmation.depositAmount || 0);
-      if (depositAmount > 0) {
-        // VNPay redirect
-        const res = await paymentApi.createVnpayDepositUrl(confirmation.bookingId);
-        const data = unwrapApiData(res.data, null);
-        if (data?.paymentUrl) {
-          window.location.href = data.paymentUrl;
-          return;
-        }
-        throw new Error("Không lấy được URL thanh toán VNPay");
-      } else {
-        // deposit = 0 → auto confirm CASH
-        const depositRes = await paymentApi.createDeposit({
-          bookingId: Number(confirmation.bookingId),
-          depositAmount: 0,
-          paymentMethod: "CASH",
+    if (createMode === "ready" && selectedSlot.slotId) {
+      try {
+        const start = new Date();
+        const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+        const res = await bookingApi.create({
+          vehicleId: Number(selection.vehicleId),
+          slotId: Number(selectedSlot.slotId),
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
         });
-        const deposit = unwrapApiData(depositRes.data, null);
-        if (deposit?.paymentId) await paymentApi.confirmDeposit(deposit.paymentId);
-        setDepositPaid(true);
-        setConfirmation((p) => ({ ...p, status: "CONFIRMED" }));
+
+        const payload = res.data?.data || res.data || {};
+        setConfirmation({
+          bookingCode: payload.bookingCode || payload.bookingId || fallbackConfirmation.bookingCode,
+          building:
+            payload.buildingName ||
+            payload.parkingBuildingName ||
+            fallbackConfirmation.building,
+          floor: payload.floorName || fallbackConfirmation.floor,
+          zone: payload.zoneName || fallbackConfirmation.zone,
+          slotCode: payload.slotCode || payload.parkingSlotCode || fallbackConfirmation.slotCode,
+          vehiclePlate:
+            payload.licensePlate || payload.vehiclePlate || fallbackConfirmation.vehiclePlate,
+        });
+        setStep(3);
+        return;
+      } catch (error) {
+        console.error("Create booking failed, using scaffold confirmation", error);
       }
-    } catch (err) {
-      setPayError(getErrorMessage(err, "Thanh toán cọc thất bại."));
-    } finally {
-      setPayingDeposit(false);
     }
-  }
 
-  function resetAll() {
-    setSelection({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
-    setBackendSlots([]);
-    setConfirmation(null);
-    setSubmitError("");
-    setPayError("");
-    setDepositPaid(false);
-    setStep(0);
-  }
+    setConfirmation(fallbackConfirmation);
+    setStep(3);
+  };
 
-  if (effectiveStep === 3 && confirmation) {
-    const rows = [
-      ["Mã đặt chỗ", `#${confirmation.bookingId}`],
-      ["Trạng thái", confirmation.status, depositPaid ? "text-emerald-600" : "text-amber-600"],
-      ["Toà nhà", confirmation.building],
-      ["Tầng", confirmation.floor],
-      ["Vị trí", `${confirmation.zone} — ${confirmation.slotCode}`],
-      ["Hẹn đến bãi", formatDateTime(confirmation.bookingStartTime)],
-      ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`],
-      ["Tính phí", "Entry → Exit (trừ cọc)", "text-emerald-600"],
-      ["Hạn thanh toán cọc", formatDateTime(confirmation.expiredAt)],
-      ["Xe", confirmation.vehiclePlate],
-    ];
+  if (step === 3 && confirmation) {
     return (
       <div className="max-w-lg mx-auto">
-        <div className="rounded-2xl border border-border bg-card p-8 text-center">
-          <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-4 ${depositPaid ? "bg-emerald-100 dark:bg-emerald-500/15" : "bg-amber-100 dark:bg-amber-500/15"}`}>
-            <CheckCircle2 size={30} className={depositPaid ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"} />
+        <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <div className="size-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 size={30} className="text-emerald-600" />
           </div>
-          <h3 className="font-bold text-foreground mb-1 text-xl">
-            {depositPaid
-              ? "Đặt chỗ thành công — QR sẵn sàng"
-              : confirmation.depositAmount > 0
-                ? "Đặt chỗ thành công — Cần thanh toán cọc"
-                : "Đặt chỗ thành công"}
-          </h3>
+          <h3 className="font-bold text-foreground mb-1 text-[1.25rem]">Booking Confirmed!</h3>
           <p className="text-muted-foreground text-sm mb-6">
-            {depositPaid
-              ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
-              : confirmation.depositAmount > 0
-                ? "Booking đã tạo. Thanh toán cọc qua VNPay để xác nhận giữ chỗ."
-                : "Booking đã tạo (miễn cọc). Nhấn xác nhận để lấy mã QR check-in."}
+            Your slot has been reserved. Show this QR code at the gate.
           </p>
+          <div className="flex justify-center mb-6">
+            <QRCodeMock value={String(confirmation.bookingCode)} />
+          </div>
           <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2 mb-6">
-            {rows.map(([label, value, cls]) => (
-              <div key={label} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{label}</span>
-                <span className={`font-medium ${cls || "text-foreground"}`}>{value}</span>
-              </div>
-            ))}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Building</span>
+              <span className="font-medium text-foreground">{confirmation.building}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Floor</span>
+              <span className="font-medium text-foreground">{confirmation.floor}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Slot</span>
+              <span className="font-medium text-foreground">
+                {confirmation.zone} - {confirmation.slotCode}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Vehicle</span>
+              <span className="font-medium text-foreground">{confirmation.vehiclePlate}</span>
+            </div>
           </div>
-          <AlertBox>{payError}</AlertBox>
-          <div className="space-y-3 mt-4">
-            {!depositPaid ? (
-              <button onClick={handlePayDeposit} disabled={payingDeposit} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60">
-                {payingDeposit
-                  ? "Đang xử lý..."
-                  : confirmation.depositAmount > 0
-                    ? `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND qua VNPay`
-                    : "Xác nhận đặt chỗ (miễn cọc)"}
-              </button>
-            ) : (
-              <button onClick={() => navigate("/driver/bookings")} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-colors">
-                Xem QR Check-in
-              </button>
-            )}
-            <button onClick={resetAll} className="w-full border border-border text-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-muted transition-colors">
-              Tạo booking mới
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setSelection({
+                building: "",
+                floor: "",
+                zone: "",
+                slotCode: "",
+                slotId: "",
+                vehicleId: "",
+              });
+              setConfirmation(null);
+              setStep(0);
+            }}
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors"
+          >
+            New Booking
+          </button>
         </div>
       </div>
     );
@@ -341,252 +304,227 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          { to: "/driver/parking-slots", icon: SquareParking, title: "Xem slot trống", desc: "Tra cứu slot theo loại xe" },
-          { to: "/driver/bookings", icon: History, title: "Lịch sử đặt chỗ", desc: "Xem cọc, QR, trạng thái booking" },
-        ].map(({ to, icon: Icon, title, desc }) => (
-          <button key={to} type="button" onClick={() => navigate(to)} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-muted/40">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon size={18} /></span>
-            <span>
-              <span className="block text-sm font-semibold text-foreground">{title}</span>
-              <span className="block text-xs text-muted-foreground">{desc}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <AlertBox variant="warn">{loadError}</AlertBox>
-      <AlertBox>{submitError}</AlertBox>
-      {isSelectedVehicleLocked && lockedBooking && (
-        <AlertBox>
-          Xe này đang có booking/phiên chưa hoàn tất (#{lockedBooking.bookingId || lockedBooking.id}).
-          Vui lòng hoàn tất vào/ra cổng, thanh toán, hoặc huỷ booking cũ trước khi tạo booking mới.
-        </AlertBox>
-      )}
-
       <div className="flex items-center gap-0">
-        {STEP_LABELS.map((label, i) => (
+        {steps.map((label, index) => (
           <div key={label} className="flex items-center flex-1 last:flex-none">
             <div className="flex items-center gap-2">
-              <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${i <= effectiveStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                {i < effectiveStep ? <Check size={14} /> : i + 1}
+              <div
+                className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                  index < step
+                    ? "bg-primary text-white"
+                    : index === step
+                    ? "bg-primary text-white"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {index < step ? <Check size={12} /> : index + 1}
               </div>
-              <span className={`text-sm hidden sm:inline ${i === effectiveStep ? "text-foreground font-medium" : "text-muted-foreground"}`}>{label}</span>
+              <span
+                className={`text-xs ${
+                  index === step ? "text-foreground font-medium" : "text-muted-foreground"
+                }`}
+              >
+                {label}
+              </span>
             </div>
-            {i < STEP_LABELS.length - 1 && <div className={`flex-1 h-px mx-3 ${i < effectiveStep ? "bg-primary" : "bg-border"}`} />}
+            {index < steps.length - 1 && (
+              <div className={`flex-1 h-px mx-3 ${index < step ? "bg-primary" : "bg-border"}`} />
+            )}
           </div>
         ))}
       </div>
 
-      {/* ─── STEP 1: Chọn vị trí ─────────────────────────── */}
-      {effectiveStep === 0 && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
-          <h3 className="font-semibold text-foreground text-lg flex items-center gap-2">
-            <Car size={20} /> Chọn xe & vị trí đỗ
-          </h3>
-
+      <div className="bg-card border border-border rounded-2xl p-6">
+        {step === 0 && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Xe của bạn</label>
-            <Select
-              value={selection.vehicleId}
-              onValueChange={(v) => {
-                setConflictLock(null);
-                setSelection({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: v });
-              }}
-            >
-              <SelectTrigger className="h-11 rounded-xl border-border bg-background px-4 text-sm" disabled={loadingVehicles}>
-                <SelectValue placeholder={loadingVehicles ? "Đang tải xe..." : "Chọn xe"} />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-border bg-card shadow-xl">
-                {vehiclesWithStatus.map((v) => {
-                  const typeName = v.vehicleType?.name;
-                  const typeLabel = typeName === "CAR" ? "Ô tô" : typeName === "MOTORBIKE" ? "Xe máy" : typeName || "";
-                  return (
-                    <SelectItem key={v.vehicleId} value={String(v.vehicleId)} disabled={v.isLocked} className="rounded-lg px-3 py-2 text-sm">
-                      {v.licensePlate}
-                      {typeLabel ? ` (${typeLabel})` : ""}
-                      {v.isLocked ? ` — đang có booking #${v.activeBooking.bookingId || v.activeBooking.id}` : ""}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            {isSelectedVehicleLocked && (
-              <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">Xe này đang có booking chưa hoàn tất. Vui lòng chọn xe khác.</p>
-            )}
-          </div>
-
-          {selection.vehicleId && loadingSlots && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <LoaderCircle size={16} className="animate-spin" /> Đang tải slot phù hợp...
+            <h3 className="font-semibold text-foreground mb-4">Select a Building</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {BUILDING_OPTIONS.map((building) => (
+                <button
+                  key={building.id}
+                  onClick={() =>
+                    setSelection((prev) => ({
+                      ...prev,
+                      building: building.name,
+                    }))
+                  }
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    selection.building === building.name
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <div className="size-8 bg-muted rounded-lg flex items-center justify-center mb-2">
+                    <MapPin size={14} className="text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-sm text-foreground">{building.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {building.available} slots available
+                  </p>
+                </button>
+              ))}
             </div>
-          )}
+            <button
+              onClick={() => setStep(1)}
+              disabled={!selection.building}
+              className="w-full mt-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        )}
 
-          {selection.vehicleId && !isSelectedVehicleLocked && buildingOptions.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Toà nhà</label>
-              <div className="grid grid-cols-2 gap-3">
-                {buildingOptions.map((b) => (
-                  <button key={b} onClick={() => setSelection((p) => ({ ...p, building: b, floor: "", zone: "", slotCode: "", slotId: "" }))}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${selection.building === b ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
-                    <div className={`mb-2 flex size-8 items-center justify-center rounded-lg ${selection.building === b ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      <MapPin size={14} />
-                    </div>
-                    <p className="font-medium text-sm text-foreground">{b}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{slotGrid.filter((s) => s.building === b).length} slot</p>
-                  </button>
+        {step === 1 && (
+          <div>
+            <h3 className="font-semibold text-foreground mb-4">Floor &amp; Zone</h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">
+                  Floor
+                </label>
+                <div className="space-y-2">
+                  {FLOOR_OPTIONS.map((floor) => (
+                    <button
+                      key={floor}
+                      onClick={() => setSelection((prev) => ({ ...prev, floor }))}
+                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${
+                        selection.floor === floor
+                          ? "border-primary bg-primary/5 text-primary font-medium"
+                          : "border-border hover:border-primary/40 text-foreground"
+                      }`}
+                    >
+                      {floor}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">
+                  Zone
+                </label>
+                <div className="space-y-2">
+                  {ZONE_OPTIONS.map((zone) => (
+                    <button
+                      key={zone}
+                      onClick={() => setSelection((prev) => ({ ...prev, zone }))}
+                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${
+                        selection.zone === zone
+                          ? "border-primary bg-primary/5 text-primary font-medium"
+                          : "border-border hover:border-primary/40 text-foreground"
+                      }`}
+                    >
+                      {zone}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(0)}
+                className="flex-1 py-2.5 border border-border rounded-xl text-sm hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setStep(2)}
+                disabled={!selection.floor || !selection.zone}
+                className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground">Select a Slot</h3>
+              <div className="flex items-center gap-3 text-xs">
+                {[
+                  ["bg-[#6BD4A5]", "Available"],
+                  ["bg-[#EE7991]", "Occupied"],
+                  ["bg-[#F8C933]", "Reserved"],
+                ].map(([cls, label]) => (
+                  <div key={label} className="flex items-center gap-1">
+                    <div className={`size-3 rounded-sm ${cls}`} />
+                    <span className="text-muted-foreground">{label}</span>
+                  </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {!loadingSlots && selection.vehicleId && !isSelectedVehicleLocked && buildingOptions.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-              Không có slot trống phù hợp với loại xe này.
+            <div className="grid grid-cols-8 gap-1.5 mb-5 p-4 bg-muted/30 rounded-xl">
+              {slotGrid.map((slot) => {
+                const blocked = slot.status !== "available";
+                const active =
+                  slot.slotCode === selection.slotCode ||
+                  String(slot.slotId) === String(selection.slotId);
+
+                return (
+                  <button
+                    key={slot.uiId}
+                    disabled={blocked}
+                    onClick={() =>
+                      setSelection((prev) => ({
+                        ...prev,
+                        slotCode: slot.slotCode,
+                        slotId: slot.slotId || slot.uiId,
+                      }))
+                    }
+                    className={`rounded-md aspect-[1.5] flex items-center justify-center text-[9px] font-mono font-bold transition-all ${slotClasses(
+                      slot.status,
+                      active
+                    )}`}
+                  >
+                    {slot.slotCode}
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          {selection.building && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Tầng</label>
-                <div className="space-y-1.5">
-                  {floorOptions.map((f) => (
-                    <button key={f} onClick={() => setSelection((p) => ({ ...p, floor: f, zone: "", slotCode: "", slotId: "" }))}
-                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.floor === f ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Khu vực</label>
-                <div className="space-y-1.5">
-                  {zoneOptions.map((z) => (
-                    <button key={z} onClick={() => setSelection((p) => ({ ...p, zone: z, slotCode: "", slotId: "" }))}
-                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.zone === z ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
-                      {z}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Select Vehicle
+              </label>
+              <select
+                value={selection.vehicleId}
+                onChange={(event) =>
+                  setSelection((prev) => ({ ...prev, vehicleId: event.target.value }))
+                }
+                className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary"
+              >
+                <option value="">Choose a vehicle</option>
+                {vehicles.map((vehicle) => (
+                  <option
+                    key={vehicle.vehicleId || vehicle.id}
+                    value={vehicle.vehicleId || vehicle.id}
+                  >
+                    {vehicle.licensePlate}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {selection.zone && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground">Chọn slot</label>
-                <div className="flex items-center gap-3 text-xs">
-                  {[["bg-emerald-500", "Trống"], ["bg-gray-300 dark:bg-gray-600", "Đã đỗ"], ["bg-amber-400", "Đã giữ"]].map(([cls, label]) => (
-                    <span key={label} className="flex items-center gap-1"><span className={`size-3 rounded-sm ${cls}`} /><span className="text-muted-foreground">{label}</span></span>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 p-4 bg-muted/30 rounded-xl">
-                {filteredSlotGrid.map((slot) => {
-                  const blocked = slot.status !== "available";
-                  const active = slot.slotCode === selection.slotCode || String(slot.slotId) === String(selection.slotId);
-                  return (
-                    <button key={slot.uiId} disabled={blocked}
-                      onClick={() => setSelection((p) => ({ ...p, slotCode: slot.slotCode, slotId: slot.slotId || slot.uiId }))}
-                      className={`rounded-lg aspect-square flex items-center justify-center text-[10px] font-mono font-bold transition-all ${slotClasses(slot.status, active)}`}>
-                      {slot.slotCode}
-                    </button>
-                  );
-                })}
-              </div>
-              {filteredSlotGrid.length === 0 && (
-                <p className="mt-3 text-center text-sm text-muted-foreground">Không có slot nào ở khu vực này.</p>
-              )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="flex-1 py-2.5 border border-border rounded-xl text-sm hover:bg-muted transition-colors"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleConfirm}
+                disabled={!selection.vehicleId || !selection.slotCode}
+                className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40"
+              >
+                Confirm Booking
+              </button>
             </div>
-          )}
-
-          <button onClick={() => setStep(1)}
-            disabled={!selection.vehicleId || !selection.slotCode || isSelectedVehicleLocked}
-            className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors">
-            Tiếp tục — Chọn thời gian
-          </button>
-        </div>
-      )}
-
-      {/* ─── STEP 2: Thời gian ───────────────────────────── */}
-      {effectiveStep === 1 && !isSelectedVehicleLocked && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
-          <h3 className="font-semibold text-foreground text-lg flex items-center gap-2">
-            <Clock size={20} /> Chọn thời gian
-          </h3>
-
-          {selectedSlot && (
-            <div className="flex items-center gap-3 rounded-xl bg-muted/40 px-4 py-3 text-sm">
-              <SquareParking size={16} className="text-primary" />
-              <span className="text-foreground font-medium">{selectedSlot.building} — {selectedSlot.floor} — {selectedSlot.zone} — {selectedSlot.slotCode}</span>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Thời gian đến bãi đỗ</label>
-            <input type="datetime-local"
-              value={formatLocalDateTime(bookingStart).slice(0, 16)}
-              min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-              onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
-            <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
           </div>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-            Phí đỗ xe sẽ tính từ lúc xe vào bãi (entry) đến khi ra bãi (exit). Tiền cọc sẽ được trừ vào tổng phí.
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={() => setStep(0)} className="flex-1 rounded-xl border border-border py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
-              Quay lại
-            </button>
-            <button onClick={() => setStep(2)} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-              Tiếp tục — Xác nhận
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── STEP 3: Xác nhận & Đặt chỗ ─────────────────── */}
-      {effectiveStep === 2 && !isSelectedVehicleLocked && (
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
-          <h3 className="font-semibold text-foreground text-lg flex items-center gap-2">
-            <CheckCircle2 size={20} /> Xác nhận đặt chỗ
-          </h3>
-
-          <div className="bg-muted/40 rounded-xl p-4 space-y-2 text-sm">
-            {[
-              ["Xe", selectedVehicle?.licensePlate || "--"],
-              ["Toà nhà", selectedSlot?.building || "--"],
-              ["Tầng / Khu vực", `${selectedSlot?.floor || "--"} — ${selectedSlot?.zone || "--"}`],
-              ["Slot", selectedSlot?.slotCode || "--"],
-              ["Hẹn đến bãi", formatDateTime(bookingStart)],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between">
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-medium text-foreground">{value}</span>
-              </div>
-            ))}
-          </div>
-
-          <AlertBox>{submitError}</AlertBox>
-
-          <div className="flex gap-3">
-            <button onClick={() => setStep(1)} className="flex-1 rounded-xl border border-border py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
-              Quay lại
-            </button>
-            <button onClick={handleConfirm}
-              disabled={!selection.vehicleId || !selection.slotCode || submitting || isSelectedVehicleLocked}
-              className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors">
-              {submitting ? "Đang tạo..." : "Xác nhận đặt chỗ"}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 package com.swp391.parking.config;
-
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.List;
 import com.swp391.parking.security.jwt.JwtAuthFilter;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,77 +22,70 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
-
+/**
+ * Cấu hình Spring Security.
+ *
+ * Thêm endpoint public:  thêm vào PUBLIC_URLS bên dưới.
+ * Giới hạn theo role:    dùng @PreAuthorize("hasRole('ADMIN')") trên method trong controller/service.
+ */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity          // cho phép dùng @PreAuthorize
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
+    // ── Các URL không cần đăng nhập ─────────────────────────────────────────
     private static final String[] PUBLIC_URLS = {
-            "/api/v1/auth/**",
-            "/api/v1/public/**",
-            "/api/v1/payments/vnpay/ipn",
-            "/api/v1/payments/vnpay/return",
+            "/api/v1/auth/**",        // login, register, refresh token
+            "/api/v1/public/**",      // thông tin bãi xe công khai
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api-docs/**",
             "/v3/api-docs/**"
     };
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:*",
-                "https://localhost:*",
-                "http://192.168.*.*:*",
-                "https://*.ngrok-free.app",
-                "https://*.ngrok-free.dev"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+    config.setAllowedOriginPatterns(List.of("*"));
+    config.setAllowedMethods(List.of("*"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(false);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
+    UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) ->
-                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(PUBLIC_URLS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/parking-buildings/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/vehicle-types/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/floors/building/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/zones/floor/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/gates/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slots/zone/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slots/public").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/slots/public-stats").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    source.registerCorsConfiguration("/**", config);
 
-        return http.build();
-    }
+    return source;
+}
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers(PUBLIC_URLS).permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/parking-buildings/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/vehicle-types/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/floors/building/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/zones/floor/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/gates/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/slots/zone/**").permitAll()
+            .anyRequest().authenticated()
+        )
+        .authenticationProvider(authenticationProvider())
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -101,7 +96,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
         return config.getAuthenticationManager();
     }
 

@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { dashboardApi } from "../../api/manager/dashboardApi";
+import { buildingApi } from "../../api/manager/buildingApi";
+import { floorApi } from "../../api/manager/floorApi";
+import { zoneApi } from "../../api/manager/zoneApi";
+import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
+import { gateApi } from "../../api/manager/gateApi";
+import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
+import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
+import { staffShiftApi } from "../../api/manager/staffShiftApi";
 import { notificationApi } from "../../api/notificationApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
@@ -19,25 +26,35 @@ import {
 } from "recharts";
 import {
   Building2,
+  Car,
   DollarSign,
   Grid3x3,
   TrendingDown,
   TrendingUp,
+  Users,
 } from "lucide-react";
 
 function asArray(payload) {
-  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
   return unwrapApiData(payload, []);
 }
 
 const PIE_COLORS = ["#4F46E5", "#06B6D4", "#22C55E", "#F59E0B", "#EF4444"];
 
+const getBuildingId = (item) => item?.buildingId ?? item?.id;
+const getFloorId = (item) => item?.floorId ?? item?.id;
+const getZoneId = (item) => item?.zoneId ?? item?.id;
+const getVehicleTypeId = (item) => item?.vehicleTypeId ?? item?.id;
+
 export default function ManagerDashboard() {
   const [stats, setStats] = useState([
-    { label: "Tỷ lệ lấp đầy", value: "0%", change: "Theo thời gian thực", trend: "up", icon: TrendingUp, color: "bg-indigo-50 text-indigo-600" },
-    { label: "Số slot đỗ xe", value: "0", change: "Đã cấu hình trong hệ thống", trend: "up", icon: Grid3x3, color: "bg-violet-50 text-violet-600" },
-    { label: "Tòa nhà", value: "0", change: "Đang quản lý", trend: "up", icon: Building2, color: "bg-blue-50 text-blue-600" },
-    { label: "Bảng giá đang áp dụng", value: "0", change: "Chính sách giá đang bật", trend: "down", icon: DollarSign, color: "bg-emerald-50 text-emerald-600" },
+    { label: "Occupancy Rate", value: "0%", change: "Live from slots", trend: "up", icon: TrendingUp, color: "bg-indigo-50 text-indigo-600" },
+    { label: "Parking Slots", value: "0", change: "Configured in system", trend: "up", icon: Grid3x3, color: "bg-violet-50 text-violet-600" },
+    { label: "Buildings", value: "0", change: "Managed buildings", trend: "up", icon: Building2, color: "bg-blue-50 text-blue-600" },
+    { label: "Active Pricing", value: "0", change: "Enabled pricing policies", trend: "down", icon: DollarSign, color: "bg-emerald-50 text-emerald-600" },
   ]);
   const [slotTrend, setSlotTrend] = useState([]);
   const [vehicleMix, setVehicleMix] = useState([]);
@@ -50,56 +67,82 @@ export default function ManagerDashboard() {
 
     async function loadDashboard() {
       try {
-        const [dashRes, notifications] = await Promise.all([
-          dashboardApi.getManagerStats(),
-          getUserId()
-            ? notificationApi.getByUser(getUserId()).then((r) => asArray(r.data))
-            : Promise.resolve([]),
+        const [buildingRes, vehicleTypeRes, pricingRes, staffShiftRes] =
+          await Promise.all([
+            buildingApi.getAll(),
+            vehicleTypeApi.getAll(),
+            pricingPolicyApi.getAll(),
+            staffShiftApi.getAll(),
+          ]);
+
+        const buildings = asArray(buildingRes.data);
+        const vehicleTypes = asArray(vehicleTypeRes.data);
+        const pricingPolicies = asArray(pricingRes.data);
+        const staffShifts = asArray(staffShiftRes.data);
+
+        const [floorResponses, gateResponses] = await Promise.all([
+          Promise.all(buildings.map((item) => floorApi.getByBuilding(getBuildingId(item)))),
+          Promise.all(buildings.map((item) => gateApi.getByBuilding(getBuildingId(item)))),
         ]);
 
-        if (cancelled) return;
+        const floors = floorResponses.flatMap((res) => asArray(res.data));
+        const gates = gateResponses.flatMap((res) => asArray(res.data));
 
-        const d = dashRes.data?.data ?? dashRes.data ?? {};
+        const zoneResponses = await Promise.all(
+          floors.map((item) => zoneApi.getByFloor(getFloorId(item)))
+        );
+        const zones = zoneResponses.flatMap((res) => asArray(res.data));
 
-        const totalSlots = d.totalSlots ?? 0;
-        const availableSlots = d.availableSlots ?? 0;
-        const occupancyRate = d.occupancyRatePercent ?? 0;
-        const totalBuildings = d.totalBuildings ?? 0;
-        const activePricingCount = d.activePricingCount ?? 0;
-        const activeGateCount = d.activeGateCount ?? 0;
-        const staffShifts = d.staffShiftCount ?? 0;
-        const slotsByBuilding = d.slotsByBuilding ?? [];
-        const vehicleTypeMix = d.vehicleTypeMix ?? [];
+        const slotResponses = await Promise.all(
+          zones.map((item) => parkingSlotApi.getByZone(getZoneId(item)))
+        );
+        const slots = slotResponses.flatMap((res) => asArray(res.data));
+
+        const userId = getUserId();
+        const notifications = userId
+          ? asArray((await notificationApi.getByUser(userId)).data)
+          : [];
+
+        if (cancelled) {
+          return;
+        }
+
+        const availableCount = slots.filter((item) =>
+          String(item.status || "").toUpperCase().includes("AVAILABLE")
+        ).length;
+        const occupancyRate = slots.length
+          ? Math.round(((slots.length - availableCount) / slots.length) * 100)
+          : 0;
 
         setStats([
           {
-            label: "Tỷ lệ lấp đầy",
+            label: "Occupancy Rate",
             value: `${occupancyRate}%`,
-            change: `${availableSlots} slot còn trống`,
+            change: `${availableCount} slots available`,
             trend: "up",
             icon: TrendingUp,
             color: "bg-indigo-50 text-indigo-600",
           },
           {
-            label: "Số slot đỗ xe",
-            value: String(totalSlots),
-            change: "Đã cấu hình trong hệ thống",
+            label: "Parking Slots",
+            value: String(slots.length),
+            change: "Configured in system",
             trend: "up",
             icon: Grid3x3,
             color: "bg-violet-50 text-violet-600",
           },
           {
-            label: "Tòa nhà",
-            value: String(totalBuildings),
-            change: `${activeGateCount} cổng đang hoạt động`,
+            label: "Buildings",
+            value: String(buildings.length),
+            change: `${gates.filter((item) => item.isActive !== false).length} active gates`,
             trend: "up",
             icon: Building2,
             color: "bg-blue-50 text-blue-600",
           },
           {
-            label: "Bảng giá đang áp dụng",
-            value: String(activePricingCount),
-            change: `${vehicleTypeMix.length} loại xe`,
+            label: "Active Pricing",
+            value: String(pricingPolicies.filter((item) => item.isActive).length),
+            change: `${vehicleTypes.length} vehicle types`,
             trend: "down",
             icon: DollarSign,
             color: "bg-emerald-50 text-emerald-600",
@@ -107,33 +150,68 @@ export default function ManagerDashboard() {
         ]);
 
         setSlotTrend(
-          slotsByBuilding.map((b) => ({
-            month: b.buildingName,
-            revenue: b.totalSlots,
-            target: b.availableSlots,
-          }))
+          buildings.map((building) => {
+            const buildingId = getBuildingId(building);
+            const buildingSlots = slots.filter(
+              (slot) => (slot.zone?.floor?.building?.buildingId ?? slot.zone?.floor?.building?.id) === buildingId
+            );
+
+            return {
+              month: building.name,
+              revenue: buildingSlots.length,
+              target: buildingSlots.filter((slot) =>
+                String(slot.status || "").toUpperCase().includes("AVAILABLE")
+              ).length,
+            };
+          })
         );
 
+        const vehicleTypeCounts = zones.reduce((acc, zone) => {
+          const vehicleTypeId = getVehicleTypeId(zone.vehicleType);
+          const apiVehicleType = vehicleTypes.find((item) => getVehicleTypeId(item) === vehicleTypeId);
+          const name = zone.vehicleType?.name || apiVehicleType?.name || "Unknown";
+          acc[name] = (acc[name] || 0) + 1;
+          return acc;
+        }, {});
+
         setVehicleMix(
-          vehicleTypeMix.map((v) => ({ name: v.name, value: v.zoneCount }))
+          Object.entries(vehicleTypeCounts).map(([name, value]) => ({
+            name,
+            value,
+          }))
         );
 
         setAvailabilityByBuilding(
-          slotsByBuilding.map((b) => ({
-            day: b.buildingName,
-            rate: b.availabilityRatePercent,
-          }))
+          buildings.map((building) => {
+            const buildingId = getBuildingId(building);
+            const buildingSlots = slots.filter(
+              (slot) => (slot.zone?.floor?.building?.buildingId ?? slot.zone?.floor?.building?.id) === buildingId
+            );
+            const available = buildingSlots.filter((slot) =>
+              String(slot.status || "").toUpperCase().includes("AVAILABLE")
+            ).length;
+
+            return {
+              day: building.name,
+              rate: buildingSlots.length
+                ? Math.round((available / buildingSlots.length) * 100)
+                : 0,
+            };
+          })
         );
 
         setRecentNotifications(notifications.slice(0, 5));
-        setStaffShiftCount(staffShifts);
+        setStaffShiftCount(staffShifts.length);
       } catch (error) {
         console.error("Failed to load manager dashboard", error);
       }
     }
 
     void loadDashboard();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -141,6 +219,7 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((item) => {
           const Icon = item.icon;
+
           return (
             <div key={item.label} className="bg-card border border-border rounded-2xl p-4">
               <div className={`size-9 rounded-xl flex items-center justify-center ${item.color} mb-3`}>
@@ -163,7 +242,7 @@ export default function ManagerDashboard() {
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-5">
         <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="font-semibold text-foreground text-sm mb-5">Số lượng slot theo tòa nhà</h3>
+          <h3 className="font-semibold text-foreground text-sm mb-5">Slot Inventory By Building</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={slotTrend}>
               <defs>
@@ -176,14 +255,14 @@ export default function ManagerDashboard() {
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
-              <Area type="monotone" dataKey="revenue" stroke="#4F46E5" strokeWidth={2} fill="url(#managerRevGrad)" name="Tổng slot" />
-              <Area type="monotone" dataKey="target" stroke="#06B6D4" strokeWidth={2} strokeDasharray="4 4" fill="none" name="Slot trống" />
+              <Area type="monotone" dataKey="revenue" stroke="#4F46E5" strokeWidth={2} fill="url(#managerRevGrad)" name="Total slots" />
+              <Area type="monotone" dataKey="target" stroke="#06B6D4" strokeWidth={2} strokeDasharray="4 4" fill="none" name="Available slots" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="font-semibold text-foreground text-sm mb-5">Tỷ lệ loại xe</h3>
+          <h3 className="font-semibold text-foreground text-sm mb-5">Vehicle Type Mix</h3>
           <ResponsiveContainer width="100%" height={150}>
             <PieChart>
               <Pie data={vehicleMix} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
@@ -191,7 +270,7 @@ export default function ManagerDashboard() {
                   <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [value, "Zone"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
+              <Tooltip formatter={(value) => [value, "Zones"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="grid grid-cols-2 gap-1.5 mt-2">
@@ -207,13 +286,13 @@ export default function ManagerDashboard() {
       </div>
 
       <div className="bg-card border border-border rounded-2xl p-5">
-        <h3 className="font-semibold text-foreground text-sm mb-5">Tỷ lệ slot trống theo tòa nhà (%)</h3>
+        <h3 className="font-semibold text-foreground text-sm mb-5">Available Slot Rate By Building (%)</h3>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={availabilityByBuilding}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
             <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value}%`} />
-            <Tooltip formatter={(value) => [`${value}%`, "Tỷ lệ trống"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
+            <Tooltip formatter={(value) => [`${value}%`, "Availability"]} contentStyle={{ borderRadius: 10, border: "1px solid var(--border)", fontSize: 12 }} />
             <Bar dataKey="rate" fill="#4F46E5" radius={[6, 6, 0, 0]} maxBarSize={48} />
           </BarChart>
         </ResponsiveContainer>
@@ -222,8 +301,8 @@ export default function ManagerDashboard() {
       <div className="grid lg:grid-cols-[1fr_320px] gap-5">
         <div className="bg-card border border-border rounded-2xl">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="font-semibold text-foreground text-sm">Thông báo gần đây</h3>
-            <span className="text-xs text-muted-foreground">Hộp thư quản lý</span>
+            <h3 className="font-semibold text-foreground text-sm">Recent Notifications</h3>
+            <span className="text-xs text-muted-foreground">Manager inbox</span>
           </div>
           <div className="divide-y divide-border">
             {recentNotifications.map((item) => (
@@ -235,7 +314,7 @@ export default function ManagerDashboard() {
                   <div className="flex items-baseline gap-2">
                     <p className="text-xs font-medium text-foreground">{item.title}</p>
                     <span className="text-muted-foreground">·</span>
-                    <p className="text-xs text-muted-foreground">{item.isRead ? "Đã đọc" : "Chưa đọc"}</p>
+                    <p className="text-xs text-muted-foreground">{item.isRead ? "Read" : "Unread"}</p>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{item.body || item.message || "-"}</p>
                 </div>
@@ -245,46 +324,46 @@ export default function ManagerDashboard() {
               </div>
             ))}
             {recentNotifications.length === 0 && (
-              <div className="px-5 py-8 text-sm text-muted-foreground">Không có thông báo nào.</div>
+              <div className="px-5 py-8 text-sm text-muted-foreground">No notifications found.</div>
             )}
           </div>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-5">
-          <h3 className="font-semibold text-foreground text-sm mb-4">Tổng quan vận hành</h3>
+          <h3 className="font-semibold text-foreground text-sm mb-4">Operations Summary</h3>
           <div className="space-y-2.5">
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors">
               <div className="size-2 rounded-full shrink-0 bg-emerald-500" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">Ca làm đã phân công</p>
-                <p className="text-[10px] text-muted-foreground">Xem chi tiết ở trang Ca làm việc</p>
+                <p className="text-xs font-medium text-foreground truncate">Staff shifts assigned</p>
+                <p className="text-[10px] text-muted-foreground">Assignments from `/staff-shifts`</p>
               </div>
               <span className="text-xs font-semibold text-foreground">{staffShiftCount}</span>
             </div>
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors">
               <div className="size-2 rounded-full shrink-0 bg-blue-500" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">Tòa nhà đang theo dõi</p>
-                <p className="text-[10px] text-muted-foreground">Tổng số tòa nhà trong hệ thống</p>
+                <p className="text-xs font-medium text-foreground truncate">Buildings tracked</p>
+                <p className="text-[10px] text-muted-foreground">Returned from `/parking-buildings`</p>
               </div>
               <span className="text-xs font-semibold text-foreground">{slotTrend.length}</span>
             </div>
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors">
               <div className="size-2 rounded-full shrink-0 bg-violet-500" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">Loại xe</p>
-                <p className="text-[10px] text-muted-foreground">Phân bổ theo zone đã cấu hình</p>
+                <p className="text-xs font-medium text-foreground truncate">Vehicle categories</p>
+                <p className="text-[10px] text-muted-foreground">Distribution across configured zones</p>
               </div>
               <span className="text-xs font-semibold text-foreground">{vehicleMix.length}</span>
             </div>
             <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/40 transition-colors">
               <div className="size-2 rounded-full shrink-0 bg-amber-500" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">Bảng giá đang áp dụng</p>
-                <p className="text-[10px] text-muted-foreground">Xem chi tiết ở trang Bảng giá</p>
+                <p className="text-xs font-medium text-foreground truncate">Live pricing policies</p>
+                <p className="text-[10px] text-muted-foreground">Visible in manager pricing page</p>
               </div>
               <span className="text-xs font-semibold text-foreground">
-                {stats.find((item) => item.label === "Bảng giá đang áp dụng")?.value || "0"}
+                {stats.find((item) => item.label === "Active Pricing")?.value || "0"}
               </span>
             </div>
           </div>

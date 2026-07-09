@@ -57,23 +57,23 @@ const PRICING_DATA = [
 ];
 function StatusBadge({ status }) {
     const map = {
-        active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-        maintenance: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-        inactive: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
-        available: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-        occupied: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-        reserved: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+        active: 'bg-emerald-100 text-emerald-700',
+        maintenance: 'bg-amber-100 text-amber-700',
+        inactive: 'bg-slate-100 text-slate-600',
+        available: 'bg-emerald-100 text-emerald-700',
+        occupied: 'bg-rose-100 text-rose-700',
+        reserved: 'bg-amber-100 text-amber-700',
     };
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${map[status] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300'}`}>{status}</span>;
+    return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${map[status] ?? 'bg-slate-100 text-slate-600'}`}>{status}</span>;
 }
 function Overview() {
     return (<div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-            { label: 'Occupancy Rate', value: '73%', change: '+5%', trend: 'up', icon: TrendingUp, color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300' },
-            { label: 'Revenue (Month)', value: '$48,320', change: '+$3,120', trend: 'up', icon: DollarSign, color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' },
-            { label: 'Active Sessions', value: '38', change: '-2 from avg', trend: 'down', icon: Car, color: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' },
-            { label: 'Total Slots', value: '620', change: '453 occupied', trend: 'up', icon: Grid3x3, color: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300' },
+            { label: 'Occupancy Rate', value: '73%', change: '+5%', trend: 'up', icon: TrendingUp, color: 'bg-indigo-50 text-indigo-600' },
+            { label: 'Revenue (Month)', value: '$48,320', change: '+$3,120', trend: 'up', icon: DollarSign, color: 'bg-emerald-50 text-emerald-600' },
+            { label: 'Active Sessions', value: '38', change: '-2 from avg', trend: 'down', icon: Car, color: 'bg-blue-50 text-blue-600' },
+            { label: 'Total Slots', value: '620', change: '453 occupied', trend: 'up', icon: Grid3x3, color: 'bg-violet-50 text-violet-600' },
         ].map(s => {
             const Icon = s.icon;
             return (<div key={s.label} className="bg-card border border-border rounded-2xl p-4">
@@ -194,9 +194,9 @@ function Buildings() {
                 <p className="text-lg font-bold text-foreground">{b.totalSlots}</p>
                 <p className="text-[10px] text-muted-foreground">Total Slots</p>
               </div>
-              <div className="bg-emerald-50 rounded-xl p-2.5 text-center dark:bg-emerald-500/10">
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{b.available}</p>
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-300">Available</p>
+              <div className="bg-emerald-50 rounded-xl p-2.5 text-center">
+                <p className="text-lg font-bold text-emerald-700">{b.available}</p>
+                <p className="text-[10px] text-emerald-600">Available</p>
               </div>
             </div>
             {/* Occupancy bar */}
@@ -275,9 +275,9 @@ function ParkingSlots() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-            { label: 'Available', count: counts.available, color: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-            { label: 'Occupied', count: counts.occupied, color: 'bg-rose-50 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
-            { label: 'Reserved', count: counts.reserved, color: 'bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+            { label: 'Available', count: counts.available, color: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+            { label: 'Occupied', count: counts.occupied, color: 'bg-rose-50 border-rose-200', text: 'text-rose-700', dot: 'bg-rose-500' },
+            { label: 'Reserved', count: counts.reserved, color: 'bg-amber-50 border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500' },
         ].map(s => (<div key={s.label} className={`${s.color} border rounded-2xl p-4 flex items-center gap-3`}>
             <div className={`size-3 rounded-full ${s.dot}`}/>
             <div>

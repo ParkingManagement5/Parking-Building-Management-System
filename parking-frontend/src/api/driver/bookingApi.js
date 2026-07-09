@@ -1,21 +1,11 @@
 import axiosClient from "../axiosClient";
 
 export const bookingApi = {
-  getAvailableSlots: (vehicleTypeId) =>
-    axiosClient.get("/slots/available", {
-      params: { vehicleTypeId },
-    }),
+  getAvailableSlots: () => axiosClient.get("/bookings/available-slots"),
 
   create: (data) => axiosClient.post("/bookings", data),
 
-  getMyBookings: () => axiosClient.get("/bookings/my"),
-
-  verifyQr: (qrToken) =>
-    axiosClient.post("/bookings/verify-qr", null, {
-      params: { qrToken },
-    }),
+  getMyBookings: () => axiosClient.get("/me/bookings"),
 
   cancel: (id) => axiosClient.put(`/bookings/${id}/cancel`),
-
-  regenerateQr: (id) => axiosClient.put(`/bookings/${id}/regenerate-qr`),
 };

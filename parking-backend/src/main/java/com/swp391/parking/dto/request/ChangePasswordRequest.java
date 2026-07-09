@@ -11,7 +11,7 @@ public class ChangePasswordRequest {
     private String currentPassword;
 
     @NotBlank(message = "New password khong duoc de trong")
-    @Size(min = 8, message = "New password toi thieu 8 ky tu")
+    @Size(min = 6, message = "New password toi thieu 6 ky tu")
     private String newPassword;
 
     @NotBlank(message = "Confirm password khong duoc de trong")

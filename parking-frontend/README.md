@@ -1,62 +1,16 @@
-# Parking Frontend
+# React + Vite
 
-## Local dev
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-Default local setup uses the Vite proxy in `.env`:
+Currently, two official plugins are available:
 
-```env
-VITE_API_URL=/api/v1
-```
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-Run the backend on `http://localhost:8080`, then start the frontend:
+## React Compiler
 
-```bash
-npm run dev
-```
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Share FE with ngrok and keep real BE data
+## Expanding the ESLint configuration
 
-When another person opens your frontend through ngrok, `/api` proxy is no longer enough. The frontend must call your backend through a public ngrok URL.
-
-1. Start backend locally on port `8080`.
-2. Open a backend tunnel:
-
-```bash
-ngrok http 8080
-```
-
-3. Copy the HTTPS ngrok URL for backend, for example:
-
-```text
-https://abc123.ngrok-free.app
-```
-
-4. Replace `.env` temporarily with:
-
-```env
-VITE_API_URL=https://abc123.ngrok-free.app/api/v1
-```
-
-You can also copy from `.env.ngrok.example`.
-
-5. Restart frontend:
-
-```bash
-npm run dev
-```
-
-6. Open a frontend tunnel:
-
-```bash
-ngrok http 5173
-```
-
-7. Share the frontend ngrok URL with testers.
-
-## Quick switch back to local
-
-After ngrok testing, set `.env` back to:
-
-```env
-VITE_API_URL=/api/v1
-```
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

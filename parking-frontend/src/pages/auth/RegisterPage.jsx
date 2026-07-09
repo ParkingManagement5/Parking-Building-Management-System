@@ -39,8 +39,8 @@ export default function RegisterPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Register</h1>
-        <p>Register your parking user account</p>
+        <h1>Create Account</h1>
+        <p>Register as parking user</p>
 
         <form onSubmit={handleRegister}>
           <div className="form-group">
@@ -74,7 +74,7 @@ export default function RegisterPage() {
         </form>
 
         <p className="auth-link">
-          Already have account? <a href="/login">Sign in</a>
+          Already have account? <a href="/login">Login</a>
         </p>
       </div>
     </div>
