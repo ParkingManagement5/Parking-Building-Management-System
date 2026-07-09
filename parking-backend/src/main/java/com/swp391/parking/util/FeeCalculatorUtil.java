@@ -1,6 +1,9 @@
 package com.swp391.parking.util;
 
 import com.swp391.parking.entity.PricingPolicy;
+import com.swp391.parking.service.SystemConfigService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -12,28 +15,48 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
+@Component
+@RequiredArgsConstructor
 public class FeeCalculatorUtil {
 
     private static final BigDecimal DEFAULT_RATE = new BigDecimal("20000");
-    public static final long GRACE_PERIOD_MINUTES = 10;
-    public static final long BILLING_BLOCK_MINUTES = 30;
+    private static final long DEFAULT_GRACE_PERIOD  = 10;
+    private static final long DEFAULT_BILLING_BLOCK = 30;
+
+    // Các timeType áp dụng flat-rate — không được dùng để resolve giá giờ
+    private static final Set<String> FLAT_RATE_TYPES = Set.of("DAILY", "WEEKLY", "MONTHLY");
+
+    private final SystemConfigService systemConfigService;
 
     /**
-     * Chọn hourlyRate đúng theo BR-12:
-     * PricingPolicy × vehicle_type × day_type × time_range
-     *
-     * "policies" có thể chứa NHIỀU PHIÊN BẢN của cùng 1 policy (do Manager sửa giá
-     * nhiều lần, mỗi lần sửa tạo 1 dòng mới với effectiveFrom mới). Với mỗi mức ưu
-     * tiên, ta chỉ xét các phiên bản đã "có hiệu lực" tại referenceTime
-     * (effectiveFrom <= referenceTime) và chọn phiên bản MỚI NHẤT trong số đó — để
-     * tính đúng giá đã áp dụng tại thời điểm đó, không bị ảnh hưởng bởi lần sửa giá
-     * sau này.
+     * Grace period (phút) đọc từ DB, fallback = 10.
+     * Admin có thể đổi qua SystemConfig key "GRACE_PERIOD_MINUTES".
      */
-    public static BigDecimal resolveHourlyRate(List<PricingPolicy> policies, LocalDateTime referenceTime) {
+    public long gracePeriodMinutes() {
+        return systemConfigService.getLongValue("GRACE_PERIOD_MINUTES", DEFAULT_GRACE_PERIOD);
+    }
+
+    /**
+     * Billing block (phút) đọc từ DB, fallback = 30.
+     * Admin có thể đổi qua SystemConfig key "BILLING_BLOCK_MINUTES".
+     */
+    public long billingBlockMinutes() {
+        return systemConfigService.getLongValue("BILLING_BLOCK_MINUTES", DEFAULT_BILLING_BLOCK);
+    }
+
+    /**
+     * Chọn hourlyRate đúng theo BR-12.
+     * Tự động loại bỏ các policy flat-rate (DAILY/WEEKLY/MONTHLY) — chỉ dùng policy tính theo giờ.
+     */
+    public BigDecimal resolveHourlyRate(List<PricingPolicy> policies, LocalDateTime referenceTime) {
         if (policies == null || policies.isEmpty()) return DEFAULT_RATE;
         LocalDateTime refTime = referenceTime != null ? referenceTime : LocalDateTime.now();
+
+        List<PricingPolicy> hourly = filterHourlyPolicies(policies);
+        if (hourly.isEmpty()) return DEFAULT_RATE;
 
         String dayType = isWeekend(refTime) ? "WEEKEND" : "WEEKDAY";
         int hour = refTime.getHour();
@@ -41,64 +64,136 @@ public class FeeCalculatorUtil {
         BigDecimal rate;
 
         // Ưu tiên 1: match cả dayType + timeRange
-        rate = latestEffectiveRate(policies, refTime,
+        rate = latestEffectiveRate(hourly, refTime,
                 p -> dayType.equalsIgnoreCase(p.getDayType()) && isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
         if (rate != null) return rate;
 
         // Ưu tiên 2: match dayType (bỏ qua timeRange)
-        rate = latestEffectiveRate(policies, refTime, p -> dayType.equalsIgnoreCase(p.getDayType()));
+        rate = latestEffectiveRate(hourly, refTime, p -> dayType.equalsIgnoreCase(p.getDayType()));
         if (rate != null) return rate;
 
         // Ưu tiên 3: match timeRange (bỏ qua dayType)
-        rate = latestEffectiveRate(policies, refTime, p -> isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
+        rate = latestEffectiveRate(hourly, refTime, p -> isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
         if (rate != null) return rate;
 
-        // Fallback: phiên bản mới nhất (tại referenceTime) trong toàn bộ danh sách,
-        // hoặc policy đầu tiên nếu không có phiên bản nào đã hiệu lực.
-        rate = latestEffectiveRate(policies, refTime, p -> true);
-        return rate != null ? rate : policies.get(0).getPricePerHour();
+        rate = latestEffectiveRate(hourly, refTime, p -> true);
+        return rate != null ? rate : hourly.get(0).getPricePerHour();
     }
 
-    private static BigDecimal latestEffectiveRate(List<PricingPolicy> policies,
-                                                   LocalDateTime referenceTime,
-                                                   Predicate<PricingPolicy> matcher) {
-        return policies.stream()
-                .filter(matcher)
-                .filter(p -> p.getEffectiveFrom() == null || !p.getEffectiveFrom().isAfter(referenceTime))
-                .max(Comparator.comparing(p -> p.getEffectiveFrom() == null ? LocalDateTime.MIN : p.getEffectiveFrom()))
-                .map(PricingPolicy::getPricePerHour)
-                .orElse(null);
-    }
-
-    public static BigDecimal calculateSessionFee(LocalDateTime entryTime,
-                                                 LocalDateTime exitTime,
-                                                 List<PricingPolicy> policies,
-                                                 BigDecimal fallbackRate) {
+    public BigDecimal calculateSessionFee(LocalDateTime entryTime,
+                                          LocalDateTime exitTime,
+                                          List<PricingPolicy> policies,
+                                          BigDecimal fallbackRate) {
         if (entryTime == null || exitTime == null) {
             return BigDecimal.ZERO;
         }
 
-        if (!exitTime.isAfter(entryTime.plusMinutes(GRACE_PERIOD_MINUTES))) {
+        long grace = gracePeriodMinutes();
+        if (!exitTime.isAfter(entryTime.plusMinutes(grace))) {
             return BigDecimal.ZERO;
         }
 
         BigDecimal defaultRate = fallbackRate != null ? fallbackRate : DEFAULT_RATE;
-        if (policies == null || policies.isEmpty()) {
-            return calculateWindowFee(entryTime.plusMinutes(GRACE_PERIOD_MINUTES), exitTime, defaultRate);
+        List<PricingPolicy> hourly = filterHourlyPolicies(policies);
+        if (hourly.isEmpty()) {
+            return calculateWindowFee(entryTime.plusMinutes(grace), exitTime, defaultRate);
         }
 
         BigDecimal total = BigDecimal.ZERO;
-        LocalDateTime cursor = entryTime.plusMinutes(GRACE_PERIOD_MINUTES);
+        LocalDateTime cursor = entryTime.plusMinutes(grace);
         while (cursor.isBefore(exitTime)) {
-            BigDecimal blockRate = resolveHourlyRate(policies, cursor);
-            LocalDateTime nextBoundary = findNextPolicyBoundary(cursor, policies);
+            BigDecimal blockRate = resolveHourlyRate(hourly, cursor);
+            LocalDateTime nextBoundary = findNextPolicyBoundary(cursor, hourly);
             LocalDateTime segmentEnd = min(exitTime, nextBoundary);
-
             total = total.add(calculateWindowFee(cursor, segmentEnd, blockRate != null ? blockRate : defaultRate));
             cursor = segmentEnd;
         }
 
         return total;
+    }
+
+    /** Lọc ra chỉ các policy tính theo giờ (loại trừ DAILY/WEEKLY/MONTHLY flat-rate). */
+    private static List<PricingPolicy> filterHourlyPolicies(List<PricingPolicy> policies) {
+        if (policies == null) return List.of();
+        return policies.stream()
+                .filter(p -> p.getTimeType() == null
+                        || !FLAT_RATE_TYPES.contains(p.getTimeType().toUpperCase()))
+                .toList();
+    }
+
+    /** Booking dài hạn (DAILY/WEEKLY/MONTHLY) tính phí flat-rate, không tích lũy theo block 30 phút. */
+    public BigDecimal calculateSessionFee(LocalDateTime entryTime,
+                                          LocalDateTime exitTime,
+                                          List<PricingPolicy> policies,
+                                          BigDecimal fallbackRate,
+                                          String bookingType) {
+        return calculateSessionFee(entryTime, exitTime, policies, fallbackRate, bookingType, null);
+    }
+
+    /**
+     * Tính phí booking dài hạn với bookingEndTime.
+     * - Phần trong hợp đồng (entry → contractEnd): flat rate × số đơn vị đặt
+     * - Phần overstay (contractEnd → exit): tính theo giờ block như walk-in, không thêm đơn vị trọn gói
+     * - Nếu ra sớm hơn contractEnd: vẫn tính đủ kỳ đặt (minimum = số đơn vị đã booking)
+     */
+    public BigDecimal calculateSessionFee(LocalDateTime entryTime,
+                                          LocalDateTime exitTime,
+                                          List<PricingPolicy> policies,
+                                          BigDecimal fallbackRate,
+                                          String bookingType,
+                                          LocalDateTime bookingEndTime) {
+        if (bookingType == null || "HOURLY".equalsIgnoreCase(bookingType)) {
+            return calculateSessionFee(entryTime, exitTime, policies, fallbackRate);
+        }
+        return calculateFlatFee(entryTime, exitTime, policies, fallbackRate, bookingType.toUpperCase(), bookingEndTime);
+    }
+
+    private static final long DAILY_UNIT_HOURS   = 24;
+    private static final long WEEKLY_UNIT_HOURS  = 7 * 24;
+    private static final long MONTHLY_UNIT_HOURS = 30 * 24;
+
+    private BigDecimal calculateFlatFee(LocalDateTime entryTime,
+                                        LocalDateTime exitTime,
+                                        List<PricingPolicy> policies,
+                                        BigDecimal fallbackRate,
+                                        String bookingType,
+                                        LocalDateTime bookingEndTime) {
+        if (entryTime == null || exitTime == null || !exitTime.isAfter(entryTime)) {
+            return BigDecimal.ZERO;
+        }
+        long unitHours = switch (bookingType) {
+            case "DAILY"   -> DAILY_UNIT_HOURS;
+            case "WEEKLY"  -> WEEKLY_UNIT_HOURS;
+            case "MONTHLY" -> MONTHLY_UNIT_HOURS;
+            default        -> DAILY_UNIT_HOURS;
+        };
+        BigDecimal rate = resolveFlatRate(policies, bookingType, entryTime);
+        if (rate == null) rate = fallbackRate != null ? fallbackRate : DEFAULT_RATE;
+
+        // Tính flat fee cho kỳ hợp đồng: entry → contractEnd (tối thiểu = kỳ đặt)
+        LocalDateTime contractEnd = (bookingEndTime != null && bookingEndTime.isAfter(entryTime))
+                ? bookingEndTime : exitTime;
+        long contractMinutes = Duration.between(entryTime, contractEnd).toMinutes();
+        long units = Math.max(1, (long) Math.ceil(contractMinutes / (double) (unitHours * 60)));
+        BigDecimal flatFee = rate.multiply(BigDecimal.valueOf(units));
+
+        // Overstay: thời gian vượt bookingEndTime → tính theo giờ block, không thêm đơn vị trọn gói
+        if (bookingEndTime != null && exitTime.isAfter(bookingEndTime)) {
+            BigDecimal overtimeFee = calculateSessionFee(bookingEndTime, exitTime, policies, fallbackRate);
+            return flatFee.add(overtimeFee);
+        }
+        return flatFee;
+    }
+
+    private static BigDecimal resolveFlatRate(List<PricingPolicy> policies, String bookingType, LocalDateTime referenceTime) {
+        if (policies == null || policies.isEmpty()) return null;
+        String dayType = isWeekend(referenceTime) ? "WEEKEND" : "WEEKDAY";
+        // Ưu tiên: đúng bookingType + đúng dayType
+        BigDecimal rate = latestEffectiveRate(policies, referenceTime,
+                p -> bookingType.equalsIgnoreCase(p.getTimeType()) && dayType.equalsIgnoreCase(p.getDayType()));
+        if (rate != null) return rate;
+        // Fallback: đúng bookingType, bất kỳ dayType
+        return latestEffectiveRate(policies, referenceTime, p -> bookingType.equalsIgnoreCase(p.getTimeType()));
     }
 
     private static boolean isWeekend(LocalDateTime dt) {
@@ -108,78 +203,57 @@ public class FeeCalculatorUtil {
 
     private static boolean isInTimeRange(int hour, Integer startHour, Integer endHour) {
         if (startHour == null || endHour == null) return true;
-        if (startHour < endHour) {
-            return hour >= startHour && hour < endHour;
-        }
-        // Night range: e.g. 22→6 means 22,23,0,1,2,3,4,5
+        if (startHour < endHour) return hour >= startHour && hour < endHour;
         return hour >= startHour || hour < endHour;
     }
 
-    /**
-     * Tính tổng phí thanh toán khi checkout
-     * total = base_fee + overtime_fee + penalty_fee - discount - deposit_deducted
-     */
+    /** Tính tổng phí: base + overtime + penalty - discount - deposit. Không để âm. */
     public static BigDecimal calculateTotal(BigDecimal baseFee,
-                                             BigDecimal overtimeFee,
-                                             BigDecimal penaltyFee,
-                                             BigDecimal discount,
-                                             BigDecimal depositDeducted) {
+                                            BigDecimal overtimeFee,
+                                            BigDecimal penaltyFee,
+                                            BigDecimal discount,
+                                            BigDecimal depositDeducted) {
+        BigDecimal base     = baseFee        != null ? baseFee        : BigDecimal.ZERO;
+        BigDecimal overtime = overtimeFee    != null ? overtimeFee    : BigDecimal.ZERO;
+        BigDecimal penalty  = penaltyFee     != null ? penaltyFee     : BigDecimal.ZERO;
+        BigDecimal disc     = discount       != null ? discount       : BigDecimal.ZERO;
+        BigDecimal deposit  = depositDeducted!= null ? depositDeducted: BigDecimal.ZERO;
 
-        BigDecimal base     = baseFee           != null ? baseFee           : BigDecimal.ZERO;
-        BigDecimal overtime = overtimeFee       != null ? overtimeFee       : BigDecimal.ZERO;
-        BigDecimal penalty  = penaltyFee        != null ? penaltyFee        : BigDecimal.ZERO;
-        BigDecimal disc     = discount          != null ? discount          : BigDecimal.ZERO;
-        BigDecimal deposit  = depositDeducted   != null ? depositDeducted   : BigDecimal.ZERO;
-
-        BigDecimal total = base.add(overtime)
-                              .add(penalty)
-                              .subtract(disc)
-                              .subtract(deposit);
-
-        // Không để âm
+        BigDecimal total = base.add(overtime).add(penalty).subtract(disc).subtract(deposit);
         return total.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : total;
     }
 
-    /**
-     * Tính phí đỗ xe dựa trên thời gian thực tế (entryTime → exitTime).
-     * Tối thiểu 1 giờ, làm tròn lên.
-     */
+    /** Overload đơn giản: tính phí theo hourly rate cố định, tối thiểu 1 giờ. */
     public static BigDecimal calculateSessionFee(LocalDateTime entryTime,
-                                                  LocalDateTime exitTime,
-                                                  BigDecimal hourlyRate) {
+                                                 LocalDateTime exitTime,
+                                                 BigDecimal hourlyRate) {
         if (entryTime == null || exitTime == null || hourlyRate == null) {
             return BigDecimal.ZERO;
         }
-
         long totalMinutes = Duration.between(entryTime, exitTime).toMinutes();
         if (totalMinutes < 0) totalMinutes = 0;
-
         long hours = Math.max(1, (long) Math.ceil(totalMinutes / 60.0));
-
         return hourlyRate.multiply(BigDecimal.valueOf(hours));
     }
 
-    private static BigDecimal calculateWindowFee(LocalDateTime start,
-                                                 LocalDateTime end,
-                                                 BigDecimal blockRate) {
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private BigDecimal calculateWindowFee(LocalDateTime start, LocalDateTime end, BigDecimal blockRate) {
         if (start == null || end == null || blockRate == null || !end.isAfter(start)) {
             return BigDecimal.ZERO;
         }
-
+        long billingBlock = billingBlockMinutes();
         long totalSeconds = Duration.between(start, end).getSeconds();
-        long blockSeconds = BILLING_BLOCK_MINUTES * 60;
+        long blockSeconds = billingBlock * 60;
         long blocks = Math.max(1, (long) Math.ceil(totalSeconds / (double) blockSeconds));
 
-        // Moi block la 30 phut = nua gio — truoc day nhan thang blockRate (gia ca GIO)
-        // cho moi block 30 phut, khien phi bi tinh gap doi thuc te (vd 1h31p bi tinh
-        // thanh 4 block x gia/gio = 4 gio, trong khi dung ra chi ~1.5-2 gio).
         BigDecimal perBlockRate = blockRate
-                .multiply(BigDecimal.valueOf(BILLING_BLOCK_MINUTES))
+                .multiply(BigDecimal.valueOf(billingBlock))
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         return perBlockRate.multiply(BigDecimal.valueOf(blocks));
     }
 
-    private static LocalDateTime findNextPolicyBoundary(LocalDateTime current, List<PricingPolicy> policies) {
+    private LocalDateTime findNextPolicyBoundary(LocalDateTime current, List<PricingPolicy> policies) {
         List<LocalDateTime> boundaries = new ArrayList<>();
         LocalDate today = current.toLocalDate();
         LocalDate tomorrow = today.plusDays(1);
@@ -190,26 +264,27 @@ public class FeeCalculatorUtil {
             addBoundary(boundaries, tomorrow, policy.getStartHour());
             addBoundary(boundaries, tomorrow, policy.getEndHour());
         }
-
-        // Ranh gioi nua dem - luon can thiet de phat hien doi ngay thuong/cuoi tuan,
-        // ke ca khi khong trung gio bat dau/ket thuc cua policy nao (VD: khung dem
-        // 22h-6h vat qua Chu nhat -> Thu 2 phai tach thanh 2 doan gia khac nhau).
         boundaries.add(LocalDateTime.of(tomorrow, LocalTime.MIDNIGHT));
-
-        // Ranh gioi tai moi moc Manager doi gia (effectiveFrom cua tung phien ban
-        // policy) - dam bao khi dang tinh phi cho mot phien do da qua ma giua chung
-        // Manager sua gia, doan truoc/sau moc sua se duoc tach rieng va tinh dung
-        // theo gia da ap dung tai tung thoi diem.
         for (PricingPolicy policy : policies) {
             if (policy.getEffectiveFrom() != null) {
                 boundaries.add(policy.getEffectiveFrom());
             }
         }
-
         return boundaries.stream()
-                .filter(boundary -> boundary.isAfter(current))
+                .filter(b -> b.isAfter(current))
                 .min(Comparator.naturalOrder())
-                .orElse(current.plusMinutes(BILLING_BLOCK_MINUTES));
+                .orElse(current.plusMinutes(billingBlockMinutes()));
+    }
+
+    private static BigDecimal latestEffectiveRate(List<PricingPolicy> policies,
+                                                  LocalDateTime referenceTime,
+                                                  Predicate<PricingPolicy> matcher) {
+        return policies.stream()
+                .filter(matcher)
+                .filter(p -> p.getEffectiveFrom() == null || !p.getEffectiveFrom().isAfter(referenceTime))
+                .max(Comparator.comparing(p -> p.getEffectiveFrom() == null ? LocalDateTime.MIN : p.getEffectiveFrom()))
+                .map(p -> p.getPricePerHour())
+                .orElse(null);
     }
 
     private static void addBoundary(List<LocalDateTime> boundaries, LocalDate date, Integer hour) {

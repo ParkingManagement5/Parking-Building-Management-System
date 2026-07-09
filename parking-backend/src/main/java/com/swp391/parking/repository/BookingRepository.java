@@ -32,14 +32,25 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // Scheduler: PENDING_PAYMENT hết expired_at
     List<Booking> findByStatusAndExpiredAtBefore(Booking.BookingStatus status, LocalDateTime now);
 
-    // Session-based: CONFIRMED quá hạn expiredAt
+    // CONFIRMED quá hạn expiredAt — WEEKLY/MONTHLY loại trừ (pass model: có hiệu lực suốt kỳ hạn)
     @Query("""
         SELECT b FROM Booking b
         WHERE b.status = 'CONFIRMED'
           AND b.bookingStartTime IS NOT NULL
           AND b.bookingStartTime <= :threshold
+          AND (b.bookingType IS NULL OR b.bookingType NOT IN ('WEEKLY', 'MONTHLY'))
     """)
     List<Booking> findConfirmedNoShow(@Param("threshold") LocalDateTime threshold);
+
+    // Pass booking (WEEKLY/MONTHLY) đã qua bookingEndTime và vẫn CONFIRMED (driver ra bãi giữa chừng)
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.status = 'CONFIRMED'
+          AND b.bookingType IN ('WEEKLY', 'MONTHLY')
+          AND b.bookingEndTime IS NOT NULL
+          AND b.bookingEndTime <= :now
+    """)
+    List<Booking> findExpiredPassBookings(@Param("now") LocalDateTime now);
 
     // Verify QR khi check-in
     Optional<Booking> findByQrToken(String qrToken);
