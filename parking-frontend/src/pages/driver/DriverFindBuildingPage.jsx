@@ -5,6 +5,26 @@ import { buildingApi } from "../../api/manager/buildingApi";
 import { unwrapApiData } from "../../utils/api";
 import "leaflet/dist/leaflet.css";
 
+/* ── Occupancy badge ── */
+function OccupancyBadge({ pct, available, total }) {
+  if (pct == null) return null;
+  const label = pct >= 80 ? "Gần đầy" : pct >= 50 ? "Trung bình" : "Còn trống";
+  const dot =
+    pct >= 80 ? "bg-rose-500" : pct >= 50 ? "bg-amber-400" : "bg-emerald-500";
+  const cls =
+    pct >= 80
+      ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+      : pct >= 50
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>
+      <span className={`size-1.5 rounded-full ${dot}`} />
+      {label} · {pct}% · {available}/{total} slot
+    </span>
+  );
+}
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const earthRadiusKm = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -85,6 +105,7 @@ export default function DriverFindBuildingPage() {
   const markersRef = useRef([]);
 
   const [buildings, setBuildings] = useState([]);
+  const [occupancyMap, setOccupancyMap] = useState({}); // buildingId → {occupancyPercent, availableSlots, totalSlots}
   const [driverPos, setDriverPos] = useState(null);
   const [geoError, setGeoError] = useState("");
   const [dataError, setDataError] = useState("");
@@ -93,22 +114,31 @@ export default function DriverFindBuildingPage() {
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    buildingApi
-      .getAll()
-      .then((res) => {
-        const list = unwrapApiData(res.data, []);
-        setBuildings(
-          list
-            .filter((building) => building.latitude != null && building.longitude != null)
-            .map(normalizeBuilding)
-        );
-        setDataError("");
-      })
-      .catch((err) => {
-        setBuildings([]);
-        setDataError(err.response?.data?.message || "Khong tai duoc danh sach bai do co toa do.");
-      })
-      .finally(() => setLoading(false));
+    // Fetch danh sách bãi và tình trạng lấp đầy song song
+    Promise.all([
+      buildingApi.getAll(),
+      buildingApi.getAvailability().catch(() => null), // graceful fallback nếu endpoint chưa có
+    ]).then(([buildingRes, availRes]) => {
+      const list = unwrapApiData(buildingRes.data, []);
+      setBuildings(
+        list
+          .filter((b) => b.latitude != null && b.longitude != null)
+          .map(normalizeBuilding)
+      );
+      setDataError("");
+
+      if (availRes) {
+        const raw = unwrapApiData(availRes.data, []);
+        const map = {};
+        raw.forEach((item) => {
+          map[item.buildingId] = item;
+        });
+        setOccupancyMap(map);
+      }
+    }).catch((err) => {
+      setBuildings([]);
+      setDataError(err.response?.data?.message || "Khong tai duoc danh sach bai do co toa do.");
+    }).finally(() => setLoading(false));
   }, []);
 
   function requestGeo() {
@@ -234,11 +264,15 @@ export default function DriverFindBuildingPage() {
         popupAnchor: [0, -46],
       });
 
+      const occ = occupancyMap[building.id];
+      const occHtml = occ
+        ? `<br/><span style="font-size:12px;color:${occ.occupancyPercent >= 80 ? "#e11d48" : occ.occupancyPercent >= 50 ? "#d97706" : "#059669"};font-weight:600;">${occ.occupancyPercent >= 80 ? "🔴 Gần đầy" : occ.occupancyPercent >= 50 ? "🟡 Trung bình" : "🟢 Còn trống"} ${occ.occupancyPercent}% · Còn ${occ.availableSlots}/${occ.totalSlots} slot</span>`
+        : "";
       const marker = leaflet
         .marker([building.markerLat, building.markerLon], { icon: buildingIcon })
         .addTo(map)
         .bindPopup(
-          `<b style="font-size:13px">${building.name}</b><br/><span style="color:#6b7280;font-size:12px">${building.address || ""}</span>${dist ? `<br/><span style="color:#059669;font-size:12px">Khoang cach: ${dist}</span>` : ""}${building.nearbyCount > 1 ? `<br/><span style="color:#f59e0b;font-size:12px">Cum khu vuc nay co ${building.nearbyCount} bai do o rat gan nhau. Marker da duoc tach nhe de de nhin.</span>` : ""}`
+          `<b style="font-size:13px">${building.name}</b><br/><span style="color:#6b7280;font-size:12px">${building.address || ""}</span>${dist ? `<br/><span style="color:#059669;font-size:12px">Khoang cach: ${dist}</span>` : ""}${occHtml}${building.nearbyCount > 1 ? `<br/><span style="color:#f59e0b;font-size:12px">Cum khu vuc nay co ${building.nearbyCount} bai do o rat gan nhau. Marker da duoc tach nhe de de nhin.</span>` : ""}`
         );
 
       markersRef.current.push(marker);
@@ -292,7 +326,7 @@ export default function DriverFindBuildingPage() {
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [42, 42], maxZoom: 15 });
     }
-  }, [mapReady, plottedBuildings, driverPos]);
+  }, [mapReady, plottedBuildings, driverPos, occupancyMap]);
 
   function handleBooking(building) {
     navigate("/driver/booking", { state: { buildingName: building.name } });
@@ -393,6 +427,15 @@ export default function DriverFindBuildingPage() {
                       <MapPin size={10} />
                       {formatDistance(building.distKm)} tu ban
                     </p>
+                  )}
+                  {occupancyMap[building.id] && (
+                    <div className="mt-2">
+                      <OccupancyBadge
+                        pct={occupancyMap[building.id].occupancyPercent}
+                        available={occupancyMap[building.id].availableSlots}
+                        total={occupancyMap[building.id].totalSlots}
+                      />
+                    </div>
                   )}
                 </div>
               </div>

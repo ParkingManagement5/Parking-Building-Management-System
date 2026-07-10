@@ -133,6 +133,12 @@ export default function PublicSlotListPage() {
   const metaLoadedRef = useRef(false);
   const slotCacheRef = useRef(new Map());
 
+  // Map refs
+  const mapRef = useRef(null);
+  const leafletRef = useRef(null);
+  const markersRef = useRef([]);
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
@@ -226,6 +232,88 @@ export default function PublicSlotListPage() {
 
     return () => clearInterval(timerRef.current);
   }, [filterBuilding]);
+
+  // Khởi tạo Leaflet map khi chưa chọn bãi cụ thể
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (filterBuilding) {
+      // Huỷ map khi đã chọn bãi
+      if (leafletRef.current?.map) {
+        leafletRef.current.map.remove();
+        leafletRef.current = null;
+        setMapReady(false);
+      }
+      return;
+    }
+
+    import("leaflet").then((leafletModule) => {
+      const L = leafletModule.default || leafletModule;
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+
+      if (!mapRef.current || leafletRef.current) return;
+
+      const map = L.map(mapRef.current, { center: [10.7769, 106.7009], zoom: 12 });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(map);
+
+      leafletRef.current = { map, L };
+      setMapReady(true);
+    });
+
+    return () => {
+      if (leafletRef.current?.map) {
+        leafletRef.current.map.remove();
+        leafletRef.current = null;
+        setMapReady(false);
+      }
+    };
+  }, [filterBuilding]);
+
+  // Vẽ markers khi map sẵn sàng và buildings đã load
+  useEffect(() => {
+    if (!mapReady || !leafletRef.current || filterBuilding) return;
+    const { map, L } = leafletRef.current;
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    const withCoords = buildings.filter((b) => b.latitude != null && b.longitude != null);
+    const bounds = [];
+
+    withCoords.forEach((b) => {
+      const bid = String(getBuildingId(b));
+      const icon = L.divIcon({
+        html: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.4));">
+          <div style="background:#059669;color:#fff;width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:3px solid #fff;">
+            <span style="transform:rotate(45deg);font-size:16px;font-weight:900;line-height:1;">P</span>
+          </div>
+          <div style="margin-top:4px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(15,23,42,0.92);color:#fff;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;">${b.name}</div>
+        </div>`,
+        className: "",
+        iconSize: [36, 58],
+        iconAnchor: [18, 40],
+        popupAnchor: [0, -42],
+      });
+
+      const marker = L.marker([Number(b.latitude), Number(b.longitude)], { icon })
+        .addTo(map)
+        .bindPopup(`<b style="font-size:13px">${b.name}</b><br/><span style="color:#059669;font-size:12px">Click để xem sơ đồ slot</span>`);
+
+      marker.on("click", () => setFilterBuilding(bid));
+      markersRef.current.push(marker);
+      bounds.push([Number(b.latitude), Number(b.longitude)]);
+    });
+
+    if (bounds.length > 0) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
+  }, [mapReady, buildings, filterBuilding]);
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -471,203 +559,225 @@ export default function PublicSlotListPage() {
 
   return (
     <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100vh", background: "var(--bg)" }}>
-      <div style={{ maxWidth: 1260, margin: "0 auto", padding: isCompact ? "24px 14px 40px" : "40px 24px 56px" }}>
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: isCompact ? "20px 14px 48px" : "32px 28px 64px" }}>
+
+        {/* ── Header ── */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <div>
-              <h1 style={{ fontSize: "1.7rem", fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
-                Bản đồ slot công khai
+              <h1 style={{ margin: 0, fontSize: isCompact ? "1.35rem" : "1.55rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>
+                {filterBuilding ? (activeBuilding?.name || "Bãi đỗ xe") : "Tìm bãi đỗ xe gần bạn"}
               </h1>
+              <p style={{ margin: "4px 0 0", fontSize: "0.83rem", color: "var(--text-muted)" }}>
+                {filterBuilding
+                  ? `${activeBuilding?.stats.available ?? 0} chỗ trống · ${activeBuilding?.stats.total ?? 0} tổng`
+                  : `${buildings.length} bãi · ${stats.available} chỗ trống toàn hệ thống`}
+              </p>
             </div>
-            {refreshing && slots.length > 0 ? (
-              <span
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 999,
-                  background: "rgba(34,197,94,0.12)",
-                  color: "var(--accent)",
-                  fontSize: "0.76rem",
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Đang cập nhật dữ liệu...
-              </span>
-            ) : null}
+            {refreshing && (
+              <span style={{ fontSize: "0.76rem", color: "var(--accent)", fontWeight: 600 }}>Đang cập nhật...</span>
+            )}
           </div>
         </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isCompact ? "repeat(2, minmax(0, 1fr))" : "repeat(12, minmax(0, 1fr))",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {statCards.map((item) => (
-            <div
-              key={item.label}
-              style={{
-                gridColumn: isCompact ? "span 1" : "span 2",
-                padding: isCompact ? "12px" : "12px 16px",
-                borderRadius: 16,
-                border: "1px solid var(--border)",
-                background: "var(--bg-elevated)",
-                display: "flex",
-                alignItems: isCompact ? "flex-start" : "center",
-                gap: 12,
-                minHeight: isCompact ? 104 : 88,
-                minWidth: 0,
-              }}
-            >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "var(--radius-sm)",
-                  background: item.color,
-                  flexShrink: 0,
-                }}
-              />
-              <div>
-                <div style={{ fontSize: isCompact ? "1.12rem" : "1.2rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>{item.value}</div>
-                <div style={{ fontSize: isCompact ? "0.76rem" : "0.78rem", color: "var(--text-muted)", marginTop: 4, wordBreak: "break-word" }}>{item.label}</div>
-              </div>
-            </div>
-          ))}
-
-          <div style={{ ...card, gridColumn: isCompact ? "1 / -1" : "span 6", padding: isCompact ? 14 : 16, minHeight: 88 }}>
-            <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>
-              Tìm bãi nhanh
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr" : "1.1fr 1fr 1.2fr", gap: 10, alignItems: "center" }}>
-            <select
-              value={filterBuilding}
-              onChange={(e) => setFilterBuilding(e.target.value)}
-              style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
-            >
-              <option value="">Tất cả bãi đỗ</option>
-              {buildings.map((building) => (
-                <option key={getBuildingId(building)} value={String(getBuildingId(building))}>
-                  {building.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterVehicle}
-              onChange={(e) => setFilterVehicle(e.target.value)}
-              style={{ ...inputStyle, cursor: "pointer", appearance: "auto" }}
-            >
-              <option value="">Tất cả loại xe</option>
-              {vehicleTypes.map((vehicle) => (
-                <option key={getVehicleTypeId(vehicle)} value={String(getVehicleTypeId(vehicle))}>
-                  {vehicle.name}
-                </option>
-              ))}
-            </select>
-
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo mã slot, tầng hoặc tên bãi đỗ..."
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
-            {Object.entries(SLOT_COLORS).slice(0, 3).map(([status, color]) => (
-              <span key={status} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                <span style={{ width: 10, height: 10, borderRadius: 999, background: color }} />
-                {SLOT_LABELS[status]}
-              </span>
-            ))}
-          </div>
-          </div>
-        </div>
-
-        {loading && slots.length === 0 && (
-          <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Đang tải dữ liệu bãi đỗ...</p>
-          </div>
-        )}
 
         {error && (
-          <div style={{ ...card, borderColor: "var(--danger)", background: "rgba(255,77,77,0.08)", color: "#ff6b6b", marginBottom: 24, fontSize: "0.9rem" }}>
+          <div style={{ background: "rgba(255,77,77,0.08)", border: "1px solid rgba(255,77,77,0.2)", borderRadius: 14, padding: "12px 16px", color: "#ff6b6b", fontSize: "0.88rem", marginBottom: 20 }}>
             {error}
           </div>
         )}
 
-        {!loading && filtered.length === 0 && !error && (
-          <div style={{ ...card, textAlign: "center", padding: "60px 20px" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Không tìm thấy slot nào phù hợp.</p>
-          </div>
-        )}
-
-        {!loading && groupedBuildings.length > 0 && (
+        {/* ════════════════════════════════
+            MAP VIEW — chưa chọn bãi
+            ════════════════════════════════ */}
+        {!filterBuilding && (
           <>
-            {activeBuilding && (
-              <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                <div style={{ padding: "18px 24px 24px" }}>
-                  {activeBuilding.floors.length > 1 && (
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>
-                        Chọn tầng
-                      </div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {activeBuilding.floors.map((floor) => {
-                        const active = activeFloor?.key === floor.key;
-                        return (
-                          <button
-                            key={floor.key}
-                            onClick={() => setSelectedFloorKey(floor.key)}
-                            style={{
-                              padding: "11px 16px",
-                              borderRadius: 14,
-                              border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
-                              background: active ? "var(--accent-dim)" : "var(--bg-elevated)",
-                              color: active ? "var(--accent)" : "var(--text-secondary)",
-                              fontWeight: 700,
-                              fontSize: "0.84rem",
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                            }}
-                          >
-                            {shortenFloorLabel(floor.floor, floor.floorNumber)}
-                          </button>
-                        );
-                      })}
-                      </div>
-                    </div>
-                  )}
+            {/* Map */}
+            <div style={{ borderRadius: 20, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 20 }}>
+              <div ref={mapRef} style={{ height: isCompact ? 340 : 460, width: "100%" }} />
+            </div>
 
-                  {activeFloor && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-                        <div>
-                          <div style={{ fontSize: "1.02rem", fontWeight: 700, color: "var(--text)" }}>{activeFloor.floor}</div>
+            {/* Building cards */}
+            {buildings.length > 0 && (
+              <div>
+                <p style={{ margin: "0 0 12px", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Chọn bãi xe
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: isCompact ? "1fr 1fr" : "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
+                  {buildings.map((b) => {
+                    const bid = String(getBuildingId(b));
+                    const bData = groupedBuildings.find((g) => g.id === bid);
+                    const avail = bData?.stats.available;
+                    const total = bData?.stats.total;
+                    const pct = bData && total ? Math.round((avail / total) * 100) : null;
+                    const dotColor = pct == null ? "#64748b" : pct <= 20 ? "#ef4444" : pct <= 50 ? "#f59e0b" : "#22c55e";
+                    const availLabel = loading ? "Đang tải..." : bData ? `${avail}/${total} trống` : "Chưa có dữ liệu";
+                    return (
+                      <button
+                        key={bid}
+                        onClick={() => setFilterBuilding(bid)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "14px 16px", borderRadius: 16,
+                          border: "1px solid var(--border)", background: "var(--bg-elevated)",
+                          cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                          transition: "border-color 0.15s, background 0.15s",
+                        }}
+                      >
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                          background: "rgba(34,197,94,0.12)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "1rem", fontWeight: 900, color: "var(--accent)",
+                        }}>P</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: "0.87rem", fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {b.name}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{availLabel}</span>
+                          </div>
                         </div>
-                      </div>
-
-                      {renderZoneMap(activeFloor)}
-                    </div>
-                  )}
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
+            )}
+
+            {loading && buildings.length === 0 && (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                Đang tải danh sách bãi...
               </div>
             )}
           </>
         )}
 
-        {!loading && filtered.length > 0 && (
-          <div style={{ marginTop: 22, textAlign: "center" }}>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-              Hiển thị {filtered.length} / {slots.length} slot -
-              <Link to="/login" style={{ color: "var(--accent)", fontWeight: 600, marginLeft: 4 }}>
-                Đăng nhập để đặt chỗ
-              </Link>
-            </p>
-          </div>
+        {/* ════════════════════════════════
+            DETAIL VIEW — đã chọn bãi
+            ════════════════════════════════ */}
+        {filterBuilding && (
+          <>
+            {/* Toolbar: back + switch building + vehicle type */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setFilterBuilding("")}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 14px", borderRadius: 10,
+                  border: "1px solid var(--border)", background: "var(--bg-elevated)",
+                  color: "var(--text)", fontSize: "0.84rem", fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                ← Bản đồ
+              </button>
+              <select
+                value={filterBuilding}
+                onChange={(e) => setFilterBuilding(e.target.value)}
+                style={{ ...inputStyle, width: "auto", minWidth: 160, flex: "1 1 160px", maxWidth: 280 }}
+              >
+                {buildings.map((b) => (
+                  <option key={getBuildingId(b)} value={String(getBuildingId(b))}>{b.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterVehicle}
+                onChange={(e) => setFilterVehicle(e.target.value)}
+                style={{ ...inputStyle, width: "auto", minWidth: 130, flex: "0 0 auto" }}
+              >
+                <option value="">Tất cả loại xe</option>
+                {vehicleTypes.map((vt) => (
+                  <option key={getVehicleTypeId(vt)} value={String(getVehicleTypeId(vt))}>{vt.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {loading && (
+              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                Đang tải sơ đồ bãi...
+              </div>
+            )}
+
+            {!loading && activeBuilding && (
+              <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+                <div style={{ padding: isCompact ? "16px" : "20px 28px 28px" }}>
+
+                  {/* Slot status summary */}
+                  <div style={{ display: "flex", gap: isCompact ? 12 : 20, marginBottom: 20, flexWrap: "wrap" }}>
+                    {[
+                      { label: "Còn trống", value: activeBuilding.stats.available, color: "#22c55e" },
+                      { label: "Đang đỗ",   value: activeBuilding.stats.occupied,  color: "#ef4444" },
+                      { label: "Đã đặt",    value: activeBuilding.stats.reserved,  color: "#f59e0b" },
+                      { label: "Tổng slot", value: activeBuilding.stats.total,     color: "var(--text-muted)" },
+                    ].map((s) => (
+                      <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{s.label}</span>
+                        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text)" }}>{s.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Floor tabs */}
+                  {activeBuilding.floors.length > 1 && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                      {activeBuilding.floors.map((floor) => {
+                        const isActive = activeFloor?.key === floor.key;
+                        return (
+                          <button
+                            key={floor.key}
+                            onClick={() => setSelectedFloorKey(floor.key)}
+                            style={{
+                              padding: "9px 16px", borderRadius: 12,
+                              border: `1.5px solid ${isActive ? "var(--accent)" : "var(--border)"}`,
+                              background: isActive ? "var(--accent-dim)" : "transparent",
+                              color: isActive ? "var(--accent)" : "var(--text-secondary)",
+                              fontWeight: 700, fontSize: "0.84rem",
+                              cursor: "pointer", fontFamily: "inherit",
+                            }}
+                          >
+                            {shortenFloorLabel(floor.floor, floor.floorNumber)}
+                            <span style={{ marginLeft: 6, fontSize: "0.72rem", opacity: 0.75 }}>
+                              {floor.stats.available} trống
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Zone map */}
+                  {activeFloor && (
+                    <>
+                      <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: 14 }}>
+                        {activeFloor.floor}
+                      </div>
+                      {renderZoneMap(activeFloor)}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!loading && !activeBuilding && !error && (
+              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text-muted)" }}>
+                Bãi này chưa có dữ liệu slot.
+              </div>
+            )}
+
+            {/* Đăng nhập CTA */}
+            {!loading && activeBuilding && (
+              <div style={{ marginTop: 20, textAlign: "center" }}>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                  Thấy chỗ ưng ý?&nbsp;
+                  <Link to="/login" style={{ color: "var(--accent)", fontWeight: 700 }}>
+                    Đăng nhập để đặt chỗ ngay
+                  </Link>
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

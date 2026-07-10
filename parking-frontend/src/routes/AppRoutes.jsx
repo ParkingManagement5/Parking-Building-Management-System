@@ -32,10 +32,8 @@ import ExceptionCasePage from "../pages/staff/ExceptionCasePage";
 import ManagerDashboard from "../pages/manager/ManagerDashboard";
 import ManagerNotificationPage from "../pages/manager/ManagerNotificationPage";
 import ReportsPage from "../pages/manager/ReportsPage";
-<<<<<<< HEAD
 import RevenueReportPage from "../pages/manager/RevenueReportPage";
-=======
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
+import FloorOccupancyPage from "../pages/manager/FloorOccupancyPage";
 import ParkingStructurePage from "../pages/parking/ParkingStructurePage";
 import VehicleTypePage from "../pages/parking/VehicleTypePage";
 import PricingPolicyPage from "../pages/manager/PricingPolicyPage";
@@ -98,6 +96,7 @@ export default function AppRoutes() {
             <Route path="payments" element={<PaymentProcessingPage />} />
             <Route path="requests" element={<RequestProcessingPage />} />
             <Route path="exceptions" element={<ExceptionCasePage />} />
+            <Route path="floor-occupancy" element={<FloorOccupancyPage />} />
             <Route path="notifications" element={<StaffNotificationPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="staff" />} />
           </Route>
@@ -116,10 +115,7 @@ export default function AppRoutes() {
             <Route path="pricing-policies" element={<PricingPolicyPage />} />
             <Route path="staff-shifts" element={<StaffShiftPage />} />
             <Route path="reports" element={<ReportsPage />} />
-<<<<<<< HEAD
             <Route path="reports/revenue" element={<RevenueReportPage />} />
-=======
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
             <Route path="notifications" element={<ManagerNotificationPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="manager" />} />
           </Route>
