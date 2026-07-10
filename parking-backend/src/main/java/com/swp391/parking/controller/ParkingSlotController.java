@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.SlotRequest;
 import com.swp391.parking.dto.response.ApiResponse;
+import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
@@ -44,6 +45,19 @@ public class ParkingSlotController {
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAvailable(@RequestParam Long vehicleTypeId) {
         return ResponseEntity.ok(ApiResponse.success(
             slotService.getAvailableByVehicleType(vehicleTypeId)));
+    }
+
+    // Cong khai, khong can auth - 1 query gop toan bo slot he thong, thay the cho
+    // viec frontend truoc day phai goi rieng tung zone (hang tram request, cham
+    // va de mat du lieu do timeout khi so luong toa nha lon).
+    @GetMapping("/public")
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getPublicOverview() {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getPublicOverview()));
+    }
+
+    @GetMapping("/public-stats")
+    public ResponseEntity<ApiResponse<PublicSlotStatsResponse>> getPublicStats() {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getPublicStats()));
     }
 
     @GetMapping("/zone/{zoneId}")
