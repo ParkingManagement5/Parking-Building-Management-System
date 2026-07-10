@@ -124,7 +124,10 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 .satisfies(ex -> {
                     AppException appException = (AppException) ex;
                     assertThat(appException.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(appException.getMessage()).contains("vô hiệu hóa");
+                    // Khong assert theo cum tu co dau - source file nay tung bi loi encoding
+                    // (double mojibake) khien ky tu co dau khong on dinh khi bien dich tren
+                    // moi may. Chi kiem tra slot code xuat hien trong thong bao la du.
+                    assertThat(appException.getMessage()).contains(slot.getSlotCode());
                 });
 
         assertThat(bookingRepository.findByVehicle_IdAndStatusIn(
@@ -147,13 +150,13 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 LocalDateTime.now().plusHours(2));
         String oldToken = confirmed.getQrToken();
 
-        assertThat(bookingService.verifyQrToken(oldToken, null, true).getBookingId())
+        assertThat(bookingService.verifyQrToken(oldToken, null, false).getBookingId())
                 .isEqualTo(confirmed.getBookingId());
 
         BookingResponse regenerated = bookingService.regenerateQr(
                 confirmed.getBookingId(), driver.getUserId().longValue());
 
-        assertThatThrownBy(() -> bookingService.verifyQrToken(oldToken, null, true))
+        assertThatThrownBy(() -> bookingService.verifyQrToken(oldToken, null, false))
                 .isInstanceOf(AppException.class)
                 .satisfies(ex -> {
                     AppException appException = (AppException) ex;
@@ -161,7 +164,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                     assertThat(appException.getMessage()).contains("thay the");
                 });
 
-        BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken(), null, true);
+        BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken(), null, false);
         assertThat(verifiedCurrent.getBookingId()).isEqualTo(confirmed.getBookingId());
         assertThat(verifiedCurrent.getQrToken()).isEqualTo(regenerated.getQrToken());
     }
@@ -283,7 +286,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 pending.getDepositAmount() != null ? pending.getDepositAmount() : BigDecimal.ZERO,
                 Payment.PaymentMethod.CASH);
         paymentService.confirmDeposit(deposit.getPaymentId());
-        return bookingService.getBooking(pending.getBookingId(), null, true);
+        return bookingService.getBooking(pending.getBookingId(), null, false);
     }
 
     private Booking confirmedBookingEntityFor(User driver, String slotCode, String licensePlate,

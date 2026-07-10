@@ -42,6 +42,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PricingPolicyRepository pricingPolicyRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final FeeCalculatorUtil feeCalculatorUtil;
     private final EmailService emailService;
 
     @Override
@@ -181,8 +182,10 @@ public class PaymentServiceImpl implements PaymentService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session #" + sessionId + " chua co thoi gian ra (exitTime null), khong the tinh phi");
         }
-        BigDecimal serverBaseFee = FeeCalculatorUtil.calculateSessionFee(
-                session.getEntryTime(), session.getExitTime(), activePolicies, serverRate);
+        String bookingType = session.getBooking() != null ? session.getBooking().getBookingType() : null;
+        LocalDateTime bookingEndTime = session.getBooking() != null ? session.getBooking().getBookingEndTime() : null;
+        BigDecimal serverBaseFee = feeCalculatorUtil.calculateSessionFee(
+                session.getEntryTime(), session.getExitTime(), activePolicies, serverRate, bookingType, bookingEndTime);
 
         BigDecimal serverDeposit = BigDecimal.ZERO;
         if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
@@ -415,6 +418,80 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    @Override
+    @Transactional
+    public PaymentResponse createPassBookingFinalFee(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+
+        String bookingType = booking.getBookingType();
+        if (!"WEEKLY".equalsIgnoreCase(bookingType) && !"MONTHLY".equalsIgnoreCase(bookingType)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chi tao pass fee cho booking WEEKLY/MONTHLY");
+        }
+
+        // Idempotent: nếu đã có PENDING hoặc PAID fee thì trả về luôn
+        List<Payment> existingFees = paymentRepository.findByBookingId(bookingId.intValue()).stream()
+                .filter(p -> p.getPaymentType() == PaymentType.PARKING_FEE)
+                .toList();
+        Payment existingPending = existingFees.stream()
+                .filter(p -> p.getPaymentStatus() == PaymentStatus.PENDING).findFirst().orElse(null);
+        boolean hasPaidFee = existingFees.stream().anyMatch(p -> p.getPaymentStatus() == PaymentStatus.PAID);
+        if (hasPaidFee || existingPending != null) {
+            return toResponse(existingPending != null ? existingPending : existingFees.get(0));
+        }
+
+        List<PricingPolicy> policies = List.of();
+        BigDecimal hourlyRate = new BigDecimal("20000");
+        if (booking.getVehicle() != null && booking.getVehicle().getVehicleType() != null) {
+            Long vtId = booking.getVehicle().getVehicleType().getId();
+            policies = pricingPolicyRepository.findByVehicleType_Id(vtId);
+            hourlyRate = feeCalculatorUtil.resolveHourlyRate(policies, booking.getBookingStartTime());
+        }
+
+        LocalDateTime start = booking.getBookingStartTime();
+        LocalDateTime end = booking.getBookingEndTime();
+        BigDecimal baseFee = feeCalculatorUtil.calculateSessionFee(
+                start, end, policies, hourlyRate, bookingType, end);
+        BigDecimal deposit = booking.getDepositAmount() != null ? booking.getDepositAmount() : BigDecimal.ZERO;
+        BigDecimal total = FeeCalculatorUtil.calculateTotal(
+                baseFee, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, deposit);
+
+        booking.setStatus(Booking.BookingStatus.WAITING_PAYMENT);
+        bookingRepository.save(booking);
+
+        Payment payment = Payment.builder()
+                .sessionId(null)
+                .bookingId(bookingId.intValue())
+                .paymentType(PaymentType.PARKING_FEE)
+                .paymentMethod(PaymentMethod.CASH)
+                .paymentStatus(PaymentStatus.PENDING)
+                .appliedRate(hourlyRate)
+                .baseFee(baseFee)
+                .overtimeFee(BigDecimal.ZERO)
+                .penaltyFee(BigDecimal.ZERO)
+                .discount(BigDecimal.ZERO)
+                .depositDeducted(deposit)
+                .totalAmount(total)
+                .build();
+
+        if (total.compareTo(BigDecimal.ZERO) == 0) {
+            payment.setPaymentStatus(PaymentStatus.PAID);
+            payment.setPaidAt(LocalDateTime.now());
+            payment.setTransactionRef("FREE-PASS-" + bookingId);
+            Payment saved = paymentRepository.save(payment);
+            completeSessionAfterParkingFee(saved);
+            return toResponse(saved);
+        }
+
+        Payment saved = paymentRepository.save(payment);
+        try {
+            notificationService.notify(booking.getUserId(), "Thanh toan phi do xe",
+                    "Booking #" + bookingId + " (" + bookingType + ") het han. Phi: " + total + " VND. Vui long thanh toan.",
+                    "warning", "PAYMENT", saved.getPaymentId());
+        } catch (Exception ignored) {}
+        return toResponse(saved);
+    }
+
     private Payment findById(Integer paymentId) {
         return paymentRepository.findById(paymentId)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Payment not found"));
@@ -429,7 +506,7 @@ public class PaymentServiceImpl implements PaymentService {
         // effectiveFrom tai thoi diem entryTime.
         List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vtId);
         LocalDateTime refTime = session.getEntryTime() != null ? session.getEntryTime() : LocalDateTime.now();
-        return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
+        return feeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }
 
     private void validateRefundEligibility(Payment payment) {
@@ -449,9 +526,9 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         if (payment.getPaymentType() == PaymentType.PARKING_FEE) {
+            // Pass booking final fee không có session — có thể refund nếu booking COMPLETED
             if (payment.getSessionId() == null) {
-                throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Parking fee khong gan voi session, khong the refund");
+                return;
             }
             ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue())
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session khong ton tai"));
@@ -463,7 +540,29 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void completeSessionAfterParkingFee(Payment payment) {
-        if (payment.getSessionId() == null || payment.getPaymentType() != PaymentType.PARKING_FEE) {
+        if (payment.getPaymentType() != PaymentType.PARKING_FEE) {
+            return;
+        }
+
+        // Pass booking final fee: không có session — hoàn tất booking + giải phóng slot trực tiếp
+        if (payment.getSessionId() == null) {
+            if (payment.getBookingId() != null) {
+                Booking booking = bookingRepository.findById(payment.getBookingId().longValue()).orElse(null);
+                if (booking != null) {
+                    booking.setStatus(Booking.BookingStatus.COMPLETED);
+                    bookingRepository.save(booking);
+                    ParkingSlot slot = booking.getSlot();
+                    if (slot != null) {
+                        slot.setStatus(ParkingSlot.Status.AVAILABLE);
+                        parkingSlotRepository.save(slot);
+                    }
+                    try {
+                        notificationService.notify(booking.getUserId(), "Thanh toan hoan tat",
+                                "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
+                                "success", "PAYMENT", payment.getPaymentId());
+                    } catch (Exception ignored) {}
+                }
+            }
             return;
         }
 

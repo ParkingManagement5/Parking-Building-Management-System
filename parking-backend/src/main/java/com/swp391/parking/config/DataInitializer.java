@@ -9,10 +9,12 @@ import com.swp391.parking.entity.User;
 import com.swp391.parking.entity.Vehicle;
 import com.swp391.parking.entity.VehicleType;
 import com.swp391.parking.entity.Zone;
+import com.swp391.parking.entity.SystemConfig;
 import com.swp391.parking.repository.FloorRepository;
 import com.swp391.parking.repository.GateRepository;
 import com.swp391.parking.repository.ParkingBuildingRepository;
 import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.SystemConfigRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.VehicleRepository;
 import com.swp391.parking.repository.VehicleTypeRepository;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
@@ -30,7 +33,11 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+// Chi seed du lieu demo cho DB that (dev/prod). Khong chay o profile "test" vi
+// DB test (H2) khoi tao rong hoan toan moi lan chay - cac test class tu dung
+// AbstractIntegrationTestSupport de tao fixture rieng cho tung test.
 @Configuration
+@Profile("!test")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -47,7 +54,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private static final List<BuildingSeed> HCMC_BUILDINGS = List.of(
             new BuildingSeed("Bai xe FPT HCM", "Lo E2a-7, Duong D1, Long Thanh My, Thu Duc, TP.HCM", "0900000010", "parking@fpt.edu.vn", "Bai do xe demo 2 tang oto tai khu FPT HCM", 10.8413, 106.8098, "FPTHCM"),
-            new BuildingSeed("Bai xe Nhà Văn Hóa Sinh Viên", "53 Vo Van Tan, Phuong Vo Thi Sau, Quan 3, TP.HCM", "0900000011", "pipink@parking.vn", "Bai do xe Pi Pink duoc chuan hoa lai du lieu va giao dien", 10.7813, 106.6917, "PIPINK"),
+            new BuildingSeed("Bai xe Pi Pink", "53 Vo Van Tan, Phuong Vo Thi Sau, Quan 3, TP.HCM", "0900000011", "pipink@parking.vn", "Bai do xe Pi Pink layout demo 2 tang O to", 10.7813, 106.6917, "PIPINK"),
             new BuildingSeed("Bai xe Ben Bach Dang", "Ton Duc Thang, Ben Nghe, Quan 1, TP.HCM", "0900000012", "bachdang@parking.vn", "Bai do xe oto gan pho di bo Nguyen Hue", 10.7729, 106.7053, "BACHDANG"),
             new BuildingSeed("Bai xe Tao Dan", "Truong Dinh, Phuong Ben Thanh, Quan 1, TP.HCM", "0900000013", "taodan@parking.vn", "Bai do xe oto phuc vu khu cong vien Tao Dan", 10.7774, 106.6922, "TAODAN"),
             new BuildingSeed("Bai xe Le Van Tam", "Hai Ba Trung, Da Kao, Quan 1, TP.HCM", "0900000014", "levantam@parking.vn", "Bai do xe oto gan cong vien Le Van Tam", 10.7873, 106.7001, "LEVANTAM"),
@@ -69,12 +76,32 @@ public class DataInitializer implements CommandLineRunner {
     private final ZoneRepository zoneRepository;
     private final ParkingSlotRepository parkingSlotRepository;
     private final GateRepository gateRepository;
+    private final SystemConfigRepository systemConfigRepository;
 
     @Override
     @Transactional
     public void run(String... args) {
+        seedSystemConfigs();
         seedParkingBuildingsAndLayouts();
         seedStaffTestVehicles();
+    }
+
+    private void seedSystemConfigs() {
+        ensureConfig("GRACE_PERIOD_MINUTES",    "10", "Thoi gian cho phep mien phi (phut) - xe dau duoi thoi gian nay khong tinh tien");
+        ensureConfig("BILLING_BLOCK_MINUTES",   "30", "Don vi tinh phi (phut) - phi duoc tinh theo tung block thoi gian nay");
+        ensureConfig("BOOKING_EXPIRE_AFTER_START", "30", "So phut sau bookingStartTime ma booking CONFIRMED bi auto-expire neu driver chua check-in");
+    }
+
+    private void ensureConfig(String key, String defaultValue, String description) {
+        if (!systemConfigRepository.existsByConfigKey(key)) {
+            systemConfigRepository.save(SystemConfig.builder()
+                    .configKey(key)
+                    .configValue(defaultValue)
+                    .description(description)
+                    .updatedAt(java.time.LocalDateTime.now())
+                    .build());
+            log.info("Seeded SystemConfig: {}={}", key, defaultValue);
+        }
     }
 
     private void seedParkingBuildingsAndLayouts() {

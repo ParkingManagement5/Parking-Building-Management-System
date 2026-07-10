@@ -144,6 +144,7 @@ CREATE TABLE `booking` (
     `slot_id` int NOT NULL,
     `booking_start_time` datetime,
     `booking_end_time` datetime,
+    `booking_type` varchar(20) NOT NULL DEFAULT 'HOURLY', -- HOURLY, DAILY, WEEKLY, MONTHLY
     `reserved_at` datetime,
     `expired_at` datetime,
     `qr_token` varchar(500) UNIQUE,
@@ -166,11 +167,7 @@ CREATE TABLE `parking_session` (
     `exit_gate_id` int,
     `entry_time` datetime,
     `exit_time` datetime,
-<<<<<<< HEAD
     `entry_mode` varchar(30) NOT NULL,
-=======
-    `entry_mode` varchar(20) NOT NULL,
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `status` varchar(30) NOT NULL,
     `created_at` datetime,
     `updated_at` datetime
@@ -254,10 +251,7 @@ CREATE TABLE `request` (
     `request_id` int PRIMARY KEY AUTO_INCREMENT,
     `user_id` int NOT NULL,
     `assigned_staff_id` int,
-<<<<<<< HEAD
     `building_id` int DEFAULT NULL,
-=======
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `request_type` varchar(30) NOT NULL,
     `subject` varchar(200),
     `description` text,
@@ -271,10 +265,7 @@ CREATE TABLE `exception_case` (
     `exception_id` int PRIMARY KEY AUTO_INCREMENT,
     `session_id` int,
     `request_id` int,
-<<<<<<< HEAD
     `booking_id` int DEFAULT NULL,
-=======
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
     `exception_type` varchar(30) NOT NULL,
     `description` varchar(500),
     `status` varchar(20) NOT NULL,
@@ -361,6 +352,7 @@ ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`gate_id`) REFERENCES `gate` (`gate_id`)
 ALTER TABLE `ocr_scan` ADD FOREIGN KEY (`corrected_by_user_id`) REFERENCES `users` (`user_id`);
 ALTER TABLE `request` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
 ALTER TABLE `request` ADD FOREIGN KEY (`assigned_staff_id`) REFERENCES `users` (`user_id`);
+ALTER TABLE `request` ADD FOREIGN KEY (`building_id`) REFERENCES `parking_building` (`building_id`);
 ALTER TABLE `exception_case` ADD FOREIGN KEY (`session_id`) REFERENCES `parking_session` (`session_id`);
 ALTER TABLE `exception_case` ADD FOREIGN KEY (`request_id`) REFERENCES `request` (`request_id`);
 ALTER TABLE `exception_case` ADD FOREIGN KEY (`resolved_by`) REFERENCES `users` (`user_id`);
@@ -612,15 +604,15 @@ INSERT INTO `gate`
 
 -- 10. Pricing Policy (chỉ 2 loại xe)
 INSERT INTO `pricing_policy`
-(`vehicle_type_id`, `time_type`, `day_type`, `start_hour`, `end_hour`, `price_per_hour`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'NORMAL', 'WEEKDAY',  6, 22,  5000.00, true, NOW(), NOW()),
-(1, 'NIGHT',  'WEEKDAY', 22,  6,  4000.00, true, NOW(), NOW()),
-(1, 'NORMAL', 'WEEKEND',  6, 22,  6000.00, true, NOW(), NOW()),
-(1, 'NIGHT',  'WEEKEND', 22,  6,  5000.00, true, NOW(), NOW()),
-(2, 'NORMAL', 'WEEKDAY',  6, 22, 15000.00, true, NOW(), NOW()),
-(2, 'NIGHT',  'WEEKDAY', 22,  6, 12000.00, true, NOW(), NOW()),
-(2, 'NORMAL', 'WEEKEND',  6, 22, 20000.00, true, NOW(), NOW()),
-(2, 'NIGHT',  'WEEKEND', 22,  6, 15000.00, true, NOW(), NOW());
+(`vehicle_type_id`, `time_type`, `day_type`, `start_hour`, `end_hour`, `price_per_hour`, `effective_from`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 'NORMAL', 'WEEKDAY',  6, 22,  5000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(1, 'NIGHT',  'WEEKDAY', 22,  6,  4000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(1, 'NORMAL', 'WEEKEND',  6, 22,  6000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(1, 'NIGHT',  'WEEKEND', 22,  6,  5000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(2, 'NORMAL', 'WEEKDAY',  6, 22, 15000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(2, 'NIGHT',  'WEEKDAY', 22,  6, 12000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(2, 'NORMAL', 'WEEKEND',  6, 22, 20000.00, '2025-01-01 00:00:00', true, NOW(), NOW()),
+(2, 'NIGHT',  'WEEKEND', 22,  6, 15000.00, '2025-01-01 00:00:00', true, NOW(), NOW());
 
 -- 11. Vehicles (driver1: 1 moto + 1 car, driver2: 1 moto)
 INSERT INTO `vehicle`

@@ -21,6 +21,7 @@ public class BookingResponse {
     private String buildingName;
     private LocalDateTime bookingStartTime;
     private LocalDateTime bookingEndTime;
+    private String bookingType;
     private LocalDateTime reservedAt;
     private LocalDateTime expiredAt;
     private String qrToken;

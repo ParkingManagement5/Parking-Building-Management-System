@@ -50,6 +50,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     private final SlotAssignmentService slotAssignmentService;
     private final NotificationService notificationService;
     private final PaymentService paymentService;
+    private final FeeCalculatorUtil feeCalculatorUtil;
 
     @Override
     @Transactional
@@ -358,12 +359,62 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         session.setExitGate(gate);
         session.setExitTime(LocalDateTime.now());
+
+        // ── Pass model: WEEKLY/MONTHLY mid-period exit ───────────────────────
+        // Nếu xe ra trước bookingEndTime → giữ slot RESERVED, reset booking CONFIRMED
+        // để driver có thể quét lại QR cũ và vào bãi trong cùng kỳ hạn.
+        Booking booking = session.getBooking();
+        String bookingType = booking != null ? booking.getBookingType() : null;
+        boolean isPassBooking = "WEEKLY".equalsIgnoreCase(bookingType)
+                || "MONTHLY".equalsIgnoreCase(bookingType);
+        boolean isMidPeriodExit = isPassBooking
+                && booking.getBookingEndTime() != null
+                && session.getExitTime().isBefore(booking.getBookingEndTime());
+
+        if (isMidPeriodExit) {
+            session.setStatus(ParkingSession.SessionStatus.COMPLETED);
+            session = sessionRepository.save(session);
+
+            booking.setStatus(Booking.BookingStatus.CONFIRMED);
+            booking.setQrUsedAt(null);
+            bookingRepository.save(booking);
+
+            ParkingSlot passSlot = session.getSlot();
+            if (passSlot != null) {
+                passSlot.setStatus(ParkingSlot.Status.RESERVED);
+                parkingSlotRepository.save(passSlot);
+            }
+
+            saveGateLog(gate, session, session.getVehicle().getLicensePlate(),
+                    GateLog.EventType.EXIT, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
+
+            String plate = session.getVehicle().getLicensePlate();
+            log.info("Session #{} mid-period exit for booking #{} ({}), slot RESERVED",
+                    sessionId, booking.getId(), bookingType);
+
+            notificationService.notify(session.getUserId(), "Xe da ra bai",
+                    "Xe " + plate + " da ra. Slot van duoc giu den "
+                            + booking.getBookingEndTime() + ". Co the vao lai voi QR.",
+                    "info", "SESSION", session.getId().intValue());
+
+            Long midBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
+            if (midBuildingId != null) {
+                notificationService.notifyStaffInBuilding(midBuildingId, "Xe ra (pass)",
+                        "Xe " + plate + " ra bai, slot giu cho booking " + bookingType + " #" + booking.getId(),
+                        "info", "SESSION", session.getId().intValue());
+            } else {
+                notificationService.notifyAllStaff("Xe ra (pass)",
+                        "Xe " + plate + " ra bai, slot giu cho booking " + bookingType + " #" + booking.getId(),
+                        "info", "SESSION", session.getId().intValue());
+            }
+            return toResponse(session);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Exit chi ghi nhan xe ra cong; session chi COMPLETED sau khi parking fee duoc confirm.
         session.setStatus(ParkingSession.SessionStatus.WAITING_PAYMENT);
         session = sessionRepository.save(session);
 
-        // Cập nhật booking gắn với session (nếu có)
-        Booking booking = session.getBooking();
         if (booking != null && booking.getStatus() == Booking.BookingStatus.CHECKED_IN) {
             booking.setStatus(Booking.BookingStatus.WAITING_PAYMENT);
             bookingRepository.save(booking);
@@ -713,7 +764,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         // sau nay.
         List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vehicleTypeId);
         LocalDateTime refTime = s.getEntryTime() != null ? s.getEntryTime() : LocalDateTime.now();
-        return FeeCalculatorUtil.resolveHourlyRate(policies, refTime);
+        return feeCalculatorUtil.resolveHourlyRate(policies, refTime);
     }
 
     private SessionResponse toResponse(ParkingSession s) {
@@ -724,8 +775,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                     s.getVehicle().getVehicleType().getId());
         }
         LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
+        String bookingType = s.getBooking() != null ? s.getBooking().getBookingType() : null;
+        LocalDateTime bookingEndTime = s.getBooking() != null ? s.getBooking().getBookingEndTime() : null;
         BigDecimal calculatedFee = s.getEntryTime() != null
-                ? FeeCalculatorUtil.calculateSessionFee(s.getEntryTime(), endTime, activePolicies, hourlyRate)
+                ? feeCalculatorUtil.calculateSessionFee(s.getEntryTime(), endTime, activePolicies, hourlyRate, bookingType, bookingEndTime)
                 : BigDecimal.ZERO;
         BigDecimal depositAmount = s.getBooking() != null ? s.getBooking().getDepositAmount() : BigDecimal.ZERO;
 
