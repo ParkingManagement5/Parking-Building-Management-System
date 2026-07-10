@@ -243,7 +243,7 @@ export default function RevenueReportPage() {
           {vtData.length > 0 ? (
             <div className="chart-card">
               <h3 style={{ fontWeight: 700, marginBottom: 20, color: "var(--text)" }}>
-                Revenue by Vehicle Type — {isDailyView ? `${MONTH_NAMES_FULL[month]} ${year}` : year}
+                Revenue by Vehicle Type — {year}
               </h3>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 32, alignItems: "center" }}>
                 <ResponsiveContainer width={240} height={240}>

@@ -75,11 +75,11 @@ function WaitingPaymentAction() {
     <>
       <p className="text-sm font-semibold text-foreground">Chờ thanh toán phí đỗ xe</p>
       <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
-        Staff da ghi nhan xe ra cong. Vui long thanh toan truc tiep voi nhan vien o cong ra de hoan tat phien.
+        Staff đã ghi nhận xe ra cổng. Vui lòng thanh toán trực tiếp với nhân viên ở cổng ra để hoàn tất phiên.
       </p>
       <div className="mt-3 flex flex-col gap-2 w-full max-w-xs">
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-          Staff se thu tien mat hoac dua ma QR VNPay tai quay thanh toan. Driver khong tu tao payment o buoc nay.
+          Staff sẽ thu tiền mặt hoặc đưa mã QR VNPay tại quầy thanh toán. Driver không tự tạo payment ở bước này.
         </div>
         <button type="button" onClick={() => navigate("/driver/payments")}
           className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">

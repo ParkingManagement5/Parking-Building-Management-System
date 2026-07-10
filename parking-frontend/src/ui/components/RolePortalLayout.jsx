@@ -61,6 +61,7 @@ const CONFIG = {
         items: [
           { id: "exceptions", label: "Ngoại lệ" },
           { id: "requests", label: "Yêu cầu" },
+          { id: "floor-occupancy", label: "Lấp đầy theo tầng" },
           { id: "notifications", label: "Thông báo" },
         ],
       },
@@ -81,12 +82,8 @@ const CONFIG = {
       {
         label: "Báo cáo",
         items: [
-<<<<<<< HEAD
           { id: "reports", label: "Báo cáo & Thống kê" },
           { id: "reports/revenue", label: "Doanh thu" },
-=======
-          { id: "reports", label: "Doanh thu & Lượt xe" },
->>>>>>> 2f994eb249bcc671e13c698d817f6336e28ce1ab
         ],
       },
       {

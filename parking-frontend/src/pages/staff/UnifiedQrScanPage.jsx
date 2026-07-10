@@ -6,7 +6,6 @@ import {
   QrCode, RefreshCw, Search, ScanLine, Video, VideoOff, X, XCircle,
 } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
-import { buildingApi } from "../../api/manager/buildingApi";
 import { gateApi } from "../../api/manager/gateApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { exceptionApi } from "../../api/staff/exceptionApi";
@@ -32,19 +31,15 @@ function normalizePlateDisplay(value) {
   const canonical = canonicalPlate(value);
   if (!canonical) return "";
 
-  // Lay 5 (uu tien) hoac 4 so cuoi lam serial, phan con lai la prefix nguyen ven —
-  // giong het logic backend (LicensePlateUtil.FIVE_DIGIT_SERIAL) de tranh regex
-  // co dinh so chu/so trong series nuot nham 1 chu so cua serial (vd "51L66666"
-  // truoc day ra "51-L6-6666" sai, dung phai la "51L-666.66").
-  const match =
-    canonical.match(/^(.+?)(\d{5})$/) ||
-    canonical.match(/^(.+?)(\d{4})$/);
+  // Chi tu dong chen dau khi chac chan serial la 5 so (giong het logic backend
+  // LicensePlateUtil.normalizeDisplay/FIVE_DIGIT_SERIAL). Voi serial 4 so hoac it hon,
+  // khong the biet chac ranh gioi giua ma tinh/series va serial (vd "55SA2345" co the la
+  // "55-SA 2345" hoac dang khac) nen giu nguyen dinh dang nguoi dung da nhap, chi xoa
+  // khoang trang - tranh doan sai vi tri dau gach ngang nhu truoc day ("55SA-2345" sai).
+  const match = canonical.match(/^(.+?)(\d{5})$/);
   if (match) {
     const [, prefix, serial] = match;
-    if (serial.length === 5) {
-      return `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`;
-    }
-    return `${prefix}-${serial}`;
+    return `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`;
   }
 
   return String(value ?? "").toUpperCase().replace(/\s+/g, "");
@@ -97,9 +92,8 @@ export default function UnifiedScanPage() {
   const qrControlsRef = useRef(null);
   const [qrCameraOn, setQrCameraOn] = useState(false);
 
-  // Gate
-  const [buildingId, setBuildingId] = useState(assignedId || "");
-  const [buildings, setBuildings] = useState([]);
+  // Gate — buildingId cố định theo assignedBuilding, không cho đổi
+  const buildingId = assignedId || "";
   const [gates, setGates] = useState([]);
   const [gateId, setGateId] = useState("");
   const [scopeError, setScopeError] = useState("");
@@ -119,7 +113,7 @@ export default function UnifiedScanPage() {
   const isConfirmedBooking = lookupType === "BOOKING" && bookingStatus === "CONFIRMED";
   const isPendingPaymentBooking = lookupType === "BOOKING" && bookingStatus === "PENDING_PAYMENT";
 
-  useEffect(() => { loadBuildings(); loadVehicleTypes(); return () => stopCamera(); }, []);
+  useEffect(() => { loadVehicleTypes(); return () => stopCamera(); }, []);
 
   async function loadVehicleTypes() {
     try {
@@ -141,12 +135,12 @@ export default function UnifiedScanPage() {
           const g = unwrapApiData(res.data, []);
           setGates(g);
           setGateId(String(g[0]?.gateId || g[0]?.id || ""));
-          setScopeError(g.length ? "" : "Toa nha hien tai chua co cong active cho staff scan.");
+          setScopeError(g.length ? "" : "Tòa nhà hiện tại chưa có cổng active. Liên hệ Manager để thêm cổng.");
         }
       } catch (err) {
         if (!c) {
           setGates([]);
-          setScopeError(err.response?.data?.message || "Khong tai duoc danh sach cong cho toa nha hien tai.");
+          setScopeError(err.response?.data?.message || "Không tải được danh sách cổng cho tòa nhà hiện tại.");
         }
       }
     })();
@@ -157,20 +151,6 @@ export default function UnifiedScanPage() {
     if (filteredGates.length && !filteredGates.find((g) => String(g.gateId || g.id) === gateId))
       setGateId(String(filteredGates[0]?.gateId || filteredGates[0]?.id || ""));
   }, [filteredGates]);
-
-  async function loadBuildings() {
-    try {
-      const res = await buildingApi.getAll();
-      const bs = unwrapApiData(res.data, []);
-      setBuildings(bs);
-      setScopeError("");
-      if (assignedId) setBuildingId(assignedId);
-      else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
-      else setScopeError("He thong chua co toa nha nao de staff thao tac.");
-    } catch (err) {
-      setScopeError(err.response?.data?.message || "Khong tai duoc danh sach toa nha.");
-    }
-  }
 
   async function proceedWithResolvedPlate(rawPlate, nextConfidence = null) {
     const normalizedPlate = normalizePlateDisplay(rawPlate);
@@ -562,6 +542,16 @@ export default function UnifiedScanPage() {
     setShowManualEntry(false); setManualPlate(""); setManualEntryError(""); setManualExitSuggestions([]); setManualExitLoading(false);
   }
 
+  // Guard: staff chưa được gán bãi → không cho scan
+  if (!assignedId) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-6 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+        <p className="font-semibold mb-1">Chưa được gán bãi xe</p>
+        <p>Tài khoản của bạn chưa được Manager phân công vào bãi xe nào. Vui lòng liên hệ Manager để được gán bãi trước khi sử dụng tính năng scan cổng.</p>
+      </div>
+    );
+  }
+
   // Step indicator
   const steps = ["Scan bien so", "Xac minh", "Hoan tat"];
 
@@ -592,14 +582,7 @@ export default function UnifiedScanPage() {
               )}
               {/* Gate select */}
               <div className="mb-4 grid gap-3 md:grid-cols-2">
-                {assignedId ? (
-                  <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel || `Building #${assignedId}`}</div>
-                ) : (
-                  <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
-                    <option value="">Chon toa nha</option>
-                    {buildings.map((b) => <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>)}
-                  </StaffSelect>
-                )}
+                <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel || `Building #${assignedId}`}</div>
                 <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
                   <option value="">Chon cong</option>
                   {gates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
@@ -808,14 +791,7 @@ export default function UnifiedScanPage() {
                   {lookupType !== "BLOCKED" && (
                     <>
                       <div className="grid gap-3 md:grid-cols-2">
-                        {assignedId ? (
-                          <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel}</div>
-                        ) : (
-                          <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
-                            <option value="">Chon toa nha</option>
-                            {buildings.map((b) => <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>)}
-                          </StaffSelect>
-                        )}
+                        <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel}</div>
                         <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
                           <option value="">Chon cong ({lookupType === "EXIT" ? "EXIT" : "ENTRY"})</option>
                           {filteredGates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
