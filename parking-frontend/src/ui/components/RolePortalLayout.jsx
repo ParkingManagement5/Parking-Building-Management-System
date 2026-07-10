@@ -17,7 +17,8 @@ const CONFIG = {
       {
         label: "Đỗ xe",
         items: [
-          { id: "booking", label: "Đặt chỗ" },
+          { id: "booking", label: "Đặt chỗ theo giờ" },
+          { id: "package-booking", label: "Đăng ký gói ngày/tuần/tháng" },
           { id: "current-session", label: "Phiên hiện tại" },
           { id: "parking-map", label: "Bản đồ bãi" },
           { id: "find-building", label: "Tìm bãi đỗ" },
@@ -27,6 +28,7 @@ const CONFIG = {
         label: "Hồ sơ",
         items: [
           { id: "bookings", label: "Lịch sử đặt" },
+          { id: "session-history", label: "Lịch sử đỗ xe" },
           { id: "payments", label: "Thanh toán" },
           { id: "vehicles", label: "Xe của tôi" },
         ],

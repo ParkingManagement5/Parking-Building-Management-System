@@ -8,6 +8,7 @@ import com.swp391.parking.repository.*;
 import com.swp391.parking.service.BookingService;
 import com.swp391.parking.service.NotificationService;
 import com.swp391.parking.service.SystemConfigService;
+import com.swp391.parking.util.FeeCalculatorUtil;
 import com.swp391.parking.util.LicensePlateUtil;
 import com.swp391.parking.util.QrTokenUtil;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,8 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final SystemConfigService systemConfigService;
+    private final PricingPolicyRepository pricingPolicyRepository;
+    private final FeeCalculatorUtil feeCalculatorUtil;
 
     @Override
     @Transactional
@@ -133,8 +136,27 @@ public class BookingServiceImpl implements BookingService {
                     "Pháº£i Ä‘áº·t trÆ°á»›c Ã­t nháº¥t " + minAdvanceMinutes + " phÃºt.");
         }
 
-        LocalDateTime endTime = request.getBookingEndTime() != null
-                ? request.getBookingEndTime() : startTime.plusHours(2);
+        String bookingType = request.getBookingType() != null && !request.getBookingType().isBlank()
+                ? request.getBookingType().toUpperCase() : "HOURLY";
+
+        LocalDateTime endTime;
+        if ("HOURLY".equals(bookingType)) {
+            endTime = request.getBookingEndTime() != null
+                    ? request.getBookingEndTime() : startTime.plusHours(2);
+        } else {
+            Integer durationUnits = request.getDurationUnits();
+            if (durationUnits == null || durationUnits < 1) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "durationUnits phai >= 1 khi bookingType khac HOURLY");
+            }
+            endTime = switch (bookingType) {
+                case "DAILY" -> startTime.plusDays(durationUnits);
+                case "WEEKLY" -> startTime.plusWeeks(durationUnits);
+                case "MONTHLY" -> startTime.plusMonths(durationUnits);
+                default -> throw new AppException(HttpStatus.BAD_REQUEST,
+                        "bookingType khong hop le: " + bookingType);
+            };
+        }
 
         if (!endTime.isAfter(startTime)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -149,7 +171,16 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // TÃ­nh deposit (tiá»n Ä‘áº·t chá»— â€” máº¥t náº¿u khÃ´ng Ä‘áº¿n)
-        BigDecimal deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
+        // Flat-rate booking (DAILY/WEEKLY/MONTHLY) mien coc
+        BigDecimal deposit;
+        if ("HOURLY".equals(bookingType)) {
+            deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
+        } else if ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType)) {
+            // Prepay tron goi: driver tra toan bo phi flat-rate truoc khi nhan QR
+            deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime);
+        } else {
+            deposit = BigDecimal.ZERO; // DAILY: mien coc, tra luc ra
+        }
 
         Booking booking = Booking.builder()
                 .userId(currentUserId)
@@ -157,6 +188,7 @@ public class BookingServiceImpl implements BookingService {
                 .slot(slot)
                 .bookingStartTime(startTime)
                 .bookingEndTime(endTime)
+                .bookingType(bookingType)
                 .reservedAt(now)
                 .expiredAt(expiredAt)
                 .depositAmount(deposit)
@@ -166,9 +198,14 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         log.info("Booking #{} táº¡o bá»Ÿi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
 
+        String paymentHint = ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType))
+                ? "Vui long thanh toan phi tron goi de nhan QR."
+                : "DAILY".equals(bookingType)
+                        ? "Dat cho thanh cong, thanh toan khi ra khoi bai."
+                        : "Vui long thanh toan coc de nhan QR.";
         notificationService.notify(currentUserId,
                 "Dat cho thanh cong",
-                "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " da duoc tao. Vui long thanh toan coc de nhan QR.",
+                "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " da duoc tao. " + paymentHint,
                 "info", "BOOKING", booking.getId().intValue());
 
         return toResponse(booking);
@@ -190,6 +227,13 @@ public class BookingServiceImpl implements BookingService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+
+        // Payment deadline (expiredAt) already passed - reject confirmation even
+        // if the gate-entry QR window (bookingStartTime + 30 min) is still open.
+        if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(now)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Booking #" + bookingId + " da qua han thanh toan, khong the xac nhan");
+        }
 
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
@@ -372,6 +416,11 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getBookingStartTime() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Booking thieu bookingStartTime");
         }
+        // Booking dài hạn: QR có hiệu lực đến hết bookingEndTime (driver có thể vào trong cả kỳ hợp đồng)
+        String type = booking.getBookingType();
+        if (type != null && !type.equalsIgnoreCase("HOURLY") && booking.getBookingEndTime() != null) {
+            return booking.getBookingEndTime().withNano(0);
+        }
         long expireAfterStart = systemConfigService.getLongValue("BOOKING_EXPIRE_AFTER_START", 30);
         return booking.getBookingStartTime().plusMinutes(expireAfterStart).withNano(0);
     }
@@ -410,6 +459,15 @@ public class BookingServiceImpl implements BookingService {
         if (minutesUntilStart < 240) return new BigDecimal("15000");
         if (minutesUntilStart < 360) return new BigDecimal("20000");
         return new BigDecimal("30000");
+    }
+
+    private BigDecimal calculatePrepayFlatRate(Vehicle vehicle, String bookingType,
+                                               LocalDateTime startTime, LocalDateTime endTime) {
+        if (vehicle.getVehicleType() == null) return BigDecimal.ZERO;
+        List<PricingPolicy> active = pricingPolicyRepository
+                .findByVehicleType_IdAndIsActiveTrue(vehicle.getVehicleType().getId());
+        BigDecimal fallback = feeCalculatorUtil.resolveHourlyRate(active, startTime);
+        return feeCalculatorUtil.calculateSessionFee(startTime, endTime, active, fallback, bookingType, endTime);
     }
 
     private boolean isWithinCancelRefundWindow(LocalDateTime depositPaidAt, long cancelWindowMinutes) {
@@ -476,6 +534,7 @@ public class BookingServiceImpl implements BookingService {
                 .buildingName(building.getName())
                 .bookingStartTime(b.getBookingStartTime())
                 .bookingEndTime(b.getBookingEndTime())
+                .bookingType(b.getBookingType())
                 .reservedAt(b.getReservedAt())
                 .expiredAt(b.getExpiredAt())
                 .qrToken(b.getStatus() == Booking.BookingStatus.CONFIRMED
