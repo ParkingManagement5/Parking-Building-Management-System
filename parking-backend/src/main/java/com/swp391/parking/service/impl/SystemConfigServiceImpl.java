@@ -41,7 +41,7 @@ public class SystemConfigServiceImpl implements SystemConfigService {
                 .build();
         SystemConfig saved = systemConfigRepository.save(config);
         activityLogService.log(user.getUserId(), "SYSTEM_CONFIG_CHANGE",
-                user.getUsername() + " da tao cau hinh " + saved.getConfigKey());
+                user.getUsername() + " đã tạo cấu hình " + saved.getConfigKey());
         return toResponse(saved);
     }
 
@@ -57,7 +57,7 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         config.setUpdatedAt(LocalDateTime.now());
         SystemConfig saved = systemConfigRepository.save(config);
         activityLogService.log(user.getUserId(), "SYSTEM_CONFIG_CHANGE",
-                user.getUsername() + " da cap nhat cau hinh " + saved.getConfigKey() + " = " + saved.getConfigValue());
+                user.getUsername() + " đã cập nhật cấu hình " + saved.getConfigKey() + " = " + saved.getConfigValue());
         return toResponse(saved);
     }
 

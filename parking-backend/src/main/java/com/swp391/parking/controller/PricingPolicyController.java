@@ -54,11 +54,11 @@ public class PricingPolicyController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete pricing policy")
+    @Operation(summary = "Deactivate pricing policy (soft-delete, preserves history for fee recalculation)")
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         pricingPolicyService.deletePolicy(id);
-        return ResponseEntity.ok(ApiResponse.success("Policy deleted", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã tắt bảng giá", null));
     }
 
     @PatchMapping("/{id}/activate")

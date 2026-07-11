@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 public class ChangeUserRoleRequest {
 
-    @NotBlank(message = "Role khong duoc de trong")
+    @NotBlank(message = "Role không được để trống")
     private String roleName;
 }

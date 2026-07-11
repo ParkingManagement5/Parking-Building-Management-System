@@ -51,7 +51,7 @@ export default function QrVerificationPage() {
         slotCode: "--",
         status: "REVIEW",
         verifiedAt: new Date().toISOString(),
-        message: err.response?.data?.message || "QR khong hop le hoac da het han.",
+        message: err.response?.data?.message || "QR không hợp lệ hoặc đã hết hạn.",
       };
       setResult(verification);
       setLogs((prev) => [verification, ...prev].slice(0, 5));

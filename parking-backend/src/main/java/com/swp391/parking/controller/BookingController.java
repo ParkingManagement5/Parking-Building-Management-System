@@ -55,7 +55,7 @@ public class BookingController {
         boolean isDriver = ud.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
         if (isDriver && !booking.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking nay");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem booking này");
         }
         return ResponseEntity.ok(ApiResponse.success(booking));
     }
@@ -89,7 +89,7 @@ public class BookingController {
             @AuthenticationPrincipal UserDetails ud) {
         boolean isStaff = ud.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
-        return ResponseEntity.ok(ApiResponse.success("QR hop le",
+        return ResponseEntity.ok(ApiResponse.success("QR hợp lệ",
                 bookingService.verifyQrToken(qrToken, getCurrentUserId(ud), isStaff)));
     }
 

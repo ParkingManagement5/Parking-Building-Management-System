@@ -47,7 +47,7 @@ public class UserController {
             @PathVariable Integer userId,
             @RequestParam Long buildingId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Gan building thanh cong",
+                "Gán building thành công",
                 userAdminService.assignBuilding(userId, buildingId)));
     }
 
@@ -58,7 +58,7 @@ public class UserController {
             Authentication authentication,
             @Valid @RequestBody ChangeUserRoleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Cap nhat role thanh cong",
+                "Cập nhật role thành công",
                 userAdminService.changeUserRole(userId, request, authentication.getName())));
     }
 
@@ -69,7 +69,7 @@ public class UserController {
             Authentication authentication,
             @Valid @RequestBody ChangeUserStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Cap nhat trang thai thanh cong",
+                "Cập nhật trạng thái thành công",
                 userAdminService.changeUserStatus(userId, request.getStatus(), authentication.getName())));
     }
 
@@ -84,7 +84,7 @@ public class UserController {
             Authentication authentication,
             @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Cap nhat thong tin thanh cong",
+                "Cập nhật thông tin thành công",
                 userProfileService.updateMyProfile(authentication.getName(), request)));
     }
 
@@ -93,6 +93,6 @@ public class UserController {
             Authentication authentication,
             @Valid @RequestBody ChangePasswordRequest request) {
         userProfileService.changeMyPassword(authentication.getName(), request);
-        return ResponseEntity.ok(ApiResponse.success("Doi mat khau thanh cong"));
+        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công"));
     }
 }

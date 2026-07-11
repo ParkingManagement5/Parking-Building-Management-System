@@ -123,11 +123,19 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
         return p.getEffectiveFrom() != null ? p.getEffectiveFrom() : LocalDateTime.MIN;
     }
 
+    /**
+     * "Xoá" bảng giá thực chất là deactivate (isActive=false), KHÔNG xoá cứng khỏi DB.
+     * Lý do: FeeCalculatorUtil quét TẤT CẢ policy (kể cả inactive) theo effectiveFrom
+     * để tính đúng giá lịch sử cho các phiên đã/đang đỗ dưới policy này. Xoá cứng sẽ
+     * làm phiên đang đỗ rơi xuống DEFAULT_RATE (20.000đ/h) và phá dữ liệu giá lịch sử
+     * dùng để tính lại phí khi tranh chấp/hoàn tiền.
+     */
     @Override
     public void deletePolicy(Long id) {
         PricingPolicy policy = pricingPolicyRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Pricing policy not found"));
-        pricingPolicyRepository.delete(policy);
+        policy.setIsActive(false);
+        pricingPolicyRepository.save(policy);
     }
 
     @Override
@@ -148,6 +156,7 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
                 .startHour(policy.getStartHour())
                 .endHour(policy.getEndHour())
                 .pricePerHour(policy.getPricePerHour())
+                .effectiveFrom(policy.getEffectiveFrom())
                 .isActive(policy.getIsActive())
                 .createdAt(policy.getCreatedAt())
                 .updatedAt(policy.getUpdatedAt())

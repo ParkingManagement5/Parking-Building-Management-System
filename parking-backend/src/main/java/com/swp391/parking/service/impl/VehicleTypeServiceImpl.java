@@ -33,7 +33,7 @@ public class VehicleTypeServiceImpl implements VehicleTypeService {
     public VehicleType getById(Long id) {
         return vehicleTypeRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay loai xe ID: " + id));
+                "Không tìm thấy loại xe ID: " + id));
     }
 
     @Override
@@ -41,7 +41,7 @@ public class VehicleTypeServiceImpl implements VehicleTypeService {
     public VehicleType create(VehicleTypeRequest req) {
         if (vehicleTypeRepo.existsByName(req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Loai xe '" + req.getName() + "' da ton tai");
+                "Loại xe '" + req.getName() + "' đã tồn tại");
         }
 
         VehicleType vt = VehicleType.builder()
@@ -63,7 +63,7 @@ public class VehicleTypeServiceImpl implements VehicleTypeService {
 
         if (!vt.getName().equalsIgnoreCase(req.getName()) && vehicleTypeRepo.existsByName(req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Loai xe '" + req.getName() + "' da ton tai");
+                "Loại xe '" + req.getName() + "' đã tồn tại");
         }
 
         vt.setName(req.getName());

@@ -53,7 +53,7 @@ public class StaffShiftController {
     public ResponseEntity<StaffShiftResponse> getOne(@PathVariable Long id, Authentication authentication) {
         StaffShiftResponse response = staffShiftService.getStaffShift(id);
         if (isStaff(authentication) && !response.getUserId().equals(resolveCurrentUserId(authentication))) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem ca lam cua nguoi khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem ca làm của người khác");
         }
         return ResponseEntity.ok(response);
     }
@@ -63,7 +63,7 @@ public class StaffShiftController {
     @Operation(summary = "Get shifts by user")
     public ResponseEntity<List<StaffShiftResponse>> getByUser(@PathVariable Long userId, Authentication authentication) {
         if (isStaff(authentication) && !userId.equals(resolveCurrentUserId(authentication))) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem ca lam cua nguoi khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem ca làm của người khác");
         }
         return ResponseEntity.ok(staffShiftService.getByUser(userId));
     }
@@ -108,7 +108,7 @@ public ResponseEntity<List<StaffShiftResponse>> getByDate(
 
     private Long resolveCurrentUserId(Authentication authentication) {
         User user = userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay user hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
         return user.getUserId().longValue();
     }
 }

@@ -61,7 +61,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public List<ParkingSlot> getByZone(Long zoneId, Long currentUserId, boolean staffScoped) {
         Zone zone = zoneRepo.findById(zoneId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay zone ID: " + zoneId));
+                        "Không tìm thấy zone ID: " + zoneId));
         Long buildingId = zone.getFloor() != null && zone.getFloor().getBuilding() != null
                 ? zone.getFloor().getBuilding().getId()
                 : null;
@@ -80,7 +80,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public ParkingSlot getById(Long id, Long currentUserId, boolean staffScoped) {
         ParkingSlot slot = slotRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay slot ID: " + id));
+                "Không tìm thấy slot ID: " + id));
         Long buildingId = slot.getZone() != null
                 && slot.getZone().getFloor() != null
                 && slot.getZone().getFloor().getBuilding() != null
@@ -95,12 +95,12 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public ParkingSlot create(SlotRequest req) {
         if (slotRepo.existsByZoneIdAndSlotCode(req.getZoneId(), req.getSlotCode())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Ma slot '" + req.getSlotCode() + "' da ton tai trong zone nay");
+                "Mã slot '" + req.getSlotCode() + "' đã tồn tại trong zone này");
         }
 
         Zone zone = zoneRepo.findById(req.getZoneId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay zone ID: " + req.getZoneId()));
+                "Không tìm thấy zone ID: " + req.getZoneId()));
 
         ParkingSlot slot = ParkingSlot.builder()
             .zone(zone)
@@ -118,17 +118,17 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public ParkingSlot update(Long id, SlotRequest req) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay slot ID: " + id));
+                        "Không tìm thấy slot ID: " + id));
 
         if ((!slot.getZone().getId().equals(req.getZoneId()) || !slot.getSlotCode().equals(req.getSlotCode()))
                 && slotRepo.existsByZoneIdAndSlotCode(req.getZoneId(), req.getSlotCode())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Ma slot '" + req.getSlotCode() + "' da ton tai trong zone nay");
+                "Mã slot '" + req.getSlotCode() + "' đã tồn tại trong zone này");
         }
 
         Zone zone = zoneRepo.findById(req.getZoneId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay zone ID: " + req.getZoneId()));
+                "Không tìm thấy zone ID: " + req.getZoneId()));
 
         slot.setZone(zone);
         slot.setSlotCode(req.getSlotCode());
@@ -145,7 +145,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public ParkingSlot updateStatus(Long id, Status newStatus) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay slot ID: " + id));
+                        "Không tìm thấy slot ID: " + id));
         slot.setStatus(newStatus);
         return slotRepo.save(slot);
     }
@@ -160,16 +160,16 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public void validateSelectable(Long slotId) {
         ParkingSlot slot = slotRepo.findById(slotId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay slot ID: " + slotId));
+                        "Không tìm thấy slot ID: " + slotId));
 
         if (slot.getStatus() == Status.MAINTENANCE) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Slot " + slot.getSlotCode() + " dang bao tri, khong the chon");
+                "Slot " + slot.getSlotCode() + " đang bảo trì, không thể chọn");
         }
 
         if (slot.getStatus() != Status.AVAILABLE) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Slot " + slot.getSlotCode() + " khong kha dung (trang thai: " + slot.getStatus() + ")");
+                "Slot " + slot.getSlotCode() + " không khả dụng (trạng thái: " + slot.getStatus() + ")");
         }
     }
 
@@ -178,7 +178,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
     public void delete(Long id) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay slot ID: " + id));
+                        "Không tìm thấy slot ID: " + id));
         slotRepo.delete(slot);
     }
 
@@ -187,12 +187,12 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
             return;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chua duoc gan toa nha");
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chưa được gán toà nhà");
         }
         if (!currentUser.getAssignedBuilding().getId().equals(buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem slot ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem slot ngoài toà nhà được phân công");
         }
     }
 }

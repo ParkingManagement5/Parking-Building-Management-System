@@ -16,14 +16,14 @@ import lombok.NoArgsConstructor;
 @Builder
 public class SlotRequest {
 
-    @NotNull(message = "Zone ID khong duoc de trong")
+    @NotNull(message = "Zone ID không được để trống")
     private Long zoneId;
 
-    @NotBlank(message = "Ma slot khong duoc de trong")
+    @NotBlank(message = "Mã slot không được để trống")
     @Size(max = 20)
     private String slotCode;
 
-    @NotNull(message = "Kich co slot khong duoc de trong")
+    @NotNull(message = "Kích cỡ slot không được để trống")
     private SlotSize slotSize;
 
     private Status status;

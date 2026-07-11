@@ -7,13 +7,13 @@ import lombok.Data;
 @Data
 public class ChangePasswordRequest {
 
-    @NotBlank(message = "Current password khong duoc de trong")
+    @NotBlank(message = "Current password không được để trống")
     private String currentPassword;
 
-    @NotBlank(message = "New password khong duoc de trong")
-    @Size(min = 8, message = "New password toi thieu 8 ky tu")
+    @NotBlank(message = "New password không được để trống")
+    @Size(min = 8, message = "New password tối thiểu 8 ký tự")
     private String newPassword;
 
-    @NotBlank(message = "Confirm password khong duoc de trong")
+    @NotBlank(message = "Confirm password không được để trống")
     private String confirmPassword;
 }

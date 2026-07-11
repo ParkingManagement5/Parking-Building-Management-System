@@ -161,7 +161,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
                 .satisfies(ex -> {
                     AppException appException = (AppException) ex;
                     assertThat(appException.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(appException.getMessage()).contains("thay the");
+                    assertThat(appException.getMessage()).contains("thay thế");
                 });
 
         BookingResponse verifiedCurrent = bookingService.verifyQrToken(regenerated.getQrToken(), null, false);

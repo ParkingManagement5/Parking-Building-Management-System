@@ -17,11 +17,9 @@ const CONFIG = {
       {
         label: "Đỗ xe",
         items: [
-          { id: "booking", label: "Đặt chỗ theo giờ" },
-          { id: "package-booking", label: "Đăng ký gói ngày/tuần/tháng" },
+          { id: "find-parking", label: "Tìm chỗ đỗ" },
+          { id: "booking", label: "Đặt chỗ" },
           { id: "current-session", label: "Phiên hiện tại" },
-          { id: "parking-map", label: "Bản đồ bãi" },
-          { id: "find-building", label: "Tìm bãi đỗ" },
         ],
       },
       {
@@ -127,7 +125,7 @@ const DRIVER_MOBILE_NAV_ITEMS = [
   { id: "overview", label: "Trang chủ" },
   { id: "booking", label: "Đặt chỗ" },
   { id: "current-session", label: "Phiên xe" },
-  { id: "parking-map", label: "Bản đồ" },
+  { id: "find-parking", label: "Bản đồ" },
   { id: "profile", label: "Tôi" },
 ];
 

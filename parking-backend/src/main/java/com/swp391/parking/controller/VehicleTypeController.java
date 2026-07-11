@@ -33,7 +33,7 @@ public class VehicleTypeController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<VehicleType>> create(
             @Valid @RequestBody VehicleTypeRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao loai xe thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo loại xe thành công",
             vehicleTypeService.create(req)));
     }
 
@@ -42,7 +42,7 @@ public class VehicleTypeController {
     public ResponseEntity<ApiResponse<VehicleType>> update(
             @PathVariable Long id,
             @Valid @RequestBody VehicleTypeRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat loai xe thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật loại xe thành công",
             vehicleTypeService.update(id, req)));
     }
 
@@ -50,6 +50,6 @@ public class VehicleTypeController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         vehicleTypeService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa loai xe khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá loại xe khỏi DB"));
     }
 }

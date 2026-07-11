@@ -109,6 +109,81 @@ class FeeCalculatorUtilTest {
         assertThat(fee).isEqualByComparingTo(new BigDecimal("100000"));
     }
 
+    // ── Rieng: gia that manager dang cau hinh cho O TO (vehicle_type_id=2) ───
+    // WEEKDAY 06-22h=15000, WEEKEND 06-22h=20000, WEEKDAY 22-06h=12000, WEEKEND 22-06h=15000
+    private List<PricingPolicy> realCarPolicies() {
+        return List.of(
+                policy("WEEKDAY", 6, 22, "15000"),
+                policy("WEEKEND", 6, 22, "20000"),
+                policy("WEEKDAY", 22, 6, "12000"),
+                policy("WEEKEND", 22, 6, "15000")
+        );
+    }
+
+    @Test
+    void shouldResolveEachRealCarRateAtItsOwnHourAndDayType() {
+        List<PricingPolicy> policies = realCarPolicies();
+        // Thu Sau (WEEKDAY) 10h sang -> gia ngay thuong ban ngay
+        assertThat(util.resolveHourlyRate(policies, LocalDateTime.of(2026, 7, 10, 10, 0)))
+                .isEqualByComparingTo("15000");
+        // Thu Sau (WEEKDAY) 23h -> gia ngay thuong ban dem
+        assertThat(util.resolveHourlyRate(policies, LocalDateTime.of(2026, 7, 10, 23, 0)))
+                .isEqualByComparingTo("12000");
+        // Thu Bay (WEEKEND) 10h sang -> gia cuoi tuan ban ngay
+        assertThat(util.resolveHourlyRate(policies, LocalDateTime.of(2026, 7, 11, 10, 0)))
+                .isEqualByComparingTo("20000");
+        // Chu Nhat (WEEKEND) 23h -> gia cuoi tuan ban dem
+        assertThat(util.resolveHourlyRate(policies, LocalDateTime.of(2026, 7, 12, 23, 0)))
+                .isEqualByComparingTo("15000");
+        // Chu Nhat (WEEKEND) 0h30 sang (van thuoc khung dem 22h-6h) -> gia cuoi tuan ban dem
+        assertThat(util.resolveHourlyRate(policies, LocalDateTime.of(2026, 7, 12, 0, 30)))
+                .isEqualByComparingTo("15000");
+    }
+
+    @Test
+    void shouldSwitchFromWeekdayToWeekendRateAtMidnightFridayToSaturday() {
+        // Xe do 23:00 thu Sau, ra 01:00 thu Bay — phai tach dung 2 doan qua nua dem:
+        // 23:10->24:00 (50p, gia dem ngay thuong 12000/h) + 00:00->01:00 (60p, gia dem cuoi tuan 15000/h)
+        List<PricingPolicy> policies = realCarPolicies();
+        BigDecimal fee = util.calculateSessionFee(
+                LocalDateTime.of(2026, 7, 10, 23, 0),   // thu Sau 23h
+                LocalDateTime.of(2026, 7, 11, 1, 0),    // thu Bay 1h
+                policies, new BigDecimal("15000"));
+
+        // 23:10-24:00 (50p) = ceil(50/30)=2 block x (12000*30/60=6000) = 12000
+        // 00:00-01:00 (60p) = 2 block x (15000*30/60=7500) = 15000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("27000"));
+    }
+
+    @Test
+    void shouldSwitchFromWeekendToWeekdayRateAtMidnightSundayToMonday() {
+        // Xe do 23:00 Chu Nhat, ra 01:00 thu Hai — phai tach dung 2 doan qua nua dem:
+        // 23:10->24:00 (50p, gia dem cuoi tuan 15000/h) + 00:00->01:00 (60p, gia dem ngay thuong 12000/h)
+        List<PricingPolicy> policies = realCarPolicies();
+        BigDecimal fee = util.calculateSessionFee(
+                LocalDateTime.of(2026, 7, 12, 23, 0),   // Chu Nhat 23h
+                LocalDateTime.of(2026, 7, 13, 1, 0),    // thu Hai 1h
+                policies, new BigDecimal("15000"));
+
+        // 23:10-24:00 (50p) = 2 block x (15000*30/60=7500) = 15000
+        // 00:00-01:00 (60p) = 2 block x (12000*30/60=6000) = 12000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("27000"));
+    }
+
+    @Test
+    void shouldSplitAcrossDayAndNightWithinSameWeekendDay() {
+        // Thu Bay: do 21:00, ra 23:00 — cat dung tai moc 22h giua gia ngay/dem cuoi tuan
+        List<PricingPolicy> policies = realCarPolicies();
+        BigDecimal fee = util.calculateSessionFee(
+                LocalDateTime.of(2026, 7, 11, 21, 0),
+                LocalDateTime.of(2026, 7, 11, 23, 0),
+                policies, new BigDecimal("15000"));
+
+        // 21:10-22:00 (50p, gia ngay cuoi tuan 20000/h) = 2 block x (20000*30/60=10000) = 20000
+        // 22:00-23:00 (60p, gia dem cuoi tuan 15000/h) = 2 block x (15000*30/60=7500) = 15000
+        assertThat(fee).isEqualByComparingTo(new BigDecimal("35000"));
+    }
+
     // ── Flat-rate booking tests ──────────────────────────────────────────────
 
     @Test

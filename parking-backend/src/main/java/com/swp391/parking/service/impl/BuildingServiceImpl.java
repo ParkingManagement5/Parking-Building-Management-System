@@ -36,7 +36,7 @@ public class BuildingServiceImpl implements BuildingService {
     public ParkingBuilding getById(Long id) {
         return buildingRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay toa nha ID: " + id));
+                "Không tìm thấy toà nhà ID: " + id));
     }
 
     @Override
@@ -44,12 +44,12 @@ public class BuildingServiceImpl implements BuildingService {
     public ParkingBuilding create(BuildingRequest req) {
         if (buildingRepo.existsByName(req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Toa nha '" + req.getName() + "' da ton tai");
+                "Toà nhà '" + req.getName() + "' đã tồn tại");
         }
 
         if (!req.getCloseTime().isAfter(req.getOpenTime())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                "Gio dong cua phai sau gio mo cua");
+                "Giờ đóng cửa phải sau giờ mở cửa");
         }
 
         ParkingBuilding building = ParkingBuilding.builder()
@@ -77,12 +77,12 @@ public class BuildingServiceImpl implements BuildingService {
         if (!building.getName().equals(req.getName())
                 && buildingRepo.existsByName(req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Toa nha '" + req.getName() + "' da ton tai");
+                "Toà nhà '" + req.getName() + "' đã tồn tại");
         }
 
         if (!req.getCloseTime().isAfter(req.getOpenTime())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                "Gio dong cua phai sau gio mo cua");
+                "Giờ đóng cửa phải sau giờ mở cửa");
         }
 
         building.setName(req.getName());

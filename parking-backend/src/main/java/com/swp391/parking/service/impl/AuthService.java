@@ -61,16 +61,16 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest req) {
         if (userRepository.existsByUsername(req.getUsername())) {
-            throw new AppException(HttpStatus.CONFLICT, "Username da ton tai");
+            throw new AppException(HttpStatus.CONFLICT, "Username đã tồn tại");
         }
         if (userRepository.existsByEmail(req.getEmail())) {
-            throw new AppException(HttpStatus.CONFLICT, "Email da duoc su dung");
+            throw new AppException(HttpStatus.CONFLICT, "Email đã được sử dụng");
         }
 
         Role driverRole = roleRepository.findByRoleName(Role.RoleName.DRIVER)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Role DRIVER chua duoc khoi tao trong DB"));
+                        "Role DRIVER chưa được khởi tạo trong DB"));
 
         String otp = generateOtp();
         User user = User.builder()
@@ -96,10 +96,10 @@ public class AuthService {
         User user = findByUsernameOrEmail(req.getUsername());
 
         if (User.UserStatus.PENDING.equals(user.getStatus())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan chua xac thuc email");
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản chưa xác thực email");
         }
         if (User.UserStatus.LOCKED.equals(user.getStatus())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khoá");
         }
         enforceTemporaryLoginLock(user);
 
@@ -111,7 +111,7 @@ public class AuthService {
         }
 
         resetLoginLock(user);
-        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " da dang nhap");
+        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " đã đăng nhập");
         String token = jwtUtil.generateToken(user.getUsername());
         return buildAuthResponse(user, token);
     }
@@ -123,15 +123,15 @@ public class AuthService {
         if (User.UserStatus.ACTIVE.equals(user.getStatus())) {
             throw new AppException(
                     HttpStatus.CONFLICT,
-                    "Tai khoan da duoc xac thuc. Vui long dang nhap bang email hoac username va mat khau");
+                    "Tài khoản đã được xác thực. Vui lòng đăng nhập bằng email hoặc username và mật khẩu");
         }
 
         if (!req.getOtp().equals(user.getEmailVerificationCode())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP khong dung");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mã OTP không đúng");
         }
         if (user.getEmailVerificationExpiresAt() == null
                 || user.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP da het han");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mã OTP đã hết hạn");
         }
 
         if (!User.UserStatus.ACTIVE.equals(user.getStatus())) {
@@ -150,7 +150,7 @@ public class AuthService {
         User user = findByUsernameOrEmail(req.getUsername());
 
         if (User.UserStatus.ACTIVE.equals(user.getStatus())) {
-            throw new AppException(HttpStatus.CONFLICT, "Tai khoan da duoc xac thuc");
+            throw new AppException(HttpStatus.CONFLICT, "Tài khoản đã được xác thực");
         }
 
         String otp = generateOtp();
@@ -164,10 +164,10 @@ public class AuthService {
     public void forgotPassword(ForgotPasswordRequest req) {
         User user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay tai khoan voi email nay"));
+                        "Không tìm thấy tài khoản với email này"));
 
         if (User.UserStatus.LOCKED.equals(user.getStatus())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khoá");
         }
 
         String otp = generateOtp();
@@ -182,21 +182,21 @@ public class AuthService {
     public void resetPassword(ResetPasswordRequest req) {
         User user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay tai khoan voi email nay"));
+                        "Không tìm thấy tài khoản với email này"));
 
         if (user.getPasswordResetOtp() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chua yeu cau dat lai mat khau. Vui long goi forgot-password truoc");
+                    "Chưa yêu cầu đặt lại mật khẩu. Vui lòng gọi forgot-password trước");
         }
         if (!req.getOtp().equals(user.getPasswordResetOtp())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP khong dung");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mã OTP không đúng");
         }
         if (user.getPasswordResetOtpExpiresAt() == null
                 || user.getPasswordResetOtpExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Ma OTP da het han");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mã OTP đã hết hạn");
         }
         if (!req.getNewPassword().equals(req.getConfirmPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Mat khau xac nhan khong khop");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Mật khẩu xác nhận không khớp");
         }
 
         user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
@@ -213,7 +213,7 @@ public class AuthService {
                 .orElseGet(() -> createGoogleUser(tokenInfo));
 
         if (User.UserStatus.LOCKED.equals(user.getStatus())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Tai khoan da bi khoa");
+            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khoá");
         }
         enforceTemporaryLoginLock(user);
         if (User.UserStatus.PENDING.equals(user.getStatus())) {
@@ -223,7 +223,7 @@ public class AuthService {
             userRepository.save(user);
         }
 
-        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " da dang nhap bang Google");
+        activityLogService.log(user.getUserId(), "LOGIN", user.getUsername() + " đã đăng nhập bằng Google");
         String token = jwtUtil.generateToken(user.getUsername());
         return buildAuthResponse(user, token);
     }
@@ -231,7 +231,7 @@ public class AuthService {
     private User findByUsernameOrEmail(String login) {
         return userRepository.findByUsername(login)
                 .or(() -> userRepository.findByEmail(login))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
     }
 
     private void enforceTemporaryLoginLock(User user) {
@@ -245,8 +245,8 @@ public class AuthService {
             long remainingMinutes = Math.max(1, Duration.between(now, state.lockedUntil).toMinutes() + 1);
             throw new AppException(
                     HttpStatus.LOCKED,
-                    "Tai khoan tam khoa do nhap sai mat khau qua nhieu lan. Thu lai sau "
-                            + remainingMinutes + " phut");
+                    "Tài khoản tạm khoá do nhập sai mật khẩu quá nhiều lần. Thử lại sau "
+                            + remainingMinutes + " phút");
         }
 
         state.lockedUntil = null;
@@ -264,7 +264,7 @@ public class AuthService {
             loginAttempts.remove(key);
             throw new AppException(
                     HttpStatus.FORBIDDEN,
-                    "Tai khoan da bi khoa do nhap sai mat khau qua nhieu lan");
+                    "Tài khoản đã bị khoá do nhập sai mật khẩu quá nhiều lần");
         }
 
         if (failedAttempts % LOCK_THRESHOLD == 0) {
@@ -272,15 +272,15 @@ public class AuthService {
             state.lockedUntil = LocalDateTime.now().plusMinutes(lockMinutes);
             throw new AppException(
                     HttpStatus.LOCKED,
-                    "Nhap sai mat khau " + failedAttempts + " lan. Tai khoan tam khoa "
-                            + lockMinutes + " phut");
+                    "Nhập sai mật khẩu " + failedAttempts + " lần. Tài khoản tạm khoá "
+                            + lockMinutes + " phút");
         }
 
         int remainingAttempts = LOCK_THRESHOLD - (failedAttempts % LOCK_THRESHOLD);
         throw new AppException(
                 HttpStatus.UNAUTHORIZED,
-                "Username hoac password khong dung. Con " + remainingAttempts
-                        + " lan truoc khi tam khoa tai khoan");
+                "Username hoặc password không đúng. Còn " + remainingAttempts
+                        + " lần trước khi tạm khoá tài khoản");
     }
 
     private int lockMinutesForFailedAttempts(int failedAttempts) {
@@ -311,17 +311,17 @@ public class AuthService {
         try {
             tokenInfo = new RestTemplate().getForObject(url, GoogleTokenInfo.class);
         } catch (Exception ex) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Google token khong hop le");
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Google token không hợp lệ");
         }
 
         if (tokenInfo == null || !googleClientId.equals(tokenInfo.getAud())) {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Google token sai client id");
         }
         if (!"true".equalsIgnoreCase(tokenInfo.getEmailVerified())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Google email chua duoc xac thuc");
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Google email chưa được xác thực");
         }
         if (tokenInfo.getEmail() == null || tokenInfo.getEmail().isBlank()) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Google token thieu email");
+            throw new AppException(HttpStatus.UNAUTHORIZED, "Google token thiếu email");
         }
 
         return tokenInfo;
@@ -331,7 +331,7 @@ public class AuthService {
         Role driverRole = roleRepository.findByRoleName(Role.RoleName.DRIVER)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Role DRIVER chua duoc khoi tao trong DB"));
+                        "Role DRIVER chưa được khởi tạo trong DB"));
 
         String username = uniqueGoogleUsername(tokenInfo.getEmail());
         User user = User.builder()

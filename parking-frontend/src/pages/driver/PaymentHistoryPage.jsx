@@ -5,12 +5,12 @@ import { formatCurrency, formatDateTime, getStatusClasses } from "./driverPortal
 
 function describePayment(item) {
   if (item.paymentType === "DEPOSIT") {
-    return `Coc booking #${item.bookingId || "-"}`;
+    return `Cọc booking #${item.bookingId || "-"}`;
   }
   if (item.paymentType === "PARKING_FEE") {
-    return `Phi do xe session #${item.sessionId || "-"}`;
+    return `Phí đỗ xe session #${item.sessionId || "-"}`;
   }
-  return item.bookingCode || item.bookingId || "Thanh toan lien ket";
+  return item.bookingCode || item.bookingId || "Thanh toán liên kết";
 }
 
 export default function PaymentHistoryPage() {
@@ -47,9 +47,9 @@ export default function PaymentHistoryPage() {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { label: "Tong chi tieu", value: formatCurrency(totalSpent), sub: "Chi tinh giao dich PAID" },
-          { label: "Giao dich thanh cong", value: String(paidPayments.length), sub: `${payments.length} ban ghi tong cong` },
-          { label: "Trung binh / lan", value: formatCurrency(averagePerVisit), sub: "Tren giao dich PAID" },
+          { label: "Tổng chi tiêu", value: formatCurrency(totalSpent), sub: "Chỉ tính giao dịch PAID" },
+          { label: "Giao dịch thành công", value: String(paidPayments.length), sub: `${payments.length} bản ghi tổng cộng` },
+          { label: "Trung bình / lần", value: formatCurrency(averagePerVisit), sub: "Trên giao dịch PAID" },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-border bg-card p-5">
             <p className="text-xs text-muted-foreground">{item.label}</p>
@@ -61,19 +61,19 @@ export default function PaymentHistoryPage() {
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h3 className="text-sm font-semibold text-foreground">Lich su giao dich</h3>
-          <button className="text-xs text-primary hover:underline">Tai CSV</button>
+          <h3 className="text-sm font-semibold text-foreground">Lịch sử giao dịch</h3>
+          <button className="text-xs text-primary hover:underline">Tải CSV</button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px]">
             <thead>
               <tr className="bg-muted/40">
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Giao dich</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Mo ta</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Phuong thuc</th>
-                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">So tien</th>
-                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Trang thai</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Giao dịch</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Mô tả</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Phương thức</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Số tiền</th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-muted-foreground">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -115,7 +115,7 @@ export default function PaymentHistoryPage() {
               {payments.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-5 py-10 text-center text-sm text-muted-foreground">
-                    Chua co lich su thanh toan nao tu he thong.
+                    Chưa có lịch sử thanh toán nào từ hệ thống.
                   </td>
                 </tr>
               )}
@@ -129,7 +129,7 @@ export default function PaymentHistoryPage() {
               disabled={page === 1}
               className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Truoc
+              Trước
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button

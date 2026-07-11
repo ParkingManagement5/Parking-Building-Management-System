@@ -141,12 +141,12 @@ export default function UnifiedScanPage() {
           const g = unwrapApiData(res.data, []);
           setGates(g);
           setGateId(String(g[0]?.gateId || g[0]?.id || ""));
-          setScopeError(g.length ? "" : "Toa nha hien tai chua co cong active cho staff scan.");
+          setScopeError(g.length ? "" : "Toà nhà hiện tại chưa có cổng active cho staff scan.");
         }
       } catch (err) {
         if (!c) {
           setGates([]);
-          setScopeError(err.response?.data?.message || "Khong tai duoc danh sach cong cho toa nha hien tai.");
+          setScopeError(err.response?.data?.message || "Không tải được danh sách cổng cho toà nhà hiện tại.");
         }
       }
     })();
@@ -166,9 +166,9 @@ export default function UnifiedScanPage() {
       setScopeError("");
       if (assignedId) setBuildingId(assignedId);
       else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
-      else setScopeError("He thong chua co toa nha nao de staff thao tac.");
+      else setScopeError("Hệ thống chưa có toà nhà nào để staff thao tác.");
     } catch (err) {
-      setScopeError(err.response?.data?.message || "Khong tai duoc danh sach toa nha.");
+      setScopeError(err.response?.data?.message || "Không tải được danh sách toà nhà.");
     }
   }
 
@@ -203,7 +203,7 @@ export default function UnifiedScanPage() {
     const currentGate = gates.find((g) => String(g.gateId || g.id) === String(gateId));
     const gateLabel = currentGate?.gateName || currentGate?.gateCode || `Gate ${gateId || "?"}`;
     const segments = [
-      `Reason: ${reasonOverride || error || ocrError || "Staff khong the hoan tat flow scan thuong."}`,
+      `Reason: ${reasonOverride || error || ocrError || "Staff không thể hoàn tất luồng scan thường."}`,
       `Gate: ${gateLabel}`,
       `Building: ${assignedLabel || buildingId || "N/A"}`,
       `Plate OCR/Final: ${plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN"}`,
@@ -259,7 +259,7 @@ export default function UnifiedScanPage() {
       });
       setStep(3);
     } catch (err) {
-      const message = err.response?.data?.message || "Khong tao duoc exception.";
+      const message = err.response?.data?.message || "Không tạo được exception.";
       if (showLowConfidenceReview) setLowConfidenceError(message);
       else if (showManualEntry) setManualEntryError(message);
       else setError(message);
@@ -282,7 +282,7 @@ export default function UnifiedScanPage() {
       streamRef.current = s;
       if (videoRef.current) videoRef.current.srcObject = s;
       setCameraOn(true);
-    } catch { setOcrError("Khong mo duoc camera."); }
+    } catch { setOcrError("Không mở được camera."); }
   }
 
   async function handleCapture() {
@@ -304,7 +304,7 @@ export default function UnifiedScanPage() {
   }
 
   async function uploadOcr(file, filename) {
-    if (!gateId) { setOcrError("Chon cong truoc."); return; }
+    if (!gateId) { setOcrError("Chọn cổng trước."); return; }
     const url = URL.createObjectURL(file);
     setPlatePreview((p) => { if (p) URL.revokeObjectURL(p); return url; });
     setScanning(true); setOcrError(""); setPlate(""); setConfidence(null);
@@ -317,7 +317,7 @@ export default function UnifiedScanPage() {
       const p = d.effectivePlate || d.detectedPlate || "";
       const c = Math.round((d.plateConfidenceScore || 0) * 100);
       if (!p || p === "UNKNOWN") {
-        setOcrError("OCR khong doc duoc. Thu lai hoac nhap tay bien so.");
+        setOcrError("OCR không đọc được. Thử lại hoặc nhập tay biển số.");
         setManualPlate("");
         setShowManualEntry(true);
         return;
@@ -327,7 +327,7 @@ export default function UnifiedScanPage() {
         return;
       }
       await proceedWithResolvedPlate(p, c);
-    } catch (err) { setOcrError(err.response?.data?.message || "OCR that bai."); }
+    } catch (err) { setOcrError(err.response?.data?.message || "OCR thất bại."); }
     finally { setScanning(false); }
   }
 
@@ -348,7 +348,7 @@ export default function UnifiedScanPage() {
     event?.preventDefault?.();
     const canonicalManualPlate = canonicalPlate(manualPlate);
     if (!canonicalManualPlate) {
-      setManualEntryError("Nhap bien so truoc khi tiep tuc.");
+      setManualEntryError("Nhập biển số trước khi tiếp tục.");
       return;
     }
     const normalizedPlate = normalizePlateDisplay(manualPlate);
@@ -361,7 +361,7 @@ export default function UnifiedScanPage() {
     event?.preventDefault?.();
     const canonical = canonicalPlate(lowConfidencePlate);
     if (!canonical) {
-      setLowConfidenceError("Nhap bien so xac nhan truoc khi tiep tuc.");
+      setLowConfidenceError("Nhập biển số xác nhận trước khi tiếp tục.");
       return;
     }
 
@@ -377,7 +377,7 @@ export default function UnifiedScanPage() {
       closeLowConfidenceReview();
       await proceedWithResolvedPlate(reviewed?.effectivePlate || correctedPlate, confidence);
     } catch (err) {
-      setLowConfidenceError(err.response?.data?.message || "Khong xac nhan duoc ket qua OCR.");
+      setLowConfidenceError(err.response?.data?.message || "Không xác nhận được kết quả OCR.");
     } finally {
       setScanning(false);
     }
@@ -443,7 +443,7 @@ export default function UnifiedScanPage() {
           if (sessionStatus === "WAITING_PAYMENT") {
             // Xe đã ra nhưng chưa thanh toán → BLOCKED, không cho vào lại
             setLookupType("BLOCKED");
-            setLookupData(`Xe co phien chua thanh toan (Session #${session.sessionId}). Thu tien truoc khi cho xe vao.`);
+            setLookupData(`Xe có phiên chưa thanh toán (Session #${session.sessionId}). Thu tiền trước khi cho xe vào.`);
             return;
           }
         }
@@ -463,7 +463,7 @@ export default function UnifiedScanPage() {
       let vehicle = null;
       try { vehicle = unwrapApiData((await axiosClient.get(`/vehicles/plate/${encodeURIComponent(p)}`)).data, null); } catch {}
 
-      if (vehicle && vehicle.isActive === false) { setLookupType("BLOCKED"); setLookupData("Xe bi vo hieu hoa."); return; }
+      if (vehicle && vehicle.isActive === false) { setLookupType("BLOCKED"); setLookupData("Xe bị vô hiệu hóa."); return; }
 
       setLookupType(vehicle ? "WALKIN" : "UNREGISTERED");
       setLookupData(vehicle);
@@ -502,7 +502,7 @@ export default function UnifiedScanPage() {
   async function handleProcess() {
     if (!gateId || !plate) return;
     if (lookupType === "UNREGISTERED" && !walkInVehicleTypeId) {
-      setError("Chon loai xe truoc khi cho xe vao.");
+      setError("Chọn loại xe trước khi cho xe vào.");
       return;
     }
     setProcessing(true); setError("");
@@ -515,7 +515,7 @@ export default function UnifiedScanPage() {
           res = await sessionApi.exit(lookupData.sessionId, { gateId: Number(gateId), staffUserId: Number(localStorage.getItem("userId")) || null, qrVerified: false });
         }
       } else if (isPendingPaymentBooking) {
-        throw new Error("Booking chua thanh toan coc. Khong the cho xe vao.");
+        throw new Error("Booking chưa thanh toán cọc. Không thể cho xe vào.");
       } else if (isConfirmedBooking && qrToken.trim()) {
         res = await sessionApi.entry({ gateId: Number(gateId), entryMode: "BOOKING", qrToken: qrToken.trim(), licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
       } else if (isConfirmedBooking) {
@@ -540,13 +540,13 @@ export default function UnifiedScanPage() {
       setHistory((prev) => [record, ...prev].slice(0, 10));
       setStep(3);
     } catch (err) {
-      const message = err.response?.data?.message || err.message || "Xu ly that bai.";
+      const message = err.response?.data?.message || err.message || "Xử lý thất bại.";
       // 409: xe đang có session active → tự động re-lookup và chuyển sang EXIT
       if (err.response?.status === 409 || message.includes("phiên đỗ xe")) {
         try {
           const sRes = await sessionApi.getActiveByPlate(plate);
           const session = unwrapApiData(sRes.data, null);
-          if (session) { setLookupType("EXIT"); setLookupData(session); setError("Xe dang trong bai — da chuyen sang che do xe ra."); return; }
+          if (session) { setLookupType("EXIT"); setLookupData(session); setError("Xe đang trong bãi — đã chuyển sang chế độ xe ra."); return; }
         } catch { /* ignore */ }
       }
       setError(message);
@@ -563,7 +563,7 @@ export default function UnifiedScanPage() {
   }
 
   // Step indicator
-  const steps = ["Scan bien so", "Xac minh", "Hoan tat"];
+  const steps = ["Scan biển số", "Xác minh", "Hoàn tất"];
 
   return (
     <div className="space-y-5">
@@ -584,7 +584,7 @@ export default function UnifiedScanPage() {
 
           {/* ==================== STEP 1: OCR SCAN ==================== */}
           {step === 1 && (
-            <StaffPageSection title="Scan bien so xe" subtitle="Chup hoac upload anh bien so — bat buoc cho moi luong">
+            <StaffPageSection title="Scan biển số xe" subtitle="Chụp hoặc upload ảnh biển số — bắt buộc cho mọi luồng">
               {scopeError && (
                 <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   {scopeError}
@@ -596,12 +596,12 @@ export default function UnifiedScanPage() {
                   <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel || `Building #${assignedId}`}</div>
                 ) : (
                   <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
-                    <option value="">Chon toa nha</option>
+                    <option value="">Chọn toà nhà</option>
                     {buildings.map((b) => <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>)}
                   </StaffSelect>
                 )}
                 <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
-                  <option value="">Chon cong</option>
+                  <option value="">Chọn cổng</option>
                   {gates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
                 </StaffSelect>
               </div>
@@ -615,12 +615,12 @@ export default function UnifiedScanPage() {
                   {scanning ? (
                     <div className="relative z-10 space-y-3 text-center">
                       <div className="mx-auto size-10 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
-                      <p className="text-sm text-emerald-300">Dang nhan dien...</p>
+                      <p className="text-sm text-emerald-300">Đang nhận diện...</p>
                     </div>
                   ) : (
                     <div className="relative z-10 space-y-3 text-center">
                       <Camera size={38} className="mx-auto text-white/30" />
-                      <p className="text-sm text-white/60">{cameraOn ? "Can chinh bien so vao khung" : "Mo camera hoac upload anh"}</p>
+                      <p className="text-sm text-white/60">{cameraOn ? "Căn chỉnh biển số vào khung" : "Mở camera hoặc upload ảnh"}</p>
                     </div>
                   )}
                 </div>
@@ -631,7 +631,7 @@ export default function UnifiedScanPage() {
                   {cameraOn ? <VideoOff size={15} /> : <Video size={15} />} {cameraOn ? "Stop" : "Camera"}
                 </StaffSecondaryButton>
                 <StaffPrimaryButton type="button" onClick={handleCapture} disabled={scanning || !cameraOn} className="flex items-center justify-center gap-2">
-                  <Camera size={15} /> Chup
+                  <Camera size={15} /> Chụp
                 </StaffPrimaryButton>
                 <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition hover:bg-muted ${scanning ? "pointer-events-none opacity-60" : ""}`}>
                   <ImageUp size={15} /> Upload
@@ -641,7 +641,7 @@ export default function UnifiedScanPage() {
                   <RefreshCw size={15} /> Reset
                 </StaffSecondaryButton>
                 <StaffSecondaryButton type="button" onClick={openManualEntry} disabled={scanning} className="flex items-center justify-center gap-2">
-                  <ScanLine size={15} /> Nhap tay
+                  <ScanLine size={15} /> Nhập tay
                 </StaffSecondaryButton>
               </div>
 
@@ -651,7 +651,7 @@ export default function UnifiedScanPage() {
                   <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p>{ocrError}</p>
                     <StaffSecondaryButton type="button" onClick={openManualEntry} className="shrink-0">
-                      Nhap tay ngay
+                      Nhập tay ngay
                     </StaffSecondaryButton>
                   </div>
                 </div>
@@ -661,7 +661,7 @@ export default function UnifiedScanPage() {
 
           {/* ==================== STEP 2: DETECT + QR ==================== */}
           {step === 2 && (
-            <StaffPageSection title="Ket qua xac minh" subtitle="He thong tu dong phan loai — scan QR neu can">
+            <StaffPageSection title="Kết quả xác minh" subtitle="Hệ thống tự động phân loại — scan QR nếu cần">
               {/* Plate result */}
               <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/20 p-4">
                 {platePreview && <img src={platePreview} alt="Plate" className="h-16 w-24 rounded-xl border border-border object-contain bg-slate-950" />}
@@ -670,13 +670,13 @@ export default function UnifiedScanPage() {
                   {confidence != null && <p className={`text-xs ${confidence >= 80 ? "text-emerald-600" : "text-amber-600"}`}>{confidence}% confidence</p>}
                 </div>
                 <StaffSecondaryButton type="button" onClick={() => { setStep(1); setLookupType(null); }} className="ml-auto text-xs">
-                  Scan lai
+                  Scan lại
                 </StaffSecondaryButton>
               </div>
 
               {lookupLoading && (
                 <div className="rounded-2xl border border-border bg-muted/20 px-4 py-4 text-center text-sm text-muted-foreground">
-                  <Search size={16} className="inline mr-2 animate-pulse" /> Dang kiem tra...
+                  <Search size={16} className="inline mr-2 animate-pulse" /> Đang kiểm tra...
                 </div>
               )}
 
@@ -688,8 +688,8 @@ export default function UnifiedScanPage() {
                       <div className="flex items-center gap-3">
                         <LogOut size={20} className="text-amber-600" />
                         <div>
-                          <p className="font-bold text-foreground">EXIT — Xe dang trong bai</p>
-                          <p className="text-sm text-muted-foreground">Session #{lookupData?.sessionId} • Slot {lookupData?.slotCode} • Vao {formatStaffDateTime(lookupData?.entryTime)}</p>
+                          <p className="font-bold text-foreground">EXIT — Xe đang trong bãi</p>
+                          <p className="text-sm text-muted-foreground">Session #{lookupData?.sessionId} • Slot {lookupData?.slotCode} • Vào {formatStaffDateTime(lookupData?.entryTime)}</p>
                         </div>
                       </div>
                     </div>
@@ -700,7 +700,7 @@ export default function UnifiedScanPage() {
                       <div className="flex items-center gap-3">
                         <QrCode size={20} className="text-blue-600" />
                         <div>
-                          <p className="font-bold text-foreground">BOOKING — Xe co booking, can QR</p>
+                          <p className="font-bold text-foreground">BOOKING — Xe có booking, cần QR</p>
                           <p className="text-sm text-muted-foreground">Booking #{lookupData?.bookingId} • Slot {lookupData?.slotCode} • {String(lookupData?.status || "")}</p>
                         </div>
                       </div>
@@ -724,15 +724,15 @@ export default function UnifiedScanPage() {
                         <div>
                           <p className="font-bold text-foreground">
                             {isPendingPaymentBooking
-                              ? "BOOKING - Chua thanh toan coc, khong cho vao"
-                              : "BOOKING - Xe co booking, can QR"}
+                              ? "BOOKING - Chưa thanh toán cọc, không cho vào"
+                              : "BOOKING - Xe có booking, cần QR"}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Booking #{lookupData?.bookingId} - Slot {lookupData?.slotCode} - {bookingStatus || "UNKNOWN"}
                           </p>
                           {isPendingPaymentBooking && (
                             <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                              Khach can thanh toan xong de booking chuyen sang CONFIRMED truoc khi staff cho xe vao.
+                              Khách cần thanh toán xong để booking chuyển sang CONFIRMED trước khi staff cho xe vào.
                             </p>
                           )}
                         </div>
@@ -744,7 +744,7 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                       <div className="flex items-center gap-3">
                         <LogIn size={20} className="text-emerald-600" />
-                        <p className="font-bold text-foreground">WALK-IN — Xe da dang ky, cho vao truc tiep</p>
+                        <p className="font-bold text-foreground">WALK-IN — Xe đã đăng ký, cho vào trực tiếp</p>
                       </div>
                     </div>
                   )}
@@ -753,22 +753,22 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                       <div className="flex items-center gap-3">
                         <AlertTriangle size={20} className="text-amber-600" />
-                        <p className="font-bold text-foreground">WALK-IN — Xe chua dang ky (tu tao khi entry)</p>
+                        <p className="font-bold text-foreground">WALK-IN — Xe chưa đăng ký (tự tạo khi entry)</p>
                       </div>
                       <div className="mt-3">
                         <label className="mb-1.5 block text-sm font-medium text-foreground">
-                          Loai xe <span className="text-rose-600">*</span>
+                          Loại xe <span className="text-rose-600">*</span>
                         </label>
                         <StaffSelect value={walkInVehicleTypeId} onChange={(e) => setWalkInVehicleTypeId(e.target.value)}>
-                          <option value="">— Chon loai xe —</option>
+                          <option value="">— Chọn loại xe —</option>
                           {vehicleTypes.map((t) => (
                             <option key={t.id} value={t.id}>
-                              {t.name} ({t.slotSize}) — {formatStaffCurrency(t.hourlyRate)}/gio
+                              {t.name} ({t.slotSize}) — {formatStaffCurrency(t.hourlyRate)}/giờ
                             </option>
                           ))}
                         </StaffSelect>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Bat buoc chon dung loai xe — quyet dinh slot size va bang gia ap dung khi tinh phi luc xe ra.
+                          Bắt buộc chọn đúng loại xe — quyết định slot size và bảng giá áp dụng khi tính phí lúc xe ra.
                         </p>
                       </div>
                     </div>
@@ -787,7 +787,7 @@ export default function UnifiedScanPage() {
                   {(isConfirmedBooking || lookupType === "EXIT") && (
                     <div className="rounded-2xl border border-border bg-muted/20 p-4">
                       <p className="text-sm font-semibold text-foreground mb-2">
-                        {isConfirmedBooking ? "Scan QR booking cua driver (khuyen nghi – co the bo qua)" : "Exit QR cua driver (neu co)"}
+                        {isConfirmedBooking ? "Scan QR booking của driver (khuyến nghị – có thể bỏ qua)" : "Exit QR của driver (nếu có)"}
                       </p>
                       <div className="flex gap-2">
                         <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
@@ -798,7 +798,7 @@ export default function UnifiedScanPage() {
                       </div>
                       {qrToken && (
                         <div className="mt-2 flex items-center gap-2 text-sm text-emerald-600">
-                          <CheckCircle2 size={14} /> QR da nhan
+                          <CheckCircle2 size={14} /> QR đã nhận
                         </div>
                       )}
                     </div>
@@ -812,12 +812,12 @@ export default function UnifiedScanPage() {
                           <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel}</div>
                         ) : (
                           <StaffSelect value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
-                            <option value="">Chon toa nha</option>
+                            <option value="">Chọn toà nhà</option>
                             {buildings.map((b) => <option key={b.buildingId || b.id} value={b.buildingId || b.id}>{b.name}</option>)}
                           </StaffSelect>
                         )}
                         <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
-                          <option value="">Chon cong ({lookupType === "EXIT" ? "EXIT" : "ENTRY"})</option>
+                          <option value="">Chọn cổng ({lookupType === "EXIT" ? "EXIT" : "ENTRY"})</option>
                           {filteredGates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
                         </StaffSelect>
                       </div>
@@ -826,19 +826,19 @@ export default function UnifiedScanPage() {
 
                       {isConfirmedBooking && !qrToken.trim() && (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                          Khong co QR — he thong se dung <strong>Staff Override</strong>: xe vao khong can QR, booking van duoc lien ket. Driver van dung Exit QR tren app de ra binh thuong.
+                          Không có QR — hệ thống sẽ dùng <strong>Staff Override</strong>: xe vào không cần QR, booking vẫn được liên kết. Driver vẫn dùng Exit QR trên app để ra bình thường.
                         </div>
                       )}
 
                       <StaffPrimaryButton type="button" onClick={handleProcess}
                         disabled={processing || !gateId || isPendingPaymentBooking || (lookupType === "UNREGISTERED" && !walkInVehicleTypeId)}
                         className="flex w-full items-center justify-center gap-2">
-                        {processing ? "Dang xu ly..." : lookupType === "EXIT" ? (
-                          <><LogOut size={15} /> Xac nhan xe ra</>
+                        {processing ? "Đang xử lý..." : lookupType === "EXIT" ? (
+                          <><LogOut size={15} /> Xác nhận xe ra</>
                         ) : isConfirmedBooking && !qrToken.trim() ? (
-                          <><LogIn size={15} /> Cho xe vao (Staff Override)</>
+                          <><LogIn size={15} /> Cho xe vào (Staff Override)</>
                         ) : (
-                          <><LogIn size={15} /> Xac nhan xe vao</>
+                          <><LogIn size={15} /> Xác nhận xe vào</>
                         )}
                       </StaffPrimaryButton>
 
@@ -847,9 +847,9 @@ export default function UnifiedScanPage() {
                         <div className="rounded-2xl border border-dashed border-border bg-muted/10 px-4 py-3">
                           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
-                              <p className="text-sm font-medium text-foreground">Xe bi khoa hoac xung dot session?</p>
+                              <p className="text-sm font-medium text-foreground">Xe bị khóa hoặc xung đột session?</p>
                               <p className="text-xs text-muted-foreground">
-                                Tao exception de ghi nhan va xu ly thu cong tai cong.
+                                Tạo exception để ghi nhận và xử lý thủ công tại cổng.
                               </p>
                             </div>
                             <StaffSecondaryButton
@@ -858,7 +858,7 @@ export default function UnifiedScanPage() {
                               disabled={creatingException}
                               className="shrink-0"
                             >
-                              {creatingException ? "Dang tao..." : "Tao exception"}
+                              {creatingException ? "Đang tạo..." : "Tạo exception"}
                             </StaffSecondaryButton>
                           </div>
                         </div>
@@ -877,21 +877,21 @@ export default function UnifiedScanPage() {
                 <CheckCircle2 size={26} className="text-emerald-600 dark:text-emerald-300" />
               </div>
               <h3 className="text-lg font-bold text-foreground">
-                {result.type === "EXIT" ? "Xe da ra bai" : result.type === "EXCEPTION" ? "Da tao exception" : "Xe da vao bai"}
+                {result.type === "EXIT" ? "Xe đã ra bãi" : result.type === "EXCEPTION" ? "Đã tạo exception" : "Xe đã vào bãi"}
               </h3>
               {platePreview && <img src={platePreview} alt="Plate" className="mx-auto mt-3 max-h-20 rounded-xl border border-border object-contain bg-slate-950" />}
               <div className="mt-4 space-y-2 rounded-2xl bg-white/60 dark:bg-white/5 p-4 text-left">
-                {[["Session", result.sessionId], ["Bien so", result.licensePlate], ["Slot", result.slotCode], ["Trang thai", result.status], ["Thoi gian", formatStaffDateTime(result.time)]].map(([k, v]) => (
+                {[["Session", result.sessionId], ["Biển số", result.licensePlate], ["Slot", result.slotCode], ["Trạng thái", result.status], ["Thời gian", formatStaffDateTime(result.time)]].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-muted-foreground">{k}</span><span className="font-medium text-foreground">{v}</span>
                   </div>
                 ))}
               </div>
               <div className="mt-4 flex gap-3">
-                <StaffPrimaryButton type="button" onClick={resetAll} className="flex-1">Xe tiep theo</StaffPrimaryButton>
+                <StaffPrimaryButton type="button" onClick={resetAll} className="flex-1">Xe tiếp theo</StaffPrimaryButton>
                 {result.type === "EXIT" && (
                   <StaffSecondaryButton type="button" onClick={() => navigate("/staff/payments")} className="flex-1 flex items-center justify-center gap-2">
-                    <CreditCard size={14} /> Thanh toan
+                    <CreditCard size={14} /> Thanh toán
                   </StaffSecondaryButton>
                 )}
               </div>
@@ -900,10 +900,10 @@ export default function UnifiedScanPage() {
         </div>
 
         {/* ==================== HISTORY ==================== */}
-        <StaffPageSection title="Lich su scan" subtitle="Cac lan xu ly gan day">
+        <StaffPageSection title="Lịch sử scan" subtitle="Các lần xử lý gần đây">
           {history.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              Chua co lan scan nao.
+              Chưa có lần scan nào.
             </div>
           ) : (
             <div className="space-y-3">
@@ -947,10 +947,10 @@ export default function UnifiedScanPage() {
                 <div className="pointer-events-none absolute inset-12 rounded-2xl border-2 border-emerald-400/80 shadow-[0_0_0_999px_rgba(2,6,23,0.3)]" />
               )}
               <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-background/85 px-3 py-1 text-xs font-medium text-foreground shadow-sm">
-                {qrCameraOn ? "Dua QR vao khung..." : "Dang mo camera..."}
+                {qrCameraOn ? "Đưa QR vào khung..." : "Đang mở camera..."}
               </div>
             </div>
-            <p className="mt-3 text-center text-xs text-muted-foreground">Dua ma QR cua driver vao khung. Tu dong nhan dien.</p>
+            <p className="mt-3 text-center text-xs text-muted-foreground">Đưa mã QR của driver vào khung. Tự động nhận diện.</p>
           </div>
         </div>
       )}
@@ -960,9 +960,9 @@ export default function UnifiedScanPage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Xac nhan bien so OCR confidence thap</h3>
+                <h3 className="text-lg font-semibold text-foreground">Xác nhận biển số OCR confidence thấp</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  OCR da doc ra bien so nhung confidence chua du de tu dong xu ly. Staff xac nhan bien cuoi cung ngay tai cong de tiep tuc flow thuong.
+                  OCR đã đọc ra biển số nhưng confidence chưa đủ để tự động xử lý. Staff xác nhận biển cuối cùng ngay tại cổng để tiếp tục luồng thường.
                 </p>
               </div>
               <button
@@ -979,30 +979,30 @@ export default function UnifiedScanPage() {
                 {platePreview ? (
                   <img src={platePreview} alt="Low confidence OCR" className="h-full w-full object-contain" />
                 ) : (
-                  <div className="flex min-h-48 items-center justify-center text-sm text-white/50">Khong co anh preview</div>
+                  <div className="flex min-h-48 items-center justify-center text-sm text-white/50">Không có ảnh preview</div>
                 )}
               </div>
 
               <form onSubmit={handleLowConfidenceConfirm} className="space-y-4">
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  OCR phat hien <span className="font-semibold">{pendingLowConfidenceScan.detectedPlate || "UNKNOWN"}</span> voi
+                  OCR phát hiện <span className="font-semibold">{pendingLowConfidenceScan.detectedPlate || "UNKNOWN"}</span> với
                   {" "}
                   <span className="font-semibold">{Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%</span> confidence.
                 </div>
 
                 <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                  <label className="mb-2 block text-sm font-medium text-foreground">Bien so xac nhan</label>
+                  <label className="mb-2 block text-sm font-medium text-foreground">Biển số xác nhận</label>
                   <StaffInput
                     value={lowConfidencePlate}
                     onChange={(event) => {
                       setLowConfidencePlate(event.target.value.toUpperCase());
                       if (lowConfidenceError) setLowConfidenceError("");
                     }}
-                    placeholder="Nhap bien so dung"
+                    placeholder="Nhập biển số đúng"
                     autoFocus
                   />
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Neu staff xac nhan duoc bien so, he thong se bo queue OCR review va tiep tuc lookup ngay.
+                    Nếu staff xác nhận được biển số, hệ thống sẽ bỏ queue OCR review và tiếp tục lookup ngay.
                   </p>
                 </div>
 
@@ -1014,11 +1014,11 @@ export default function UnifiedScanPage() {
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <StaffSecondaryButton type="button" onClick={closeLowConfidenceReview} disabled={scanning}>
-                    Huy
+                    Hủy
                   </StaffSecondaryButton>
                   <StaffPrimaryButton type="submit" disabled={scanning} className="flex items-center justify-center gap-2">
                     <CheckCircle2 size={15} />
-                    {scanning ? "Dang xac nhan..." : "Xac nhan bien va tiep tuc"}
+                    {scanning ? "Đang xác nhận..." : "Xác nhận biển và tiếp tục"}
                   </StaffPrimaryButton>
                 </div>
               </form>
@@ -1032,9 +1032,9 @@ export default function UnifiedScanPage() {
           <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Nhap tay bien so</h3>
+                <h3 className="text-lg font-semibold text-foreground">Nhập tay biển số</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Dung khi OCR doc sai hoac khong nhan ra bien so. Sau khi nhap, he thong se tiep tuc buoc xac minh hien tai.
+                  Dùng khi OCR đọc sai hoặc không nhận ra biển số. Sau khi nhập, hệ thống sẽ tiếp tục bước xác minh hiện tại.
                 </p>
               </div>
               <button
@@ -1048,27 +1048,27 @@ export default function UnifiedScanPage() {
 
             <form onSubmit={handleManualPlateSubmit} className="mt-5 space-y-4">
               <div className="rounded-2xl border border-border bg-muted/20 p-4">
-                <label className="mb-2 block text-sm font-medium text-foreground">Bien so xe</label>
+                <label className="mb-2 block text-sm font-medium text-foreground">Biển số xe</label>
                 <StaffInput
                   value={manualPlate}
                   onChange={(event) => {
                     setManualPlate(event.target.value.toUpperCase());
                     if (manualEntryError) setManualEntryError("");
                   }}
-                  placeholder="Vi du: 51A12345"
+                  placeholder="Ví dụ: 51A12345"
                   autoFocus
                 />
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Co the nhap lien hoac co dau gach. He thong se tu chuan hoa truoc khi lookup.
+                  Có thể nhập liền hoặc có dấu gạch. Hệ thống sẽ tự chuẩn hóa trước khi lookup.
                 </p>
               </div>
 
               {(manualExitLoading || manualExitSuggestions.length > 0 || canonicalPlate(manualPlate).length >= 2) && (
                 <div className="rounded-2xl border border-border bg-muted/10 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-foreground">Goi y xe dang trong bai</p>
+                    <p className="text-sm font-medium text-foreground">Gợi ý xe đang trong bãi</p>
                     <span className="text-xs text-muted-foreground">
-                      {manualExitLoading ? "Dang loc..." : `${manualExitSuggestions.length} ket qua`}
+                      {manualExitLoading ? "Đang lọc..." : `${manualExitSuggestions.length} kết quả`}
                     </span>
                   </div>
 
@@ -1097,7 +1097,7 @@ export default function UnifiedScanPage() {
                   ) : (
                     !manualExitLoading && (
                       <p className="mt-3 text-sm text-muted-foreground">
-                        Khong tim thay xe dang trong bai khop voi bien dang nhap.
+                        Không tìm thấy xe đang trong bãi khớp với biển đang nhập.
                       </p>
                     )
                   )}
@@ -1112,11 +1112,11 @@ export default function UnifiedScanPage() {
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <StaffSecondaryButton type="button" onClick={closeManualEntry}>
-                  Huy
+                  Hủy
                 </StaffSecondaryButton>
                 <StaffPrimaryButton type="submit" className="flex items-center justify-center gap-2">
                   <CheckCircle2 size={15} />
-                  Dung bien so nay
+                  Dùng biển số này
                 </StaffPrimaryButton>
               </div>
             </form>

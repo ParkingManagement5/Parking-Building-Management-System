@@ -6,13 +6,13 @@ import lombok.Data;
 
 @Data
 public class SessionEntryRequest {
-    @NotNull(message = "gateId khong duoc de trong")
+    @NotNull(message = "gateId không được để trống")
     private Long gateId;
 
     private String qrToken;
     private String licensePlate;
 
-    @NotBlank(message = "entryMode khong duoc de trong")
+    @NotBlank(message = "entryMode không được để trống")
     private String entryMode;
 
     private Long slotId;

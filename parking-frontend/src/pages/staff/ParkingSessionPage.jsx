@@ -54,7 +54,7 @@ export default function ParkingSessionPage() {
       setPricingPolicies(unwrapApiData(pricingRes.data, []));
     } catch (err) {
       console.error("Failed to load parking sessions", err);
-      setError(err.response?.data?.message || "Khong tai duoc danh sach session.");
+      setError(err.response?.data?.message || "Không tải được danh sách session.");
     } finally {
       setLoading(false);
     }

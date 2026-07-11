@@ -33,7 +33,7 @@ public class BuildingController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingBuilding>> create(
             @Valid @RequestBody BuildingRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao toa nha thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo toà nhà thành công",
             buildingService.create(req)));
     }
 
@@ -42,7 +42,7 @@ public class BuildingController {
     public ResponseEntity<ApiResponse<ParkingBuilding>> update(
             @PathVariable Long id,
             @Valid @RequestBody BuildingRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat toa nha thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật toà nhà thành công",
             buildingService.update(id, req)));
     }
 
@@ -50,6 +50,6 @@ public class BuildingController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         buildingService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa toa nha khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá toà nhà khỏi DB"));
     }
 }

@@ -20,44 +20,44 @@ function exceptionMeta(type) {
     case "PLATE_UNVERIFIED":
       return {
         priority: "HIGH", priorityTone: "rose",
-        recommendation: "Xe dang cho xac nhan bien so. Quay lai trang Scan va nhap tay bien so de tiep tuc cho xe vao.",
-        resolutionGuide: "Vao trang Scan, dung Nhap tay de xac nhan bien so dung, sau do tiep tuc quy trinh cho xe vao.",
+        recommendation: "Xe đang chờ xác nhận biển số. Quay lại trang Scan và nhập tay biển số để tiếp tục cho xe vào.",
+        resolutionGuide: "Vào trang Scan, dùng Nhập tay để xác nhận biển số đúng, sau đó tiếp tục quy trình cho xe vào.",
       };
     case "BOOKING_MISMATCH":
       return {
         priority: "HIGH", priorityTone: "amber",
-        recommendation: "Doi chieu booking, bien xe, va QR. Khong cho xe vao neu khong khop.",
-        resolutionGuide: "Kiem tra thu cong booking ID va bien so xe voi tai xe. Neu hop le, vao trang Scan de nhap tay cho xe vao.",
+        recommendation: "Đối chiếu booking, biển xe, và QR. Không cho xe vào nếu không khớp.",
+        resolutionGuide: "Kiểm tra thủ công booking ID và biển số xe với tài xế. Nếu hợp lệ, vào trang Scan để nhập tay cho xe vào.",
       };
     case "EXIT_VERIFICATION_FAILED":
       return {
         priority: "HIGH", priorityTone: "rose",
-        recommendation: "Xe can ra cong nhung xac thuc that bai. Dung Force Exit neu da xac nhan xe.",
-        resolutionGuide: "Chon cong ra va bam 'Cho xe ra' de ghi nhan xe ra va chuyen sang cho thanh toan.",
+        recommendation: "Xe cần ra cổng nhưng xác thực thất bại. Dùng Force Exit nếu đã xác nhận xe.",
+        resolutionGuide: "Chọn cổng ra và bấm 'Cho xe ra' để ghi nhận xe ra và chuyển sang chờ thanh toán.",
       };
     case "LOST_QR":
       return {
         priority: "HIGH", priorityTone: "rose",
-        recommendation: "Tai xe mat QR. Xac nhan bien so xe khop voi session, sau do dung Force Exit.",
-        resolutionGuide: "Xac nhan xe vat ly la xe dang co session. Chon cong ra va bam 'Cho xe ra'.",
+        recommendation: "Tài xế mất QR. Xác nhận biển số xe khớp với session, sau đó dùng Force Exit.",
+        resolutionGuide: "Xác nhận xe vật lý là xe đang có session. Chọn cổng ra và bấm 'Cho xe ra'.",
       };
     case "SESSION_CONFLICT":
       return {
         priority: "MEDIUM", priorityTone: "amber",
-        recommendation: "Xe bi xung dot session. Kiem tra tab Sessions de xem lich su session cua xe.",
-        resolutionGuide: "Mo trang Sessions kiem tra xe nay. Neu session cu da ket thuc nhung chua duoc dong, xu ly tai do. Sau do vao Scan cho xe vao binh thuong.",
+        recommendation: "Xe bị xung đột session. Kiểm tra tab Sessions để xem lịch sử session của xe.",
+        resolutionGuide: "Mở trang Sessions kiểm tra xe này. Nếu session cũ đã kết thúc nhưng chưa được đóng, xử lý tại đó. Sau đó vào Scan cho xe vào bình thường.",
       };
     case "SYSTEM_ERROR":
       return {
         priority: "HIGH", priorityTone: "violet",
-        recommendation: "Loi he thong. Kiem tra ket noi mang. Neu xe dang cho vao, vao trang Scan lam thu cong.",
-        resolutionGuide: "Neu mat wifi: cho phuc hoi ket noi roi vao trang Scan nhap tay bien so. Neu xe khong co booking, dung Direct Walk-in.",
+        recommendation: "Lỗi hệ thống. Kiểm tra kết nối mạng. Nếu xe đang chờ vào, vào trang Scan làm thủ công.",
+        resolutionGuide: "Nếu mất wifi: chờ phục hồi kết nối rồi vào trang Scan nhập tay biển số. Nếu xe không có booking, dùng Direct Walk-in.",
       };
     default:
       return {
         priority: "MEDIUM", priorityTone: "slate",
-        recommendation: "Xem mo ta va xu ly theo tinh huong thuc te tai cong.",
-        resolutionGuide: "Xu ly theo mo ta exception va danh dau da giai quyet sau khi hoan tat.",
+        recommendation: "Xem mô tả và xử lý theo tình huống thực tế tại cổng.",
+        resolutionGuide: "Xử lý theo mô tả exception và đánh dấu đã giải quyết sau khi hoàn tất.",
       };
   }
 }
@@ -188,7 +188,7 @@ export default function ExceptionCasePage() {
       setResolvedCases(unwrapApiData(resolvedRes.data, []));
     } catch (err) {
       console.error("Failed to load exception cases", err);
-      setError(err.response?.data?.message || "Khong tai duoc danh sach exception.");
+      setError(err.response?.data?.message || "Không tải được danh sách exception.");
     } finally {
       setLoading(false);
     }
@@ -196,14 +196,14 @@ export default function ExceptionCasePage() {
 
   const assignToMe = async (item) => {
     const staffId = Number(localStorage.getItem("userId"));
-    if (!staffId) { setError("Khong tim thay staff userId trong localStorage."); return; }
+    if (!staffId) { setError("Không tìm thấy staff userId trong localStorage."); return; }
     setSavingId(item.exceptionId);
     setError("");
     try {
       await exceptionApi.assign(item.exceptionId, staffId);
       await loadCases();
     } catch (err) {
-      setError(err.response?.data?.message || "Khong assign duoc exception.");
+      setError(err.response?.data?.message || "Không assign được exception.");
     } finally {
       setSavingId(null);
     }
@@ -216,7 +216,7 @@ export default function ExceptionCasePage() {
       await exceptionApi.resolve(item.exceptionId);
       await loadCases();
     } catch (err) {
-      setError(err.response?.data?.message || "Khong resolve duoc exception.");
+      setError(err.response?.data?.message || "Không resolve được exception.");
     } finally {
       setSavingId(null);
     }
@@ -229,7 +229,7 @@ export default function ExceptionCasePage() {
       await exceptionApi.close(item.exceptionId);
       await loadCases();
     } catch (err) {
-      setError(err.response?.data?.message || "Khong close duoc exception.");
+      setError(err.response?.data?.message || "Không close được exception.");
     } finally {
       setSavingId(null);
     }
@@ -237,7 +237,7 @@ export default function ExceptionCasePage() {
 
   const forceExit = async (item) => {
     const gateId = forceExitGateId[item.exceptionId];
-    if (!gateId) { setError("Chon cong ra truoc khi cho xe ra."); return; }
+    if (!gateId) { setError("Chọn cổng ra trước khi cho xe ra."); return; }
     const staffId = Number(localStorage.getItem("userId")) || 0;
     setSavingId(item.exceptionId);
     setError("");
@@ -246,7 +246,7 @@ export default function ExceptionCasePage() {
       await exceptionApi.resolve(item.exceptionId);
       await loadCases();
     } catch (err) {
-      setError(err.response?.data?.message || "Force exit that bai.");
+      setError(err.response?.data?.message || "Force exit thất bại.");
     } finally {
       setSavingId(null);
     }
@@ -449,20 +449,20 @@ export default function ExceptionCasePage() {
                               onChange={(e) => setForceExitGateId((prev) => ({ ...prev, [item.exceptionId]: e.target.value }))}
                               className="flex-1 text-xs"
                             >
-                              <option value="">-- Chon cong ra --</option>
+                              <option value="">-- Chọn cổng ra --</option>
                               {gates.map((g) => (
                                 <option key={g.gateId || g.id} value={g.gateId || g.id}>
                                   {g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`}
                                 </option>
                               ))}
-                              {gates.length === 0 && <option disabled>Khong co cong ra (chua gan building)</option>}
+                              {gates.length === 0 && <option disabled>Không có cổng ra (chưa gán building)</option>}
                             </StaffSelect>
                             <StaffPrimaryButton
                               type="button"
                               onClick={() => forceExit(item)}
                               disabled={saving || !forceExitGateId[item.exceptionId]}
                             >
-                              {saving ? "Dang xu ly..." : "Cho xe ra"}
+                              {saving ? "Đang xử lý..." : "Cho xe ra"}
                             </StaffPrimaryButton>
                           </div>
                         </div>
@@ -530,11 +530,11 @@ export default function ExceptionCasePage() {
         )}
       </StaffPageSection>
 
-      <StaffPageSection title="Resolved Gan Day" subtitle="Case da xu ly xong va cho dong ho so">
+      <StaffPageSection title="Resolved Gần Đây" subtitle="Case đã xử lý xong và chờ đóng hồ sơ">
         {resolvedCases.length === 0 ? (
           <StaffEmptyState
-            title={loading ? "Loading resolved cases" : "No resolved cases waiting to close"}
-            description="Case RESOLVED se hien o day truoc khi dong ho so."
+            title={loading ? "Đang tải case đã xử lý" : "Chưa có case nào chờ đóng hồ sơ"}
+            description="Case RESOLVED sẽ hiện ở đây trước khi đóng hồ sơ."
           />
         ) : (
           <div className="space-y-4">

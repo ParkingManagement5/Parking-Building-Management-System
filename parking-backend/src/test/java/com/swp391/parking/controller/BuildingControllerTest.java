@@ -75,7 +75,7 @@ class BuildingControllerTest {
         assertTrue(response.getStatusCode().is2xxSuccessful());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isSuccess());
-        assertEquals("Tao toa nha thanh cong", response.getBody().getMessage());
+        assertEquals("Tạo toà nhà thành công", response.getBody().getMessage());
         assertEquals(1L, response.getBody().getData().getId());
     }
 
@@ -112,6 +112,6 @@ class BuildingControllerTest {
         assertTrue(response.getStatusCode().is2xxSuccessful());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isSuccess());
-        assertEquals("Da xoa toa nha khoi DB", response.getBody().getMessage());
+        assertEquals("Đã xoá toà nhà khỏi DB", response.getBody().getMessage());
     }
 }

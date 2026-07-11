@@ -95,7 +95,7 @@ export default function PaymentProcessingPage() {
     } catch (err) {
       console.error("Failed to load pending payments", err);
       if (!silent) {
-        setError(err.response?.data?.message || "Khong tai duoc danh sach cho thanh toan.");
+        setError(err.response?.data?.message || "Không tải được danh sách chờ thanh toán.");
       }
     } finally {
       if (!silent) {

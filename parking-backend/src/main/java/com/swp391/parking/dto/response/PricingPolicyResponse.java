@@ -20,6 +20,7 @@ public class PricingPolicyResponse {
     private Integer startHour;
     private Integer endHour;
     private BigDecimal pricePerHour;
+    private LocalDateTime effectiveFrom;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -41,7 +41,7 @@ public class GateServiceImpl implements GateService {
     public Gate getById(Long id) {
         return gateRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay cong ID: " + id));
+                "Không tìm thấy cổng ID: " + id));
     }
 
     @Override
@@ -49,12 +49,12 @@ public class GateServiceImpl implements GateService {
     public Gate create(GateRequest req) {
         if (gateRepo.existsByGateCode(req.getGateCode())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Ma cong da ton tai: " + req.getGateCode());
+                "Mã cổng đã tồn tại: " + req.getGateCode());
         }
 
         ParkingBuilding building = buildingRepo.findById(req.getBuildingId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay toa nha ID: " + req.getBuildingId()));
+                "Không tìm thấy toà nhà ID: " + req.getBuildingId()));
 
         Gate gate = Gate.builder()
             .building(building)
@@ -74,12 +74,12 @@ public class GateServiceImpl implements GateService {
         if (!gate.getGateCode().equals(req.getGateCode())
                 && gateRepo.existsByGateCode(req.getGateCode())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Ma cong da ton tai: " + req.getGateCode());
+                "Mã cổng đã tồn tại: " + req.getGateCode());
         }
 
         ParkingBuilding building = buildingRepo.findById(req.getBuildingId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay toa nha ID: " + req.getBuildingId()));
+                "Không tìm thấy toà nhà ID: " + req.getBuildingId()));
 
         gate.setBuilding(building);
         gate.setGateCode(req.getGateCode());

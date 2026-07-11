@@ -50,7 +50,7 @@ public class OcrController {
             @RequestParam String triggerType,
             @RequestParam(required = false) Long sessionId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "OCR scan thanh cong",
+                "OCR scan thành công",
                 ocrService.scanImage(image, gateId, triggerType, sessionId)));
     }
 
@@ -109,7 +109,7 @@ public class OcrController {
         }
         OcrScanResponse scan = ocrService.getScan(scanId);
         if (scan.getBuildingId() != null && !staffBuildingId.equals(scan.getBuildingId())) {
-            throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay scan #" + scanId);
+            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy scan #" + scanId);
         }
     }
 }

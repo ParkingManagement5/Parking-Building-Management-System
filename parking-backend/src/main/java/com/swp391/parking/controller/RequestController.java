@@ -102,7 +102,7 @@ public class RequestController {
         Integer currentUserId = resolveUserId(authentication);
         boolean staffScoped = isStaff(authentication);
         if (staffScoped && !currentUserId.equals(staffId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chi duoc nhan request cho chinh minh");
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chỉ được nhận request cho chính mình");
         }
         RequestResponse response = requestService.assignStaff(requestId, staffId, currentUserId, staffScoped);
         return ResponseEntity.ok(

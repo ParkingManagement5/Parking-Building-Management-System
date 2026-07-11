@@ -8,8 +8,10 @@ import {
   Car,
   LoaderCircle,
   MapPin,
+  Moon,
   Package,
   SquareParking,
+  Sun,
   History,
 } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
@@ -47,9 +49,78 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback;
 }
 
-const DURATION_UNIT_LABELS = { HOURLY: "giờ", DAILY: "ngày", WEEKLY: "tuần", MONTHLY: "tháng" };
 const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
-const BOOKING_TYPE_DAYS = { HOURLY: null, DAILY: 1, WEEKLY: 7, MONTHLY: 30 };
+
+// Khung gio ap dung cua 1 policy — trung voi FeeCalculatorUtil.isInTimeRange ben
+// backend (ho tro khung gio vong qua nua dem, vd 22h-6h).
+function isInTimeRange(hour, startHour, endHour) {
+  if (startHour == null || endHour == null) return true;
+  if (startHour < endHour) return hour >= startHour && hour < endHour;
+  return hour >= startHour || hour < endHour;
+}
+
+function formatHourRange(startHour, endHour) {
+  if (startHour == null || endHour == null) return "Cả ngày";
+  const p = (h) => `${String(h).padStart(2, "0")}:00`;
+  return `${p(startHour)}–${p(endHour)}`;
+}
+
+// Khung gio vong qua nua dem (vd 22h-6h) = ban dem; con lai = ban ngay.
+function isNightRange(startHour, endHour) {
+  if (startHour == null || endHour == null) return false;
+  return startHour > endHour;
+}
+
+// Trung voi BookingServiceImpl.calculateDeposit ben backend (BR-03d): chi
+// CAR/ELECTRIC_CAR moi tinh coc, muc coc tang dan theo khoang cach tu luc dat
+// den luc hen den bai — dat cang gan gio thi coc cang thap.
+function calculateDeposit(vehicleTypeName, minutesUntilStart) {
+  const name = String(vehicleTypeName || "").toUpperCase();
+  if (name !== "CAR" && name !== "ELECTRIC_CAR") return 0;
+  if (minutesUntilStart < 10) return 0;
+  if (minutesUntilStart < 120) return 10000;
+  if (minutesUntilStart < 240) return 15000;
+  if (minutesUntilStart < 360) return 20000;
+  return 30000;
+}
+
+// Trong so nhieu policy cung khop dieu kien: uu tien ban co effectiveFrom moi
+// nhat (nhung <= thoi diem tham chieu) — dung y het FeeCalculatorUtil.latestEffectiveRate
+// ben backend, de gia uoc tinh hien thi truoc khi dat luon khop voi so tien
+// thuc te se tinh luc xe ra (kho co the lech khi manager sua gia giua chung).
+function latestEffectivePolicy(policies, referenceTime, matcher) {
+  const refMs = referenceTime instanceof Date ? referenceTime.getTime() : Date.now();
+  let best = null;
+  let bestFrom = -Infinity;
+  for (const p of policies) {
+    if (!matcher(p)) continue;
+    const fromMs = p.effectiveFrom ? new Date(p.effectiveFrom).getTime() : -Infinity;
+    if (fromMs > refMs) continue; // chua co hieu luc tai thoi diem tham chieu
+    if (fromMs >= bestFrom) { best = p; bestFrom = fromMs; }
+  }
+  return best;
+}
+
+// Chon dung policy theo dayType + gio, uu tien 4 cap do y het
+// FeeCalculatorUtil.resolveHourlyRate ben backend: (1) dayType+khung gio khop
+// dung, (2) chi dayType, (3) chi khung gio, (4) bat ky — moi cap do lay ban
+// effectiveFrom moi nhat.
+function resolveHourlyPolicy(policies, dayType, hour, referenceTime) {
+  if (!policies.length) return null;
+  return (
+    latestEffectivePolicy(policies, referenceTime, (p) => p.dayType === dayType && isInTimeRange(hour, p.startHour, p.endHour)) ||
+    latestEffectivePolicy(policies, referenceTime, (p) => p.dayType === dayType) ||
+    latestEffectivePolicy(policies, referenceTime, (p) => isInTimeRange(hour, p.startHour, p.endHour)) ||
+    latestEffectivePolicy(policies, referenceTime, () => true) ||
+    policies[0]
+  );
+}
+
+const PACKAGE_OPTIONS = [
+  { value: "DAILY", label: "Gói ngày", days: 1, unitLabel: "ngày", desc: "Trọn ngày · thanh toán khi ra cổng" },
+  { value: "WEEKLY", label: "Gói tuần", days: 7, unitLabel: "tuần", desc: "7 ngày · vào/ra tự do · trả trọn gói" },
+  { value: "MONTHLY", label: "Gói tháng", days: 30, unitLabel: "tháng", desc: "30 ngày · vào/ra tự do · giá ưu đãi" },
+];
 
 function computeBookingEnd(start, type, units) {
   const d = new Date(start);
@@ -89,7 +160,25 @@ function AlertBox({ variant = "error", children }) {
   );
 }
 
-const STEP_LABELS = ["Chọn vị trí", "Thời gian", "Xác nhận"];
+// Dong tom tat cho 1 muc da chon xong trong accordion "Chon vi tri" — thay vi
+// hien het cac khoi luon mo cung luc (nhin roi/khong chuyen nghiep), muc da
+// chon se gon lai thanh 1 dong, bam "Doi" moi mo lai de chon khac.
+function SummaryRow({ icon: Icon, label, value, onEdit }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon size={14} /></span>
+        <span className="min-w-0">
+          <span className="block text-[11px] text-muted-foreground">{label}</span>
+          <span className="block text-sm font-medium text-foreground truncate">{value}</span>
+        </span>
+      </div>
+      <button type="button" onClick={onEdit} className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors">
+        Đổi
+      </button>
+    </div>
+  );
+}
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -108,13 +197,17 @@ export default function BookingPage() {
   const [conflictLock, setConflictLock] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const [bookingStart, setBookingStart] = useState(() => { const d = new Date(Date.now() + 15 * 60000); d.setSeconds(0, 0); return d; });
-  const [bookingType] = useState("HOURLY");
+  const [bookingType, setBookingType] = useState("HOURLY"); // HOURLY | DAILY | WEEKLY | MONTHLY
   const [durationUnits, setDurationUnits] = useState(1);
   const [selection, setSelection] = useState({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: "" });
+  const [openPanel, setOpenPanel] = useState("building"); // "building" | "floorZone" | "slot" | null (khong panel nao dang mo)
   const [pricingPolicies, setPricingPolicies] = useState([]);
   const [payingDeposit, setPayingDeposit] = useState(false);
   const [depositPaid, setDepositPaid] = useState(false);
   const [payError, setPayError] = useState("");
+
+  const isPackageMode = bookingType !== "HOURLY";
+  const stepLabels = ["Chọn vị trí", isPackageMode ? "Chọn gói" : "Thời gian", "Xác nhận"];
 
   useEffect(() => {
     (async () => {
@@ -180,18 +273,43 @@ export default function BookingPage() {
     [pricingPolicies],
   );
 
-  const estimatedCost = useMemo(() => {
-    if (!hourlyPolicies.length) return null;
-    const dow = bookingStart.getDay();
-    const isWeekend = dow === 0 || dow === 6;
-    const policy = hourlyPolicies.find((p) => p.dayType === (isWeekend ? "WEEKEND" : "WEEKDAY")) || hourlyPolicies[0];
-    return Number(policy.pricePerHour) * Number(durationUnits);
-  }, [hourlyPolicies, durationUnits, bookingStart]);
+  const priceByType = useMemo(() => {
+    const map = {};
+    for (const opt of PACKAGE_OPTIONS) {
+      map[opt.value] = pricingPolicies.filter((p) => p.timeType === opt.value);
+    }
+    return map;
+  }, [pricingPolicies]);
 
   const effectiveDayType = useMemo(() => {
     const dow = bookingStart.getDay();
     return dow === 0 || dow === 6 ? "WEEKEND" : "WEEKDAY";
   }, [bookingStart]);
+
+  const estimatedCost = useMemo(() => {
+    if (!isPackageMode) {
+      if (!hourlyPolicies.length) return null;
+      const policy = resolveHourlyPolicy(hourlyPolicies, effectiveDayType, bookingStart.getHours(), bookingStart);
+      if (!policy) return null;
+      return Number(policy.pricePerHour) * Number(durationUnits);
+    }
+    const policies = priceByType[bookingType];
+    if (!policies?.length) return null;
+    const policy =
+      latestEffectivePolicy(policies, bookingStart, (p) => p.dayType === effectiveDayType) ||
+      latestEffectivePolicy(policies, bookingStart, () => true) ||
+      policies[0];
+    return Number(policy.pricePerHour) * Number(durationUnits);
+  }, [isPackageMode, bookingType, hourlyPolicies, priceByType, durationUnits, effectiveDayType, bookingStart]);
+
+  // Coc uoc tinh hien thi truoc khi dat — tinh dung theo loai xe + con bao lau
+  // nua den gio hen, khop voi calculateDeposit ben backend, thay vi hien tinh
+  // "10.000 - 30.000d" chung chung khong phan anh dung so tien se ap dung.
+  const estimatedDeposit = useMemo(() => {
+    const vehicleTypeName = selectedVehicle?.vehicleType?.name;
+    const minutesUntilStart = (bookingStart.getTime() - Date.now()) / 60000;
+    return calculateDeposit(vehicleTypeName, minutesUntilStart);
+  }, [selectedVehicle, bookingStart]);
 
   const slotGrid = useMemo(
     () => backendSlots.map((s, i) => ({
@@ -233,8 +351,14 @@ export default function BookingPage() {
     setBackendSlots([]);
     setSubmitError("");
     setConfirmation(null);
+    setOpenPanel("building");
     setStep(0);
   }, [isSelectedVehicleLocked]);
+
+  function handleModeChange(newType) {
+    setBookingType(newType);
+    setDurationUnits(1);
+  }
 
   async function handleConfirm() {
     if (!selection.vehicleId || !selectedSlot || isSelectedVehicleLocked) return;
@@ -253,6 +377,7 @@ export default function BookingPage() {
         slotId: Number(selectedSlot.slotId),
         bookingStartTime: formatLocalDateTime(start),
         bookingType,
+        durationUnits: Number(durationUnits),
       });
       const p = unwrapApiData(res.data, {});
       setConfirmation({
@@ -310,7 +435,7 @@ export default function BookingPage() {
         setConfirmation((p) => ({ ...p, status: "CONFIRMED" }));
       }
     } catch (err) {
-      setPayError(getErrorMessage(err, "Thanh toán cọc thất bại."));
+      setPayError(getErrorMessage(err, "Thanh toán thất bại."));
     } finally {
       setPayingDeposit(false);
     }
@@ -323,38 +448,55 @@ export default function BookingPage() {
     setSubmitError("");
     setPayError("");
     setDepositPaid(false);
+    setBookingType("HOURLY");
+    setDurationUnits(1);
+    setOpenPanel("building");
     setStep(0);
   }
 
   if (effectiveStep === 3 && confirmation) {
+    const confIsPackage = confirmation.bookingType !== "HOURLY";
+    const confPkgOpt = PACKAGE_OPTIONS.find((o) => o.value === confirmation.bookingType);
+    const isDaily = confirmation.bookingType === "DAILY";
     const rows = [
       ["Mã đặt chỗ", `#${confirmation.bookingId}`],
       ["Trạng thái", confirmation.status, depositPaid ? "text-emerald-600" : "text-amber-600"],
       ["Toà nhà", confirmation.building],
       ["Tầng", confirmation.floor],
       ["Vị trí", `${confirmation.zone} — ${confirmation.slotCode}`],
-      ["Hình thức", "Theo giờ (tính khi ra)"],
+      confIsPackage
+        ? ["Hình thức", `${confPkgOpt?.label || confirmation.bookingType} × ${confirmation.durationUnits}`]
+        : ["Hình thức", "Theo giờ (tính khi ra)"],
+      ...(confIsPackage && !isDaily
+        ? [["Thời hạn", `${confirmation.durationUnits * (confPkgOpt?.days || 7)} ngày`]]
+        : []),
       ["Hẹn đến bãi", formatDateTime(confirmation.bookingStartTime)],
-      ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"],
+      confIsPackage && !isDaily
+        ? ["Phí trọn gói", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"]
+        : ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"],
       ["Hạn TT cọc", formatDateTime(confirmation.expiredAt)],
       ["Xe", confirmation.vehiclePlate],
     ];
+    const title = confIsPackage
+      ? (depositPaid ? "Đăng ký gói thành công — QR sẵn sàng" : "Đăng ký gói thành công — Cần thanh toán")
+      : (depositPaid ? "Đặt chỗ thành công — QR sẵn sàng" : "Đặt chỗ thành công — Cần thanh toán cọc");
+    const desc = confIsPackage
+      ? (depositPaid
+          ? "Phí gói đã thanh toán. Vào Lịch sử đặt chỗ để xem mã QR. Vào/ra tự do trong suốt kỳ hạn."
+          : "Thanh toán phí gói qua VNPay để nhận mã QR. Sau đó vào/ra tự do không cần thanh toán thêm.")
+      : (depositPaid
+          ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
+          : "Thanh toán cọc qua VNPay để xác nhận giữ chỗ. Phần còn lại trả khi ra.");
     return (
       <div className="max-w-lg mx-auto">
         <div className="rounded-2xl border border-border bg-card p-8 text-center">
           <div className={`size-16 rounded-full flex items-center justify-center mx-auto mb-4 ${depositPaid ? "bg-emerald-100 dark:bg-emerald-500/15" : "bg-amber-100 dark:bg-amber-500/15"}`}>
-            <CheckCircle2 size={30} className={depositPaid ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"} />
+            {confIsPackage && !depositPaid
+              ? <Package size={30} className="text-amber-600 dark:text-amber-300" />
+              : <CheckCircle2 size={30} className={depositPaid ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"} />}
           </div>
-          <h3 className="font-bold text-foreground mb-1 text-xl">
-            {depositPaid
-              ? "Đặt chỗ thành công — QR sẵn sàng"
-              : "Đặt chỗ thành công — Cần thanh toán cọc"}
-          </h3>
-          <p className="text-muted-foreground text-sm mb-6">
-            {depositPaid
-              ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
-              : "Thanh toán cọc qua VNPay để xác nhận giữ chỗ. Phần còn lại trả khi ra."}
-          </p>
+          <h3 className="font-bold text-foreground mb-1 text-xl">{title}</h3>
+          <p className="text-muted-foreground text-sm mb-6">{desc}</p>
           <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2 mb-6">
             {rows.map(([label, value, cls]) => (
               <div key={label} className="flex justify-between text-sm">
@@ -363,13 +505,24 @@ export default function BookingPage() {
               </div>
             ))}
           </div>
+          {confIsPackage && !isDaily && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 text-left mb-4">
+              <p className="font-semibold mb-1">Quyền lợi gói {confPkgOpt?.label}:</p>
+              <ul className="space-y-0.5 list-disc list-inside text-xs">
+                <li>Vào/ra bãi nhiều lần trong kỳ hạn</li>
+                <li>Slot {confirmation.slotCode} được giữ riêng cho bạn</li>
+                <li>Không tính phí thêm khi ra giữa kỳ</li>
+                <li>Slot tự giải phóng khi hết kỳ</li>
+              </ul>
+            </div>
+          )}
           <AlertBox>{payError}</AlertBox>
           <div className="space-y-3 mt-4">
             {!depositPaid ? (
               <button onClick={handlePayDeposit} disabled={payingDeposit} className="w-full bg-primary text-primary-foreground py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60">
                 {payingDeposit
                   ? "Đang xử lý..."
-                  : `Thanh toán cọc ${vnd(confirmation.depositAmount)} VND qua VNPay`}
+                  : `Thanh toán ${vnd(confirmation.depositAmount)} VND qua VNPay`}
               </button>
             ) : (
               <button onClick={() => navigate("/driver/bookings")} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-colors">
@@ -388,10 +541,9 @@ export default function BookingPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {[
-          { to: "/driver/parking-slots", icon: SquareParking, title: "Xem slot trống", desc: "Tra cứu slot theo loại xe" },
-          { to: "/driver/package-booking", icon: Package, title: "Đăng ký gói", desc: "Gói ngày / tuần / tháng" },
+          { to: "/driver/find-parking", icon: SquareParking, title: "Tìm chỗ đỗ", desc: "So độ trống, khoảng cách giữa các bãi" },
           { to: "/driver/bookings", icon: History, title: "Lịch sử đặt chỗ", desc: "Xem cọc, QR, trạng thái booking" },
         ].map(({ to, icon: Icon, title, desc }) => (
           <button key={to} type="button" onClick={() => navigate(to)} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-muted/40">
@@ -414,7 +566,7 @@ export default function BookingPage() {
       )}
 
       <div className="flex items-center gap-0">
-        {STEP_LABELS.map((label, i) => (
+        {stepLabels.map((label, i) => (
           <div key={label} className="flex items-center flex-1 last:flex-none">
             <div className="flex items-center gap-2">
               <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${i <= effectiveStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
@@ -422,7 +574,7 @@ export default function BookingPage() {
               </div>
               <span className={`text-sm hidden sm:inline ${i === effectiveStep ? "text-foreground font-medium" : "text-muted-foreground"}`}>{label}</span>
             </div>
-            {i < STEP_LABELS.length - 1 && <div className={`flex-1 h-px mx-3 ${i < effectiveStep ? "bg-primary" : "bg-border"}`} />}
+            {i < stepLabels.length - 1 && <div className={`flex-1 h-px mx-3 ${i < effectiveStep ? "bg-primary" : "bg-border"}`} />}
           </div>
         ))}
       </div>
@@ -441,6 +593,7 @@ export default function BookingPage() {
               onValueChange={(v) => {
                 setConflictLock(null);
                 setSelection({ building: "", floor: "", zone: "", slotCode: "", slotId: "", vehicleId: v });
+                setOpenPanel("building");
               }}
             >
               <SelectTrigger className="h-11 rounded-xl border-border bg-background px-4 text-sm" disabled={loadingVehicles}>
@@ -472,21 +625,28 @@ export default function BookingPage() {
           )}
 
           {selection.vehicleId && !isSelectedVehicleLocked && buildingOptions.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Toà nhà</label>
-              <div className="grid grid-cols-2 gap-3">
-                {buildingOptions.map((b) => (
-                  <button key={b} onClick={() => setSelection((p) => ({ ...p, building: b, floor: "", zone: "", slotCode: "", slotId: "" }))}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${selection.building === b ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
-                    <div className={`mb-2 flex size-8 items-center justify-center rounded-lg ${selection.building === b ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      <MapPin size={14} />
-                    </div>
-                    <p className="font-medium text-sm text-foreground">{b}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{slotGrid.filter((s) => s.building === b).length} slot</p>
-                  </button>
-                ))}
+            selection.building && openPanel !== "building" ? (
+              <SummaryRow icon={MapPin} label="Toà nhà" value={selection.building} onEdit={() => setOpenPanel("building")} />
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Toà nhà</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {buildingOptions.map((b) => (
+                    <button key={b} onClick={() => {
+                        setSelection((p) => ({ ...p, building: b, floor: "", zone: "", slotCode: "", slotId: "" }));
+                        setOpenPanel("floorZone");
+                      }}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${selection.building === b ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
+                      <div className={`mb-2 flex size-8 items-center justify-center rounded-lg ${selection.building === b ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        <MapPin size={14} />
+                      </div>
+                      <p className="font-medium text-sm text-foreground">{b}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{slotGrid.filter((s) => s.building === b).length} vị trí</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )}
 
           {!loadingSlots && selection.vehicleId && !isSelectedVehicleLocked && buildingOptions.length === 0 && (
@@ -496,74 +656,88 @@ export default function BookingPage() {
           )}
 
           {selection.building && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Tầng</label>
-                <div className="space-y-1.5">
-                  {floorOptions.map((f) => (
-                    <button key={f} onClick={() => setSelection((p) => ({ ...p, floor: f, zone: "", slotCode: "", slotId: "" }))}
-                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.floor === f ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
-                      {f}
-                    </button>
-                  ))}
+            selection.floor && selection.zone && openPanel !== "floorZone" ? (
+              <SummaryRow icon={MapPin} label="Tầng / Khu vực" value={`${selection.floor} — ${selection.zone}`} onEdit={() => setOpenPanel("floorZone")} />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Tầng</label>
+                  <div className="space-y-1.5">
+                    {floorOptions.map((f) => (
+                      <button key={f} onClick={() => setSelection((p) => ({ ...p, floor: f, zone: "", slotCode: "", slotId: "" }))}
+                        className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.floor === f ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Khu vực</label>
+                  <div className="space-y-1.5">
+                    {zoneOptions.map((z) => (
+                      <button key={z} onClick={() => {
+                          setSelection((p) => ({ ...p, zone: z, slotCode: "", slotId: "" }));
+                          if (selection.floor) setOpenPanel("slot");
+                        }}
+                        className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.zone === z ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
+                        {z}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Khu vực</label>
-                <div className="space-y-1.5">
-                  {zoneOptions.map((z) => (
-                    <button key={z} onClick={() => setSelection((p) => ({ ...p, zone: z, slotCode: "", slotId: "" }))}
-                      className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.zone === z ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
-                      {z}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )
           )}
 
           {selection.zone && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground">Chọn slot</label>
-                <div className="flex items-center gap-3 text-xs">
-                  {[["bg-emerald-500", "Trống"], ["bg-gray-300 dark:bg-gray-600", "Đã đỗ"], ["bg-amber-400", "Đã giữ"]].map(([cls, label]) => (
-                    <span key={label} className="flex items-center gap-1"><span className={`size-3 rounded-sm ${cls}`} /><span className="text-muted-foreground">{label}</span></span>
-                  ))}
+            selection.slotCode && openPanel !== "slot" ? (
+              <SummaryRow icon={SquareParking} label="Slot" value={selection.slotCode} onEdit={() => setOpenPanel("slot")} />
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-foreground">Chọn vị trí đỗ</label>
+                  <div className="flex items-center gap-3 text-xs">
+                    {[["bg-emerald-500", "Trống"], ["bg-gray-300 dark:bg-gray-600", "Đã đỗ"], ["bg-amber-400", "Đã giữ"]].map(([cls, label]) => (
+                      <span key={label} className="flex items-center gap-1"><span className={`size-3 rounded-sm ${cls}`} /><span className="text-muted-foreground">{label}</span></span>
+                    ))}
+                  </div>
                 </div>
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 p-4 bg-muted/30 rounded-xl">
+                  {filteredSlotGrid.map((slot) => {
+                    const blocked = slot.status !== "available";
+                    const active = slot.slotCode === selection.slotCode || String(slot.slotId) === String(selection.slotId);
+                    return (
+                      <button key={slot.uiId} disabled={blocked}
+                        onClick={() => {
+                          setSelection((p) => ({ ...p, slotCode: slot.slotCode, slotId: slot.slotId || slot.uiId }));
+                          setOpenPanel(null);
+                        }}
+                        className={`rounded-lg aspect-square flex items-center justify-center text-[10px] font-mono font-bold transition-all ${slotClasses(slot.status, active)}`}>
+                        {slot.slotCode}
+                      </button>
+                    );
+                  })}
+                </div>
+                {filteredSlotGrid.length === 0 && (
+                  <p className="mt-3 text-center text-sm text-muted-foreground">Không có slot nào ở khu vực này.</p>
+                )}
               </div>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 p-4 bg-muted/30 rounded-xl">
-                {filteredSlotGrid.map((slot) => {
-                  const blocked = slot.status !== "available";
-                  const active = slot.slotCode === selection.slotCode || String(slot.slotId) === String(selection.slotId);
-                  return (
-                    <button key={slot.uiId} disabled={blocked}
-                      onClick={() => setSelection((p) => ({ ...p, slotCode: slot.slotCode, slotId: slot.slotId || slot.uiId }))}
-                      className={`rounded-lg aspect-square flex items-center justify-center text-[10px] font-mono font-bold transition-all ${slotClasses(slot.status, active)}`}>
-                      {slot.slotCode}
-                    </button>
-                  );
-                })}
-              </div>
-              {filteredSlotGrid.length === 0 && (
-                <p className="mt-3 text-center text-sm text-muted-foreground">Không có slot nào ở khu vực này.</p>
-              )}
-            </div>
+            )
           )}
 
           <button onClick={() => setStep(1)}
             disabled={!selection.vehicleId || !selection.slotCode || isSelectedVehicleLocked}
             className="w-full rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors">
-            Tiếp tục — Chọn thời gian
+            Tiếp tục — Chọn hình thức
           </button>
         </div>
       )}
 
-      {/* ─── STEP 2: Thời gian ───────────────────────────── */}
+      {/* ─── STEP 2: Hình thức (Theo giờ / Theo gói) ─────── */}
       {effectiveStep === 1 && !isSelectedVehicleLocked && (
         <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
           <h3 className="font-semibold text-foreground text-lg flex items-center gap-2">
-            <Clock size={20} /> Chọn thời gian
+            <Clock size={20} /> {isPackageMode ? "Chọn gói đỗ xe" : "Chọn thời gian"}
           </h3>
 
           {selectedSlot && (
@@ -573,69 +747,245 @@ export default function BookingPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Thời gian đến bãi đỗ</label>
-            <input type="datetime-local"
-              value={formatLocalDateTime(bookingStart).slice(0, 16)}
-              min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-              onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
-            <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
+          {/* Hình thức toggle */}
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => handleModeChange("HOURLY")}
+              className={`p-3 rounded-xl border-2 text-left transition-all ${!isPackageMode ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
+              <p className={`font-semibold text-sm ${!isPackageMode ? "text-primary" : "text-foreground"}`}>Theo giờ</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Cọc trước, trả phần còn lại khi ra</p>
+            </button>
+            <button type="button" onClick={() => handleModeChange("WEEKLY")}
+              className={`p-3 rounded-xl border-2 text-left transition-all ${isPackageMode ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
+              <p className={`font-semibold text-sm flex items-center gap-1.5 ${isPackageMode ? "text-primary" : "text-foreground"}`}><Package size={13} /> Theo gói</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Ngày / tuần / tháng — thanh toán trọn gói</p>
+            </button>
           </div>
 
-          {/* Bảng giá tham khảo */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá tham khảo</label>
-            {hourlyPolicies.length > 0 ? (
-              <div className="rounded-xl border border-primary/30 overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-primary/10">
-                      <th className="text-left px-3 py-2 font-semibold text-primary">Loại ngày</th>
-                      <th className="text-right px-3 py-2 font-semibold text-primary">Đơn giá</th>
-                      <th className="text-right px-3 py-2 font-semibold text-primary">Tính theo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hourlyPolicies.map((p) => {
-                      const isActive = effectiveDayType === p.dayType || hourlyPolicies.length === 1;
-                      return (
-                        <tr key={p.policyId} className={`border-t border-primary/20 ${isActive ? "bg-primary/5" : ""}`}>
-                          <td className="px-3 py-2 text-foreground">
-                            {DAY_TYPE_LABELS[p.dayType] || p.dayType}
-                            {isActive && <span className="ml-1.5 text-[10px] text-primary font-semibold">◀ hôm nay</span>}
-                          </td>
-                          <td className="px-3 py-2 text-right font-medium text-foreground">
-                            {Number(p.pricePerHour).toLocaleString("vi-VN")}đ/giờ
-                          </td>
-                          <td className="px-3 py-2 text-right text-muted-foreground">mỗi 30 phút</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+          {!isPackageMode ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Thời gian đến bãi đỗ</label>
+                <input type="datetime-local"
+                  value={formatLocalDateTime(bookingStart).slice(0, 16)}
+                  min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
+                  onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
+                <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">Chưa có bảng giá. Vui lòng liên hệ quản lý bãi.</p>
-            )}
-          </div>
 
-          {/* Tóm tắt */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span>Thời gian đến bãi</span>
-              <span className="font-medium">{bookingStart.toLocaleString("vi-VN")}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>{effectiveDayType === "WEEKEND" ? "Cuối tuần" : "Ngày thường"}</span>
-              <span className="font-medium">{effectiveDayType === "WEEKEND" ? "Áp dụng giá cuối tuần" : "Áp dụng giá ngày thường"}</span>
-            </div>
-            <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-500/30 mt-1">
-              <span className="font-semibold">Tiền cọc giữ chỗ</span>
-              <span className="font-bold text-base">10.000 – 30.000đ</span>
-            </div>
-            <p className="text-xs opacity-75">Phí tính theo thời gian thực khi ra. Cọc được trừ vào tổng phí.</p>
-          </div>
+              {/* Bảng giá tham khảo */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá tham khảo</label>
+                {hourlyPolicies.length > 0 ? (
+                  <div className="rounded-xl border border-primary/30 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-primary/10">
+                          <th className="text-left px-3 py-2 font-semibold text-primary">Loại ngày</th>
+                          <th className="text-left px-3 py-2 font-semibold text-primary">Khung giờ</th>
+                          <th className="text-right px-3 py-2 font-semibold text-primary">Đơn giá</th>
+                          <th className="text-right px-3 py-2 font-semibold text-primary">Tính theo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const currentPolicy = resolveHourlyPolicy(hourlyPolicies, effectiveDayType, bookingStart.getHours(), bookingStart);
+                          return hourlyPolicies.map((p) => {
+                            const isActive = p.policyId === currentPolicy?.policyId;
+                            const night = isNightRange(p.startHour, p.endHour);
+                            return (
+                              <tr key={p.policyId} className={`border-t border-primary/20 ${isActive ? "bg-primary/5" : night ? "bg-muted/20" : ""}`}>
+                                <td className="px-3 py-2 text-foreground">
+                                  {DAY_TYPE_LABELS[p.dayType] || p.dayType}
+                                  {isActive && <span className="ml-1.5 text-[10px] text-primary font-semibold">◀ đang áp dụng</span>}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className="font-medium text-foreground whitespace-nowrap">{formatHourRange(p.startHour, p.endHour)}</span>
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ${night ? "bg-indigo-500/10 text-indigo-400" : "bg-amber-500/10 text-amber-600"}`}>
+                                      {night ? <Moon size={10} /> : <Sun size={10} />}
+                                      {night ? "Ban đêm" : "Ban ngày"}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-right font-medium text-foreground">
+                                  {Number(p.pricePerHour).toLocaleString("vi-VN")}đ/giờ
+                                </td>
+                                <td className="px-3 py-2 text-right text-muted-foreground">mỗi 30 phút</td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Chưa có bảng giá. Vui lòng liên hệ quản lý bãi.</p>
+                )}
+              </div>
+
+              {/* Tóm tắt */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span>Thời gian đến bãi</span>
+                  <span className="font-medium">{bookingStart.toLocaleString("vi-VN")}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>{effectiveDayType === "WEEKEND" ? "Cuối tuần" : "Ngày thường"}</span>
+                  <span className="font-medium">{effectiveDayType === "WEEKEND" ? "Áp dụng giá cuối tuần" : "Áp dụng giá ngày thường"}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-500/30 mt-1">
+                  <span className="font-semibold">Tiền cọc giữ chỗ</span>
+                  <span className="font-bold text-base">{estimatedDeposit > 0 ? `${vnd(estimatedDeposit)}đ` : "Miễn phí"}</span>
+                </div>
+                <p className="text-xs opacity-75">
+                  {estimatedDeposit > 0
+                    ? "Cọc tăng dần theo thời gian còn lại đến giờ hẹn — đặt càng sớm cọc càng thấp. Cọc được trừ vào tổng phí khi ra."
+                    : selectedVehicle?.vehicleType?.name === "MOTORBIKE"
+                      ? "Xe máy không yêu cầu đặt cọc."
+                      : "Phí tính theo thời gian thực khi ra."}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Loại gói */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Loại gói</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PACKAGE_OPTIONS.map((opt) => {
+                    const policies = priceByType[opt.value] || [];
+                    const policy =
+                      latestEffectivePolicy(policies, bookingStart, (p) => p.dayType === effectiveDayType) ||
+                      latestEffectivePolicy(policies, bookingStart, () => true) ||
+                      policies[0];
+                    const selected = bookingType === opt.value;
+                    return (
+                      <button key={opt.value} type="button" onClick={() => handleModeChange(opt.value)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${selected ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
+                        <p className={`font-semibold text-sm mb-0.5 ${selected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
+                        {policy && (
+                          <p className="text-[11px] text-muted-foreground">{Number(policy.pricePerHour).toLocaleString("vi-VN")}đ/{opt.unitLabel}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Bảng giá gói */}
+              {pricingPolicies.length > 0 && PACKAGE_OPTIONS.some((o) => priceByType[o.value]?.length > 0) && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá gói</label>
+                  <div className="rounded-xl border border-primary/30 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-primary/10">
+                          <th className="text-left px-3 py-2 font-semibold text-primary">Gói</th>
+                          <th className="text-left px-3 py-2 font-semibold text-primary">Loại ngày</th>
+                          <th className="text-right px-3 py-2 font-semibold text-primary">Giá / kỳ</th>
+                          <th className="text-right px-3 py-2 font-semibold text-primary">Quy đổi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {PACKAGE_OPTIONS.filter((opt) => priceByType[opt.value]?.length > 0).flatMap((opt) => {
+                          const optPolicies = priceByType[opt.value];
+                          const resolvedForOpt =
+                            latestEffectivePolicy(optPolicies, bookingStart, (p) => p.dayType === effectiveDayType) ||
+                            latestEffectivePolicy(optPolicies, bookingStart, () => true) ||
+                            optPolicies[0];
+                          return optPolicies.map((p, i) => {
+                            const active = bookingType === opt.value && p.policyId === resolvedForOpt?.policyId;
+                            const perDay = Number(p.pricePerHour) / opt.days;
+                            return (
+                              <tr key={p.policyId} className={`border-t border-primary/20 ${active ? "bg-primary/5" : ""}`}>
+                                <td className="px-3 py-2 font-medium text-foreground">
+                                  {i === 0 ? opt.label : ""}
+                                  {active && <span className="ml-1.5 text-[10px] text-primary font-semibold">◀ đang chọn</span>}
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  {p.dayType === "WEEKEND" ? "Cuối tuần" : p.dayType === "WEEKDAY" ? "Ngày thường" : p.dayType}
+                                </td>
+                                <td className="px-3 py-2 text-right font-medium text-foreground">
+                                  {Number(p.pricePerHour).toLocaleString("vi-VN")}đ/{opt.unitLabel}
+                                </td>
+                                <td className="px-3 py-2 text-right text-muted-foreground">
+                                  ≈ {Math.round(perDay).toLocaleString("vi-VN")}đ/ngày
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Ngày bắt đầu gói</label>
+                <input type="datetime-local"
+                  value={formatLocalDateTime(bookingStart).slice(0, 16)}
+                  min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
+                  onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
+                <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
+              </div>
+
+              {(() => {
+                const pkgOpt = PACKAGE_OPTIONS.find((o) => o.value === bookingType);
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Số {pkgOpt?.unitLabel} ({pkgOpt?.days} ngày/kỳ)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => setDurationUnits((n) => Math.max(1, n - 1))}
+                        className="size-9 rounded-xl border border-border bg-background text-foreground font-bold text-lg hover:bg-muted transition-colors flex items-center justify-center">
+                        −
+                      </button>
+                      <input type="number" min={1} max={12} value={durationUnits}
+                        onChange={(e) => setDurationUnits(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                        className="flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground text-center font-medium" />
+                      <button type="button" onClick={() => setDurationUnits((n) => Math.min(12, n + 1))}
+                        className="size-9 rounded-xl border border-border bg-background text-foreground font-bold text-lg hover:bg-muted transition-colors flex items-center justify-center">
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tóm tắt */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 px-4 py-4 text-sm text-emerald-800 dark:text-emerald-200 space-y-1.5">
+                {(() => {
+                  const pkgOpt = PACKAGE_OPTIONS.find((o) => o.value === bookingType);
+                  return [
+                    ["Gói", `${pkgOpt?.label} × ${durationUnits}`],
+                    ["Bắt đầu", bookingStart.toLocaleString("vi-VN")],
+                    ["Kết thúc", computeBookingEnd(bookingStart, bookingType, durationUnits).toLocaleString("vi-VN")],
+                    ["Tổng ngày", `${durationUnits * (pkgOpt?.days || 7)} ngày`],
+                  ].map(([l, v]) => (
+                    <div key={l} className="flex justify-between"><span>{l}</span><span className="font-medium">{v}</span></div>
+                  ));
+                })()}
+                {estimatedCost != null && (
+                  <div className="flex justify-between items-center pt-2 border-t border-emerald-200 dark:border-emerald-500/30 mt-1">
+                    <span className="font-semibold">
+                      {bookingType === "DAILY" ? "Phí dự tính (trả khi ra)" : "Phí trọn gói cần thanh toán"}
+                    </span>
+                    <span className="font-bold text-base">{vnd(estimatedCost)}đ</span>
+                  </div>
+                )}
+                <p className="text-xs opacity-75 pt-1">
+                  {bookingType === "DAILY"
+                    ? "Slot được giữ trọn ngày. Thanh toán phí khi ra cổng."
+                    : "Thanh toán 1 lần qua VNPay. Sau đó vào/ra tự do."}
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3">
             <button onClick={() => setStep(0)} className="flex-1 rounded-xl border border-border py-2.5 text-sm text-foreground hover:bg-muted transition-colors">
@@ -661,8 +1011,12 @@ export default function BookingPage() {
               ["Toà nhà", selectedSlot?.building || "--"],
               ["Tầng / Khu vực", `${selectedSlot?.floor || "--"} — ${selectedSlot?.zone || "--"}`],
               ["Slot", selectedSlot?.slotCode || "--"],
-              ["Hình thức", "Theo giờ (tính khi ra)"],
-              ["Hẹn đến bãi", formatDateTime(bookingStart)],
+              isPackageMode
+                ? ["Hình thức", `${PACKAGE_OPTIONS.find((o) => o.value === bookingType)?.label} × ${durationUnits}`]
+                : ["Hình thức", "Theo giờ (tính khi ra)"],
+              isPackageMode
+                ? ["Bắt đầu gói", formatDateTime(bookingStart)]
+                : ["Hẹn đến bãi", formatDateTime(bookingStart)],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between">
                 <span className="text-muted-foreground">{label}</span>
@@ -670,8 +1024,8 @@ export default function BookingPage() {
               </div>
             ))}
             <div className="flex justify-between pt-2 border-t border-border">
-              <span className="text-muted-foreground">Tiền cọc giữ chỗ</span>
-              <span className="font-bold text-primary">10.000 – 30.000đ</span>
+              <span className="text-muted-foreground">{isPackageMode ? "Phí trọn gói dự kiến" : "Tiền cọc giữ chỗ"}</span>
+              <span className="font-bold text-primary">{isPackageMode ? `${vnd(estimatedCost)}đ` : (estimatedDeposit > 0 ? `${vnd(estimatedDeposit)}đ` : "Miễn phí")}</span>
             </div>
           </div>
 

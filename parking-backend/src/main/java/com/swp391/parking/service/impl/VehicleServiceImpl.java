@@ -43,14 +43,14 @@ public class VehicleServiceImpl implements VehicleService {
     public Vehicle getById(Long id) {
         return vehicleRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay xe ID: " + id));
+                "Không tìm thấy xe ID: " + id));
     }
 
     @Override
     public Vehicle getByLicensePlate(String licensePlate) {
         return findByEquivalentLicensePlate(licensePlate)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay xe bien so: " + licensePlate));
+                "Không tìm thấy xe biển số: " + licensePlate));
     }
 
     @Override
@@ -59,12 +59,12 @@ public class VehicleServiceImpl implements VehicleService {
         String normalizedPlate = LicensePlateUtil.normalizeDisplay(req.getLicensePlate());
         if (findByEquivalentLicensePlate(normalizedPlate).isPresent()) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Bien so '" + normalizedPlate + "' da duoc dang ky");
+                "Biển số '" + normalizedPlate + "' đã được đăng ký");
         }
 
         VehicleType vehicleType = vehicleTypeRepo.findById(req.getVehicleTypeId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay loai xe ID: " + req.getVehicleTypeId()));
+                "Không tìm thấy loại xe ID: " + req.getVehicleTypeId()));
 
         Vehicle vehicle = Vehicle.builder()
             .userId(userId.longValue())
@@ -86,14 +86,14 @@ public class VehicleServiceImpl implements VehicleService {
         String normalizedPlate = LicensePlateUtil.normalizeDisplay(req.getLicensePlate());
         VehicleType vehicleType = vehicleTypeRepo.findById(req.getVehicleTypeId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay loai xe ID: " + req.getVehicleTypeId()));
+                "Không tìm thấy loại xe ID: " + req.getVehicleTypeId()));
 
         findByEquivalentLicensePlate(normalizedPlate).stream()
             .filter(existing -> !existing.getId().equals(id))
             .findFirst()
             .ifPresent(existing -> {
                 throw new AppException(HttpStatus.CONFLICT,
-                    "Bien so '" + normalizedPlate + "' da duoc dang ky");
+                    "Biển số '" + normalizedPlate + "' đã được đăng ký");
             });
 
         vehicle.setVehicleType(vehicleType);
@@ -114,7 +114,7 @@ public class VehicleServiceImpl implements VehicleService {
                 List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT));
         if (hasActiveSession) {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Xe dang co session chua hoan tat, khong the vo hieu hoa");
+                    "Xe đang có session chưa hoàn tất, không thể vô hiệu hoá");
         }
 
         vehicle.setIsActive(false);

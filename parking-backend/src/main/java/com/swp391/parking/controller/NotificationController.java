@@ -81,7 +81,7 @@ public class NotificationController {
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User not found"))
                 .getUserId().longValue();
         if (!currentUserId.equals(targetUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen truy cap notification cua nguoi khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền truy cập notification của người khác");
         }
     }
 }

@@ -8,19 +8,19 @@ import { unwrapApiData } from "../../utils/api";
 import { markPaymentSync } from "../../utils/paymentSync";
 
 const VNP_RESPONSE_MESSAGES = {
-  "00": "Giao dich thanh cong",
-  "07": "Tru tien thanh cong nhung giao dich dang bi nghi ngo.",
-  "09": "The hoac tai khoan chua dang ky Internet Banking.",
-  "10": "Xac thuc the hoac tai khoan khong dung qua 3 lan.",
-  "11": "Da het han cho thanh toan. Vui long thuc hien lai giao dich.",
-  "12": "The hoac tai khoan bi khoa.",
-  "13": "Nhap sai OTP. Vui long thuc hien lai giao dich.",
-  "24": "Khach hang huy giao dich.",
-  "51": "Tai khoan khong du so du.",
-  "65": "Vuot qua han muc giao dich trong ngay.",
-  "75": "Ngan hang thanh toan dang bao tri.",
-  "79": "Nhap sai mat khau qua so lan quy dinh.",
-  "99": "Loi khong xac dinh.",
+  "00": "Giao dịch thành công",
+  "07": "Trừ tiền thành công nhưng giao dịch đang bị nghi ngờ.",
+  "09": "Thẻ hoặc tài khoản chưa đăng ký Internet Banking.",
+  "10": "Xác thực thẻ hoặc tài khoản không đúng quá 3 lần.",
+  "11": "Đã hết hạn chờ thanh toán. Vui lòng thực hiện lại giao dịch.",
+  "12": "Thẻ hoặc tài khoản bị khoá.",
+  "13": "Nhập sai OTP. Vui lòng thực hiện lại giao dịch.",
+  "24": "Khách hàng huỷ giao dịch.",
+  "51": "Tài khoản không đủ số dư.",
+  "65": "Vượt quá hạn mức giao dịch trong ngày.",
+  "75": "Ngân hàng thanh toán đang bảo trì.",
+  "79": "Nhập sai mật khẩu quá số lần quy định.",
+  "99": "Lỗi không xác định.",
 };
 
 function parseTargetId(orderInfo) {
@@ -81,7 +81,7 @@ export default function PaymentResultPage() {
               return;
             }
             if (!cancelled) {
-              setSyncMessage("Dang doi backend hoan tat phien do xe sau khi VNPay xac nhan.");
+              setSyncMessage("Đang đợi backend hoàn tất phiên đỗ xe sau khi VNPay xác nhận.");
             }
           } else {
             const res = await bookingApi.getMyBookings();
@@ -100,12 +100,12 @@ export default function PaymentResultPage() {
               return;
             }
             if (!cancelled) {
-              setSyncMessage("Dang doi backend xac nhan booking va sinh ma QR entry.");
+              setSyncMessage("Đang đợi backend xác nhận booking và sinh mã QR entry.");
             }
           }
         } catch {
           if (!cancelled) {
-            setSyncMessage("Dang dong bo ket qua thanh toan tu backend...");
+            setSyncMessage("Đang đồng bộ kết quả thanh toán từ backend...");
           }
         }
 
@@ -117,8 +117,8 @@ export default function PaymentResultPage() {
         setBackendReady(true);
         setSyncMessage(
           isParkingFee
-            ? "VNPay da bao thanh cong. Neu phien chua cap nhat ngay, vui long mo lai Current Session sau vai giay."
-            : "VNPay da bao thanh cong. Neu QR chua hien ngay, vui long mo lai Lich su dat cho sau vai giay."
+            ? "VNPay đã báo thành công. Nếu phiên chưa cập nhật ngay, vui lòng mở lại Current Session sau vài giây."
+            : "VNPay đã báo thành công. Nếu QR chưa hiện ngay, vui lòng mở lại Lịch sử đặt chỗ sau vài giây."
         );
       }
     }
@@ -160,7 +160,7 @@ export default function PaymentResultPage() {
 
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-foreground">
-            {isSuccess ? "Thanh toan thanh cong" : "Thanh toan that bai"}
+            {isSuccess ? "Thanh toán thành công" : "Thanh toán thất bại"}
           </h1>
           <p className="text-sm text-muted-foreground">{message}</p>
         </div>
@@ -169,25 +169,25 @@ export default function PaymentResultPage() {
           <div className="rounded-xl border border-border bg-muted/40 p-4 text-left space-y-2 text-sm">
             {orderInfo && (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Noi dung</span>
+                <span className="text-muted-foreground">Nội dung</span>
                 <span className="font-medium text-foreground text-right">{orderInfo}</span>
               </div>
             )}
             {amountVnd && (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">So tien</span>
+                <span className="text-muted-foreground">Số tiền</span>
                 <span className="font-bold text-foreground">{amountVnd} VND</span>
               </div>
             )}
             {transactionNo && (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Ma giao dich</span>
+                <span className="text-muted-foreground">Mã giao dịch</span>
                 <span className="font-mono text-xs text-foreground">{transactionNo}</span>
               </div>
             )}
             {txnRef && (
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">Ma don</span>
+                <span className="text-muted-foreground">Mã đơn</span>
                 <span className="font-mono text-xs text-foreground">{txnRef}</span>
               </div>
             )}
@@ -198,12 +198,12 @@ export default function PaymentResultPage() {
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle size={14} className="animate-spin" />
             {backendReady
-              ? `Chuyen ve ${isParkingFee ? "Current Session" : "Lich su dat cho"} sau ${countdown}s...`
-              : (syncMessage || "Dang doi backend xac nhan giao dich...")}
+              ? `Chuyển về ${isParkingFee ? "Current Session" : "Lịch sử đặt chỗ"} sau ${countdown}s...`
+              : (syncMessage || "Đang đợi backend xác nhận giao dịch...")}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Vui long quay lai va thu lai hoac lien he nhan vien ho tro.
+            Vui lòng quay lại và thử lại hoặc liên hệ nhân viên hỗ trợ.
           </p>
         )}
 
@@ -212,13 +212,13 @@ export default function PaymentResultPage() {
             onClick={() => navigate(successPath, { replace: true })}
             className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            {isParkingFee ? "Ve Current Session" : "Ve Lich su dat cho"}
+            {isParkingFee ? "Về Current Session" : "Về Lịch sử đặt chỗ"}
           </button>
           <button
             onClick={() => navigate("/driver", { replace: true })}
             className="w-full rounded-xl border border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
           >
-            Ve trang chu
+            Về trang chủ
           </button>
         </div>
       </div>

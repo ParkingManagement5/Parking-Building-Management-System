@@ -60,9 +60,9 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
                 }
                 notificationService.notify(
                     session.getUserId(),
-                    "Co su co tai cong xe",
-                    "Nhan vien da ghi nhan su co: " + req.getExceptionType().name().replace("_", " ").toLowerCase()
-                        + ". Vui long lien he staff hoac gui yeu cau ho tro.",
+                    "Có sự cố tại cổng xe",
+                    "Nhân viên đã ghi nhận sự cố: " + req.getExceptionType().name().replace("_", " ").toLowerCase()
+                        + ". Vui lòng liên hệ staff hoặc gửi yêu cầu hỗ trợ.",
                     "warning", "EXCEPTION", saved.getExceptionId()
                 );
             }
@@ -134,14 +134,14 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         enforceStaffAccess(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.OPEN) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi co the assign exception dang OPEN (hien: " + exceptionCase.getStatus() + ")");
+                    "Chỉ có thể assign exception đang OPEN (hiện: " + exceptionCase.getStatus() + ")");
         }
         User staff = userRepository.findById(staffId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay staff duoc assign"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy staff được assign"));
         boolean isStaff = staff.getRoles() != null
                 && staff.getRoles().stream().anyMatch(role -> role.getRoleName() == Role.RoleName.STAFF);
         if (!isStaff) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the assign exception cho tai khoan STAFF");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ có thể assign exception cho tài khoản STAFF");
         }
 
         exceptionCase.setResolvedBy(staffId);
@@ -157,7 +157,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         enforceAssignedStaff(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.IN_PROGRESS) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi co the resolve exception dang IN_PROGRESS (hien: " + exceptionCase.getStatus() + ")");
+                    "Chỉ có thể resolve exception đang IN_PROGRESS (hiện: " + exceptionCase.getStatus() + ")");
         }
 
         exceptionCase.setStatus(ExceptionStatus.RESOLVED);
@@ -173,7 +173,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
         enforceAssignedStaff(exceptionCase, currentUserId, staffScoped);
         if (exceptionCase.getStatus() != ExceptionStatus.RESOLVED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi co the close exception da RESOLVED (hien: " + exceptionCase.getStatus() + ")");
+                    "Chỉ có thể close exception đã RESOLVED (hiện: " + exceptionCase.getStatus() + ")");
         }
 
         exceptionCase.setStatus(ExceptionStatus.CLOSED);
@@ -191,7 +191,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
 
     private void enforceStaffAccess(ExceptionCase exceptionCase, Integer currentUserId, boolean staffScoped) {
         if (!canStaffAccess(exceptionCase, currentUserId, staffScoped)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem exception cua staff khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem exception của staff khác");
         }
     }
 
@@ -239,7 +239,7 @@ public class ExceptionCaseServiceImpl implements ExceptionCaseService {
             return;
         }
         if (exceptionCase.getResolvedBy() == null || !exceptionCase.getResolvedBy().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Chi staff duoc assign moi duoc xu ly exception nay");
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ staff được assign mới được xử lý exception này");
         }
     }
 

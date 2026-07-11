@@ -75,7 +75,7 @@ class VehicleTypeControllerTest {
         assertTrue(response.getStatusCode().is2xxSuccessful());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isSuccess());
-        assertEquals("Tao loai xe thanh cong", response.getBody().getMessage());
+        assertEquals("Tạo loại xe thành công", response.getBody().getMessage());
         assertEquals(5L, response.getBody().getData().getId());
     }
 }

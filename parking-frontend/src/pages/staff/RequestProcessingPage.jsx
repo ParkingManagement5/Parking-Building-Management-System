@@ -32,7 +32,7 @@ export default function RequestProcessingPage() {
       ]);
     } catch (err) {
       console.error("Failed to load requests", err);
-      setError(err.response?.data?.message || "Khong tai duoc danh sach request.");
+      setError(err.response?.data?.message || "Không tải được danh sách request.");
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ export default function RequestProcessingPage() {
   const assignToMe = async (request) => {
     const staffId = Number(localStorage.getItem("userId"));
     if (!staffId) {
-      setError("Khong tim thay staff userId trong localStorage.");
+      setError("Không tìm thấy staff userId trong localStorage.");
       return;
     }
 
@@ -52,7 +52,7 @@ export default function RequestProcessingPage() {
       await loadRequests();
     } catch (err) {
       console.error("Assign request failed", err);
-      setError(err.response?.data?.message || "Khong assign duoc request.");
+      setError(err.response?.data?.message || "Không assign được request.");
     } finally {
       setSavingId(null);
     }
@@ -66,7 +66,7 @@ export default function RequestProcessingPage() {
       await loadRequests();
     } catch (err) {
       console.error("Resolve request failed", err);
-      setError(err.response?.data?.message || "Khong resolve duoc request.");
+      setError(err.response?.data?.message || "Không resolve được request.");
     } finally {
       setSavingId(null);
     }

@@ -155,7 +155,7 @@ export default function LoginPage() {
       });
       data = unwrapApiData(res.data, {});
     } catch (err) {
-      setError(err.response?.data?.message || "Dang nhap that bai. Vui long kiem tra tai khoan hoac mat khau.");
+      setError(err.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra tài khoản hoặc mật khẩu.");
       setLoading(false);
       return;
     }
@@ -164,7 +164,7 @@ export default function LoginPage() {
       navigate(saveAuthData(data));
     } catch (err) {
       console.error("Failed to persist login session", err);
-      setError("Dang nhap thanh cong nhung khong luu duoc phien dang nhap. Vui long thu lai.");
+      setError("Đăng nhập thành công nhưng không lưu được phiên đăng nhập. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ export default function LoginPage() {
   const handleGoogleLogin = () => {
     if (!isLocalhost) {
       setGoogleLoading(false);
-      setError("Google login chi ho tro tren localhost. Hay dang nhap bang username/password.");
+      setError("Google login chỉ hỗ trợ trên localhost. Hãy đăng nhập bằng username/password.");
       return;
     }
     if (window.google?.accounts?.id) {
@@ -208,8 +208,8 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-form-wrapper">
-          <h1>Chao mung tro lai</h1>
-          <p className="auth-subtitle">Dang nhap de quan ly bai do xe cua ban</p>
+          <h1>Chào mừng trở lại</h1>
+          <p className="auth-subtitle">Đăng nhập để quản lý bãi đỗ xe của bạn</p>
 
           {error && (
             <div
@@ -229,27 +229,27 @@ export default function LoginPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="username">Username hoac Email</label>
+              <label htmlFor="username">Username hoặc Email</label>
               <input
                 id="username"
                 type="text"
                 required
                 value={form.username}
                 onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-                placeholder="Nhap username hoac email"
+                placeholder="Nhập username hoặc email"
               />
             </div>
 
             <div className="form-group">
               <label htmlFor="password">
-                Mat khau
+                Mật khẩu
                 <button
                   type="button"
                   className="form-link"
                   onClick={() => navigate("/forgot-password")}
                   style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                 >
-                  Quen mat khau?
+                  Quên mật khẩu?
                 </button>
               </label>
               <div className="input-password">
@@ -259,7 +259,7 @@ export default function LoginPage() {
                   required
                   value={form.password}
                   onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                  placeholder="Nhap mat khau"
+                  placeholder="Nhập mật khẩu"
                 />
                 <button
                   type="button"
@@ -290,15 +290,15 @@ export default function LoginPage() {
                 checked={rememberMe}
                 onChange={(event) => setRememberMe(event.target.checked)}
               />
-              <label htmlFor="remember">Ghi nho dang nhap</label>
+              <label htmlFor="remember">Ghi nhớ đăng nhập</label>
             </div>
 
             <button type="submit" className="btn btn-accent btn-full btn-lg" disabled={loading}>
-              {loading ? "Dang dang nhap..." : "Dang nhap"}
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </form>
 
-          <div className="auth-divider"><span>hoac</span></div>
+          <div className="auth-divider"><span>hoặc</span></div>
 
           <button
             type="button"
@@ -307,7 +307,7 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
           >
             {googleLoading ? (
-              "Dang dang nhap..."
+              "Đang đăng nhập..."
             ) : (
               <>
                 <svg width="20" height="20" viewBox="0 0 24 24">
@@ -316,20 +316,20 @@ export default function LoginPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
-                Dang nhap voi Google
+                Đăng nhập với Google
               </>
             )}
           </button>
 
           <p className="auth-footer-text">
-            Chua co tai khoan?{" "}
+            Chưa có tài khoản?{" "}
             <button
               type="button"
               className="text-link"
               onClick={() => navigate("/register")}
               style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}
             >
-              Dang ky ngay
+              Đăng ký ngay
             </button>
           </p>
         </div>
@@ -348,15 +348,15 @@ export default function LoginPage() {
             <div className="auth-stat-grid">
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "var(--accent)" }}>{overview.total}</span>
-                <span className="auth-stat-label">Tong slot</span>
+                <span className="auth-stat-label">Tổng slot</span>
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#60a5fa" }}>{overview.available}</span>
-                <span className="auth-stat-label">Trong</span>
+                <span className="auth-stat-label">Trống</span>
               </div>
               <div className="auth-stat-item">
                 <span className="auth-stat-value" style={{ color: "#f97316" }}>{overview.occupied}</span>
-                <span className="auth-stat-label">Dang do</span>
+                <span className="auth-stat-label">Đang đỗ</span>
               </div>
             </div>
           </div>

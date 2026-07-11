@@ -112,7 +112,7 @@ public class RequestServiceImpl implements RequestService {
         User staff = findUserById(staffId);
         ensureStatus(request, RequestStatus.OPEN, "assign");
         if (!hasRole(staff, Role.RoleName.STAFF)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the assign request cho tai khoan STAFF");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ có thể assign request cho tài khoản STAFF");
         }
 
         request.setAssignedStaff(staff);
@@ -163,8 +163,8 @@ public class RequestServiceImpl implements RequestService {
     private void ensureStatus(Request request, RequestStatus expectedStatus, String action) {
         if (request.getStatus() != expectedStatus) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Khong the " + action + " request khi trang thai la " + request.getStatus()
-                            + ". Trang thai hop le: " + expectedStatus);
+                    "Không thể " + action + " request khi trạng thái là " + request.getStatus()
+                            + ". Trạng thái hợp lệ: " + expectedStatus);
         }
     }
 
@@ -175,7 +175,7 @@ public class RequestServiceImpl implements RequestService {
 
     private void enforceStaffAccess(Request request, Integer currentUserId, boolean staffScoped) {
         if (!canStaffAccess(request, currentUserId, staffScoped)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem request cua staff khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem request của staff khác");
         }
     }
 
@@ -205,7 +205,7 @@ public class RequestServiceImpl implements RequestService {
             return;
         }
         if (request.getAssignedStaff() == null || !request.getAssignedStaff().getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Chi staff duoc assign moi duoc xu ly request nay");
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ staff được assign mới được xử lý request này");
         }
     }
 

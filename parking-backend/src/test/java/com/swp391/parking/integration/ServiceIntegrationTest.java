@@ -328,7 +328,9 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertTrue(activated.getIsActive());
 
         pricingPolicyService.deletePolicy(created.getPolicyId());
-        assertTrue(pricingPolicyRepository.findById(created.getPolicyId()).isEmpty());
+        var afterDelete = pricingPolicyRepository.findById(created.getPolicyId());
+        assertTrue(afterDelete.isPresent(), "Delete should soft-deactivate, not hard-delete, to preserve historical pricing");
+        assertFalse(afterDelete.get().getIsActive());
     }
 
     @Test

@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 public class SessionExitRequest {
-    @NotNull(message = "gateId khong duoc de trong")
+    @NotNull(message = "gateId không được để trống")
     private Long gateId;
 
     private Long staffUserId;

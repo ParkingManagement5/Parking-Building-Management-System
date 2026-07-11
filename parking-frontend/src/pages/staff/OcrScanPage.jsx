@@ -42,7 +42,7 @@ export default function OcrScanPage() {
     setError("");
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError("Trinh duyet khong ho tro camera. Can chay tren HTTPS hoac localhost. Hay upload anh thay the.");
+      setError("Trình duyệt không hỗ trợ camera. Cần chạy trên HTTPS hoặc localhost. Hãy upload ảnh thay thế.");
       return;
     }
 
@@ -59,12 +59,12 @@ export default function OcrScanPage() {
     } catch (err) {
       const msg =
         err.name === "NotAllowedError"
-          ? "Quyen camera bi tu choi. Vao Settings trinh duyet > cho phep camera cho trang nay."
+          ? "Quyền camera bị từ chối. Vào Settings trình duyệt > cho phép camera cho trang này."
           : err.name === "NotFoundError"
-            ? "Khong tim thay camera tren thiet bi nay. Hay upload anh bien so thay the."
+            ? "Không tìm thấy camera trên thiết bị này. Hãy upload ảnh biển số thay thế."
             : err.name === "NotReadableError"
-              ? "Camera dang duoc ung dung khac su dung. Dong ung dung do roi thu lai."
-              : `Khong mo duoc camera (${err.name || err.message}). Hay upload anh bien so thay the.`;
+              ? "Camera đang được ứng dụng khác sử dụng. Đóng ứng dụng đó rồi thử lại."
+              : `Không mở được camera (${err.name || err.message}). Hãy upload ảnh biển số thay thế.`;
       setError(msg);
     }
   };
@@ -73,7 +73,7 @@ export default function OcrScanPage() {
     new Promise((resolve, reject) => {
       const video = videoRef.current;
       if (!video || video.readyState < 2) {
-        reject(new Error("Camera chua san sang"));
+        reject(new Error("Camera chưa sẵn sàng"));
         return;
       }
 
@@ -90,13 +90,13 @@ export default function OcrScanPage() {
       context.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
-        else reject(new Error("Khong chup duoc anh tu camera"));
+        else reject(new Error("Không chụp được ảnh từ camera"));
       }, "image/jpeg", 0.92);
     });
 
   const uploadForOcr = async (blob, filename = "camera-capture.jpg") => {
     if (!gateId.trim()) {
-      setError("Nhap gateId truoc khi scan.");
+      setError("Nhập gateId trước khi scan.");
       return;
     }
 
@@ -133,7 +133,7 @@ export default function OcrScanPage() {
 
       setResult(record);
       if (record.status === "FAILED") {
-        setError("OCR engine khong doc duoc bien so. Hay chup ro hon hoac qua OCR Correction de nhap tay.");
+        setError("OCR engine không đọc được biển số. Hãy chụp rõ hơn hoặc qua OCR Correction để nhập tay.");
       }
     } catch (err) {
       setResult(null);
@@ -148,7 +148,7 @@ export default function OcrScanPage() {
       const blob = await captureBlob();
       await uploadForOcr(blob);
     } catch (err) {
-      setError(err.message || "Khong chup duoc anh tu camera.");
+      setError(err.message || "Không chụp được ảnh từ camera.");
     }
   };
 

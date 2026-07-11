@@ -109,7 +109,7 @@ export default function LandingPage() {
         });
         setStatsError("");
       } catch (err) {
-        setStatsError(err.response?.data?.message || "Khong tai duoc thong ke bai do song.");
+        setStatsError(err.response?.data?.message || "Không tải được thống kê bãi đỗ trực tiếp.");
       }
     })();
   }, []);

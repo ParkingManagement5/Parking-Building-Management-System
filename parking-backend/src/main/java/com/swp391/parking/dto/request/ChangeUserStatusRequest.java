@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 public class ChangeUserStatusRequest {
 
-    @NotBlank(message = "Trang thai khong duoc de trong")
+    @NotBlank(message = "Trạng thái không được để trống")
     private String status;
 }

@@ -47,7 +47,7 @@ public class PaymentController {
                     && depositAmount.compareTo(BigDecimal.ZERO) > 0) {
                 throw new AppException(
                         HttpStatus.FORBIDDEN,
-                        "Driver khong duoc tao deposit co tien truc tiep. Vui long dung luong VNPay");
+                        "Driver không được tạo deposit có tiền trực tiếp. Vui lòng dùng luồng VNPay");
             }
         } else if (isStaff) {
             paymentService.enforceBookingBuildingScope(bookingId, resolveUserId(authentication), true);
@@ -76,7 +76,7 @@ public class PaymentController {
             if (totalAmount.compareTo(BigDecimal.ZERO) > 0) {
                 throw new AppException(
                         HttpStatus.FORBIDDEN,
-                        "Driver khong duoc tu xac nhan deposit co tien. Vui long thanh toan qua VNPay");
+                        "Driver không được tự xác nhận deposit có tiền. Vui lòng thanh toán qua VNPay");
             }
         } else if (isStaff) {
             paymentService.enforcePaymentBuildingScope(paymentId, resolveUserId(authentication), true);

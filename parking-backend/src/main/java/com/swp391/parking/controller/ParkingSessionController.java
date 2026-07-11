@@ -67,13 +67,13 @@ public class ParkingSessionController {
             @Valid @RequestBody SessionQrScanRequest request,
             Authentication authentication) {
         request.setStaffUserId(resolveStaffUserId(authentication));
-        return ResponseEntity.ok(ApiResponse.success("Exit QR hop le, xe dang cho thanh toan",
+        return ResponseEntity.ok(ApiResponse.success("Exit QR hợp lệ, xe đang chờ thanh toán",
                 sessionService.processExitQr(request)));
     }
 
     private Long resolveStaffUserId(Authentication authentication) {
         return userRepository.findByUsername(authentication.getName())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"))
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
                 .getUserId().longValue();
     }
 
@@ -84,9 +84,9 @@ public class ParkingSessionController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails ud) {
         Long userId = userRepository.findByUsername(ud.getUsername())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khÃ´ng tá»“n táº¡i"))
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
                 .getUserId().longValue();
-        return ResponseEntity.ok(ApiResponse.success("Exit QR da duoc tao",
+        return ResponseEntity.ok(ApiResponse.success("Exit QR đã được tạo",
                 sessionService.generateExitQr(id, userId)));
     }
 
@@ -99,20 +99,20 @@ public class ParkingSessionController {
         SessionResponse response = sessionService.getSession(id);
         if (authentication != null && hasRole(authentication, Role.RoleName.DRIVER)) {
             Long currentUserId = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"))
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
                     .getUserId().longValue();
             if (!currentUserId.equals(response.getUserId())) {
-                throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay session #" + id);
+                throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy session #" + id);
             }
         } else if (authentication != null && hasRole(authentication, Role.RoleName.STAFF)) {
             com.swp391.parking.entity.User staffUser = userRepository
                     .findByUsername(authentication.getName())
-                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User khong ton tai"));
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
             if (staffUser.getAssignedBuilding() != null
                     && staffUser.getAssignedBuilding().getId() != null
                     && response.getBuildingId() != null
                     && !staffUser.getAssignedBuilding().getId().equals(response.getBuildingId())) {
-                throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay session #" + id);
+                throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy session #" + id);
             }
         }
         return ResponseEntity.ok(ApiResponse.success(response));

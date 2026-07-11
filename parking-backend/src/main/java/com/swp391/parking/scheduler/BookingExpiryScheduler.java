@@ -95,9 +95,9 @@ public class BookingExpiryScheduler {
                     }
                     bookingRepository.save(b);
                     try {
-                        notificationService.notify(b.getUserId(), "Booking het han",
+                        notificationService.notify(b.getUserId(), "Booking hết hạn",
                                 "Booking #" + b.getId() + " (" + b.getBookingType()
-                                        + ") het han ma khong co lan vao nao. Slot da duoc giai phong.",
+                                        + ") hết hạn mà không có lần vào nào. Slot đã được giải phóng.",
                                 "warning", "BOOKING", b.getId().intValue());
                     } catch (Exception ignored) {}
                     log.info("[BookingExpiry] Expired no-entry pass booking #{}", b.getId());

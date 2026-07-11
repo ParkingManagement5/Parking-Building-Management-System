@@ -102,7 +102,7 @@ public class OcrServiceImpl implements OcrService {
     @Transactional
     public OcrScanResponse scanImage(MultipartFile image, Long gateId, String triggerType, Long sessionId) {
         if (image == null || image.isEmpty()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Vui long chon anh bien so");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Vui lòng chọn ảnh biển số");
         }
 
         String imagePath = storeImage(image);
@@ -190,13 +190,13 @@ public class OcrServiceImpl implements OcrService {
 
             Path target = targetDir.resolve(UUID.randomUUID() + extension).normalize();
             if (!target.startsWith(targetDir)) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Ten file anh khong hop le");
+                throw new AppException(HttpStatus.BAD_REQUEST, "Tên file ảnh không hợp lệ");
             }
 
             Files.copy(image.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
             return target.toString();
         } catch (IOException ex) {
-            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Khong luu duoc anh OCR");
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Không lưu được ảnh OCR");
         }
     }
 
@@ -283,13 +283,13 @@ public class OcrServiceImpl implements OcrService {
         OcrRecognitionResult recognize(Path imagePath, String originalFilename) {
             if (engineUrl == null || engineUrl.isBlank()) {
                 throw new AppException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "OCR engine chua duoc cau hinh. Chay: cd ocr-service && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000");
+                        "OCR engine chưa được cấu hình. Chạy: cd ocr-service && pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000");
             }
 
             OcrRecognitionResult result = callEngine(imagePath);
             if (result == null) {
                 throw new AppException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Khong ket noi duoc OCR engine tai " + engineUrl + ". Chay: cd ocr-service && uvicorn main:app --host 0.0.0.0 --port 8000");
+                        "Không kết nối được OCR engine tại " + engineUrl + ". Chạy: cd ocr-service && uvicorn main:app --host 0.0.0.0 --port 8000");
             }
 
             return result;
