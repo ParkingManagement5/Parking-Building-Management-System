@@ -4,6 +4,7 @@ import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.FloorOccupancyResponse;
 import com.swp391.parking.dto.response.ManagerDashboardResponse;
 import com.swp391.parking.dto.response.RevenueStatsResponse;
+import com.swp391.parking.dto.response.StaffDailyRevenueResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.Zone;
@@ -48,8 +49,30 @@ public class DashboardController {
     @GetMapping("/manager")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Transactional(readOnly = true)
-    public ResponseEntity<ApiResponse<ManagerDashboardResponse>> getManagerDashboard() {
-        List<ParkingSlot> slots = slotRepository.findAll();
+    public ResponseEntity<ApiResponse<ManagerDashboardResponse>> getManagerDashboard(
+            @AuthenticationPrincipal UserDetails ud) {
+
+        // MANAGER → chỉ xem bãi được phân công; ADMIN → xem tất cả
+        boolean isManager = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        List<ParkingSlot> slots;
+        if (isManager) {
+            var user = userRepository.findByUsername(ud.getUsername())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (user.getAssignedBuilding() == null) {
+                // Chưa được gán bãi → trả về dashboard rỗng
+                return ResponseEntity.ok(ApiResponse.success(ManagerDashboardResponse.builder()
+                        .totalBuildings(0).totalSlots(0).availableSlots(0).occupancyRatePercent(0)
+                        .activePricingCount(0).staffShiftCount(0).activeGateCount(0)
+                        .slotsByBuilding(List.of()).vehicleTypeMix(List.of()).build()));
+            }
+            final Long assignedBuildingId = user.getAssignedBuilding().getId();
+            slots = slotRepository.findAll().stream()
+                    .filter(s -> assignedBuildingId.equals(s.getZone().getFloor().getBuilding().getId()))
+                    .toList();
+        } else {
+            slots = slotRepository.findAll();
+        }
 
         int totalSlots = slots.size();
         int availableSlots = (int) slots.stream()
@@ -257,5 +280,64 @@ public class DashboardController {
 
         return ResponseEntity.ok(ApiResponse.success(
                 FloorOccupancyResponse.builder().floors(floors).build()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Doanh thu trong ngày cho STAFF — scoped by assignedBuilding
+    // GET /api/v1/dashboard/staff/revenue/today
+    // -----------------------------------------------------------------------
+    @GetMapping("/staff/revenue/today")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    @Transactional(readOnly = true)
+    public ResponseEntity<ApiResponse<StaffDailyRevenueResponse>> getStaffTodayRevenue(
+            @AuthenticationPrincipal UserDetails ud) {
+
+        var user = userRepository.findByUsername(ud.getUsername())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+
+        if (user.getAssignedBuilding() == null) {
+            // Chưa được gán bãi → trả về rỗng, không lộ dữ liệu bãi khác
+            return ResponseEntity.ok(ApiResponse.success(
+                    StaffDailyRevenueResponse.builder()
+                            .totalRevenue(java.math.BigDecimal.ZERO)
+                            .sessionCount(0)
+                            .transactionCount(0)
+                            .transactions(List.of())
+                            .build()));
+        }
+
+        Long buildingId = user.getAssignedBuilding().getId();
+        List<Object[]> rows = paymentRepository.getTodayParkingFeeTransactions(buildingId);
+
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+        java.util.Set<Long> sessionIds = new java.util.HashSet<>();
+        List<StaffDailyRevenueResponse.TransactionItem> txList = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            java.math.BigDecimal amount = row[4] != null
+                    ? new java.math.BigDecimal(row[4].toString())
+                    : java.math.BigDecimal.ZERO;
+            total = total.add(amount);
+
+            txList.add(StaffDailyRevenueResponse.TransactionItem.builder()
+                    .paymentId(((Number) row[0]).intValue())
+                    .vehiclePlate(row[1] != null ? row[1].toString() : "")
+                    .vehicleType(row[2] != null ? row[2].toString() : "")
+                    .paidAt(row[3] != null
+                            ? ((java.sql.Timestamp) row[3]).toLocalDateTime()
+                            : null)
+                    .amount(amount)
+                    .paymentType(row[5] != null ? row[5].toString() : "")
+                    .paymentMethod(row[6] != null ? row[6].toString() : "")
+                    .build());
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(
+                StaffDailyRevenueResponse.builder()
+                        .totalRevenue(total)
+                        .sessionCount(txList.size())   // mỗi PARKING_FEE = 1 phiên xe
+                        .transactionCount(txList.size())
+                        .transactions(txList)
+                        .build()));
     }
 }

@@ -4,6 +4,7 @@ import com.swp391.parking.dto.request.ZoneRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.Zone;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.FloorRepository;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.repository.ZoneRepository;
 import com.swp391.parking.service.ZoneService;
@@ -25,6 +26,7 @@ public class ZoneController {
 
     private final ZoneService zoneService;
     private final ZoneRepository zoneRepository;
+    private final FloorRepository floorRepository;
     private final UserRepository userRepository;
 
     @GetMapping
@@ -48,7 +50,10 @@ public class ZoneController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Zone>> create(@Valid @RequestBody ZoneRequest req) {
+    public ResponseEntity<ApiResponse<Zone>> create(@Valid @RequestBody ZoneRequest req, Authentication authentication) {
+        var floor = floorRepository.findById(req.getFloorId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy tầng #" + req.getFloorId()));
+        enforceManagerBuildingOwnership(floor.getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Tao zone thanh cong",
             zoneService.create(req)));
     }
@@ -57,16 +62,36 @@ public class ZoneController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Zone>> update(
             @PathVariable Long id,
-            @Valid @RequestBody ZoneRequest req) {
+            @Valid @RequestBody ZoneRequest req,
+            Authentication authentication) {
+        Zone existing = zoneRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy zone #" + id));
+        enforceManagerBuildingOwnership(existing.getFloor().getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Cap nhat zone thanh cong",
             zoneService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id, Authentication authentication) {
+        Zone existing = zoneRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy zone #" + id));
+        enforceManagerBuildingOwnership(existing.getFloor().getBuilding().getId(), authentication);
         zoneService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa zone khoi DB"));
+    }
+
+    private void enforceManagerBuildingOwnership(Long buildingId, Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return;
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        if (user.getAssignedBuilding() == null
+                || !user.getAssignedBuilding().getId().equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Manager chỉ được thao tác trên bãi đỗ xe được phân công");
+        }
     }
 
     private boolean isAuthenticated(Authentication authentication) {

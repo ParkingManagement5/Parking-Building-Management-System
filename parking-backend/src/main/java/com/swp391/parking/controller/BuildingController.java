@@ -3,12 +3,16 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.request.BuildingRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.ParkingBuilding;
+import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ParkingSlotRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.BuildingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +28,7 @@ public class BuildingController {
 
     private final BuildingService buildingService;
     private final ParkingSlotRepository slotRepository;
+    private final UserRepository userRepository;
 
     // -----------------------------------------------------------------------
     // Public: tình trạng lấp đầy theo tòa nhà — driver xem trước khi đặt chỗ
@@ -63,7 +68,7 @@ public class BuildingController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ParkingBuilding>> create(
             @Valid @RequestBody BuildingRequest req) {
         return ResponseEntity.ok(ApiResponse.success("Tao toa nha thanh cong",
@@ -74,15 +79,37 @@ public class BuildingController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingBuilding>> update(
             @PathVariable Long id,
-            @Valid @RequestBody BuildingRequest req) {
+            @Valid @RequestBody BuildingRequest req,
+            Authentication authentication) {
+        enforceManagerBuildingOwnership(id, authentication);
         return ResponseEntity.ok(ApiResponse.success("Cap nhat toa nha thanh cong",
             buildingService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(
+            @PathVariable Long id,
+            Authentication authentication) {
+        enforceManagerBuildingOwnership(id, authentication);
         buildingService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa toa nha khoi DB"));
+    }
+
+    /**
+     * MANAGER chỉ được thao tác trên bãi được gán. ADMIN không bị giới hạn.
+     */
+    private void enforceManagerBuildingOwnership(Long buildingId, Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return; // ADMIN — không giới hạn
+
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        if (user.getAssignedBuilding() == null
+                || !user.getAssignedBuilding().getId().equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Manager chỉ được thao tác trên bãi đỗ xe được phân công");
+        }
     }
 }

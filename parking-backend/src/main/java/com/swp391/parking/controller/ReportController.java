@@ -5,11 +5,15 @@ import com.swp391.parking.dto.response.RevenueReportResponse;
 import com.swp391.parking.dto.response.TimeSeriesReportResponse;
 import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.Payment;
+import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.PaymentRepository;
+import com.swp391.parking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,18 +46,23 @@ public class ReportController {
 
     private final ParkingSessionRepository sessionRepository;
     private final PaymentRepository paymentRepository;
+    private final UserRepository userRepository;
 
     @GetMapping("/revenue")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<RevenueReportResponse>> getRevenueReport(
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
+            @RequestParam(required = false) String to,
+            Authentication authentication) {
 
         LocalDateTime fromDt = from != null && !from.isBlank() ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt = to != null && !to.isBlank() ? LocalDate.parse(to).atTime(23, 59, 59) : null;
 
-        List<ParkingSession> sessions = sessionRepository.findAllWithBuildingOrderByCreatedAtDesc().stream()
+        Long buildingId = resolveManagerBuildingId(authentication);
+        List<ParkingSession> sessions = (buildingId != null
+                ? sessionRepository.findAllByBuildingIdOrderByCreatedAtDesc(buildingId)
+                : sessionRepository.findAllWithBuildingOrderByCreatedAtDesc()).stream()
                 .filter(s -> s.getEntryTime() != null)
                 .filter(s -> fromDt == null || !s.getEntryTime().isBefore(fromDt))
                 .filter(s -> toDt == null || !s.getEntryTime().isAfter(toDt))
@@ -165,13 +174,17 @@ public class ReportController {
     public ResponseEntity<ApiResponse<TimeSeriesReportResponse>> getTimeSeries(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(defaultValue = "DAY") String groupBy) {
+            @RequestParam(defaultValue = "DAY") String groupBy,
+            Authentication authentication) {
 
         LocalDateTime fromDt = from != null && !from.isBlank() ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt   = to   != null && !to.isBlank()   ? LocalDate.parse(to).atTime(23, 59, 59) : null;
 
-        // 1. Load sessions trong khoảng thời gian
-        List<ParkingSession> sessions = sessionRepository.findAllWithBuildingOrderByCreatedAtDesc().stream()
+        // 1. Load sessions trong khoảng thời gian — MANAGER chỉ xem bãi của mình
+        Long buildingId = resolveManagerBuildingId(authentication);
+        List<ParkingSession> sessions = (buildingId != null
+                ? sessionRepository.findAllByBuildingIdOrderByCreatedAtDesc(buildingId)
+                : sessionRepository.findAllWithBuildingOrderByCreatedAtDesc()).stream()
                 .filter(s -> s.getEntryTime() != null)
                 .filter(s -> fromDt == null || !s.getEntryTime().isBefore(fromDt))
                 .filter(s -> toDt   == null || !s.getEntryTime().isAfter(toDt))
@@ -244,5 +257,18 @@ public class ReportController {
             case "MONTH" -> dt.format(DateTimeFormatter.ofPattern("yyyy-MM"));
             default      -> dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         };
+    }
+
+    /**
+     * Nếu người dùng có role MANAGER → trả về buildingId được phân công.
+     * ADMIN → trả về null (không giới hạn bãi).
+     */
+    private Long resolveManagerBuildingId(Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return null;
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        return user.getAssignedBuilding() != null ? user.getAssignedBuilding().getId() : null;
     }
 }

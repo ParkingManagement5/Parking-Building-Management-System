@@ -48,7 +48,8 @@ public class FloorController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Floor>> create(@Valid @RequestBody FloorRequest req) {
+    public ResponseEntity<ApiResponse<Floor>> create(@Valid @RequestBody FloorRequest req, Authentication authentication) {
+        enforceManagerBuildingOwnership(req.getBuildingId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Tao tang thanh cong",
             floorService.create(req)));
     }
@@ -57,16 +58,36 @@ public class FloorController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Floor>> update(
             @PathVariable Long id,
-            @Valid @RequestBody FloorRequest req) {
+            @Valid @RequestBody FloorRequest req,
+            Authentication authentication) {
+        Floor existing = floorRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy tầng #" + id));
+        enforceManagerBuildingOwnership(existing.getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Cap nhat tang thanh cong",
             floorService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id, Authentication authentication) {
+        Floor existing = floorRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy tầng #" + id));
+        enforceManagerBuildingOwnership(existing.getBuilding().getId(), authentication);
         floorService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa tang khoi DB"));
+    }
+
+    private void enforceManagerBuildingOwnership(Long buildingId, Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return;
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        if (user.getAssignedBuilding() == null
+                || !user.getAssignedBuilding().getId().equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Manager chỉ được thao tác trên bãi đỗ xe được phân công");
+        }
     }
 
     private boolean isAuthenticated(Authentication authentication) {

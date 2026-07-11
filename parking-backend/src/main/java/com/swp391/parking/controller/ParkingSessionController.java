@@ -126,7 +126,9 @@ public class ParkingSessionController {
             @RequestParam(required = false) String keyword,
             Authentication authentication) {
         Long currentUserId = resolveStaffUserId(authentication);
-        boolean staffScoped = hasRole(authentication, Role.RoleName.STAFF);
+        // STAFF và MANAGER đều bị scope theo building được phân công
+        boolean staffScoped = hasRole(authentication, Role.RoleName.STAFF)
+                || hasRole(authentication, Role.RoleName.MANAGER);
         return ResponseEntity.ok(ApiResponse.success(
                 sessionService.getSessions(status, keyword, currentUserId, staffScoped)));
     }

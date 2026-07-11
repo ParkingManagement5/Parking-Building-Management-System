@@ -4,12 +4,16 @@ import com.swp391.parking.dto.request.GateRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.entity.Gate;
 import com.swp391.parking.entity.Gate.GateType;
+import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.GateRepository;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.GateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +26,7 @@ public class GateController {
 
     private final GateService gateService;
     private final GateRepository gateRepository;
+    private final UserRepository userRepository;
 
     @GetMapping("/all")
     @Transactional(readOnly = true)
@@ -54,7 +59,8 @@ public class GateController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Gate>> create(@Valid @RequestBody GateRequest req) {
+    public ResponseEntity<ApiResponse<Gate>> create(@Valid @RequestBody GateRequest req, Authentication authentication) {
+        enforceManagerBuildingOwnership(req.getBuildingId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Tao cong thanh cong",
             gateService.create(req)));
     }
@@ -63,15 +69,36 @@ public class GateController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Gate>> update(
             @PathVariable Long id,
-            @Valid @RequestBody GateRequest req) {
+            @Valid @RequestBody GateRequest req,
+            Authentication authentication) {
+        Gate existing = gateRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy cổng #" + id));
+        enforceManagerBuildingOwnership(existing.getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Cap nhat cong thanh cong",
             gateService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id, Authentication authentication) {
+        Gate existing = gateRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy cổng #" + id));
+        enforceManagerBuildingOwnership(existing.getBuilding().getId(), authentication);
         gateService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa cong khoi DB"));
+    }
+
+    private void enforceManagerBuildingOwnership(Long buildingId, Authentication authentication) {
+        if (authentication == null) return;
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return;
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        if (user.getAssignedBuilding() == null
+                || !user.getAssignedBuilding().getId().equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Manager chỉ được thao tác trên bãi đỗ xe được phân công");
+        }
     }
 }

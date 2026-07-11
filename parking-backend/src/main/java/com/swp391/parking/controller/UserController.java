@@ -7,11 +7,14 @@ import com.swp391.parking.dto.request.UpdateProfileRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.UserProfileResponse;
 import com.swp391.parking.dto.response.UserSummaryResponse;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.UserAdminService;
 import com.swp391.parking.service.UserProfileService;
 import com.swp391.parking.service.UserQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -33,11 +36,23 @@ public class UserController {
     private final UserQueryService userQueryService;
     private final UserAdminService userAdminService;
     private final UserProfileService userProfileService;
+    private final UserRepository userRepository;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getUsers(
-            @RequestParam(required = false) String role) {
+            @RequestParam(required = false) String role,
+            Authentication authentication) {
+        // MANAGER → tự động giới hạn theo bãi được gán, không cần frontend truyền buildingId
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (isManager) {
+            var user = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            Long buildingId = user.getAssignedBuilding() != null
+                    ? user.getAssignedBuilding().getId() : null;
+            return ResponseEntity.ok(ApiResponse.success(userQueryService.getUsers(role, buildingId)));
+        }
         return ResponseEntity.ok(ApiResponse.success(userQueryService.getUsers(role)));
     }
 
@@ -45,7 +60,20 @@ public class UserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<UserSummaryResponse>> assignBuilding(
             @PathVariable Integer userId,
-            @RequestParam Long buildingId) {
+            @RequestParam Long buildingId,
+            Authentication authentication) {
+        // MANAGER chỉ được gán staff vào bãi của chính mình
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (isManager) {
+            var manager = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (manager.getAssignedBuilding() == null
+                    || !manager.getAssignedBuilding().getId().equals(buildingId)) {
+                throw new AppException(HttpStatus.FORBIDDEN,
+                        "Manager chỉ được gán nhân viên vào bãi đỗ xe của mình");
+            }
+        }
         return ResponseEntity.ok(ApiResponse.success(
                 "Gan building thanh cong",
                 userAdminService.assignBuilding(userId, buildingId)));

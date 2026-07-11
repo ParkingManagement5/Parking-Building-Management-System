@@ -15,6 +15,7 @@ import {
   ManagerSelect, ManagerStatCard, ManagerStatsRow, ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { getAssignedBuildingId, getRole } from "../../utils/auth";
 
 function getBuildingId(item) { return item?.buildingId ?? item?.id; }
 function getFloorId(item) { return item?.floorId ?? item?.id; }
@@ -45,6 +46,9 @@ const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
 const SLOT_PAGE_SIZE = 10;
 
 export default function ParkingStructurePage() {
+  const isManager = getRole() === "MANAGER";
+  const myBuildingId = getAssignedBuildingId(); // null nếu chưa được gán
+
   const [buildings, setBuildings] = useState([]);
   const [floors, setFloors] = useState([]);
   const [zones, setZones] = useState([]);
@@ -83,7 +87,16 @@ export default function ParkingStructurePage() {
         vehicleTypeApi.getAll(),
         gateApi.getAll(),
       ]);
-      setBuildings(unwrapApiData(buildingRes.data, []));
+      const allBuildings = unwrapApiData(buildingRes.data, []);
+      // MANAGER chỉ thấy bãi được phân công
+      const scopedBuildings = isManager && myBuildingId
+        ? allBuildings.filter((b) => String(getBuildingId(b)) === String(myBuildingId))
+        : allBuildings;
+      setBuildings(scopedBuildings);
+      // Auto-select building nếu MANAGER chỉ có 1 bãi
+      if (isManager && myBuildingId && scopedBuildings.length === 1) {
+        setSelectedBuildingId(String(getBuildingId(scopedBuildings[0])));
+      }
       setFloors(unwrapApiData(floorRes.data, []));
       setZones(unwrapApiData(zoneRes.data, []));
       setSlots(unwrapApiData(slotRes.data, []));
@@ -476,7 +489,7 @@ export default function ParkingStructurePage() {
         title="Cấu trúc bãi xe"
         description="Quản lý Tòa nhà → Tầng → Zone → Slot và Cổng ra vào trong một nơi duy nhất"
         action={
-          !selectedBuildingId ? (
+          !selectedBuildingId && !isManager ? (
             <ManagerPrimaryButton type="button" onClick={() => openBuildingModal()} className="flex items-center gap-2">
               <Plus size={14} /> Thêm tòa nhà
             </ManagerPrimaryButton>

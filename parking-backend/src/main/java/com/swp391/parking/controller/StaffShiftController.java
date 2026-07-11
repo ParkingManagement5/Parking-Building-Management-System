@@ -2,6 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.AssignStaffShiftRequest;
 import com.swp391.parking.dto.response.StaffShiftResponse;
+import com.swp391.parking.entity.Role;
 import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
@@ -33,7 +34,25 @@ public class StaffShiftController {
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     @Operation(summary = "Assign shift to staff")
-    public ResponseEntity<StaffShiftResponse> assign(@Valid @RequestBody AssignStaffShiftRequest request) {
+    public ResponseEntity<StaffShiftResponse> assign(
+            @Valid @RequestBody AssignStaffShiftRequest request,
+            Authentication authentication) {
+        if (isManager(authentication)) {
+            User manager = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (manager.getAssignedBuilding() == null) {
+                throw new AppException(HttpStatus.FORBIDDEN,
+                        "Manager chưa được gán tòa nhà, không thể phân ca");
+            }
+            User staff = userRepository.findById(request.getUserId().intValue())
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                            "Không tìm thấy nhân viên #" + request.getUserId()));
+            if (staff.getAssignedBuilding() == null
+                    || !staff.getAssignedBuilding().getId().equals(manager.getAssignedBuilding().getId())) {
+                throw new AppException(HttpStatus.FORBIDDEN,
+                        "Manager chỉ được phân ca cho nhân viên thuộc bãi đỗ xe của mình");
+            }
+        }
         return ResponseEntity.ok(staffShiftService.assignShift(request));
     }
 
@@ -43,6 +62,22 @@ public class StaffShiftController {
     public ResponseEntity<List<StaffShiftResponse>> getAll(Authentication authentication) {
         if (isStaff(authentication)) {
             return ResponseEntity.ok(staffShiftService.getByUser(resolveCurrentUserId(authentication)));
+        }
+        if (isManager(authentication)) {
+            // MANAGER chỉ thấy ca làm của nhân viên trong bãi mình quản lý
+            User manager = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (manager.getAssignedBuilding() == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            Long buildingId = manager.getAssignedBuilding().getId();
+            List<Long> staffIds = userRepository
+                    .findByRolesRoleNameAndAssignedBuilding_Id(Role.RoleName.STAFF, buildingId)
+                    .stream().map(u -> u.getUserId().longValue()).toList();
+            List<StaffShiftResponse> all = staffShiftService.getAllStaffShifts();
+            return ResponseEntity.ok(all.stream()
+                    .filter(s -> staffIds.contains(s.getUserId()))
+                    .toList());
         }
         return ResponseEntity.ok(staffShiftService.getAllStaffShifts());
     }
@@ -104,6 +139,11 @@ public ResponseEntity<List<StaffShiftResponse>> getByDate(
     private boolean isStaff(Authentication authentication) {
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+    }
+
+    private boolean isManager(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
     }
 
     private Long resolveCurrentUserId(Authentication authentication) {

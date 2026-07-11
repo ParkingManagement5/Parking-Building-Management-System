@@ -5,7 +5,9 @@ import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
 import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.ParkingSlotRepository;
 import com.swp391.parking.repository.UserRepository;
+import com.swp391.parking.repository.ZoneRepository;
 import com.swp391.parking.service.ParkingSlotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,8 @@ import java.util.List;
 public class ParkingSlotController {
 
     private final ParkingSlotService slotService;
+    private final ZoneRepository zoneRepository;
+    private final ParkingSlotRepository parkingSlotRepository;
     private final UserRepository userRepository;
 
     @GetMapping("/all")
@@ -75,7 +79,10 @@ public class ParkingSlotController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ParkingSlot>> create(@Valid @RequestBody SlotRequest req) {
+    public ResponseEntity<ApiResponse<ParkingSlot>> create(@Valid @RequestBody SlotRequest req, Authentication authentication) {
+        var zone = zoneRepository.findById(req.getZoneId())
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy zone #" + req.getZoneId()));
+        enforceManagerBuildingOwnership(zone.getFloor().getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Tao slot thanh cong",
             slotService.create(req)));
     }
@@ -84,16 +91,36 @@ public class ParkingSlotController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingSlot>> update(
             @PathVariable Long id,
-            @Valid @RequestBody SlotRequest req) {
+            @Valid @RequestBody SlotRequest req,
+            Authentication authentication) {
+        ParkingSlot existing = parkingSlotRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot #" + id));
+        enforceManagerBuildingOwnership(existing.getZone().getFloor().getBuilding().getId(), authentication);
         return ResponseEntity.ok(ApiResponse.success("Cap nhat slot thanh cong",
             slotService.update(id, req)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, Authentication authentication) {
+        ParkingSlot existing = parkingSlotRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot #" + id));
+        enforceManagerBuildingOwnership(existing.getZone().getFloor().getBuilding().getId(), authentication);
         slotService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Da xoa slot khoi DB"));
+    }
+
+    private void enforceManagerBuildingOwnership(Long buildingId, Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) return;
+        var user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        if (user.getAssignedBuilding() == null
+                || !user.getAssignedBuilding().getId().equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Manager chỉ được thao tác trên bãi đỗ xe được phân công");
+        }
     }
 
     private boolean isAuthenticated(Authentication authentication) {

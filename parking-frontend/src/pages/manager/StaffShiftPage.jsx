@@ -18,8 +18,12 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { getAssignedBuildingId, getRole } from "../../utils/auth";
 
 export default function StaffShiftPage() {
+  const isManager = getRole() === "MANAGER";
+  const myBuildingId = getAssignedBuildingId();
+
   const [staffUsers, setStaffUsers] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [staffShifts, setStaffShifts] = useState([]);
@@ -55,7 +59,13 @@ export default function StaffShiftPage() {
       setStaffUsers(unwrapApiData(usersRes.data, []));
       setShifts(unwrapApiData(shiftsRes.data, []));
       setStaffShifts(unwrapApiData(staffShiftsRes.data, []));
-      setBuildings(unwrapApiData(buildingsRes.data, []));
+      const allBuildings = unwrapApiData(buildingsRes.data, []);
+      // MANAGER chỉ thấy bãi của mình trong dropdown gán tòa nhà
+      setBuildings(
+        isManager && myBuildingId
+          ? allBuildings.filter((b) => String(b.buildingId || b.id) === String(myBuildingId))
+          : allBuildings
+      );
     } catch (error) {
       console.error("Failed to load staff shift data", error);
       setLoadError("Không tải được dữ liệu ca làm từ backend.");

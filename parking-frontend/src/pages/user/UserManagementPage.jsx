@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { roleApi } from "../../api/admin/roleApi";
 import { userApi } from "../../api/admin/userApi";
+import { buildingApi } from "../../api/manager/buildingApi";
+import axiosClient from "../../api/axiosClient";
 import {
   ManagerCell,
   ManagerDataTable,
   ManagerEmptyState,
+  ManagerField,
   ManagerPanel,
   ManagerPrimaryButton,
   ManagerRow,
@@ -48,18 +51,26 @@ export default function UserManagementPage() {
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [statusChangingId, setStatusChangingId] = useState(null);
+  const [buildings, setBuildings] = useState([]);
+  const [buildingAssignTarget, setBuildingAssignTarget] = useState(null); // user object
+  const [buildingDraft, setBuildingDraft] = useState("");
+  const [savingBuilding, setSavingBuilding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadRoles() {
       try {
-        const res = await roleApi.getAll();
+        const [roleRes, buildingRes] = await Promise.all([
+          roleApi.getAll(),
+          buildingApi.getAll(),
+        ]);
         if (!cancelled) {
-          setRoles(unwrapApiData(res.data, []));
+          setRoles(unwrapApiData(roleRes.data, []));
+          setBuildings(unwrapApiData(buildingRes.data, []));
         }
       } catch (err) {
-        console.error("Failed to load roles", err);
+        console.error("Failed to load roles/buildings", err);
         if (!cancelled) {
           setRoles([]);
         }
@@ -166,6 +177,35 @@ export default function UserManagementPage() {
     }
   };
 
+  const openBuildingAssign = (user) => {
+    setBuildingAssignTarget(user);
+    setBuildingDraft(user.assignedBuildingId ? String(user.assignedBuildingId) : "");
+    setActionError("");
+    setActionMessage("");
+  };
+
+  const closeBuildingAssign = () => {
+    setBuildingAssignTarget(null);
+    setBuildingDraft("");
+    setSavingBuilding(false);
+  };
+
+  const handleAssignBuilding = async () => {
+    if (!buildingAssignTarget || !buildingDraft) return;
+    setSavingBuilding(true);
+    setActionError("");
+    try {
+      await axiosClient.put(`/users/${buildingAssignTarget.userId}/assign-building?buildingId=${buildingDraft}`);
+      await loadUsers();
+      setActionMessage(`Đã gán tòa nhà cho ${buildingAssignTarget.username}.`);
+      closeBuildingAssign();
+    } catch (err) {
+      console.error("Failed to assign building", err);
+      setActionError(err.response?.data?.message || "Không thể gán tòa nhà.");
+      setSavingBuilding(false);
+    }
+  };
+
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === "LOCKED" ? "ACTIVE" : "LOCKED";
     const confirmText =
@@ -239,7 +279,7 @@ export default function UserManagementPage() {
         ) : users.length === 0 ? (
           <ManagerEmptyState title="Không có người dùng nào" description="Không có người dùng nào khớp với bộ lọc vai trò hoặc từ khóa tìm kiếm hiện tại." />
         ) : (
-          <ManagerDataTable columns={["Người dùng", "Vai trò", "Trạng thái", "Liên hệ", "Mã người dùng", "Thao tác"]} minRows={PAGE_SIZE}>
+          <ManagerDataTable columns={["Người dùng", "Vai trò", "Tòa nhà", "Trạng thái", "Liên hệ", "Mã ND", "Thao tác"]} minRows={PAGE_SIZE}>
             {paged.map((item) => (
               <ManagerRow key={item.userId}>
                 <ManagerCell>
@@ -262,6 +302,15 @@ export default function UserManagementPage() {
                   <ManagerStatusBadge tone={toneForRole(item.role)}>{roleLabel(item.role)}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
+                  {item.assignedBuildingName ? (
+                    <ManagerStatusBadge tone="emerald">{item.assignedBuildingName}</ManagerStatusBadge>
+                  ) : (["MANAGER", "STAFF"].includes(roleLabel(item.role)) ? (
+                    <ManagerStatusBadge tone="amber">Chưa gán</ManagerStatusBadge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  ))}
+                </ManagerCell>
+                <ManagerCell>
                   <ManagerStatusBadge tone={toneForStatus(item.status)}>{USER_STATUS_LABELS[item.status] || item.status}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
@@ -278,6 +327,15 @@ export default function UserManagementPage() {
                     >
                       Đổi vai trò
                     </button>
+                    {["MANAGER", "STAFF"].includes(roleLabel(item.role)) && (
+                      <button
+                        type="button"
+                        onClick={() => openBuildingAssign(item)}
+                        className="rounded-xl border border-violet-200 bg-background px-3 py-1.5 text-xs font-medium text-violet-600 transition hover:bg-violet-50"
+                      >
+                        {item.assignedBuildingName ? "Đổi tòa nhà" : "Gán tòa nhà"}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(item)}
@@ -315,6 +373,49 @@ export default function UserManagementPage() {
           </div>
         )}
       </ManagerPanel>
+
+      {buildingAssignTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Gán tòa nhà</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Phân công bãi đỗ xe cho <span className="font-medium text-foreground">{buildingAssignTarget.fullName || buildingAssignTarget.username}</span>.
+                </p>
+              </div>
+              <button type="button" onClick={closeBuildingAssign} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm">
+                <div className="font-medium text-foreground">{buildingAssignTarget.username}</div>
+                <div className="text-muted-foreground">{buildingAssignTarget.email || "Chưa có email"}</div>
+              </div>
+              <ManagerField label="Tòa nhà">
+                <ManagerSelect value={buildingDraft} onChange={(e) => setBuildingDraft(e.target.value)}>
+                  <option value="">Chọn tòa nhà</option>
+                  {buildings.map((b) => (
+                    <option key={b.buildingId ?? b.id} value={b.buildingId ?? b.id}>{b.name}</option>
+                  ))}
+                </ManagerSelect>
+              </ManagerField>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <ManagerSecondaryButton type="button" className="flex-1" onClick={closeBuildingAssign}>Hủy</ManagerSecondaryButton>
+              <ManagerPrimaryButton
+                type="button"
+                className="flex-1"
+                onClick={handleAssignBuilding}
+                disabled={savingBuilding || !buildingDraft}
+              >
+                {savingBuilding ? "Đang lưu..." : "Gán tòa nhà"}
+              </ManagerPrimaryButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editingUser ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">

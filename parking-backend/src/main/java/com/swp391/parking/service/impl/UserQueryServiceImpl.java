@@ -24,9 +24,27 @@ public class UserQueryServiceImpl implements UserQueryService {
     @Override
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUsers(String role) {
-        List<User> users = (role == null || role.isBlank())
-            ? userRepository.findAll()
-            : userRepository.findByRolesRoleName(parseRole(role));
+        return getUsers(role, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> getUsers(String role, Long buildingId) {
+        List<User> users;
+        if (buildingId != null) {
+            // Scope by building — used by MANAGER
+            Role.RoleName roleName = (role == null || role.isBlank()) ? null : parseRole(role);
+            users = (roleName != null)
+                    ? userRepository.findByRolesRoleNameAndAssignedBuilding_Id(roleName, buildingId)
+                    : userRepository.findAll().stream()
+                        .filter(u -> u.getAssignedBuilding() != null
+                                && buildingId.equals(u.getAssignedBuilding().getId()))
+                        .toList();
+        } else {
+            users = (role == null || role.isBlank())
+                    ? userRepository.findAll()
+                    : userRepository.findByRolesRoleName(parseRole(role));
+        }
 
         return users.stream()
             .sorted(Comparator.comparing(User::getUserId))
