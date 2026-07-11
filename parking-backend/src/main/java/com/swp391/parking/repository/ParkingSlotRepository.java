@@ -84,6 +84,47 @@ List<ParkingSlot> findAvailableByBuildingAndSlotSize(
     """, nativeQuery = true)
 List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
 
+    // Thống kê lấp đầy theo từng tầng, scoped by building (null = tất cả)
+    @Query(value = """
+        SELECT
+            b.building_id                                                    AS buildingId,
+            b.name                                                           AS buildingName,
+            f.floor_id                                                       AS floorId,
+            f.floor_number                                                   AS floorNumber,
+            f.floor_name                                                     AS floorName,
+            COUNT(ps.slot_id)                                                AS totalSlots,
+            SUM(CASE WHEN ps.status = 'OCCUPIED'    THEN 1 ELSE 0 END)      AS occupiedSlots,
+            SUM(CASE WHEN ps.status = 'AVAILABLE'   THEN 1 ELSE 0 END)      AS availableSlots,
+            SUM(CASE WHEN ps.status = 'RESERVED'    THEN 1 ELSE 0 END)      AS reservedSlots,
+            SUM(CASE WHEN ps.status = 'MAINTENANCE' THEN 1 ELSE 0 END)      AS maintenanceSlots
+        FROM parking_slot ps
+        JOIN zone             z ON ps.zone_id   = z.zone_id
+        JOIN floor            f ON z.floor_id   = f.floor_id
+        JOIN parking_building b ON f.building_id = b.building_id
+        WHERE ps.is_active = true
+          AND (:buildingId IS NULL OR b.building_id = :buildingId)
+        GROUP BY b.building_id, b.name, f.floor_id, f.floor_number, f.floor_name
+        ORDER BY b.building_id, f.floor_number
+        """, nativeQuery = true)
+    List<Object[]> getFloorOccupancy(@Param("buildingId") Long buildingId);
+
+    // Thống kê lấp đầy theo từng tòa nhà — public, dành cho driver xem khi tìm bãi
+    @Query(value = """
+        SELECT
+            b.building_id                                               AS buildingId,
+            COUNT(ps.slot_id)                                           AS totalSlots,
+            SUM(CASE WHEN ps.status = 'AVAILABLE'   THEN 1 ELSE 0 END) AS availableSlots,
+            SUM(CASE WHEN ps.status = 'OCCUPIED'    THEN 1 ELSE 0 END) AS occupiedSlots,
+            SUM(CASE WHEN ps.status = 'RESERVED'    THEN 1 ELSE 0 END) AS reservedSlots
+        FROM parking_slot ps
+        JOIN zone             z ON ps.zone_id    = z.zone_id
+        JOIN floor            f ON z.floor_id    = f.floor_id
+        JOIN parking_building b ON f.building_id = b.building_id
+        WHERE ps.is_active = true
+        GROUP BY b.building_id
+        """, nativeQuery = true)
+    List<Object[]> getBuildingOccupancy();
+
     // Toan bo slot he thong, JOIN FETCH mot lan de tranh N+1 (truoc day frontend
     // phai goi rieng tung zone, hang tram request cho trang cong khai/landing).
     @Query("""

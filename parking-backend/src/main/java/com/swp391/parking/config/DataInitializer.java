@@ -313,12 +313,13 @@ public class DataInitializer implements CommandLineRunner {
         Gate gate = existingGates.stream()
                 .filter(item -> normalizeKey(gateCode).equals(normalizeKey(item.getGateCode())))
                 .findFirst()
-                .orElseGet(() -> Gate.builder()
-                        .building(building)
-                        .gateCode(gateCode)
-                        .gateType(gateType)
-                        .isActive(true)
-                        .build());
+                .orElseGet(() -> gateRepository.findByGateCode(gateCode)
+                        .orElseGet(() -> Gate.builder()
+                                .building(building)
+                                .gateCode(gateCode)
+                                .gateType(gateType)
+                                .isActive(true)
+                                .build()));
 
         gate.setBuilding(building);
         gate.setGateCode(gateCode);

@@ -110,7 +110,18 @@ export default function LoginPage() {
             const data = unwrapApiData(res.data, {});
             navigate(saveAuthData(data));
           } catch (err) {
-            setError(err.response?.data?.message || "Google login failed.");
+            // Ưu tiên: message từ backend → fallback chi tiết hơn
+            const backendMsg = err.response?.data?.message;
+            const httpStatus = err.response?.status;
+            const networkFail = !err.response;
+            if (backendMsg) {
+              setError(backendMsg);
+            } else if (networkFail) {
+              setError("Không kết nối được server. Kiểm tra backend đang chạy chưa.");
+            } else {
+              setError(`Google login thất bại (HTTP ${httpStatus ?? "unknown"}). Kiểm tra Console/Network tab.`);
+            }
+            console.error("[Google Login] err:", err);
           } finally {
             setGoogleLoading(false);
           }
