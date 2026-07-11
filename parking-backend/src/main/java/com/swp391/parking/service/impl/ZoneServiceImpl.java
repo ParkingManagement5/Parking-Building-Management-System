@@ -39,7 +39,7 @@ public class ZoneServiceImpl implements ZoneService {
     public List<Zone> getByFloor(Long floorId, Long currentUserId, boolean staffScoped) {
         Floor floor = floorRepo.findById(floorId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay tang ID: " + floorId));
+                        "Không tìm thấy tầng ID: " + floorId));
         Long buildingId = floor.getBuilding() != null ? floor.getBuilding().getId() : null;
         enforceStaffBuildingScope(buildingId, currentUserId, staffScoped);
         return getByFloor(floorId);
@@ -49,7 +49,7 @@ public class ZoneServiceImpl implements ZoneService {
     public Zone getById(Long id, Long currentUserId, boolean staffScoped) {
         Zone zone = zoneRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay zone ID: " + id));
+                "Không tìm thấy zone ID: " + id));
         Long buildingId = zone.getFloor() != null && zone.getFloor().getBuilding() != null
                 ? zone.getFloor().getBuilding().getId() : null;
         enforceStaffBuildingScope(buildingId, currentUserId, staffScoped);
@@ -61,16 +61,16 @@ public class ZoneServiceImpl implements ZoneService {
     public Zone create(ZoneRequest req) {
         if (zoneRepo.existsByFloorIdAndName(req.getFloorId(), req.getName())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Zone '" + req.getName() + "' da ton tai o tang nay");
+                "Zone '" + req.getName() + "' đã tồn tại ở tầng này");
         }
 
         Floor floor = floorRepo.findById(req.getFloorId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay tang ID: " + req.getFloorId()));
+                "Không tìm thấy tầng ID: " + req.getFloorId()));
 
         VehicleType vehicleType = vehicleTypeRepo.findById(req.getVehicleTypeId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay loai xe ID: " + req.getVehicleTypeId()));
+                "Không tìm thấy loại xe ID: " + req.getVehicleTypeId()));
 
         Zone zone = Zone.builder()
             .floor(floor)
@@ -89,7 +89,7 @@ public class ZoneServiceImpl implements ZoneService {
     public Zone update(Long id, ZoneRequest req) {
         Zone zone = zoneRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay zone ID: " + id));
+                        "Không tìm thấy zone ID: " + id));
         zone.setName(req.getName());
         zone.setDescription(req.getDescription());
         if (req.getStatus() != null) {
@@ -103,7 +103,7 @@ public class ZoneServiceImpl implements ZoneService {
     public void deactivate(Long id) {
         Zone zone = zoneRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay zone ID: " + id));
+                        "Không tìm thấy zone ID: " + id));
         parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId()));
         zoneRepo.delete(zone);
     }
@@ -113,12 +113,12 @@ public class ZoneServiceImpl implements ZoneService {
             return;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chua duoc gan toa nha");
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chưa được gán toà nhà");
         }
         if (!currentUser.getAssignedBuilding().getId().equals(buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem zone ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem zone ngoài toà nhà được phân công");
         }
     }
 }

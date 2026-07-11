@@ -29,22 +29,22 @@ public class UserAdminServiceImpl implements UserAdminService {
     @Transactional
     public UserSummaryResponse changeUserRole(Integer userId, ChangeUserRoleRequest request, String actorUsername) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay user voi id: " + userId));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy user với id: " + userId));
 
         if (user.getUsername().equalsIgnoreCase(actorUsername)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Khong the tu thay doi role cua chinh minh");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể tự thay đổi role của chính mình");
         }
 
         Role.RoleName roleName = parseRole(request.getRoleName());
         Role role = roleRepository.findByRoleName(roleName)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Role khong ton tai: " + roleName.name()));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Role không tồn tại: " + roleName.name()));
 
         user.getRoles().clear();
         user.getRoles().add(role);
 
         User savedUser = userRepository.save(user);
         activityLogService.log(savedUser.getUserId(), "USER_ROLE_CHANGE",
-                actorUsername + " da doi role cua " + savedUser.getUsername() + " thanh " + roleName.name());
+                actorUsername + " đã đổi role của " + savedUser.getUsername() + " thành " + roleName.name());
         return toResponse(savedUser);
     }
 
@@ -52,10 +52,10 @@ public class UserAdminServiceImpl implements UserAdminService {
     @Transactional
     public UserSummaryResponse changeUserStatus(Integer userId, String status, String actorUsername) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay user voi id: " + userId));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy user với id: " + userId));
 
         if (user.getUsername().equalsIgnoreCase(actorUsername)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Khong the tu khoa/mo khoa chinh minh");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Không thể tự khoá/mở khoá chính mình");
         }
 
         User.UserStatus newStatus = parseStatus(status);
@@ -63,7 +63,7 @@ public class UserAdminServiceImpl implements UserAdminService {
 
         User savedUser = userRepository.save(user);
         activityLogService.log(savedUser.getUserId(), "USER_STATUS_CHANGE",
-                actorUsername + " da doi trang thai cua " + savedUser.getUsername() + " thanh " + newStatus.name());
+                actorUsername + " đã đổi trạng thái của " + savedUser.getUsername() + " thành " + newStatus.name());
         return toResponse(savedUser);
     }
 
@@ -71,7 +71,7 @@ public class UserAdminServiceImpl implements UserAdminService {
         try {
             return User.UserStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Trang thai khong hop le: " + status);
+            throw new AppException(HttpStatus.BAD_REQUEST, "Trạng thái không hợp lệ: " + status);
         }
     }
 
@@ -79,10 +79,10 @@ public class UserAdminServiceImpl implements UserAdminService {
     @Transactional
     public UserSummaryResponse assignBuilding(Integer userId, Long buildingId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay user"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy user"));
 
         ParkingBuilding building = buildingRepository.findById(buildingId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Khong tim thay building"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy building"));
 
         user.setAssignedBuilding(building);
         return toResponse(userRepository.save(user));
@@ -92,7 +92,7 @@ public class UserAdminServiceImpl implements UserAdminService {
         try {
             return Role.RoleName.valueOf(role.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Role khong hop le: " + role);
+            throw new AppException(HttpStatus.BAD_REQUEST, "Role không hợp lệ: " + role);
         }
     }
 

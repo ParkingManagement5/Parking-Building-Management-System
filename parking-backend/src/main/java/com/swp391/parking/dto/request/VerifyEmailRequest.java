@@ -6,9 +6,9 @@ import lombok.Data;
 @Data
 public class VerifyEmailRequest {
 
-    @NotBlank(message = "Username khong duoc de trong")
+    @NotBlank(message = "Username không được để trống")
     private String username;
 
-    @NotBlank(message = "Ma OTP khong duoc de trong")
+    @NotBlank(message = "Mã OTP không được để trống")
     private String otp;
 }

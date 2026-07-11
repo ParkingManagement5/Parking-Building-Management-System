@@ -8,13 +8,13 @@ import lombok.Data;
 @Data
 public class UpdateProfileRequest {
 
-    @NotBlank(message = "Ho ten khong duoc de trong")
+    @NotBlank(message = "Họ tên không được để trống")
     private String fullName;
 
-    @NotBlank(message = "Email khong duoc de trong")
-    @Email(message = "Email khong hop le")
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Email không hợp lệ")
     private String email;
 
-    @Size(max = 20, message = "So dien thoai toi da 20 ky tu")
+    @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
     private String phone;
 }

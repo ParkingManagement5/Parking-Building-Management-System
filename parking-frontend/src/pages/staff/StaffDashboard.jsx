@@ -95,7 +95,7 @@ export default function StaffDashboard() {
       } catch (err) {
         console.error("Load staff dashboard failed:", err);
         if (!cancelled) {
-          setError(err.response?.data?.message || "Khong tai duoc staff dashboard.");
+          setError(err.response?.data?.message || "Không tải được staff dashboard.");
         }
       } finally {
         if (!cancelled) {
@@ -169,14 +169,14 @@ export default function StaffDashboard() {
 
       {/* KPI nhanh */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StaffStatCard icon={LogIn} label="Xe dang trong bai" value={activeSessions.length} hint="Phien dang ACTIVE" tone="emerald" />
-        <StaffStatCard icon={CreditCard} label="Cho thanh toan" value={waitingPayments.length} hint="Xe da ra, chua thu tien" tone="amber" />
-        <StaffStatCard icon={CreditCard} label="Tong tien cho thu" value={formatStaffCurrency(pendingAmount)} hint={`${waitingPayments.length} phien dang cho`} tone="violet" />
+        <StaffStatCard icon={LogIn} label="Xe đang trong bãi" value={activeSessions.length} hint="Phiên đang ACTIVE" tone="emerald" />
+        <StaffStatCard icon={CreditCard} label="Chờ thanh toán" value={waitingPayments.length} hint="Xe đã ra, chưa thu tiền" tone="amber" />
+        <StaffStatCard icon={CreditCard} label="Tổng tiền chờ thu" value={formatStaffCurrency(pendingAmount)} hint={`${waitingPayments.length} phiên đang chờ`} tone="violet" />
         <StaffStatCard
           icon={ShieldAlert}
-          label="Su co can xu ly"
+          label="Sự cố cần xử lý"
           value={openExceptions.length + ocrReviews.length}
-          hint="Exception + OCR review — bam de xu ly"
+          hint="Exception + OCR review — bấm để xử lý"
           tone="rose"
           onClick={() => navigate("/staff/exceptions")}
         />
@@ -185,16 +185,16 @@ export default function StaffDashboard() {
       {/* Trong tam 1: xe dang trong bai (chi tiet) + bang gia xe (tra cuu nhanh) */}
       <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
         <StaffPageSection
-          title="Xe dang trong bai"
-          subtitle="Phien dang hoat dong — bien so, slot, gio vao va phi tam tinh"
+          title="Xe đang trong bãi"
+          subtitle="Phiên đang hoạt động — biển số, slot, giờ vào và phí tạm tính"
           action={
             <button type="button" onClick={() => navigate("/staff/sessions")} className="text-xs font-medium text-primary hover:underline">
-              Xem tat ca &rarr;
+              Xem tất cả &rarr;
             </button>
           }
         >
           {activeSessions.length === 0 ? (
-            <StaffEmptyState title="Chua co xe nao" description="Xe vao bai qua Scan se hien o day." />
+            <StaffEmptyState title="Chưa có xe nào" description="Xe vào bãi qua Scan sẽ hiện ở đây." />
           ) : (
             <div className="space-y-3">
               {activeSessions.slice(0, 6).map((item) => (
@@ -209,7 +209,7 @@ export default function StaffDashboard() {
                     <StaffStatusBadge tone="emerald">{formatElapsed(item.entryTime)}</StaffStatusBadge>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Vao luc {formatStaffDateTime(item.entryTime)}</span>
+                    <span className="text-muted-foreground">Vào lúc {formatStaffDateTime(item.entryTime)}</span>
                     <span className="font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}</span>
                   </div>
                 </div>
@@ -218,9 +218,9 @@ export default function StaffDashboard() {
           )}
         </StaffPageSection>
 
-        <StaffPageSection title="Bang gia xe" subtitle="Gia theo gio / loai xe">
+        <StaffPageSection title="Bảng giá xe" subtitle="Giá theo giờ / loại xe">
           {vehicleTypes.length === 0 ? (
-            <StaffEmptyState title="Chua co loai xe" description="Manager chua cau hinh loai xe active." />
+            <StaffEmptyState title="Chưa có loại xe" description="Manager chưa cấu hình loại xe active." />
           ) : (
             <div className="space-y-2">
               {vehicleTypes.map((t) => (
@@ -231,7 +231,7 @@ export default function StaffDashboard() {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-bold text-foreground">{formatStaffCurrency(t.hourlyRate)}/h</p>
-                    {t.dailyRate ? <p className="text-xs text-muted-foreground">{formatStaffCurrency(t.dailyRate)}/ngay</p> : null}
+                    {t.dailyRate ? <p className="text-xs text-muted-foreground">{formatStaffCurrency(t.dailyRate)}/ngày</p> : null}
                   </div>
                 </div>
               ))}
@@ -243,16 +243,16 @@ export default function StaffDashboard() {
       {/* Trong tam 2: hang cho thanh toan (chi tiet) + hoat dong gan day (rut gon) */}
       <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
         <StaffPageSection
-          title="Hang cho thanh toan"
-          subtitle="Xe da ra cong, can thu tien"
+          title="Hàng chờ thanh toán"
+          subtitle="Xe đã ra cổng, cần thu tiền"
           action={
             <button type="button" onClick={() => navigate("/staff/payments")} className="text-xs font-medium text-primary hover:underline">
-              Xem tat ca &rarr;
+              Xem tất cả &rarr;
             </button>
           }
         >
           {waitingPayments.length === 0 ? (
-            <StaffEmptyState title="Khong co khoan cho thu" description="Xe se xuat hien o day sau khi qua cong ra." tone="success" />
+            <StaffEmptyState title="Không có khoản chờ thu" description="Xe sẽ xuất hiện ở đây sau khi qua cổng ra." tone="success" />
           ) : (
             <div className="space-y-3">
               {waitingPayments.slice(0, 5).map((item) => {
@@ -272,7 +272,7 @@ export default function StaffDashboard() {
                           Slot {item.slotCode} • {formatStaffCurrency(rate)}/h • {item.vehicleTypeName || "—"}
                         </p>
                       </div>
-                      <StaffStatusBadge tone="amber">cho thu</StaffStatusBadge>
+                      <StaffStatusBadge tone="amber">chờ thu</StaffStatusBadge>
                     </div>
                     <p className="mt-2 text-sm font-bold text-foreground">{formatStaffCurrency(fee)}</p>
                   </button>
@@ -282,9 +282,9 @@ export default function StaffDashboard() {
           )}
         </StaffPageSection>
 
-        <StaffPageSection title="Hoat dong gan day" subtitle="Vao/ra/thanh toan/OCR moi nhat">
+        <StaffPageSection title="Hoạt động gần đây" subtitle="Vào/ra/thanh toán/OCR mới nhất">
           {recentActivity.length === 0 ? (
-            <StaffEmptyState title="Chua co hoat dong" description="Xu ly entry/exit/OCR se hien o day." />
+            <StaffEmptyState title="Chưa có hoạt động" description="Xử lý entry/exit/OCR sẽ hiện ở đây." />
           ) : (
             <div className="space-y-2">
               {recentActivity.slice(0, 5).map((item) => (
@@ -313,10 +313,10 @@ export default function StaffDashboard() {
       </div>
 
       {/* Thong tin phu — gom lai thanh 1 dai gon, khong chiem rieng section lon */}
-      <StaffPageSection title="Khac" subtitle="Ca lam, yeu cau ho tro, thong bao">
+      <StaffPageSection title="Khác" subtitle="Ca làm, yêu cầu hỗ trợ, thông báo">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground">Ca lam sap toi</p>
+            <p className="text-xs text-muted-foreground">Ca làm sắp tới</p>
             {upcomingShifts[0] ? (
               <>
                 <p className="mt-1 text-sm font-semibold text-foreground">{upcomingShifts[0].shiftName}</p>
@@ -325,7 +325,7 @@ export default function StaffDashboard() {
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Chua co ca duoc gan.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Chưa có ca được gán.</p>
             )}
           </div>
 
@@ -334,7 +334,7 @@ export default function StaffDashboard() {
             onClick={() => navigate("/staff/requests")}
             className="rounded-2xl bg-muted/30 p-4 text-left transition-colors hover:bg-muted"
           >
-            <p className="text-xs text-muted-foreground">Yeu cau ho tro mo</p>
+            <p className="text-xs text-muted-foreground">Yêu cầu hỗ trợ mở</p>
             <p className="mt-1 text-2xl font-bold text-foreground">{openRequests.length}</p>
           </button>
 
@@ -343,13 +343,13 @@ export default function StaffDashboard() {
             onClick={() => navigate("/staff/notifications")}
             className="rounded-2xl bg-muted/30 p-4 text-left transition-colors hover:bg-muted"
           >
-            <p className="text-xs text-muted-foreground">Thong bao chua doc</p>
+            <p className="text-xs text-muted-foreground">Thông báo chưa đọc</p>
             <p className="mt-1 text-2xl font-bold text-foreground">{notifications.filter((item) => !item.isRead).length}</p>
           </button>
         </div>
       </StaffPageSection>
 
-      {loading ? <p className="text-sm text-muted-foreground">Dang tai staff dashboard...</p> : null}
+      {loading ? <p className="text-sm text-muted-foreground">Đang tải staff dashboard...</p> : null}
     </div>
   );
 }

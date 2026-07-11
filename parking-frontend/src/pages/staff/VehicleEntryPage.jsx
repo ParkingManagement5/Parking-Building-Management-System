@@ -207,7 +207,7 @@ export default function VehicleEntryPage() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setOcrState({
         loading: false,
-        error: "Trinh duyet khong ho tro camera. Can chay tren HTTPS hoac localhost. Hay upload anh thay the.",
+        error: "Trình duyệt không hỗ trợ camera. Cần chạy trên HTTPS hoặc localhost. Hãy upload ảnh thay thế.",
         notice: "",
         result: null,
       });
@@ -227,12 +227,12 @@ export default function VehicleEntryPage() {
     } catch (err) {
       const msg =
         err.name === "NotAllowedError"
-          ? "Quyen camera bi tu choi. Vao Settings trinh duyet > cho phep camera cho trang nay."
+          ? "Quyền camera bị từ chối. Vào Settings trình duyệt > cho phép camera cho trang này."
           : err.name === "NotFoundError"
-            ? "Khong tim thay camera tren thiet bi nay. Hay upload anh bien so thay the."
+            ? "Không tìm thấy camera trên thiết bị này. Hãy upload ảnh biển số thay thế."
             : err.name === "NotReadableError"
-              ? "Camera dang duoc ung dung khac su dung. Dong ung dung do roi thu lai."
-              : `Khong mo duoc camera (${err.name || err.message}). Hay upload anh bien so thay the.`;
+              ? "Camera đang được ứng dụng khác sử dụng. Đóng ứng dụng đó rồi thử lại."
+              : `Không mở được camera (${err.name || err.message}). Hãy upload ảnh biển số thay thế.`;
       setOcrState({
         loading: false,
         error: msg,
@@ -246,7 +246,7 @@ export default function VehicleEntryPage() {
     new Promise((resolve, reject) => {
       const video = videoRef.current;
       if (!video || video.readyState < 2) {
-        reject(new Error("Camera chua san sang"));
+        reject(new Error("Camera chưa sẵn sàng"));
         return;
       }
 
@@ -263,7 +263,7 @@ export default function VehicleEntryPage() {
       context.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
-        else reject(new Error("Khong chup duoc anh tu camera"));
+        else reject(new Error("Không chụp được ảnh từ camera"));
       }, "image/jpeg", 0.92);
     });
 
@@ -274,7 +274,7 @@ export default function VehicleEntryPage() {
     } catch (error) {
       setOcrState({
         loading: false,
-        error: error.message || "Khong chup duoc anh tu camera.",
+        error: error.message || "Không chụp được ảnh từ camera.",
         notice: "",
         result: null,
       });
@@ -293,7 +293,7 @@ export default function VehicleEntryPage() {
 
   const uploadForOcr = async (file, filename = "entry-plate.jpg") => {
     if (!form.gateId) {
-      setOcrState({ loading: false, error: "Chon entry gate truoc khi scan OCR.", notice: "", result: null });
+      setOcrState({ loading: false, error: "Chọn entry gate trước khi scan OCR.", notice: "", result: null });
       return;
     }
 
@@ -317,7 +317,7 @@ export default function VehicleEntryPage() {
       if (!detectedPlate || detectedPlate === "UNKNOWN") {
         setOcrState({
           loading: false,
-          error: "OCR khong doc duoc bien so hop le. Hay thu anh ro hon hoac nhap tay.",
+          error: "OCR không đọc được biển số hợp lệ. Hãy thử ảnh rõ hơn hoặc nhập tay.",
           notice: "",
           result: data,
         });
@@ -340,7 +340,7 @@ export default function VehicleEntryPage() {
       setOcrState({
         loading: false,
         error: "",
-        notice: `Da scan bien ${detectedPlate} va dua vao form entry.`,
+        notice: `Đã scan biển ${detectedPlate} và đưa vào form entry.`,
         result: record,
       });
     } catch (error) {
@@ -417,7 +417,7 @@ export default function VehicleEntryPage() {
     if (!lookup.vehicle) {
       setLookup((prev) => ({
         ...prev,
-        error: "Chua co thong tin xe de confirm entry.",
+        error: "Chưa có thông tin xe để confirm entry.",
         notice: "",
       }));
       return;
@@ -425,7 +425,7 @@ export default function VehicleEntryPage() {
     if (!selectedGate || !selectedBuilding) {
       setLookup((prev) => ({
         ...prev,
-        error: "Chon building va entry gate truoc khi confirm entry.",
+        error: "Chọn building và entry gate trước khi confirm entry.",
         notice: "",
       }));
       return;
@@ -470,7 +470,7 @@ export default function VehicleEntryPage() {
       console.error("Backend entry failed", error);
       setLookup({
         loading: false,
-        error: error.response?.data?.message || "Khong tao duoc session backend cho xe vao.",
+        error: error.response?.data?.message || "Không tạo được session backend cho xe vào.",
         notice: "",
         vehicle: lookup.vehicle,
       });
@@ -479,15 +479,15 @@ export default function VehicleEntryPage() {
 
   const handleDirectWalkInEntry = async () => {
     if (!normalizedPlate) {
-      setLookup({ loading: false, error: "Nhap bien so xe truoc khi cho xe vao bai.", notice: "", vehicle: null });
+      setLookup({ loading: false, error: "Nhập biển số xe trước khi cho xe vào bãi.", notice: "", vehicle: null });
       return;
     }
     if (!selectedGate || !selectedBuilding) {
-      setLookup({ loading: false, error: "Chon building va entry gate truoc khi cho xe vao bai.", notice: "", vehicle: null });
+      setLookup({ loading: false, error: "Chọn building và entry gate trước khi cho xe vào bãi.", notice: "", vehicle: null });
       return;
     }
     if (!form.vehicleTypeId) {
-      setLookup({ loading: false, error: "Chon loai xe de he thong tim slot phu hop.", notice: "", vehicle: null });
+      setLookup({ loading: false, error: "Chọn loại xe để hệ thống tìm slot phù hợp.", notice: "", vehicle: null });
       return;
     }
 
@@ -525,7 +525,7 @@ export default function VehicleEntryPage() {
       console.error("Direct walk-in entry failed", error);
       setLookup({
         loading: false,
-        error: error.response?.data?.message || "Khong tao duoc walk-in entry cho xe chua dang ky.",
+        error: error.response?.data?.message || "Không tạo được walk-in entry cho xe chưa đăng ký.",
         notice: "",
         vehicle: null,
       });
@@ -576,7 +576,7 @@ export default function VehicleEntryPage() {
       console.error("QR booking entry failed", error);
       setLookup({
         loading: false,
-        error: error.response?.data?.message || "QR khong hop le hoac booking khong con hieu luc.",
+        error: error.response?.data?.message || "QR không hợp lệ hoặc booking không còn hiệu lực.",
         notice: "",
         vehicle: null,
       });
@@ -749,7 +749,7 @@ export default function VehicleEntryPage() {
                   name="licensePlate"
                   value={form.licensePlate}
                   onChange={handleChange}
-                  placeholder="Nhap bien so xe"
+                  placeholder="Nhập biển số xe"
                 />
               </StaffField>
               {latestOcrPlate ? (

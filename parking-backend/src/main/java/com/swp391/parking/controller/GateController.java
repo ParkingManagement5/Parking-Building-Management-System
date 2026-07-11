@@ -55,7 +55,7 @@ public class GateController {
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Gate>> create(@Valid @RequestBody GateRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao cong thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo cổng thành công",
             gateService.create(req)));
     }
 
@@ -64,7 +64,7 @@ public class GateController {
     public ResponseEntity<ApiResponse<Gate>> update(
             @PathVariable Long id,
             @Valid @RequestBody GateRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat cong thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật cổng thành công",
             gateService.update(id, req)));
     }
 
@@ -72,6 +72,6 @@ public class GateController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         gateService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa cong khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá cổng khỏi DB"));
     }
 }

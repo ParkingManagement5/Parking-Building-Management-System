@@ -61,9 +61,9 @@ export default function MapPage() {
       setLoadError("");
       if (assignedId) setBuildingId(assignedId);
       else if (bs[0]) setBuildingId(String(bs[0].buildingId || bs[0].id));
-      else setLoadError("He thong chua co toa nha nao de hien thi ban do bai xe.");
+      else setLoadError("Hệ thống chưa có toà nhà nào để hiển thị bản đồ bãi xe.");
     } catch (err) {
-      setLoadError(err.response?.data?.message || "Khong tai duoc du lieu toa nha hoac bang gia.");
+      setLoadError(err.response?.data?.message || "Không tải được dữ liệu toà nhà hoặc bảng giá.");
     }
     await loadSessions();
   }
@@ -78,7 +78,7 @@ export default function MapPage() {
       setWaitingPayments(unwrapApiData(wRes.data, []));
       setLoadError("");
     } catch (err) {
-      setLoadError(err.response?.data?.message || "Khong tai duoc danh sach session cho staff.");
+      setLoadError(err.response?.data?.message || "Không tải được danh sách session cho staff.");
     }
   }
 
@@ -89,9 +89,9 @@ export default function MapPage() {
       const items = unwrapApiData(res.data, []);
       setFloors(items);
       if (items[0]) setSelectedFloor(items[0].floorId || items[0].id);
-      setLoadError(items.length ? "" : "Toa nha hien tai chua co tang nao de hien thi.");
+      setLoadError(items.length ? "" : "Toà nhà hiện tại chưa có tầng nào để hiển thị.");
     } catch (err) {
-      setLoadError(err.response?.data?.message || "Khong tai duoc danh sach tang cho toa nha hien tai.");
+      setLoadError(err.response?.data?.message || "Không tải được danh sách tầng cho toà nhà hiện tại.");
     }
     finally { setLoading(false); }
   }
@@ -111,7 +111,7 @@ export default function MapPage() {
       setSlotsMap((p) => ({ ...p, ...results }));
       setLoadError("");
     } catch (err) {
-      setLoadError(err.response?.data?.message || "Khong tai duoc zone/slot cho tang hien tai.");
+      setLoadError(err.response?.data?.message || "Không tải được zone/slot cho tầng hiện tại.");
     }
     finally { setLoading(false); }
   }
@@ -149,10 +149,10 @@ export default function MapPage() {
       {/* Header stats */}
       <div className="grid gap-4 sm:grid-cols-4">
         {[
-          { label: "Tong slot", value: stats.total, color: "text-foreground" },
-          { label: "Trong", value: stats.available, color: "text-emerald-600" },
-          { label: "Co xe", value: stats.occupied, color: "text-rose-600" },
-          { label: "Da dat", value: stats.reserved, color: "text-amber-600" },
+          { label: "Tổng slot", value: stats.total, color: "text-foreground" },
+          { label: "Trống", value: stats.available, color: "text-emerald-600" },
+          { label: "Có xe", value: stats.occupied, color: "text-rose-600" },
+          { label: "Đã đặt", value: stats.reserved, color: "text-amber-600" },
         ].map((s) => (
           <div key={s.label} className="rounded-2xl border border-border bg-card p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -163,7 +163,7 @@ export default function MapPage() {
 
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         {/* LEFT: Parking Map */}
-        <StaffPageSection title="Ban do bai xe" subtitle={assignedLabel || "Chon toa nha"}>
+        <StaffPageSection title="Bản đồ bãi xe" subtitle={assignedLabel || "Chọn toà nhà"}>
           {/* Floor tabs */}
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="flex gap-1.5">
@@ -172,7 +172,7 @@ export default function MapPage() {
                 return (
                   <button key={fid} type="button" onClick={() => setSelectedFloor(fid)}
                     className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${selectedFloor === fid ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-                    {f.floorName || f.name || `Tang ${f.floorNumber}`}
+                    {f.floorName || f.name || `Tầng ${f.floorNumber}`}
                   </button>
                 );
               })}
@@ -184,16 +184,16 @@ export default function MapPage() {
 
           {/* Legend */}
           <div className="flex gap-4 text-xs mb-4">
-            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-emerald-400" /> Trong</span>
-            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-rose-400" /> Co xe</span>
-            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-amber-400" /> Da dat</span>
-            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-slate-400" /> Bao tri</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-emerald-400" /> Trống</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-rose-400" /> Có xe</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-amber-400" /> Đã đặt</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded bg-slate-400" /> Bảo trì</span>
           </div>
 
-          {loading && <p className="text-sm text-muted-foreground">Dang tai...</p>}
+          {loading && <p className="text-sm text-muted-foreground">Đang tải...</p>}
 
           {/* Zone grids */}
-          {currentZones.length === 0 && !loading && <p className="text-sm text-muted-foreground">Chon tang de xem.</p>}
+          {currentZones.length === 0 && !loading && <p className="text-sm text-muted-foreground">Chọn tầng để xem.</p>}
 
           <div className="space-y-4">
             {currentZones.map((zone) => {
@@ -204,7 +204,7 @@ export default function MapPage() {
                 <div key={zid} className="rounded-2xl border border-border bg-muted/10 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-foreground">{zone.zoneName || zone.name}</p>
-                    <p className="text-xs text-muted-foreground">{avail}/{slots.length} trong</p>
+                    <p className="text-xs text-muted-foreground">{avail}/{slots.length} trống</p>
                   </div>
                   <div className="grid grid-cols-6 gap-2">
                     {slots.map((slot) => {
@@ -228,11 +228,11 @@ export default function MapPage() {
         {/* RIGHT: Sessions + Queue */}
         <div className="space-y-5">
           {/* Active sessions */}
-          <StaffPageSection title={`Xe trong bai (${activeSessions.length})`} subtitle="Session dang ACTIVE">
+          <StaffPageSection title={`Xe trong bãi (${activeSessions.length})`} subtitle="Session đang ACTIVE">
             <StaffInput value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tim bien so hoac session ID" className="mb-3" />
+              placeholder="Tìm biển số hoặc session ID" className="mb-3" />
             {filteredActive.length === 0 ? (
-              <StaffEmptyState title="Khong co xe" description={searchQuery ? "Khong tim thay." : "Bai trong."} />
+              <StaffEmptyState title="Không có xe" description={searchQuery ? "Không tìm thấy." : "Bãi trống."} />
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {filteredActive.map((s) => (
@@ -252,9 +252,9 @@ export default function MapPage() {
           </StaffPageSection>
 
           {/* Waiting payment */}
-          <StaffPageSection title={`Cho thanh toan (${waitingPayments.length})`} subtitle="Session da exit, can payment">
+          <StaffPageSection title={`Chờ thanh toán (${waitingPayments.length})`} subtitle="Session đã exit, cần payment">
             {waitingPayments.length === 0 ? (
-              <StaffEmptyState title="Khong co" description="Xe exit se hien o day." tone="success" />
+              <StaffEmptyState title="Không có" description="Xe exit sẽ hiện ở đây." tone="success" />
             ) : (
               <div className="space-y-2">
                 {waitingPayments.map((s) => (

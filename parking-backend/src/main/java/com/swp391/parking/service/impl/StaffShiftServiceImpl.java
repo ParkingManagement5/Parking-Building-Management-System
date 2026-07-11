@@ -102,7 +102,7 @@ public List<StaffShiftResponse> getByUser(Long userId) {
         boolean isStaff = user.getRoles() != null
                 && user.getRoles().stream().anyMatch(role -> role.getRoleName() == Role.RoleName.STAFF);
         if (!isStaff) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi co the gan ca lam cho tai khoan STAFF");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ có thể gán ca làm cho tài khoản STAFF");
         }
     }
 

@@ -92,7 +92,7 @@ public class ExceptionCaseController {
         Integer currentUserId = resolveUserId(authentication);
         boolean staffScoped = isStaff(authentication);
         if (staffScoped && !currentUserId.equals(staffId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chi duoc nhan exception cho chinh minh");
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chỉ được nhận exception cho chính mình");
         }
         return ResponseEntity.ok(ApiResponse.success("Exception assigned",
                 exceptionCaseService.assignToStaff(id, staffId, currentUserId, staffScoped)));

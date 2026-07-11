@@ -10,13 +10,13 @@ import lombok.*;
 @Builder
 public class ZoneRequest {
 
-    @NotNull(message = "Floor ID khong duoc de trong")
+    @NotNull(message = "Floor ID không được để trống")
     private Long floorId;
 
-    @NotNull(message = "Vehicle type ID khong duoc de trong")
+    @NotNull(message = "Vehicle type ID không được để trống")
     private Long vehicleTypeId;
 
-    @NotBlank(message = "Ten zone khong duoc de trong")
+    @NotBlank(message = "Tên zone không được để trống")
     @Size(max = 50)
     private String name;
 

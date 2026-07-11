@@ -148,14 +148,14 @@ export default function PricingPolicyPage() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bảng giá này?")) return;
+  const handleDeactivate = async (id) => {
+    if (!window.confirm("Tắt bảng giá này? Các phiên đỗ xe cũ vẫn giữ nguyên giá lịch sử, chỉ dừng áp dụng cho phiên mới.")) return;
     try {
       await pricingPolicyApi.delete(id);
       await loadInitialData();
     } catch (error) {
-      console.error("Failed to delete pricing policy", error);
-      alert("Xóa bảng giá thất bại");
+      console.error("Failed to deactivate pricing policy", error);
+      alert("Tắt bảng giá thất bại");
     }
   };
 
@@ -265,7 +265,9 @@ export default function PricingPolicyPage() {
                 <ManagerCell>
                   <div className="flex gap-2">
                     <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
-                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(item.policyId)}>Xóa</ManagerSecondaryButton>
+                    {item.isActive && (
+                      <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivate(item.policyId)}>Tắt</ManagerSecondaryButton>
+                    )}
                   </div>
                 </ManagerCell>
               </ManagerRow>

@@ -67,7 +67,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                     """))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.message").value("Username hoac password khong dung. Con 4 lan truoc khi tam khoa tai khoan"));
+            .andExpect(jsonPath("$.message").value("Username hoặc password không đúng. Còn 4 lần trước khi tạm khoá tài khoản"));
     }
 
     @Test

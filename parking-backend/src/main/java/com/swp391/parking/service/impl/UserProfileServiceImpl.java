@@ -38,7 +38,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         userRepository.findByEmail(normalizedEmail)
                 .filter(existing -> !existing.getUserId().equals(user.getUserId()))
                 .ifPresent(existing -> {
-                    throw new AppException(HttpStatus.CONFLICT, "Email da duoc su dung");
+                    throw new AppException(HttpStatus.CONFLICT, "Email đã được sử dụng");
                 });
 
         user.setFullName(request.getFullName().trim());
@@ -54,15 +54,15 @@ public class UserProfileServiceImpl implements UserProfileService {
         User user = findByUsername(username);
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Current password khong dung");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Current password không đúng");
         }
 
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Confirm password khong khop");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Confirm password không khớp");
         }
 
         if (request.getCurrentPassword().equals(request.getNewPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "New password phai khac password hien tai");
+            throw new AppException(HttpStatus.BAD_REQUEST, "New password phải khác password hiện tại");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -71,7 +71,7 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private User findByUsername(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay user: " + username));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user: " + username));
     }
 
     private UserProfileResponse toResponse(User user) {

@@ -43,7 +43,7 @@ export default function RegisterPage() {
       await authApi.register({ username: form.username, fullName: form.fullName, email: form.email, phone: form.phone, password: form.password });
       navigate("/verify-email", { state: { username: form.username, email: form.email } });
     } catch (err) {
-      setError(err.response?.data?.message || "Đăng ký that bai. Vui long thu lai.");
+      setError(err.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.");
     } finally { setLoading(false); }
   };
 

@@ -49,7 +49,7 @@ public class FloorController {
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Floor>> create(@Valid @RequestBody FloorRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao tang thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo tầng thành công",
             floorService.create(req)));
     }
 
@@ -58,7 +58,7 @@ public class FloorController {
     public ResponseEntity<ApiResponse<Floor>> update(
             @PathVariable Long id,
             @Valid @RequestBody FloorRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat tang thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật tầng thành công",
             floorService.update(id, req)));
     }
 
@@ -66,7 +66,7 @@ public class FloorController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         floorService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa tang khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá tầng khỏi DB"));
     }
 
     private boolean isAuthenticated(Authentication authentication) {

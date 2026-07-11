@@ -38,7 +38,7 @@ public class UserQueryServiceImpl implements UserQueryService {
         try {
             return Role.RoleName.valueOf(role.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Role khong hop le: " + role);
+            throw new AppException(HttpStatus.BAD_REQUEST, "Role không hợp lệ: " + role);
         }
     }
 

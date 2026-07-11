@@ -75,38 +75,38 @@ function resolveHeroMetric(record, isSessionRecord) {
   }
 
   const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Cho coc";
-  if (status === "CONFIRMED") return "Cho vao";
+  if (status === "PENDING_PAYMENT") return "Chờ cọc";
+  if (status === "CONFIRMED") return "Chờ vào";
   return "--:--";
 }
 
 function resolveHeroMetricLabel(record, isSessionRecord) {
-  if (isSessionRecord) return "Thoi gian";
+  if (isSessionRecord) return "Thời gian";
 
   const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Trang thai";
-  if (status === "CONFIRMED") return "Dieu kien";
-  return "Thoi gian";
+  if (status === "PENDING_PAYMENT") return "Trạng thái";
+  if (status === "CONFIRMED") return "Điều kiện";
+  return "Thời gian";
 }
 
 function resolveHeroTitle(record, isSessionRecord) {
-  if (!record) return "Chua co phien do xe";
+  if (!record) return "Chưa có phiên đỗ xe";
   if (isSessionRecord) {
-    return record?.slotCode ? `Xe dang do tai ${record.slotCode}` : "Xe dang do trong bai";
+    return record?.slotCode ? `Xe đang đỗ tại ${record.slotCode}` : "Xe đang đỗ trong bãi";
   }
-  return record?.buildingName || record?.parkingBuildingName || "Cho xe vao bai";
+  return record?.buildingName || record?.parkingBuildingName || "Chờ xe vào bãi";
 }
 
 function resolveHeroSubtitle(record, isSessionRecord) {
-  if (!record) return "Tao booking de xem phien do xe hien tai tai day";
-  const slotLabel = record?.slotCode || record?.parkingSlotCode || "Cho cho xac nhan";
-  const plateLabel = record?.licensePlate || record?.vehiclePlate || "Xe da lien ket";
+  if (!record) return "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
+  const slotLabel = record?.slotCode || record?.parkingSlotCode || "Chờ xác nhận";
+  const plateLabel = record?.licensePlate || record?.vehiclePlate || "Xe đã liên kết";
 
   if (isSessionRecord) {
     return `${slotLabel} - ${plateLabel}`;
   }
 
-  const startLabel = resolveBookingStart(record) ? formatRelativeTime(resolveBookingStart(record)) : "Sap den luot";
+  const startLabel = resolveBookingStart(record) ? formatRelativeTime(resolveBookingStart(record)) : "Sắp đến lượt";
   return `${slotLabel} - ${plateLabel} - ${startLabel}`;
 }
 

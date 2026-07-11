@@ -76,7 +76,7 @@ public class ParkingSlotController {
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingSlot>> create(@Valid @RequestBody SlotRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao slot thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo slot thành công",
             slotService.create(req)));
     }
 
@@ -85,7 +85,7 @@ public class ParkingSlotController {
     public ResponseEntity<ApiResponse<ParkingSlot>> update(
             @PathVariable Long id,
             @Valid @RequestBody SlotRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat slot thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật slot thành công",
             slotService.update(id, req)));
     }
 
@@ -93,7 +93,7 @@ public class ParkingSlotController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         slotService.delete(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa slot khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá slot khỏi DB"));
     }
 
     private boolean isAuthenticated(Authentication authentication) {

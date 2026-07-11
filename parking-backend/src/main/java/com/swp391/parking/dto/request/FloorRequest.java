@@ -10,17 +10,17 @@ import lombok.*;
 @Builder
 public class FloorRequest {
 
-    @NotNull(message = "Building ID khong duoc de trong")
+    @NotNull(message = "Building ID không được để trống")
     private Long buildingId;
 
-    @NotNull(message = "So tang khong duoc de trong")
+    @NotNull(message = "Số tầng không được để trống")
     private Integer floorNumber;
 
-    @NotBlank(message = "Ten tang khong duoc de trong")
+    @NotBlank(message = "Tên tầng không được để trống")
     @Size(max = 50)
     private String name;
 
-    @Min(value = 0, message = "Suc chua khong duoc am")
+    @Min(value = 0, message = "Sức chứa không được âm")
     @Builder.Default
     private Integer capacity = 0;
 

@@ -48,44 +48,44 @@ public class BookingServiceImpl implements BookingService {
         LocalDateTime now = LocalDateTime.now();
         expireStaleOpenBookings(now);
 
-        // Load vehicle (BE2) â€” kiá»ƒm tra chá»§ sá»Ÿ há»¯u
+        // Load vehicle (BE2) — kiểm tra chủ sở hữu
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y xe"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy xe"));
         if (!vehicle.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Xe nÃ y khÃ´ng thuá»™c vá» báº¡n");
+            throw new AppException(HttpStatus.FORBIDDEN, "Xe này không thuộc về bạn");
         }
 
         // Load slot (BE2)
         ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y slot"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
 
-        // [BR-02] Loáº¡i xe pháº£i match zone â€” so sÃ¡nh slotSize
+        // [BR-02] Loại xe phải match zone — so sánh slotSize
         ParkingSlot.SlotSize vehicleSlotSize = vehicle.getVehicleType().getSlotSize() != null
                 ? ParkingSlot.SlotSize.valueOf(vehicle.getVehicleType().getSlotSize().name())
                 : null;
         if (vehicleSlotSize == null || vehicleSlotSize != slot.getSlotSize()) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "KÃ­ch cá»¡ xe (" + vehicle.getVehicleType().getSlotSize()
-                            + ") khÃ´ng phÃ¹ há»£p vá»›i slot " + slot.getSlotCode()
+                    "Kích cỡ xe (" + vehicle.getVehicleType().getSlotSize()
+                            + ") không phù hợp với slot " + slot.getSlotCode()
                             + " (" + slot.getSlotSize() + ")");
         }
 
-        // Slot pháº£i Ä‘ang Ä‘Æ°á»£c kÃ­ch hoáº¡t trÆ°á»›c khi kiá»ƒm tra tráº¡ng thÃ¡i khai thÃ¡c.
+        // Slot phải đang được kích hoạt trước khi kiểm tra trạng thái khai thác.
         if (!Boolean.TRUE.equals(slot.getIsActive())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Slot " + slot.getSlotCode() + " Ä‘ang bá»‹ vÃ´ hiá»‡u hÃ³a, khÃ´ng thá»ƒ Ä‘áº·t");
+                    "Slot " + slot.getSlotCode() + " đang bị vô hiệu hóa, không thể đặt");
         }
 
-        // [BR-11] Slot khÃ´ng Ä‘Æ°á»£c MAINTENANCE
+        // [BR-11] Slot không được MAINTENANCE
         if (slot.getStatus() == ParkingSlot.Status.MAINTENANCE) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Slot Ä‘ang báº£o trÃ¬, khÃ´ng thá»ƒ Ä‘áº·t");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Slot đang bảo trì, không thể đặt");
         }
         if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Slot " + slot.getSlotCode() + " khÃ´ng kháº£ dá»¥ng (tráº¡ng thÃ¡i: " + slot.getStatus() + ")");
+                    "Slot " + slot.getSlotCode() + " không khả dụng (trạng thái: " + slot.getStatus() + ")");
         }
 
-        // [BR-06] 1 xe chá»‰ cÃ³ 1 booking active
+        // [BR-06] 1 xe chỉ có 1 booking active
         bookingRepository.findByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(
@@ -96,20 +96,20 @@ public class BookingServiceImpl implements BookingService {
                 )
         ).ifPresent(b -> {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Xe nÃ y Ä‘ang cÃ³ booking active (#" + b.getId() + ")");
+                    "Xe này đang có booking active (#" + b.getId() + ")");
         });
 
-        // [BR-06b] Xe Ä‘ang cÃ³ session chÆ°a hoÃ n táº¥t (walk-in hoáº·c booking) â†’ khÃ´ng cho Ä‘áº·t thÃªm
+        // [BR-06b] Xe đang có session chưa hoàn tất (walk-in hoặc booking) → không cho đặt thêm
         boolean hasOpenSession = sessionRepository.existsByVehicle_IdAndStatusIn(
                 vehicle.getId(),
                 List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.WAITING_PAYMENT)
         );
         if (hasOpenSession) {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Xe Ä‘ang cÃ³ phiÃªn Ä‘á»— xe chÆ°a hoÃ n táº¥t, khÃ´ng thá»ƒ Ä‘áº·t booking má»›i");
+                    "Xe đang có phiên đỗ xe chưa hoàn tất, không thể đặt booking mới");
         }
 
-        // Kiá»ƒm tra slot Ä‘Ã£ cÃ³ booking active chÆ°a
+        // Kiểm tra slot đã có booking active chưa
         bookingRepository.findBySlot_IdAndStatusIn(
                 slot.getId(),
                 List.of(
@@ -119,7 +119,7 @@ public class BookingServiceImpl implements BookingService {
                 )
         ).ifPresent(b -> {
             throw new AppException(HttpStatus.CONFLICT,
-                    "Slot " + slot.getSlotCode() + " Ä‘Ã£ cÃ³ booking active (#" + b.getId() + ")");
+                    "Slot " + slot.getSlotCode() + " đã có booking active (#" + b.getId() + ")");
         });
 
         LocalDateTime startTime = request.getBookingStartTime();
@@ -133,7 +133,7 @@ public class BookingServiceImpl implements BookingService {
         long minutesUntilStart = ChronoUnit.MINUTES.between(now, startTime);
         if (minutesUntilStart < minAdvanceMinutes) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Pháº£i Ä‘áº·t trÆ°á»›c Ã­t nháº¥t " + minAdvanceMinutes + " phÃºt.");
+                    "Phải đặt trước ít nhất " + minAdvanceMinutes + " phút.");
         }
 
         String bookingType = request.getBookingType() != null && !request.getBookingType().isBlank()
@@ -147,20 +147,20 @@ public class BookingServiceImpl implements BookingService {
             Integer durationUnits = request.getDurationUnits();
             if (durationUnits == null || durationUnits < 1) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "durationUnits phai >= 1 khi bookingType khac HOURLY");
+                        "durationUnits phải >= 1 khi bookingType khác HOURLY");
             }
             endTime = switch (bookingType) {
                 case "DAILY" -> startTime.plusDays(durationUnits);
                 case "WEEKLY" -> startTime.plusWeeks(durationUnits);
                 case "MONTHLY" -> startTime.plusMonths(durationUnits);
                 default -> throw new AppException(HttpStatus.BAD_REQUEST,
-                        "bookingType khong hop le: " + bookingType);
+                        "bookingType không hợp lệ: " + bookingType);
             };
         }
 
         if (!endTime.isAfter(startTime)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "bookingEndTime phai sau bookingStartTime");
+                    "bookingEndTime phải sau bookingStartTime");
         }
 
         // expired_at = MIN(now+QR_EXPIRE_BUFFER_MINUTES, start-5p)
@@ -170,7 +170,7 @@ public class BookingServiceImpl implements BookingService {
             expiredAt = now.plusMinutes(qrExpireBufferMinutes);
         }
 
-        // TÃ­nh deposit (tiá»n Ä‘áº·t chá»— â€” máº¥t náº¿u khÃ´ng Ä‘áº¿n)
+        // Tính deposit (tiền đặt chỗ — mất nếu không đến)
         // Flat-rate booking (DAILY/WEEKLY/MONTHLY) mien coc
         BigDecimal deposit;
         if ("HOURLY".equals(bookingType)) {
@@ -196,16 +196,16 @@ public class BookingServiceImpl implements BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
-        log.info("Booking #{} táº¡o bá»Ÿi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
+        log.info("Booking #{} tạo bởi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
 
         String paymentHint = ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType))
-                ? "Vui long thanh toan phi tron goi de nhan QR."
+                ? "Vui lòng thanh toán phí trọn gói để nhận QR."
                 : "DAILY".equals(bookingType)
-                        ? "Dat cho thanh cong, thanh toan khi ra khoi bai."
-                        : "Vui long thanh toan coc de nhan QR.";
+                        ? "Đặt chỗ thành công, thanh toán khi ra khỏi bãi."
+                        : "Vui lòng thanh toán cọc để nhận QR.";
         notificationService.notify(currentUserId,
-                "Dat cho thanh cong",
-                "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " da duoc tao. " + paymentHint,
+                "Đặt chỗ thành công",
+                "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " đã được tạo. " + paymentHint,
                 "info", "BOOKING", booking.getId().intValue());
 
         return toResponse(booking);
@@ -223,7 +223,7 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Booking #" + bookingId + " khÃ´ng á»Ÿ tráº¡ng thÃ¡i chá» thanh toÃ¡n (hiá»‡n: " + booking.getStatus() + ")");
+                    "Booking #" + bookingId + " không ở trạng thái chờ thanh toán (hiện: " + booking.getStatus() + ")");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -232,13 +232,13 @@ public class BookingServiceImpl implements BookingService {
         // if the gate-entry QR window (bookingStartTime + 30 min) is still open.
         if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(now)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Booking #" + bookingId + " da qua han thanh toan, khong the xac nhan");
+                    "Booking #" + bookingId + " đã quá hạn thanh toán, không thể xác nhận");
         }
 
         // Booking QR is valid until bookingStartTime + 30 minutes.
         LocalDateTime qrExpiry = confirmedBookingQrExpiry(booking);
         if (!qrExpiry.isAfter(now)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking Ä‘Ã£ quÃ¡ háº¡n vÃ o bÃ£i");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã quá hạn vào bãi");
         }
 
         String qr = qrTokenUtil.generateBookingQrToken(
@@ -263,8 +263,8 @@ public class BookingServiceImpl implements BookingService {
                 bookingId, slot.getSlotCode());
 
         notificationService.notify(booking.getUserId(),
-                "QR da duoc tao",
-                "Booking #" + bookingId + " da xac nhan. Dua QR cho staff tai cong vao.",
+                "QR đã được tạo",
+                "Booking #" + bookingId + " đã xác nhận. Đưa QR cho staff tại cổng vào.",
                 "success", "BOOKING", bookingId.intValue());
 
         Booking confirmedBooking = booking;
@@ -286,28 +286,28 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public BookingResponse verifyQrToken(String qrToken, Long currentUserId, boolean staffScoped) {
         if (qrToken == null || qrToken.isBlank()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Thiáº¿u QR token");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu QR token");
         }
 
         Long bookingId;
         try {
             bookingId = qrTokenUtil.parseQrToken(qrToken).get("booking_id", Long.class);
         } catch (Exception ex) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "QR khÃ´ng há»£p lá»‡ hoáº·c Ä‘Ã£ háº¿t háº¡n");
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR không hợp lệ hoặc đã hết hạn");
         }
 
         Booking booking = getBookingEntity(bookingId);
         enforceStaffBuildingScope(booking, currentUserId, staffScoped);
         if (booking.getQrUsedAt() != null) {
-            throw new AppException(HttpStatus.CONFLICT, "QR Ä‘Ã£ Ä‘Æ°á»£c dÃ¹ng rá»“i");
+            throw new AppException(HttpStatus.CONFLICT, "QR đã được dùng rồi");
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking khÃ´ng cÃ²n hiá»‡u lá»±c");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không còn hiệu lực");
         }
-        // Token verify pháº£i Ä‘Ãºng token hiá»‡n táº¡i trong DB Ä‘á»ƒ QR cÅ© bá»‹ revoke sau regenerate.
+        // Token verify phải đúng token hiện tại trong DB để QR cũ bị revoke sau regenerate.
         if (booking.getQrToken() == null || !booking.getQrToken().equals(qrToken)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "QR da bi thay the boi token moi. Dung QR moi nhat.");
+                    "QR đã bị thay thế bởi token mới. Dùng QR mới nhất.");
         }
 
         return toResponse(booking);
@@ -326,12 +326,12 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse cancelBooking(Long bookingId, Long currentUserId) {
         Booking booking = getBookingEntity(bookingId);
         if (!booking.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen huy booking nay");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền huỷ booking này");
         }
         if (!List.of(Booking.BookingStatus.PENDING_PAYMENT, Booking.BookingStatus.CONFIRMED)
                 .contains(booking.getStatus())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi huy duoc PENDING_PAYMENT hoac CONFIRMED");
+                    "Chỉ huỷ được PENDING_PAYMENT hoặc CONFIRMED");
         }
 
         boolean shouldRefundDeposit = false;
@@ -357,20 +357,20 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse regenerateQr(Long bookingId, Long currentUserId) {
         Booking booking = getBookingEntity(bookingId);
         if (!booking.getUserId().equals(currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "KhÃ´ng cÃ³ quyá»n táº¡o láº¡i QR cho booking nÃ y");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền tạo lại QR cho booking này");
         }
         if (booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chá»‰ táº¡o láº¡i QR cho booking CONFIRMED (hiá»‡n: " + booking.getStatus() + ")");
+                    "Chỉ tạo lại QR cho booking CONFIRMED (hiện: " + booking.getStatus() + ")");
         }
         if (booking.getQrUsedAt() != null) {
-            throw new AppException(HttpStatus.CONFLICT, "QR Ä‘Ã£ Ä‘Æ°á»£c sá»­ dá»¥ng, khÃ´ng thá»ƒ táº¡o láº¡i");
+            throw new AppException(HttpStatus.CONFLICT, "QR đã được sử dụng, không thể tạo lại");
         }
 
         LocalDateTime qrExpiry = booking.getExpiredAt();
         if (qrExpiry == null || !qrExpiry.isAfter(LocalDateTime.now())) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "QR da het han, khong the tao lai cho booking nay");
+                    "QR đã hết hạn, không thể tạo lại cho booking này");
         }
 
         String newQr = qrTokenUtil.generateBookingQrToken(
@@ -406,10 +406,10 @@ public class BookingServiceImpl implements BookingService {
                 .map(this::toResponse).toList();
     }
 
-    // â”€â”€ Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Helper ────────────────────────────────────────────────────────────────
     private Booking getBookingEntity(Long id) {
         return bookingRepository.findById(id)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "KhÃ´ng tÃ¬m tháº¥y booking #" + id));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy booking #" + id));
     }
 
     private LocalDateTime confirmedBookingQrExpiry(Booking booking) {
@@ -449,7 +449,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BigDecimal calculateDeposit(String vehicleTypeName, long minutesUntilStart) {
-        // BR-03d: chá»‰ CAR vÃ  ELECTRIC_CAR má»›i tÃ­nh cá»c, MOTORBIKE khÃ´ng tÃ­nh
+        // BR-03d: chỉ CAR và ELECTRIC_CAR mới tính cọc, MOTORBIKE không tính
         if (!vehicleTypeName.equalsIgnoreCase("CAR")
                 && !vehicleTypeName.equalsIgnoreCase("ELECTRIC_CAR")) {
             return BigDecimal.ZERO;
@@ -491,7 +491,7 @@ public class BookingServiceImpl implements BookingService {
 
     private void enforceStaffBuildingScope(Booking booking, Long currentUserId, boolean staffScoped) {
         if (!canStaffAccessBooking(booking, currentUserId, staffScoped)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem booking ngoài toà nhà được phân công");
         }
     }
 
@@ -500,7 +500,7 @@ public class BookingServiceImpl implements BookingService {
             return true;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
             // Staff without assigned building can see all bookings (e.g. floating/admin staff)
             return true;

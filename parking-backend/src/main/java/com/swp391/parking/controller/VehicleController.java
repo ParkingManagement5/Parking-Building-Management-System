@@ -49,7 +49,7 @@ public class VehicleController {
         if (isDriver) {
             User user = resolveUser(authentication);
             if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem xe cua nguoi khac");
+                throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem xe của người khác");
             }
         }
         return ResponseEntity.ok(ApiResponse.success(vehicle));
@@ -61,7 +61,7 @@ public class VehicleController {
             Authentication authentication,
             @Valid @RequestBody VehicleRequest req) {
         User user = resolveUser(authentication);
-        return ResponseEntity.ok(ApiResponse.success("Dang ky xe thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Đăng ký xe thành công",
             vehicleService.create(user.getUserId(), req)));
     }
 
@@ -74,9 +74,9 @@ public class VehicleController {
         User user = resolveUser(authentication);
         Vehicle vehicle = vehicleService.getById(id);
         if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen sua xe cua nguoi khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền sửa xe của người khác");
         }
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat xe thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật xe thành công",
             vehicleService.update(id, req)));
     }
 
@@ -90,17 +90,17 @@ public class VehicleController {
             User user = resolveUser(authentication);
             Vehicle vehicle = vehicleService.getById(id);
             if (!vehicle.getUserId().equals(user.getUserId().longValue())) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xoa xe cua nguoi khac");
+                throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xoá xe của người khác");
             }
         }
         vehicleService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da vo hieu hoa xe"));
+        return ResponseEntity.ok(ApiResponse.success("Đã vô hiệu hoá xe"));
     }
 
     private User resolveUser(Authentication authentication) {
         String username = authentication.getName();
         return userRepository.findByUsername(username)
             .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED,
-                "Khong tim thay user: " + username));
+                "Không tìm thấy user: " + username));
     }
 }

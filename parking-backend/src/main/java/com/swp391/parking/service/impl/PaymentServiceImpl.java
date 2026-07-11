@@ -77,7 +77,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getPaymentType() != PaymentType.DEPOSIT) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Payment #" + paymentId + " khong phai DEPOSIT (hien: " + payment.getPaymentType() + ")");
+                    "Payment #" + paymentId + " không phải DEPOSIT (hiện: " + payment.getPaymentType() + ")");
         }
 
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
@@ -86,7 +86,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentStatus() == PaymentStatus.FAILED
                 || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Khong the confirm payment dang o trang thai " + payment.getPaymentStatus());
+                    "Không thể confirm payment đang ở trạng thái " + payment.getPaymentStatus());
         }
 
         if (payment.getBookingId() != null) {
@@ -94,7 +94,7 @@ public class PaymentServiceImpl implements PaymentService {
             if (booking != null && booking.getExpiredAt() != null
                     && booking.getExpiredAt().isBefore(LocalDateTime.now())
                     && booking.getStatus() != Booking.BookingStatus.CONFIRMED) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han, khong the confirm deposit");
+                throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã hết hạn, không thể confirm deposit");
             }
         }
 
@@ -119,10 +119,10 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = findById(paymentId);
 
         if (payment.getPaymentStatus() == PaymentStatus.PAID) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Payment da PAID, khong the mark FAILED");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Payment đã PAID, không thể mark FAILED");
         }
         if (payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Payment da REFUNDED, khong the mark FAILED");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Payment đã REFUNDED, không thể mark FAILED");
         }
         if (payment.getPaymentStatus() == PaymentStatus.FAILED) {
             return toResponse(payment);
@@ -151,11 +151,11 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentMethod paymentMethod
     ) {
         ParkingSession session = parkingSessionRepository.findById(sessionId.longValue())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Session khong ton tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Session không tồn tại"));
 
         if (session.getStatus() != ParkingSession.SessionStatus.WAITING_PAYMENT) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi tao Parking Fee cho session WAITING_PAYMENT (hien: " + session.getStatus() + ")");
+                    "Chỉ tạo Parking Fee cho session WAITING_PAYMENT (hiện: " + session.getStatus() + ")");
         }
 
         Payment existingPending = paymentRepository.findBySessionId(sessionId).stream()
@@ -167,7 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .anyMatch(p -> p.getPaymentType() == PaymentType.PARKING_FEE
                         && p.getPaymentStatus() == PaymentStatus.PAID);
         if (hasPaidFee) {
-            throw new AppException(HttpStatus.CONFLICT, "Session da co Parking Fee da thanh toan");
+            throw new AppException(HttpStatus.CONFLICT, "Session đã có Parking Fee đã thanh toán");
         }
 
         BigDecimal serverRate = resolveHourlyRate(session);
@@ -180,7 +180,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
         if (session.getExitTime() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Session #" + sessionId + " chua co thoi gian ra (exitTime null), khong the tinh phi");
+                    "Session #" + sessionId + " chưa có thời gian ra (exitTime null), không thể tính phí");
         }
         String bookingType = session.getBooking() != null ? session.getBooking().getBookingType() : null;
         LocalDateTime bookingEndTime = session.getBooking() != null ? session.getBooking().getBookingEndTime() : null;
@@ -239,7 +239,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getPaymentType() != PaymentType.PARKING_FEE) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Payment #" + paymentId + " khong phai PARKING_FEE (hien: " + payment.getPaymentType() + ")");
+                    "Payment #" + paymentId + " không phải PARKING_FEE (hiện: " + payment.getPaymentType() + ")");
         }
 
         // Idempotent: duplicate IPN or concurrent /return + IPN calls both succeed
@@ -249,14 +249,14 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentStatus() == PaymentStatus.FAILED
                 || payment.getPaymentStatus() == PaymentStatus.REFUNDED) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Khong the confirm payment dang o trang thai " + payment.getPaymentStatus());
+                    "Không thể confirm payment đang ở trạng thái " + payment.getPaymentStatus());
         }
 
         if (payment.getSessionId() != null) {
             ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue()).orElse(null);
             if (session != null && session.getStatus() != ParkingSession.SessionStatus.WAITING_PAYMENT) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Session khong o trang thai WAITING_PAYMENT (hien: " + session.getStatus() + ")");
+                        "Session không ở trạng thái WAITING_PAYMENT (hiện: " + session.getStatus() + ")");
             }
         }
 
@@ -287,7 +287,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
         if (payment.getPaymentStatus() != PaymentStatus.PAID) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi refund payment da PAID (hien: " + payment.getPaymentStatus() + ")");
+                    "Chỉ refund payment đã PAID (hiện: " + payment.getPaymentStatus() + ")");
         }
 
         validateRefundEligibility(payment);
@@ -346,15 +346,15 @@ public class PaymentServiceImpl implements PaymentService {
         boolean owned = false;
         if (payment.getBookingId() != null) {
             bookingRepository.findById(payment.getBookingId().longValue())
-                    .ifPresent(b -> { if (!b.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay"); });
+                    .ifPresent(b -> { if (!b.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment này"); });
             owned = true;
         }
         if (payment.getSessionId() != null) {
             parkingSessionRepository.findById(payment.getSessionId().longValue())
-                    .ifPresent(s -> { if (!s.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay"); });
+                    .ifPresent(s -> { if (!s.getUserId().equals(userId)) throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment này"); });
             owned = true;
         }
-        if (!owned) throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment nay");
+        if (!owned) throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment này");
     }
 
     @Override
@@ -362,7 +362,7 @@ public class PaymentServiceImpl implements PaymentService {
     public void enforceBookingOwnership(Integer bookingId, Long userId) {
         bookingRepository.findById(bookingId.longValue()).ifPresent(b -> {
             if (!b.getUserId().equals(userId)) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment cua booking nay");
+                throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment của booking này");
             }
         });
     }
@@ -372,7 +372,7 @@ public class PaymentServiceImpl implements PaymentService {
     public void enforceSessionOwnership(Integer sessionId, Long userId) {
         parkingSessionRepository.findById(sessionId.longValue()).ifPresent(s -> {
             if (!s.getUserId().equals(userId)) {
-                throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment cua session nay");
+                throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment của session này");
             }
         });
     }
@@ -386,7 +386,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
         Payment payment = findById(paymentId);
         if (!paymentBelongsToBuilding(payment, buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem payment ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem payment ngoài toà nhà được phân công");
         }
     }
 
@@ -400,7 +400,7 @@ public class PaymentServiceImpl implements PaymentService {
         Booking booking = bookingRepository.findById(bookingId.longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking not found"));
         if (!bookingBelongsToBuilding(booking, buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem booking ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem booking ngoài toà nhà được phân công");
         }
     }
 
@@ -414,7 +414,7 @@ public class PaymentServiceImpl implements PaymentService {
         ParkingSession session = parkingSessionRepository.findById(sessionId.longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Session not found"));
         if (!sessionBelongsToBuilding(session, buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem session ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem session ngoài toà nhà được phân công");
         }
     }
 
@@ -422,11 +422,11 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PaymentResponse createPassBookingFinalFee(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking không tồn tại"));
 
         String bookingType = booking.getBookingType();
         if (!"WEEKLY".equalsIgnoreCase(bookingType) && !"MONTHLY".equalsIgnoreCase(bookingType)) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Chi tao pass fee cho booking WEEKLY/MONTHLY");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ tạo pass fee cho booking WEEKLY/MONTHLY");
         }
 
         // Idempotent: nếu đã có PENDING hoặc PAID fee thì trả về luôn
@@ -486,7 +486,7 @@ public class PaymentServiceImpl implements PaymentService {
         Payment saved = paymentRepository.save(payment);
         try {
             notificationService.notify(booking.getUserId(), "Thanh toan phi do xe",
-                    "Booking #" + bookingId + " (" + bookingType + ") het han. Phi: " + total + " VND. Vui long thanh toan.",
+                    "Booking #" + bookingId + " (" + bookingType + ") hết hạn. Phí: " + total + " VND. Vui lòng thanh toán.",
                     "warning", "PAYMENT", saved.getPaymentId());
         } catch (Exception ignored) {}
         return toResponse(saved);
@@ -513,14 +513,14 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getPaymentType() == PaymentType.DEPOSIT) {
             if (payment.getBookingId() == null) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Deposit payment khong gan voi booking, khong the refund");
+                        "Deposit payment không gắn với booking, không thể refund");
             }
             Booking booking = bookingRepository.findById(payment.getBookingId().longValue())
-                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking không tồn tại"));
             if (booking.getStatus() != Booking.BookingStatus.CANCELLED
                     && booking.getStatus() != Booking.BookingStatus.EXPIRED) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Chi refund deposit khi booking da CANCELLED hoac EXPIRED");
+                        "Chỉ refund deposit khi booking đã CANCELLED hoặc EXPIRED");
             }
             return;
         }
@@ -531,10 +531,10 @@ public class PaymentServiceImpl implements PaymentService {
                 return;
             }
             ParkingSession session = parkingSessionRepository.findById(payment.getSessionId().longValue())
-                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session khong ton tai"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Parking session không tồn tại"));
             if (session.getStatus() != ParkingSession.SessionStatus.COMPLETED) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Chi refund parking fee khi session da COMPLETED");
+                        "Chỉ refund parking fee khi session đã COMPLETED");
             }
         }
     }
@@ -558,7 +558,7 @@ public class PaymentServiceImpl implements PaymentService {
                     }
                     try {
                         notificationService.notify(booking.getUserId(), "Thanh toan hoan tat",
-                                "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
+                                "Phí đỗ xe " + payment.getTotalAmount() + " VND đã được thanh toán. Cảm ơn bạn!",
                                 "success", "PAYMENT", payment.getPaymentId());
                     } catch (Exception ignored) {}
                 }
@@ -587,7 +587,7 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             notificationService.notify(session.getUserId(),
                     "Thanh toan hoan tat",
-                    "Phi do xe " + payment.getTotalAmount() + " VND da duoc thanh toan. Cam on ban!",
+                    "Phí đỗ xe " + payment.getTotalAmount() + " VND đã được thanh toán. Cảm ơn bạn!",
                     "success", "PAYMENT", payment.getPaymentId());
         } catch (Exception ignored) {}
 
@@ -602,10 +602,10 @@ public class PaymentServiceImpl implements PaymentService {
             return null;
         }
         var currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
             throw new AppException(HttpStatus.FORBIDDEN,
-                    "Staff chua duoc gan toa nha, khong the xem payment ngoai pham vi");
+                    "Staff chưa được gán toà nhà, không thể xem payment ngoài phạm vi");
         }
         return currentUser.getAssignedBuilding().getId();
     }

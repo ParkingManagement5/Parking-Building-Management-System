@@ -172,7 +172,7 @@ export default function BookingHistoryPage() {
       await loadBookings();
     } catch (cancelError) {
       console.error("Failed to cancel booking", cancelError);
-      setError(cancelError.response?.data?.message || "Khong the huy booking nay.");
+      setError(cancelError.response?.data?.message || "Không thể huỷ booking này.");
     } finally {
       setProcessingBookingId(null);
     }
@@ -276,9 +276,9 @@ export default function BookingHistoryPage() {
                           className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/10"
                         >
                           {processingBookingId === item.bookingId ? (
-                            <><LoaderCircle size={12} className="animate-spin" /> Dang xu ly</>
+                            <><LoaderCircle size={12} className="animate-spin" /> Đang xử lý</>
                           ) : (
-                            "Huy booking"
+                            "Huỷ booking"
                           )}
                         </button>
                       )}
@@ -338,7 +338,7 @@ export default function BookingHistoryPage() {
 
                   {isConfirmed && item.depositPaidAt && (
                     <div className="ml-[52px] flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>Coc luc {formatDateTime(item.depositPaidAt)}</span>
+                      <span>Cọc lúc {formatDateTime(item.depositPaidAt)}</span>
                       {cancelPolicy.deadline != null && (
                         <span className={cancelPolicy.refundable ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}>
                           {cancelPolicy.refundable

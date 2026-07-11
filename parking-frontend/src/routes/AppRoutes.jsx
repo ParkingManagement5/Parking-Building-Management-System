@@ -11,14 +11,11 @@ import UnauthorizedPage from "../pages/auth/UnauthorizedPage";
 import RolePortalLayout from "../ui/components/RolePortalLayout";
 import DriverDashboard from "../pages/driver/DriverDashboard";
 import DriverNotificationPage from "../pages/driver/DriverNotificationPage";
-import DriverParkingSlotPage from "../pages/driver/DriverParkingSlotPage";
+import DriverFindParkingPage from "../pages/driver/DriverFindParkingPage";
 import MyVehiclesPage from "../pages/driver/MyVehiclesPage";
 import BookingPage from "../pages/driver/BookingPage";
-import PackageBookingPage from "../pages/driver/PackageBookingPage";
 import BookingHistoryPage from "../pages/driver/BookingHistoryPage";
 import CurrentSessionPage from "../pages/driver/CurrentSessionPage";
-import DriverParkingMapPage from "../pages/driver/DriverParkingMapPage";
-import DriverFindBuildingPage from "../pages/driver/DriverFindBuildingPage";
 import PaymentHistoryPage from "../pages/driver/PaymentHistoryPage";
 import ParkingSessionHistoryPage from "../pages/driver/ParkingSessionHistoryPage";
 import RequestCenterPage from "../pages/driver/RequestCenterPage";
@@ -68,13 +65,14 @@ export default function AppRoutes() {
           <Route path="/driver" element={<RolePortalLayout portal="driver" />}>
             <Route index element={<DriverDashboard />} />
             <Route path="vehicles" element={<MyVehiclesPage />} />
-            <Route path="parking-slots" element={<DriverParkingSlotPage />} />
+            <Route path="find-parking" element={<DriverFindParkingPage />} />
+            <Route path="parking-slots" element={<Navigate to="/driver/find-parking" replace />} />
+            <Route path="find-building" element={<Navigate to="/driver/find-parking" replace />} />
             <Route path="booking" element={<BookingPage />} />
-            <Route path="package-booking" element={<PackageBookingPage />} />
+            <Route path="package-booking" element={<Navigate to="/driver/booking" replace />} />
             <Route path="bookings" element={<BookingHistoryPage />} />
             <Route path="current-session" element={<CurrentSessionPage />} />
-            <Route path="parking-map" element={<DriverParkingMapPage />} />
-            <Route path="find-building" element={<DriverFindBuildingPage />} />
+            <Route path="parking-map" element={<Navigate to="/driver/find-parking" replace />} />
             <Route path="payments" element={<PaymentHistoryPage />} />
             <Route path="session-history" element={<ParkingSessionHistoryPage />} />
             <Route path="requests" element={<RequestCenterPage />} />

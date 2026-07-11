@@ -60,12 +60,12 @@ export default function VehicleExitPage() {
     setCameraError("");
     setScanStatus("Opening camera...");
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Khong mo duoc camera tren thiet bi nay.");
+      setCameraError("Không mở được camera trên thiết bị này.");
       setScanStatus("Camera unavailable");
       return;
     }
     if (!videoRef.current) {
-      setCameraError("Khung camera chua san sang. Reload trang roi thu lai.");
+      setCameraError("Khung camera chưa sẵn sàng. Reload trang rồi thử lại.");
       setScanStatus("Camera unavailable");
       return;
     }
@@ -96,7 +96,7 @@ export default function VehicleExitPage() {
       );
     } catch (err) {
       console.error("Cannot start QR camera", err);
-      setCameraError("Khong mo duoc camera. Kiem tra quyen camera roi thu lai.");
+      setCameraError("Không mở được camera. Kiểm tra quyền camera rồi thử lại.");
       setScanStatus("Camera failed");
       stopQrCamera();
     }
@@ -120,12 +120,12 @@ export default function VehicleExitPage() {
         setExitQrToken(value);
         setScanStatus("QR detected - token filled");
       } else {
-        setCameraError("Khong doc duoc QR tu anh nay.");
+        setCameraError("Không đọc được QR từ ảnh này.");
         setScanStatus("QR image not readable");
       }
     } catch (err) {
       console.error("QR image scan failed", err);
-      setCameraError("Khong doc duoc QR tu anh. Thu anh ro hon hoac QR lon hon.");
+      setCameraError("Không đọc được QR từ ảnh. Thử ảnh rõ hơn hoặc QR lớn hơn.");
       setScanStatus("QR image not readable");
     } finally {
       event.target.value = "";
@@ -159,9 +159,9 @@ export default function VehicleExitPage() {
     } catch (err) {
       console.error("Failed to load exit data", err);
       if (err.response?.status === 401 || err.response?.status === 403) {
-        setError("Tai khoan staff khong co quyen hoac phien dang nhap da het han. Dang nhap lai roi thu tiep.");
+        setError("Tài khoản staff không có quyền hoặc phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử tiếp.");
       } else {
-        setError(err.response?.data?.message || "Khong tai duoc danh sach session/cong ra.");
+        setError(err.response?.data?.message || "Không tải được danh sách session/cổng ra.");
       }
     } finally {
       setLoading(false);
@@ -216,7 +216,7 @@ export default function VehicleExitPage() {
       await loadInitialData();
     } catch (err) {
       console.error("Manual exit failed", err);
-      setError(err.response?.data?.message || "Khong ghi nhan duoc xe ra. Thu lai hoac dung Exit QR.");
+      setError(err.response?.data?.message || "Không ghi nhận được xe ra. Thử lại hoặc dùng Exit QR.");
     } finally {
       setProcessing(false);
     }
@@ -243,7 +243,7 @@ export default function VehicleExitPage() {
       await loadInitialData();
     } catch (err) {
       console.error("Exit QR scan failed", err);
-      setError(err.response?.data?.message || "Exit QR khong hop le hoac khong ghi nhan duoc xe ra.");
+      setError(err.response?.data?.message || "Exit QR không hợp lệ hoặc không ghi nhận được xe ra.");
     } finally {
       setProcessing(false);
     }
@@ -380,7 +380,7 @@ export default function VehicleExitPage() {
               {!foundSession && query.trim() ? (
                 <StaffEmptyState
                   title="No active session found"
-                  description="Xe phai duoc Confirm Entry truoc, sau do moi tim thay o man hinh Exit."
+                  description="Xe phải được Confirm Entry trước, sau đó mới tìm thấy ở màn hình Exit."
                 />
               ) : null}
 

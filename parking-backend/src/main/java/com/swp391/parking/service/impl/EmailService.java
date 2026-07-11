@@ -44,28 +44,28 @@ public class EmailService {
             log.warn("Email not configured. Password reset OTP for {} ({}) is {}", username, to, otp);
             throw new AppException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "Chua cau hinh email SMTP nen khong gui duoc OTP dat lai mat khau");
+                    "Chưa cấu hình email SMTP nên không gửi được OTP đặt lại mật khẩu");
         }
 
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(mailUsername);
             message.setTo(to);
-            message.setSubject("ParkSmart - Reset mat khau");
+            message.setSubject("ParkSmart - Đặt lại mật khẩu");
             message.setText("""
-                    Hello %s,
+                    Xin chào %s,
 
-                    Ma OTP de dat lai mat khau cua ban la: %s
+                    Mã OTP để đặt lại mật khẩu của bạn là: %s
 
-                    Ma nay het han sau 10 phut.
-                    Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.
+                    Mã này hết hạn sau 10 phút.
+                    Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
                     """.formatted(username, otp));
             mailSender.send(message);
         } catch (Exception ex) {
             log.warn("Failed to send password reset email to {}. OTP is {}", to, otp, ex);
             throw new AppException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "Gui email OTP dat lai mat khau that bai. Vui long kiem tra SMTP username/password");
+                    "Gửi email OTP đặt lại mật khẩu thất bại. Vui lòng kiểm tra SMTP username/password");
         }
     }
 
@@ -74,27 +74,27 @@ public class EmailService {
             log.warn("Email is not configured. Verification OTP for {} ({}) is {}", username, to, otp);
             throw new AppException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "Chua cau hinh email SMTP nen khong gui duoc OTP");
+                    "Chưa cấu hình email SMTP nên không gửi được OTP");
         }
 
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(mailUsername);
             message.setTo(to);
-            message.setSubject("ParkSmart email verification");
+            message.setSubject("ParkSmart - Xác thực email");
             message.setText("""
-                    Hello %s,
+                    Xin chào %s,
 
-                    Your ParkSmart verification code is: %s
+                    Mã xác thực ParkSmart của bạn là: %s
 
-                    This code expires in 10 minutes.
+                    Mã này hết hạn sau 10 phút.
                     """.formatted(username, otp));
             mailSender.send(message);
         } catch (Exception ex) {
             log.warn("Failed to send verification email to {}. OTP is {}", to, otp, ex);
             throw new AppException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "Gui email OTP that bai. Vui long kiem tra SMTP username/password");
+                    "Gửi email OTP thất bại. Vui lòng kiểm tra SMTP username/password");
         }
     }
 
@@ -112,28 +112,28 @@ public class EmailService {
                       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
                         <div style="background:#0f172a;padding:24px 28px;color:#ffffff">
                           <div style="font-size:24px;font-weight:700">ParkSmart</div>
-                          <div style="margin-top:6px;font-size:14px;color:#cbd5e1">QR vao bai cho booking cua ban da san sang</div>
+                          <div style="margin-top:6px;font-size:14px;color:#cbd5e1">QR vào bãi cho booking của bạn đã sẵn sàng</div>
                         </div>
                         <div style="padding:28px">
-                          <p style="margin:0 0 16px">Xin chao <strong>%s</strong>,</p>
-                          <p style="margin:0 0 18px">Ban da thanh toan coc thanh cong cho booking <strong>#%s</strong>. Vui long dua ma QR nay cho nhan vien khi vao bai.</p>
+                          <p style="margin:0 0 16px">Xin chào <strong>%s</strong>,</p>
+                          <p style="margin:0 0 18px">Bạn đã thanh toán cọc thành công cho booking <strong>#%s</strong>. Vui lòng đưa mã QR này cho nhân viên khi vào bãi.</p>
                           <div style="border:1px solid #dbeafe;background:#f8fbff;border-radius:14px;padding:18px 20px;margin:0 0 20px">
-                            <div style="font-size:13px;color:#475569;margin-bottom:10px">Thong tin booking</div>
+                            <div style="font-size:13px;color:#475569;margin-bottom:10px">Thông tin booking</div>
                             <div style="font-size:14px;line-height:1.8">
-                              <div><strong>Bien so:</strong> %s</div>
-                              <div><strong>Vi tri:</strong> %s</div>
-                              <div><strong>Bat dau:</strong> %s</div>
-                              <div><strong>Ket thuc:</strong> %s</div>
-                              <div><strong>Coc da thanh toan:</strong> %s VND</div>
+                              <div><strong>Biển số:</strong> %s</div>
+                              <div><strong>Vị trí:</strong> %s</div>
+                              <div><strong>Bắt đầu:</strong> %s</div>
+                              <div><strong>Kết thúc:</strong> %s</div>
+                              <div><strong>Cọc đã thanh toán:</strong> %s VND</div>
                             </div>
                           </div>
                           %s
                           <div style="margin-top:18px;padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px dashed #cbd5e1">
-                            <div style="font-size:12px;color:#64748b;margin-bottom:6px">QR token du phong</div>
+                            <div style="font-size:12px;color:#64748b;margin-bottom:6px">QR token dự phòng</div>
                             <div style="font-size:12px;word-break:break-all;color:#0f172a">%s</div>
                           </div>
                           <div style="margin-top:22px">
-                            <a href="%s" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600">Mo lich su dat cho</a>
+                            <a href="%s" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600">Mở lịch sử đặt chỗ</a>
                           </div>
                         </div>
                       </div>
@@ -151,7 +151,7 @@ public class EmailService {
                     bookingsUrl
             );
 
-            sendHtmlEmail(user.getEmail(), "ParkSmart - QR vao bai cho booking #" + booking.getId(), html);
+            sendHtmlEmail(user.getEmail(), "ParkSmart - QR vào bãi cho booking #" + booking.getId(), html);
         } catch (Exception ex) {
             log.warn("Failed to send booking QR email for booking #{} to {}", booking.getId(), user.getEmail(), ex);
         }
@@ -170,59 +170,59 @@ public class EmailService {
                       <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden">
                         <div style="background:#052e16;padding:24px 28px;color:#ffffff">
                           <div style="font-size:24px;font-weight:700">ParkSmart</div>
-                          <div style="margin-top:6px;font-size:14px;color:#bbf7d0">Bien lai thanh toan phi do xe</div>
+                          <div style="margin-top:6px;font-size:14px;color:#bbf7d0">Biên lai thanh toán phí đỗ xe</div>
                         </div>
                         <div style="padding:28px">
-                          <p style="margin:0 0 16px">Xin chao <strong>%s</strong>,</p>
-                          <p style="margin:0 0 18px">He thong da ghi nhan thanh toan thanh cong cho phien do xe cua ban.</p>
+                          <p style="margin:0 0 16px">Xin chào <strong>%s</strong>,</p>
+                          <p style="margin:0 0 18px">Hệ thống đã ghi nhận thanh toán thành công cho phiên đỗ xe của bạn.</p>
                           <div style="border:1px solid #dcfce7;background:#f0fdf4;border-radius:14px;padding:18px 20px;margin:0 0 18px">
-                            <div style="font-size:13px;color:#166534;margin-bottom:10px">Thong tin giao dich</div>
+                            <div style="font-size:13px;color:#166534;margin-bottom:10px">Thông tin giao dịch</div>
                             <div style="font-size:14px;line-height:1.8">
-                              <div><strong>Ma payment:</strong> #%s</div>
+                              <div><strong>Mã payment:</strong> #%s</div>
                               <div><strong>Session:</strong> #%s</div>
-                              <div><strong>Bien so:</strong> %s</div>
-                              <div><strong>Phuong thuc:</strong> %s</div>
-                              <div><strong>Ma giao dich:</strong> %s</div>
-                              <div><strong>Thoi gian thanh toan:</strong> %s</div>
+                              <div><strong>Biển số:</strong> %s</div>
+                              <div><strong>Phương thức:</strong> %s</div>
+                              <div><strong>Mã giao dịch:</strong> %s</div>
+                              <div><strong>Thời gian thanh toán:</strong> %s</div>
                             </div>
                           </div>
                           <table style="width:100%%;border-collapse:collapse;margin:8px 0 20px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
                             <tr style="background:#f8fafc">
-                              <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e5e7eb">Hang muc</th>
-                              <th style="text-align:right;padding:12px 14px;border-bottom:1px solid #e5e7eb">So tien</th>
+                              <th style="text-align:left;padding:12px 14px;border-bottom:1px solid #e5e7eb">Hạng mục</th>
+                              <th style="text-align:right;padding:12px 14px;border-bottom:1px solid #e5e7eb">Số tiền</th>
                             </tr>
                             <tr>
-                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phi co ban</td>
+                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phí cơ bản</td>
                               <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right">%s VND</td>
                             </tr>
                             <tr>
-                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phi qua gio</td>
+                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phí quá giờ</td>
                               <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right">%s VND</td>
                             </tr>
                             <tr>
-                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phu thu</td>
+                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Phụ thu</td>
                               <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right">%s VND</td>
                             </tr>
                             <tr>
-                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Giam gia</td>
+                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Giảm giá</td>
                               <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right">-%s VND</td>
                             </tr>
                             <tr>
-                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Tru tien coc</td>
+                              <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb">Trừ tiền cọc</td>
                               <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:right">-%s VND</td>
                             </tr>
                             <tr style="background:#f8fafc;font-weight:700">
-                              <td style="padding:13px 14px">Tong thanh toan</td>
+                              <td style="padding:13px 14px">Tổng thanh toán</td>
                               <td style="padding:13px 14px;text-align:right">%s VND</td>
                             </tr>
                           </table>
                           <div style="font-size:14px;line-height:1.8;color:#334155">
-                            <div><strong>Thoi gian vao:</strong> %s</div>
-                            <div><strong>Thoi gian ra:</strong> %s</div>
+                            <div><strong>Thời gian vào:</strong> %s</div>
+                            <div><strong>Thời gian ra:</strong> %s</div>
                           </div>
                           <div style="margin-top:22px">
-                            <a href="%s" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;margin-right:10px">Xem lich su thanh toan</a>
-                            <a href="%s" style="display:inline-block;background:#e2e8f0;color:#0f172a;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600">Mo current session</a>
+                            <a href="%s" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;margin-right:10px">Xem lịch sử thanh toán</a>
+                            <a href="%s" style="display:inline-block;background:#e2e8f0;color:#0f172a;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600">Mở current session</a>
                           </div>
                         </div>
                       </div>
@@ -247,7 +247,7 @@ public class EmailService {
                     currentSessionUrl
             );
 
-            sendHtmlEmail(user.getEmail(), "ParkSmart - Bien lai thanh toan #" + payment.getPaymentId(), html);
+            sendHtmlEmail(user.getEmail(), "ParkSmart - Biên lai thanh toán #" + payment.getPaymentId(), html);
         } catch (Exception ex) {
             log.warn("Failed to send parking receipt email for payment #{} to {}", payment.getPaymentId(), user.getEmail(), ex);
         }

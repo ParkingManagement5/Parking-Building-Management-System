@@ -44,7 +44,7 @@ public class FloorServiceImpl implements FloorService {
     public Floor getById(Long id, Long currentUserId, boolean staffScoped) {
         Floor floor = floorRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay tang ID: " + id));
+                "Không tìm thấy tầng ID: " + id));
         enforceStaffBuildingScope(floor.getBuilding() != null ? floor.getBuilding().getId() : null, currentUserId, staffScoped);
         return floor;
     }
@@ -54,12 +54,12 @@ public class FloorServiceImpl implements FloorService {
     public Floor create(FloorRequest req) {
         if (floorRepo.existsByBuildingIdAndFloorNumber(req.getBuildingId(), req.getFloorNumber())) {
             throw new AppException(HttpStatus.CONFLICT,
-                "Tang so " + req.getFloorNumber() + " da ton tai trong toa nha nay");
+                "Tầng số " + req.getFloorNumber() + " đã tồn tại trong toà nhà này");
         }
 
         ParkingBuilding building = buildingRepo.findById(req.getBuildingId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Khong tim thay toa nha ID: " + req.getBuildingId()));
+                "Không tìm thấy toà nhà ID: " + req.getBuildingId()));
 
         Floor floor = Floor.builder()
             .building(building)
@@ -78,7 +78,7 @@ public class FloorServiceImpl implements FloorService {
     public Floor update(Long id, FloorRequest req) {
         Floor floor = floorRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay tang ID: " + id));
+                        "Không tìm thấy tầng ID: " + id));
         floor.setName(req.getName());
         floor.setCapacity(req.getCapacity() != null ? req.getCapacity() : floor.getCapacity());
         if (req.getStatus() != null) {
@@ -92,7 +92,7 @@ public class FloorServiceImpl implements FloorService {
     public void deactivate(Long id) {
         Floor floor = floorRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                        "Khong tim thay tang ID: " + id));
+                        "Không tìm thấy tầng ID: " + id));
         var zones = zoneRepo.findByFloorId(floor.getId());
         zones.forEach(zone -> parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId())));
         zoneRepo.deleteAllInBatch(zones);
@@ -104,12 +104,12 @@ public class FloorServiceImpl implements FloorService {
             return;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chua duoc gan toa nha");
+            throw new AppException(HttpStatus.FORBIDDEN, "Staff chưa được gán toà nhà");
         }
         if (!currentUser.getAssignedBuilding().getId().equals(buildingId)) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen xem tang ngoai toa nha duoc phan cong");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem tầng ngoài toà nhà được phân công");
         }
     }
 }

@@ -56,7 +56,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Notification not found"));
         Long ownerUserId = notification.getUser() != null ? notification.getUser().getUserId().longValue() : null;
         if (!privileged && (ownerUserId == null || !ownerUserId.equals(currentUserId))) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Khong co quyen danh dau notification cua nguoi khac");
+            throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền đánh dấu notification của người khác");
         }
         notification.setIsRead(true);
         notificationRepository.save(notification);

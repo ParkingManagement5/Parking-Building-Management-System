@@ -62,26 +62,26 @@ public class VNPayController {
         }
 
         var booking = bookingRepository.findById(bookingId.longValue())
-                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking khong ton tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Booking không tồn tại"));
 
         if (booking.getStatus() == Booking.BookingStatus.CONFIRMED) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da duoc xac nhan (da thanh toan coc)");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã được xác nhận (đã thanh toán cọc)");
         }
         if (booking.getStatus() == Booking.BookingStatus.EXPIRED
                 || booking.getStatus() == Booking.BookingStatus.CANCELLED) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da het han hoac bi huy, khong the thanh toan");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã hết hạn hoặc bị huỷ, không thể thanh toán");
         }
         if (booking.getStatus() != Booking.BookingStatus.PENDING_PAYMENT) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking khong o trang thai cho thanh toan");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking không ở trạng thái chờ thanh toán");
         }
         if (booking.getExpiredAt() != null && !booking.getExpiredAt().isAfter(LocalDateTime.now())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Booking da qua han thanh toan, khong the tao thanh toan moi");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Booking đã quá hạn thanh toán, không thể tạo thanh toán mới");
         }
 
         BigDecimal depositAmount = booking.getDepositAmount();
         if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Booking nay khong yeu cau coc (depositAmount = 0). Xac nhan mien phi.");
+                    "Booking này không yêu cầu cọc (depositAmount = 0). Xác nhận miễn phí.");
         }
 
         // Extend expiredAt 30 min to give user time to complete VNPay payment
@@ -101,7 +101,7 @@ public class VNPayController {
         result.put("paymentUrl", paymentUrl);
         result.put("paymentId", payment.getPaymentId());
         result.put("amount", depositAmount);
-        return ResponseEntity.ok(ApiResponse.success("Tao URL thanh toan thanh cong", result));
+        return ResponseEntity.ok(ApiResponse.success("Tạo URL thanh toán thành công", result));
     }
 
     @Operation(summary = "Tao URL thanh toan phi do xe qua VNPay")
@@ -143,7 +143,7 @@ public class VNPayController {
             result.put("paymentId", payment.getPaymentId());
             result.put("amount", BigDecimal.ZERO);
             result.put("autoConfirmed", true);
-            return ResponseEntity.ok(ApiResponse.success("Phi = 0, da xac nhan tu dong", result));
+            return ResponseEntity.ok(ApiResponse.success("Phí = 0, đã xác nhận tự động", result));
         }
 
         String paymentUrl = vnPayService.createPaymentUrl(
@@ -156,7 +156,7 @@ public class VNPayController {
         result.put("paymentId", payment.getPaymentId());
         result.put("amount", total);
         result.put("autoConfirmed", false);
-        return ResponseEntity.ok(ApiResponse.success("Tao URL thanh toan thanh cong", result));
+        return ResponseEntity.ok(ApiResponse.success("Tạo URL thanh toán thành công", result));
     }
 
     @Operation(summary = "IPN callback tu VNPay")
@@ -180,12 +180,12 @@ public class VNPayController {
 
         boolean success = "00".equals(callback.get("RspCode")) || "02".equals(callback.get("RspCode"));
         if (success) {
-            return ResponseEntity.ok(ApiResponse.success("VNPay callback da duoc xu ly", result));
+            return ResponseEntity.ok(ApiResponse.success("VNPay callback đã được xử lý", result));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.<Map<String, Object>>builder()
                         .success(false)
-                        .message("VNPay callback chua duoc xac nhan")
+                        .message("VNPay callback chưa được xác nhận")
                         .data(result)
                         .build());
     }

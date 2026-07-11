@@ -104,7 +104,7 @@ public class ReportController {
 
             String vtName = s.getVehicle() != null && s.getVehicle().getVehicleType() != null
                     ? s.getVehicle().getVehicleType().getName()
-                    : "Khong xac dinh";
+                    : "Không xác định";
             revenueByVehicleType.merge(vtName, amount, BigDecimal::add);
             sessionCountByVehicleType.merge(vtName, 1, Integer::sum);
         }

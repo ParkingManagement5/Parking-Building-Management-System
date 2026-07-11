@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 public class ResendVerificationRequest {
 
-    @NotBlank(message = "Username khong duoc de trong")
+    @NotBlank(message = "Username không được để trống")
     private String username;
 }

@@ -59,13 +59,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
         if (!Boolean.TRUE.equals(gate.getIsActive())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " dang inactive");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " đang inactive");
         }
         if (gate.getGateType() != null
                 && gate.getGateType() != Gate.GateType.ENTRY
                 && gate.getGateType() != Gate.GateType.BOTH) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Gate " + gate.getGateCode() + " khong phai cong vao (type: " + gate.getGateType() + ")");
+                    "Gate " + gate.getGateCode() + " không phải cổng vào (type: " + gate.getGateType() + ")");
         }
 
         ParkingSession.EntryMode mode;
@@ -73,7 +73,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             mode = ParkingSession.EntryMode.valueOf(request.getEntryMode());
         } catch (IllegalArgumentException e) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "entryMode khong hop le: " + request.getEntryMode() + ". Dung: BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL");
+                    "entryMode không hợp lệ: " + request.getEntryMode() + ". Dùng: BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL");
         }
         ParkingSession session;
         if (mode == ParkingSession.EntryMode.BOOKING) {
@@ -88,18 +88,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 GateLog.EventType.ENTRY, GateLog.ResultStatus.SUCCESS, request.getStaffUserId());
 
         notificationService.notify(session.getUserId(),
-                "Xe da vao bai",
-                "Xe " + session.getVehicle().getLicensePlate() + " da vao slot " + session.getSlot().getSlotCode() + ".",
+                "Xe đã vào bãi",
+                "Xe " + session.getVehicle().getLicensePlate() + " đã vào slot " + session.getSlot().getSlotCode() + ".",
                 "success", "SESSION", session.getId().intValue());
 
         Long entryBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
         if (entryBuildingId != null) {
-            notificationService.notifyStaffInBuilding(entryBuildingId, "Xe vao bai",
-                    "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
+            notificationService.notifyStaffInBuilding(entryBuildingId, "Xe vào bãi",
+                    "Xe " + session.getVehicle().getLicensePlate() + " vào slot " + session.getSlot().getSlotCode(),
                     "info", "SESSION", session.getId().intValue());
         } else {
-            notificationService.notifyAllStaff("Xe vao bai",
-                    "Xe " + session.getVehicle().getLicensePlate() + " vao slot " + session.getSlot().getSlotCode(),
+            notificationService.notifyAllStaff("Xe vào bãi",
+                    "Xe " + session.getVehicle().getLicensePlate() + " vào slot " + session.getSlot().getSlotCode(),
                     "info", "SESSION", session.getId().intValue());
         }
 
@@ -131,18 +131,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
         // QR phải match token hiện tại trong DB (revoke QR cũ sau regenerate)
         if (booking.getQrToken() == null || !booking.getQrToken().equals(request.getQrToken())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "QR da bi thay the boi token moi. Dung QR moi nhat.");
+            throw new AppException(HttpStatus.BAD_REQUEST, "QR đã bị thay thế bởi token mới. Dùng QR mới nhất.");
         }
 
         // Verify biển số xe khớp với booking
         String bookingPlate = booking.getVehicle().getLicensePlate();
         if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Thieu bien so xe. Staff can xac minh bien so xe khop voi booking (bien dang ky: " + bookingPlate + ")");
+                    "Thiếu biển số xe. Staff cần xác minh biển số xe khớp với booking (biển đăng ký: " + bookingPlate + ")");
         }
         if (!LicensePlateUtil.equivalent(request.getLicensePlate(), bookingPlate)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Bien so xe khong khop. QR booking cho xe " + bookingPlate + " nhung bien scan la " + request.getLicensePlate());
+                    "Biển số xe không khớp. QR booking cho xe " + bookingPlate + " nhưng biển scan là " + request.getLicensePlate());
         }
 
         // [BR-06b] Xe đang có session chưa hoàn tất → không cho check-in
@@ -348,13 +348,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
         if (!Boolean.TRUE.equals(gate.getIsActive())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " dang inactive");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " đang inactive");
         }
         if (gate.getGateType() != null
                 && gate.getGateType() != Gate.GateType.EXIT
                 && gate.getGateType() != Gate.GateType.BOTH) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Gate " + gate.getGateCode() + " khong phai cong ra (type: " + gate.getGateType() + ")");
+                    "Gate " + gate.getGateCode() + " không phải cổng ra (type: " + gate.getGateType() + ")");
         }
 
         session.setExitGate(gate);
@@ -392,19 +392,19 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             log.info("Session #{} mid-period exit for booking #{} ({}), slot RESERVED",
                     sessionId, booking.getId(), bookingType);
 
-            notificationService.notify(session.getUserId(), "Xe da ra bai",
-                    "Xe " + plate + " da ra. Slot van duoc giu den "
-                            + booking.getBookingEndTime() + ". Co the vao lai voi QR.",
+            notificationService.notify(session.getUserId(), "Xe đã ra bãi",
+                    "Xe " + plate + " đã ra. Slot vẫn được giữ đến "
+                            + booking.getBookingEndTime() + ". Có thể vào lại với QR.",
                     "info", "SESSION", session.getId().intValue());
 
             Long midBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
             if (midBuildingId != null) {
                 notificationService.notifyStaffInBuilding(midBuildingId, "Xe ra (pass)",
-                        "Xe " + plate + " ra bai, slot giu cho booking " + bookingType + " #" + booking.getId(),
+                        "Xe " + plate + " ra bãi, slot giữ cho booking " + bookingType + " #" + booking.getId(),
                         "info", "SESSION", session.getId().intValue());
             } else {
                 notificationService.notifyAllStaff("Xe ra (pass)",
-                        "Xe " + plate + " ra bai, slot giu cho booking " + bookingType + " #" + booking.getId(),
+                        "Xe " + plate + " ra bãi, slot giữ cho booking " + bookingType + " #" + booking.getId(),
                         "info", "SESSION", session.getId().intValue());
             }
             return toResponse(session);
@@ -429,18 +429,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
 
         notificationService.notify(session.getUserId(),
-                "Xe da ra bai",
-                "Xe " + session.getVehicle().getLicensePlate() + " da ra khoi bai. Vui long cho thanh toan.",
+                "Xe đã ra bãi",
+                "Xe " + session.getVehicle().getLicensePlate() + " đã ra khỏi bãi. Vui lòng chờ thanh toán.",
                 "warning", "SESSION", session.getId().intValue());
 
         Long exitBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
         if (exitBuildingId != null) {
-            notificationService.notifyStaffInBuilding(exitBuildingId, "Xe ra bai",
-                    "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
+            notificationService.notifyStaffInBuilding(exitBuildingId, "Xe ra bãi",
+                    "Xe " + session.getVehicle().getLicensePlate() + " đã ra. Chờ thanh toán phí đỗ xe.",
                     "warning", "SESSION", session.getId().intValue());
         } else {
-            notificationService.notifyAllStaff("Xe ra bai",
-                    "Xe " + session.getVehicle().getLicensePlate() + " da ra. Cho thanh toan phi do xe.",
+            notificationService.notifyAllStaff("Xe ra bãi",
+                    "Xe " + session.getVehicle().getLicensePlate() + " đã ra. Chờ thanh toán phí đỗ xe.",
                     "warning", "SESSION", session.getId().intValue());
         }
 
@@ -472,11 +472,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Thieu bien so xe. Can xac minh bien so khop voi session (bien: " + sessionPlate + ")");
+                    "Thiếu biển số xe. Cần xác minh biển số khớp với session (biển: " + sessionPlate + ")");
         }
         if (sessionPlate != null && !LicensePlateUtil.equivalent(request.getLicensePlate(), sessionPlate)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Bien so khong khop. Session cho xe " + sessionPlate + " nhung bien scan la " + request.getLicensePlate());
+                    "Biển số không khớp. Session cho xe " + sessionPlate + " nhưng biển scan là " + request.getLicensePlate());
         }
 
         SessionExitRequest exitRequest = new SessionExitRequest();
@@ -492,15 +492,15 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         ParkingSession session = getSessionEntity(sessionId);
         if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chi session ACTIVE moi tao duoc Exit QR");
+                    "Chỉ session ACTIVE mới tạo được Exit QR");
         }
         if (!Objects.equals(session.getUserId(), currentUserId)) {
             throw new AppException(HttpStatus.FORBIDDEN,
-                    "Khong the tao Exit QR cho session cua nguoi khac");
+                    "Không thể tạo Exit QR cho session của người khác");
         }
         if (session.getVehicle() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Session chua co thong tin xe");
+                    "Session chưa có thông tin xe");
         }
 
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
@@ -653,7 +653,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         if (vehicleTypeId != null) {
             return vehicleTypeRepository.findById(vehicleTypeId)
                     .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                            "Khong tim thay loai xe ID: " + vehicleTypeId));
+                            "Không tìm thấy loại xe ID: " + vehicleTypeId));
         }
 
         return vehicleTypeRepository.findByIsActiveTrue().stream()
@@ -661,7 +661,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .findFirst()
                 .or(() -> vehicleTypeRepository.findByIsActiveTrue().stream().findFirst())
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
-                        "Chua co loai xe active de tao walk-in"));
+                        "Chưa có loại xe active để tạo walk-in"));
     }
 
     private Long resolveWalkInOwnerUserId(Long staffUserId) {
@@ -673,7 +673,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .findFirst()
                 .map(user -> user.getUserId().longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
-                        "Khong tim thay user de tao walk-in"));
+                        "Không tìm thấy user để tạo walk-in"));
     }
 
     private Long claimLong(Claims claims, String key) {
@@ -694,23 +694,23 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             String msg = compactError.getMessage();
             if (msg != null && msg.toLowerCase().contains("expired")) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Exit QR da het han. Yeu cau driver tao lai Exit QR moi tu Current Session.");
+                        "Exit QR đã hết hạn. Yêu cầu driver tạo lại Exit QR mới từ Current Session.");
             }
             try {
                 Claims claims = qrTokenUtil.parseQrToken(qrToken);
                 if (!"QR_SESSION_EXIT".equals(claims.getSubject()) || !"EXIT".equals(claims.get("purpose", String.class))) {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "QR nay khong phai Exit QR");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "QR này không phải Exit QR");
                 }
                 Long sessionId = claimLong(claims, "session_id");
                 if (sessionId == null) {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thieu session_id");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thiếu session_id");
                 }
                 return sessionId;
             } catch (AppException ae) {
                 throw ae;
             } catch (JwtException | IllegalArgumentException jwtError) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Exit QR khong hop le. Kiem tra lai token hoac yeu cau driver tao moi.");
+                        "Exit QR không hợp lệ. Kiểm tra lại token hoặc yêu cầu driver tạo mới.");
             }
         }
     }
@@ -746,10 +746,10 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             return null;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Khong tim thay staff hien tai"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
             throw new AppException(HttpStatus.FORBIDDEN,
-                    "Staff chua duoc gan toa nha, khong the xem danh sach session");
+                    "Staff chưa được gán toà nhà, không thể xem danh sách session");
         }
         return currentUser.getAssignedBuilding().getId();
     }

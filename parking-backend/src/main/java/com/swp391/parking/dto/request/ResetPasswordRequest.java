@@ -7,16 +7,16 @@ import lombok.Data;
 @Data
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "Email khong duoc de trong")
+    @NotBlank(message = "Email không được để trống")
     private String email;
 
-    @NotBlank(message = "Ma OTP khong duoc de trong")
+    @NotBlank(message = "Mã OTP không được để trống")
     private String otp;
 
-    @NotBlank(message = "Mat khau moi khong duoc de trong")
-    @Size(min = 6, message = "Mat khau phai co it nhat 6 ky tu")
+    @NotBlank(message = "Mật khẩu mới không được để trống")
+    @Size(min = 6, message = "Mật khẩu phải có ít nhất 6 ký tự")
     private String newPassword;
 
-    @NotBlank(message = "Xac nhan mat khau khong duoc de trong")
+    @NotBlank(message = "Xác nhận mật khẩu không được để trống")
     private String confirmPassword;
 }

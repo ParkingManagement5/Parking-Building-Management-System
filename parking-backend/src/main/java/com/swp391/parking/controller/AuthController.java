@@ -30,7 +30,7 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
         return ResponseEntity.ok(ApiResponse.success(
-                "Dang ky thanh cong. Vui long kiem tra email de lay ma OTP",
+                "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP",
                 response));
     }
 
@@ -38,14 +38,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> verifyEmail(
             @Valid @RequestBody VerifyEmailRequest request) {
         AuthResponse response = authService.verifyEmail(request);
-        return ResponseEntity.ok(ApiResponse.success("Xac thuc email thanh cong", response));
+        return ResponseEntity.ok(ApiResponse.success("Xác thực email thành công", response));
     }
 
     @PostMapping("/resend-verification")
     public ResponseEntity<ApiResponse<Void>> resendVerification(
             @Valid @RequestBody ResendVerificationRequest request) {
         authService.resendVerification(request);
-        return ResponseEntity.ok(ApiResponse.success("Da gui lai ma OTP", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi lại mã OTP", null));
     }
 
     @PostMapping("/forgot-password")
@@ -53,7 +53,7 @@ public class AuthController {
             @Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
         return ResponseEntity.ok(ApiResponse.success(
-                "Da gui ma OTP dat lai mat khau qua email", null));
+                "Đã gửi mã OTP đặt lại mật khẩu qua email", null));
     }
 
     @PostMapping("/reset-password")
@@ -61,20 +61,20 @@ public class AuthController {
             @Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok(ApiResponse.success(
-                "Dat lai mat khau thanh cong", null));
+                "Đặt lại mật khẩu thành công", null));
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success("Dang nhap thanh cong", response));
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập thành công", response));
     }
 
     @PostMapping("/google")
     public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(
             @Valid @RequestBody GoogleLoginRequest request) {
         AuthResponse response = authService.googleLogin(request);
-        return ResponseEntity.ok(ApiResponse.success("Dang nhap Google thanh cong", response));
+        return ResponseEntity.ok(ApiResponse.success("Đăng nhập Google thành công", response));
     }
 }

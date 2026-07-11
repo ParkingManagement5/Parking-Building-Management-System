@@ -49,7 +49,7 @@ public class ZoneController {
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Zone>> create(@Valid @RequestBody ZoneRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Tao zone thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Tạo zone thành công",
             zoneService.create(req)));
     }
 
@@ -58,7 +58,7 @@ public class ZoneController {
     public ResponseEntity<ApiResponse<Zone>> update(
             @PathVariable Long id,
             @Valid @RequestBody ZoneRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Cap nhat zone thanh cong",
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật zone thành công",
             zoneService.update(id, req)));
     }
 
@@ -66,7 +66,7 @@ public class ZoneController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         zoneService.deactivate(id);
-        return ResponseEntity.ok(ApiResponse.success("Da xoa zone khoi DB"));
+        return ResponseEntity.ok(ApiResponse.success("Đã xoá zone khỏi DB"));
     }
 
     private boolean isAuthenticated(Authentication authentication) {
