@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Car, CreditCard, Clock, RefreshCw, Search } from "lucide-react";
 import { floorApi } from "../../api/manager/floorApi";
 import { zoneApi } from "../../api/manager/zoneApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
-import { buildingApi } from "../../api/manager/buildingApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
@@ -12,7 +11,7 @@ import { getAssignedBuildingId, getAssignedBuildingName } from "../../utils/auth
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import {
   StaffEmptyState, StaffInput, StaffPageSection,
-  StaffSecondaryButton, StaffStatusBadge,
+  StaffSecondaryButton,
 } from "./StaffUi";
 
 const SLOT_COLORS = {
@@ -24,10 +23,10 @@ const SLOT_COLORS = {
 
 export default function MapPage() {
   const navigate = useNavigate();
+  // buildingId là cố định — luôn lấy từ assignedBuilding trong token
+  // Staff không được phép xem bản đồ của bãi khác
   const assignedId = getAssignedBuildingId();
   const assignedLabel = getAssignedBuildingName();
-  const [buildingId, setBuildingId] = useState(assignedId || "");
-  const [buildings, setBuildings] = useState([]);
 
   const [floors, setFloors] = useState([]);
   const [selectedFloor, setSelectedFloor] = useState(null);
@@ -49,14 +48,16 @@ export default function MapPage() {
     return () => clearInterval(refreshInterval.current);
   }, []);
 
-  useEffect(() => { if (buildingId) loadFloors(); }, [buildingId]);
   useEffect(() => { if (selectedFloor) loadZonesSlots(selectedFloor); }, [selectedFloor]);
 
   async function loadInitial() {
+    // Guard: staff chưa được gán bãi → không load gì cả
+    if (!assignedId) {
+      setLoadError("Bạn chưa được gán bãi xe. Liên hệ Manager để được phân công.");
+      return;
+    }
     try {
-      const [bRes, pRes] = await Promise.all([buildingApi.getAll(), pricingPolicyApi.getAll()]);
-      const bs = unwrapApiData(bRes.data, []);
-      setBuildings(bs);
+      const pRes = await pricingPolicyApi.getAll();
       setPolicies(unwrapApiData(pRes.data, []));
       setLoadError("");
       if (assignedId) setBuildingId(assignedId);
@@ -65,7 +66,7 @@ export default function MapPage() {
     } catch (err) {
       setLoadError(err.response?.data?.message || "Không tải được dữ liệu toà nhà hoặc bảng giá.");
     }
-    await loadSessions();
+    await Promise.all([loadFloors(), loadSessions()]);
   }
 
   async function loadSessions() {
@@ -83,9 +84,10 @@ export default function MapPage() {
   }
 
   async function loadFloors() {
+    if (!assignedId) return;
     setLoading(true);
     try {
-      const res = await floorApi.getByBuilding(buildingId);
+      const res = await floorApi.getByBuilding(assignedId);
       const items = unwrapApiData(res.data, []);
       setFloors(items);
       if (items[0]) setSelectedFloor(items[0].floorId || items[0].id);
@@ -117,6 +119,7 @@ export default function MapPage() {
   }
 
   function refresh() {
+    if (!assignedId) return;
     loadSessions();
     if (selectedFloor) loadZonesSlots(selectedFloor);
   }
@@ -138,6 +141,16 @@ export default function MapPage() {
   const filteredActive = searchQuery.trim()
     ? activeSessions.filter((s) => String(s.licensePlate || "").toLowerCase().includes(searchQuery.toLowerCase()) || String(s.sessionId || "").includes(searchQuery))
     : activeSessions;
+
+  // Nếu chưa được gán bãi → hiện thông báo, không render gì thêm
+  if (!assignedId) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-6 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+        <p className="font-semibold mb-1">Chưa được gán bãi xe</p>
+        <p>Tài khoản của bạn chưa được Manager phân công vào bãi nào. Liên hệ Manager để được cấp quyền truy cập.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

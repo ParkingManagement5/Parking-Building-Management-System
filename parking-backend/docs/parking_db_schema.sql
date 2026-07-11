@@ -167,7 +167,7 @@ CREATE TABLE `parking_session` (
     `exit_gate_id` int,
     `entry_time` datetime,
     `exit_time` datetime,
-    `entry_mode` varchar(20) NOT NULL,
+    `entry_mode` varchar(30) NOT NULL,
     `status` varchar(30) NOT NULL,
     `created_at` datetime,
     `updated_at` datetime
