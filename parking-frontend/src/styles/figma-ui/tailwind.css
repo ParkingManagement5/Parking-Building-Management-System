@@ -2,3 +2,11 @@
 @import "tw-animate-css";
 
 @source "../../**/*.{js,jsx,ts,tsx}";
+
+/* Tailwind v4 mac dinh `dark:` theo prefers-color-scheme (OS), KHONG theo
+   class .dark ma app tu toggle (xem src/utils/theme.js). Khi OS o che do
+   dark nhung nguoi dung chon "light" trong app, cac tien to dark:text-*,
+   dark:bg-*... van bi ap dung theo OS — chu/mau nhat mau bi lem tren nen
+   sang ("chu mo nhat trong mode light"). Custom variant nay buoc dark:
+   chi kich hoat khi co class .dark tren <html>, dung khop voi toggle cua app. */
+@custom-variant dark (&:where(.dark, .dark *));

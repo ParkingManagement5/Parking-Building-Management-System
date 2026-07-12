@@ -3,13 +3,18 @@ package com.swp391.parking.controller;
 import com.swp391.parking.dto.request.CreatePricingPolicyRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PricingPolicyResponse;
+import com.swp391.parking.entity.User;
+import com.swp391.parking.exception.AppException;
+import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.PricingPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,27 +26,33 @@ import java.util.List;
 public class PricingPolicyController {
 
     private final PricingPolicyService pricingPolicyService;
+    private final UserRepository userRepository;
 
     @PostMapping
     @Operation(summary = "Create pricing policy")
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> create(
-            @Valid @RequestBody CreatePricingPolicyRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Policy created", pricingPolicyService.createPolicy(request)));
+            @Valid @RequestBody CreatePricingPolicyRequest request, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success("Policy created",
+                pricingPolicyService.createPolicy(request, resolveScopeBuildingId(authentication))));
     }
 
     @GetMapping
     @Operation(summary = "Get all pricing policies")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
-    public ResponseEntity<ApiResponse<List<PricingPolicyResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getAllPolicies()));
+    public ResponseEntity<ApiResponse<List<PricingPolicyResponse>>> getAll(Authentication authentication) {
+        // DRIVER/STAFF không có khái niệm "toà nhà đang quản lý" -> xem như Admin
+        // (không lọc) để vẫn thấy được giá áp dụng khi tra cứu/thanh toán.
+        Long scope = isManager(authentication) ? resolveScopeBuildingId(authentication) : null;
+        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getAllPolicies(scope)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get pricing policy by ID")
     @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
-    public ResponseEntity<ApiResponse<PricingPolicyResponse>> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getPolicy(id)));
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> getOne(@PathVariable Long id, Authentication authentication) {
+        Long scope = isManager(authentication) ? resolveScopeBuildingId(authentication) : null;
+        return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getPolicy(id, scope)));
     }
 
     @PutMapping("/{id}")
@@ -49,22 +60,42 @@ public class PricingPolicyController {
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> update(
             @PathVariable Long id,
-            @Valid @RequestBody CreatePricingPolicyRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Policy updated", pricingPolicyService.updatePolicy(id, request)));
+            @Valid @RequestBody CreatePricingPolicyRequest request, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success("Policy updated",
+                pricingPolicyService.updatePolicy(id, request, resolveScopeBuildingId(authentication))));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Deactivate pricing policy (soft-delete, preserves history for fee recalculation)")
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
-        pricingPolicyService.deletePolicy(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, Authentication authentication) {
+        pricingPolicyService.deletePolicy(id, resolveScopeBuildingId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Đã tắt bảng giá", null));
     }
 
     @PatchMapping("/{id}/activate")
     @Operation(summary = "Activate pricing policy")
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
-    public ResponseEntity<ApiResponse<PricingPolicyResponse>> activate(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Policy activated", pricingPolicyService.activatePolicy(id)));
+    public ResponseEntity<ApiResponse<PricingPolicyResponse>> activate(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success("Policy activated",
+                pricingPolicyService.activatePolicy(id, resolveScopeBuildingId(authentication))));
+    }
+
+    private boolean isManager(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+    /** null = ADMIN (không giới hạn). MANAGER luôn trả về buildingId của họ, hoặc lỗi nếu chưa được gán. */
+    private Long resolveScopeBuildingId(Authentication authentication) {
+        if (!isManager(authentication)) {
+            return null;
+        }
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
+        if (user.getAssignedBuilding() == null) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Manager chưa được gán toà nhà, không thể quản lý bảng giá");
+        }
+        return user.getAssignedBuilding().getId();
     }
 }

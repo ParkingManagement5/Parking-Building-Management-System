@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 public class PricingPolicyResponse {
     private Long policyId;
     private Long vehicleTypeId;
+    private Long buildingId;
+    private String buildingName;
     private String dayType;
     private String timeType;
     private Integer startHour;

@@ -102,6 +102,7 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         JOIN floor            f ON z.floor_id   = f.floor_id
         JOIN parking_building b ON f.building_id = b.building_id
         WHERE ps.is_active = true
+          AND b.is_active = true
           AND (:buildingId IS NULL OR b.building_id = :buildingId)
         GROUP BY b.building_id, b.name, f.floor_id, f.floor_number, f.floor_name
         ORDER BY b.building_id, f.floor_number
@@ -121,6 +122,7 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         JOIN floor            f ON z.floor_id    = f.floor_id
         JOIN parking_building b ON f.building_id = b.building_id
         WHERE ps.is_active = true
+          AND b.is_active = true
         GROUP BY b.building_id
         """, nativeQuery = true)
     List<Object[]> getBuildingOccupancy();
@@ -133,6 +135,7 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         JOIN FETCH z.floor f
         JOIN FETCH f.building b
         JOIN FETCH z.vehicleType
+        WHERE b.isActive = true
         """)
     List<ParkingSlot> findAllWithDetails();
 
@@ -146,6 +149,7 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         JOIN zone z ON ps.zone_id = z.zone_id
         JOIN floor f ON z.floor_id = f.floor_id
         JOIN parking_building b ON f.building_id = b.building_id
+        WHERE b.is_active = true
         """, nativeQuery = true)
     PublicSlotStatsProjection getPublicStats();
 

@@ -4,6 +4,7 @@ import com.swp391.parking.dto.request.SlotRequest;
 import com.swp391.parking.dto.response.ApiResponse;
 import com.swp391.parking.dto.response.PublicSlotStatsResponse;
 import com.swp391.parking.entity.ParkingSlot;
+import com.swp391.parking.entity.User;
 import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.UserRepository;
 import com.swp391.parking.service.ParkingSlotService;
@@ -28,8 +29,8 @@ public class ParkingSlotController {
 
     @GetMapping("/all")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(slotService.getAll()));
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll(Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(slotService.getAll(resolveScopeBuildingId(authentication))));
     }
 
     @GetMapping("/search")
@@ -63,36 +64,37 @@ public class ParkingSlotController {
     @GetMapping("/zone/{zoneId}")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> getByZone(@PathVariable Long zoneId, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(
-                slotService.getByZone(zoneId, resolveUserId(authentication), isStaff(authentication))));
+                slotService.getByZone(zoneId, resolveUserId(authentication), isBuildingScoped(authentication))));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingSlot>> getById(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success(
-                slotService.getById(id, resolveUserId(authentication), isStaff(authentication))));
+                slotService.getById(id, resolveUserId(authentication), isBuildingScoped(authentication))));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<ParkingSlot>> create(@Valid @RequestBody SlotRequest req) {
+    public ResponseEntity<ApiResponse<ParkingSlot>> create(@Valid @RequestBody SlotRequest req, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success("Tạo slot thành công",
-            slotService.create(req)));
+            slotService.create(req, resolveScopeBuildingId(authentication))));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<ApiResponse<ParkingSlot>> update(
             @PathVariable Long id,
-            @Valid @RequestBody SlotRequest req) {
+            @Valid @RequestBody SlotRequest req,
+            Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật slot thành công",
-            slotService.update(id, req)));
+            slotService.update(id, req, resolveScopeBuildingId(authentication))));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
-        slotService.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, Authentication authentication) {
+        slotService.delete(id, resolveScopeBuildingId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Đã xoá slot khỏi DB"));
     }
 
@@ -102,10 +104,27 @@ public class ParkingSlotController {
                 && authentication.isAuthenticated();
     }
 
-    private boolean isStaff(Authentication authentication) {
+    private boolean isBuildingScoped(Authentication authentication) {
         if (!isAuthenticated(authentication)) return false;
         return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));
+                .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF") || a.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+    private boolean isManager(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+    private Long resolveScopeBuildingId(Authentication authentication) {
+        if (!isManager(authentication)) {
+            return null;
+        }
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
+        if (user.getAssignedBuilding() == null) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Manager chưa được gán toà nhà");
+        }
+        return user.getAssignedBuilding().getId();
     }
 
     private Long resolveUserId(Authentication authentication) {

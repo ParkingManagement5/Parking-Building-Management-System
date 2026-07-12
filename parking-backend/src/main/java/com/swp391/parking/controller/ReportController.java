@@ -5,11 +5,16 @@ import com.swp391.parking.dto.response.RevenueReportResponse;
 import com.swp391.parking.dto.response.TimeSeriesReportResponse;
 import com.swp391.parking.entity.ParkingSession;
 import com.swp391.parking.entity.Payment;
+import com.swp391.parking.exception.AppException;
 import com.swp391.parking.repository.ParkingSessionRepository;
 import com.swp391.parking.repository.PaymentRepository;
+import com.swp391.parking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,21 +47,42 @@ public class ReportController {
 
     private final ParkingSessionRepository sessionRepository;
     private final PaymentRepository paymentRepository;
+    private final UserRepository userRepository;
+
+    /**
+     * MANAGER chỉ xem được toà nhà mình quản lý; ADMIN xem tất cả (null = không lọc).
+     * MANAGER chưa được gán toà nhà -> trả về null-nhưng-rỗng ở nơi gọi (không rơi
+     * về "thấy tất cả" để tránh lặp lại lỗi rò rỉ dữ liệu giữa các Manager).
+     */
+    private Long resolveManagerBuildingId(UserDetails ud) {
+        boolean isManager = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (!isManager) {
+            return null; // ADMIN
+        }
+        var user = userRepository.findByUsername(ud.getUsername())
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+        return user.getAssignedBuilding() != null ? user.getAssignedBuilding().getId() : -1L;
+    }
 
     @GetMapping("/revenue")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<RevenueReportResponse>> getRevenueReport(
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
+            @RequestParam(required = false) String to,
+            @AuthenticationPrincipal UserDetails ud) {
 
         LocalDateTime fromDt = from != null && !from.isBlank() ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt = to != null && !to.isBlank() ? LocalDate.parse(to).atTime(23, 59, 59) : null;
+        Long scopeBuildingId = resolveManagerBuildingId(ud);
 
         List<ParkingSession> sessions = sessionRepository.findAllWithBuildingOrderByCreatedAtDesc().stream()
                 .filter(s -> s.getEntryTime() != null)
                 .filter(s -> fromDt == null || !s.getEntryTime().isBefore(fromDt))
                 .filter(s -> toDt == null || !s.getEntryTime().isAfter(toDt))
+                .filter(s -> scopeBuildingId == null
+                        || scopeBuildingId.equals(s.getSlot().getZone().getFloor().getBuilding().getId()))
                 .toList();
 
         Map<Long, ParkingSession> sessionById = new LinkedHashMap<>();
@@ -165,16 +191,20 @@ public class ReportController {
     public ResponseEntity<ApiResponse<TimeSeriesReportResponse>> getTimeSeries(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(defaultValue = "DAY") String groupBy) {
+            @RequestParam(defaultValue = "DAY") String groupBy,
+            @AuthenticationPrincipal UserDetails ud) {
 
         LocalDateTime fromDt = from != null && !from.isBlank() ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt   = to   != null && !to.isBlank()   ? LocalDate.parse(to).atTime(23, 59, 59) : null;
+        Long scopeBuildingId = resolveManagerBuildingId(ud);
 
         // 1. Load sessions trong khoảng thời gian
         List<ParkingSession> sessions = sessionRepository.findAllWithBuildingOrderByCreatedAtDesc().stream()
                 .filter(s -> s.getEntryTime() != null)
                 .filter(s -> fromDt == null || !s.getEntryTime().isBefore(fromDt))
                 .filter(s -> toDt   == null || !s.getEntryTime().isAfter(toDt))
+                .filter(s -> scopeBuildingId == null
+                        || scopeBuildingId.equals(s.getSlot().getZone().getFloor().getBuilding().getId()))
                 .toList();
 
         Map<Long, ParkingSession> sessionById = new LinkedHashMap<>();

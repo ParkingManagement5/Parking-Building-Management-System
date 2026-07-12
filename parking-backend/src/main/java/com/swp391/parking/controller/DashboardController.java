@@ -48,8 +48,24 @@ public class DashboardController {
     @GetMapping("/manager")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Transactional(readOnly = true)
-    public ResponseEntity<ApiResponse<ManagerDashboardResponse>> getManagerDashboard() {
-        List<ParkingSlot> slots = slotRepository.findAll();
+    public ResponseEntity<ApiResponse<ManagerDashboardResponse>> getManagerDashboard(
+            @AuthenticationPrincipal UserDetails ud) {
+
+        // MANAGER → chỉ thấy toà nhà mình quản lý; ADMIN → tất cả (null = không lọc)
+        Long callerScopeBuildingId = null;
+        boolean isManagerCaller = ud.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (isManagerCaller) {
+            var caller = userRepository.findByUsername(ud.getUsername())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            callerScopeBuildingId = caller.getAssignedBuilding() != null ? caller.getAssignedBuilding().getId() : -1L;
+        }
+        final Long scopedBuildingId = callerScopeBuildingId;
+
+        List<ParkingSlot> slots = slotRepository.findAll().stream()
+                .filter(s -> scopedBuildingId == null
+                        || scopedBuildingId.equals(s.getZone().getFloor().getBuilding().getId()))
+                .toList();
 
         int totalSlots = slots.size();
         int availableSlots = (int) slots.stream()
@@ -105,10 +121,20 @@ public class DashboardController {
                 vehicleTypeMix.add(ManagerDashboardResponse.VehicleTypeStat.builder()
                         .name(name).zoneCount(count).build()));
 
-        int activePricingCount = pricingPolicyRepository.findByIsActiveTrue().size();
-        int staffShiftCount = (int) staffShiftRepository.count();
+        int activePricingCount = (int) pricingPolicyRepository.findByIsActiveTrue().stream()
+                .filter(p -> scopedBuildingId == null
+                        || p.getBuilding() == null // giá global luôn hiển thị
+                        || scopedBuildingId.equals(p.getBuilding().getId()))
+                .count();
+        int staffShiftCount = (int) staffShiftRepository.findAll().stream()
+                .filter(ss -> scopedBuildingId == null
+                        || (ss.getUser().getAssignedBuilding() != null
+                                && scopedBuildingId.equals(ss.getUser().getAssignedBuilding().getId())))
+                .count();
         int activeGateCount = (int) gateRepository.findAll().stream()
                 .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
+                .filter(g -> scopedBuildingId == null
+                        || (g.getBuilding() != null && scopedBuildingId.equals(g.getBuilding().getId())))
                 .count();
 
         ManagerDashboardResponse response = ManagerDashboardResponse.builder()

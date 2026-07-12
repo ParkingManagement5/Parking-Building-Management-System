@@ -19,6 +19,11 @@ public class PricingPolicy extends BaseEntity {
     @JoinColumn(name = "vehicle_type_id")
     private VehicleType vehicleType;
 
+    /** NULL = giá mặc định áp dụng toàn hệ thống (global). Có giá trị = giá riêng cho 1 toà nhà. */
+    @ManyToOne
+    @JoinColumn(name = "building_id")
+    private ParkingBuilding building;
+
     @Column(name = "time_type", nullable = false, length = 20)
     private String timeType;
 

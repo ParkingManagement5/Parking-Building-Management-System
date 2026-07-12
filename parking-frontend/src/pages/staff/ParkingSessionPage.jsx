@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3 } from "lucide-react";
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
@@ -82,9 +81,15 @@ export default function ParkingSessionPage() {
   const paged = useMemo(() => filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredSessions, page]);
   const totalPages = Math.max(1, Math.ceil(filteredSessions.length / PAGE_SIZE));
 
+  const activeCount = useMemo(() => sessions.filter((item) => item.status === "ACTIVE").length, [sessions]);
+  const completedCount = useMemo(() => sessions.filter((item) => item.status === "COMPLETED").length, [sessions]);
+
   return (
     <div className="space-y-5">
-      <StaffPageSection title="Parking Sessions" subtitle="Track backend active, waiting-payment, and completed sessions">
+      <StaffPageSection
+        title="Parking Sessions"
+        subtitle={`${activeCount} active · ${completedCount} completed · ${sessions.length} total`}
+      >
         <StaffInput
           value={keyword}
           onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
@@ -165,20 +170,6 @@ export default function ParkingSessionPage() {
           </div>
         )}
       </StaffPageSection>
-
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-            <Clock3 size={18} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Session Summary</p>
-            <p className="text-xs text-muted-foreground">
-              {sessions.filter((item) => item.status === "ACTIVE").length} active - {sessions.filter((item) => item.status === "COMPLETED").length} completed
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

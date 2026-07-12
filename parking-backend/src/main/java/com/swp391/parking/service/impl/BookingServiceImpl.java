@@ -177,7 +177,7 @@ public class BookingServiceImpl implements BookingService {
             deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
         } else if ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType)) {
             // Prepay tron goi: driver tra toan bo phi flat-rate truoc khi nhan QR
-            deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime);
+            deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime, buildingIdOf(slot));
         } else {
             deposit = BigDecimal.ZERO; // DAILY: mien coc, tra luc ra
         }
@@ -462,12 +462,20 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private BigDecimal calculatePrepayFlatRate(Vehicle vehicle, String bookingType,
-                                               LocalDateTime startTime, LocalDateTime endTime) {
+                                               LocalDateTime startTime, LocalDateTime endTime, Long buildingId) {
         if (vehicle.getVehicleType() == null) return BigDecimal.ZERO;
         List<PricingPolicy> active = pricingPolicyRepository
-                .findByVehicleType_IdAndIsActiveTrue(vehicle.getVehicleType().getId());
+                .resolveActiveForBuilding(vehicle.getVehicleType().getId(), buildingId);
         BigDecimal fallback = feeCalculatorUtil.resolveHourlyRate(active, startTime);
         return feeCalculatorUtil.calculateSessionFee(startTime, endTime, active, fallback, bookingType, endTime);
+    }
+
+    private Long buildingIdOf(ParkingSlot slot) {
+        if (slot == null || slot.getZone() == null || slot.getZone().getFloor() == null
+                || slot.getZone().getFloor().getBuilding() == null) {
+            return null;
+        }
+        return slot.getZone().getFloor().getBuilding().getId();
     }
 
     private boolean isWithinCancelRefundWindow(LocalDateTime depositPaidAt, long cancelWindowMinutes) {

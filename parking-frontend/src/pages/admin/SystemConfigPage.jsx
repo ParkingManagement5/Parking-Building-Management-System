@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
 import { systemConfigApi } from "../../api/admin/systemConfigApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
 import {
+  ManagerCell,
+  ManagerDataTable,
   ManagerEmptyState,
-  ManagerField,
-  ManagerForm,
-  ManagerInput,
   ManagerPageHeader,
-  ManagerPrimaryButton,
-  ManagerSecondaryButton,
+  ManagerPanel,
+  ManagerRow,
 } from "../../ui/components/manager/ManagerUi";
 
 const GROUP_META = {
@@ -79,12 +77,6 @@ export default function SystemConfigPage() {
   const [page, setPage] = useState(1);
   const [draftValues, setDraftValues] = useState({});
   const [saving, setSaving] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    configKey: "",
-    configValue: "",
-    description: "",
-  });
 
   useEffect(() => {
     void loadConfigs();
@@ -205,182 +197,70 @@ export default function SystemConfigPage() {
     }
   };
 
-  const handleCreateChange = (event) => {
-    setCreateForm((prev) => ({
-      ...prev,
-      [event.target.name]: event.target.value,
-    }));
-  };
+  const renderGroupHeaderRow = (groupKey, count) => (
+    <tr key={`${groupKey}-header`}>
+      <td colSpan={2} className="border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {GROUP_META[groupKey].title} <span className="font-normal normal-case text-muted-foreground/70">· {count} cấu hình</span>
+      </td>
+    </tr>
+  );
 
-  const resetCreateForm = () => {
-    setCreateForm({
-      configKey: "",
-      configValue: "",
-      description: "",
-    });
-  };
-
-  const closeAddModal = () => {
-    setShowAddModal(false);
-    resetCreateForm();
-  };
-
-  const handleCreateConfig = async (event) => {
-    event.preventDefault();
-
-    const userId = getUserId();
-    if (!userId) {
-      alert("Vui lòng đăng nhập lại để quản lý cấu hình hệ thống");
-      return;
-    }
-
-    if (!createForm.configKey.trim()) {
-      alert("Khóa cấu hình là bắt buộc");
-      return;
-    }
-
-    try {
-      await systemConfigApi.create(
-        {
-          configKey: createForm.configKey.trim(),
-          configValue: createForm.configValue,
-          description: createForm.description,
-        },
-        userId
-      );
-      await loadConfigs();
-      closeAddModal();
-    } catch (error) {
-      console.error("Failed to create system config", error);
-      alert("Tạo cấu hình hệ thống thất bại");
-    }
-  };
-
-  const addConfigModal = showAddModal ? (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Thêm cấu hình</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Tạo một bản ghi cấu hình hệ thống mới.</p>
-          </div>
-          <button type="button" onClick={closeAddModal} className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted">
-            <X size={18} />
-          </button>
-        </div>
-        <ManagerForm onSubmit={handleCreateConfig}>
-          <ManagerField label="Khóa cấu hình">
-            <ManagerInput name="configKey" value={createForm.configKey} onChange={handleCreateChange} placeholder="QR_EXPIRE_MINUTES" />
-          </ManagerField>
-          <ManagerField label="Giá trị">
-            <ManagerInput name="configValue" value={createForm.configValue} onChange={handleCreateChange} placeholder="30" />
-          </ManagerField>
-          <ManagerField label="Mô tả">
-            <ManagerInput name="description" value={createForm.description} onChange={handleCreateChange} placeholder="Mô tả ngắn gọn" />
-          </ManagerField>
-          <div className="flex gap-3">
-            <ManagerPrimaryButton type="submit" className="flex-1">Tạo cấu hình</ManagerPrimaryButton>
-            <ManagerSecondaryButton type="button" className="flex-1" onClick={closeAddModal}>Hủy</ManagerSecondaryButton>
-          </div>
-        </ManagerForm>
-      </div>
-    </div>
-  ) : null;
-
-  const renderCard = (groupKey, items) => {
-    if (!items.length) {
-      return null;
-    }
+  const renderConfigRow = (item) => {
+    const fieldType = detectFieldType(item.configKey, item.configValue);
+    const currentValue = draftValues[item.configId] ?? "";
+    const hasChanged = String(currentValue ?? "") !== String(item.configValue ?? "");
 
     return (
-      <div
-        key={groupKey}
-        className={`rounded-3xl border border-border bg-card p-6 ${
-          groupKey === "OTHER" ? "xl:col-span-2" : ""
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">{GROUP_META[groupKey].title}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">{items.length} cấu hình</p>
-          </div>
-        </div>
-        <div className="mt-4 space-y-3">
-          {items.map((item) => {
-            const fieldType = detectFieldType(item.configKey, item.configValue);
-            const currentValue = draftValues[item.configId] ?? "";
-            const hasChanged = String(currentValue ?? "") !== String(item.configValue ?? "");
+      <ManagerRow key={item.configId}>
+        <ManagerCell className={hasChanged ? "bg-primary/5" : ""}>
+          <p className="font-medium text-foreground">
+            {item.description?.trim() || prettifyKey(item.configKey)}
+          </p>
+          <p className="mt-0.5 font-mono text-[11px] tracking-wide text-muted-foreground">
+            {item.configKey}
+          </p>
+        </ManagerCell>
+        <ManagerCell className={hasChanged ? "bg-primary/5" : ""}>
+          <div className="flex items-center justify-end gap-3">
+            {hasChanged ? (
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                Đã sửa
+              </span>
+            ) : null}
 
-            return (
-              <div
-                key={item.configId}
-                className={`rounded-2xl border px-4 py-3 transition-colors ${
-                  hasChanged ? "border-primary/40 bg-primary/5" : "border-border bg-muted/20"
+            {fieldType === "toggle" ? (
+              <button
+                type="button"
+                onClick={() => handleToggleChange(item, !normalizeToggleValue(currentValue))}
+                className={`relative inline-flex h-7 w-11 shrink-0 rounded-full transition-colors ${
+                  normalizeToggleValue(currentValue) ? "bg-primary" : "bg-muted"
                 }`}
               >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-6 text-foreground">
-                      {item.description?.trim() || prettifyKey(item.configKey)}
-                    </p>
-                    <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      {item.configKey}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3 self-start lg:self-center">
-                    {hasChanged ? (
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                        Đã sửa
-                      </span>
-                    ) : null}
-
-                    {fieldType === "toggle" ? (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleChange(item, !normalizeToggleValue(currentValue))}
-                        className={`relative inline-flex h-8 w-11 shrink-0 rounded-full transition-colors ${
-                          normalizeToggleValue(currentValue) ? "bg-primary" : "bg-muted"
-                        }`}
-                      >
-                        <span
-                          className={`m-0.5 inline-block size-7 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
-                            normalizeToggleValue(currentValue) ? "translate-x-3" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    ) : (
-                      <input
-                        value={currentValue}
-                        onChange={(event) => handleInputChange(item.configId, event.target.value)}
-                        className="h-11 w-24 shrink-0 rounded-2xl border border-border bg-muted px-4 text-right text-sm font-semibold text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                <span
+                  className={`m-0.5 inline-block size-6 rounded-full bg-white shadow transition-transform dark:bg-slate-100 ${
+                    normalizeToggleValue(currentValue) ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            ) : (
+              <input
+                value={currentValue}
+                onChange={(event) => handleInputChange(item.configId, event.target.value)}
+                className="h-9 w-20 shrink-0 rounded-xl border border-border bg-muted px-3 text-right text-sm font-semibold text-foreground outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/10"
+              />
+            )}
+          </div>
+        </ManagerCell>
+      </ManagerRow>
     );
   };
 
   if (!configs.length) {
     return (
-      <div className="space-y-4">
-        <ManagerEmptyState
-          title="Chưa có cấu hình hệ thống nào"
-          description="Hệ thống chưa trả về bản ghi cấu hình nào."
-        />
-        <div className="flex justify-end">
-          <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center gap-2">
-            <Plus size={14} />
-            Thêm cấu hình
-          </ManagerPrimaryButton>
-        </div>
-        {addConfigModal}
-      </div>
+      <ManagerEmptyState
+        title="Chưa có cấu hình hệ thống nào"
+        description="Hệ thống chưa trả về bản ghi cấu hình nào."
+      />
     );
   }
 
@@ -397,39 +277,34 @@ export default function SystemConfigPage() {
             <span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary">
               {summary.changed} thay đổi
             </span>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="rounded-2xl border border-border bg-card px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Đặt lại
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveChanges}
+              disabled={!hasChanges || saving}
+              className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
           </div>
         }
       />
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <ManagerPrimaryButton type="button" onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2">
-            <Plus size={14} />
-            Thêm cấu hình
-          </ManagerPrimaryButton>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-2xl border border-border px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            Đặt lại
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={handleSaveChanges}
-          disabled={!hasChanges || saving}
-          className="rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? "Đang lưu..." : "Lưu thay đổi"}
-        </button>
-      </div>
-
-      <div className="grid auto-rows-fr gap-5 xl:grid-cols-2" style={{ minHeight: totalPages > 1 ? 420 : undefined }}>
-        {["OCR", "BOOKING", "NOTIFICATION", "SECURITY", "OTHER"]
-          .map((groupKey) => renderCard(groupKey, groupedConfigs[groupKey]))
-          .filter(Boolean)}
-      </div>
+      <ManagerPanel>
+        <ManagerDataTable columns={["Cấu hình", "Giá trị"]}>
+          {["OCR", "BOOKING", "NOTIFICATION", "SECURITY", "OTHER"].flatMap((groupKey) => {
+            const items = groupedConfigs[groupKey];
+            if (!items.length) return [];
+            return [renderGroupHeaderRow(groupKey, items.length), ...items.map(renderConfigRow)];
+          })}
+        </ManagerDataTable>
+      </ManagerPanel>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
@@ -449,8 +324,6 @@ export default function SystemConfigPage() {
           </button>
         </div>
       )}
-
-      {addConfigModal}
     </div>
   );
 }

@@ -257,56 +257,6 @@ export default function LandingPage() {
       link.addEventListener("click", handleAnchorClick);
     });
 
-    // ===== Counter animation =====
-    function animateNum(el, from, to, duration, isFloat, suffix) {
-      suffix = suffix || "";
-      const start = performance.now();
-      const tick = (now) => {
-        const elapsed = now - start;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const current = from + (to - from) * eased;
-        if (to >= 10000) {
-          el.textContent = Math.floor(current).toLocaleString() + suffix;
-        } else if (isFloat) {
-          el.textContent = current.toFixed(1) + suffix;
-        } else {
-          el.textContent = Math.floor(current) + suffix;
-        }
-        if (progress < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }
-
-    const counterEls = document.querySelectorAll("[data-count], .pill-num");
-    const counterObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const el = entry.target;
-          counterObserver.unobserve(el);
-
-          const dataCount = el.dataset.count;
-          if (dataCount) {
-            const target = parseInt(dataCount);
-            animateNum(el, 0, target, 2000, false);
-            return;
-          }
-
-          const text = el.textContent;
-          const numMatch = text.match(/[\d.]+/);
-          if (numMatch) {
-            const target = parseFloat(numMatch[0]);
-            const suffix = text.replace(numMatch[0], "");
-            const isFloat = text.includes(".");
-            animateNum(el, 0, target, 1500, isFloat, suffix);
-          }
-        });
-      },
-      { threshold: 0.5 }
-    );
-    counterEls.forEach((el) => counterObserver.observe(el));
-
     // ===== Card tilt =====
     const tiltCards = document.querySelectorAll("[data-tilt]");
     const tiltMoveHandlers = [];
@@ -405,7 +355,6 @@ export default function LandingPage() {
     // ===== Cleanup =====
     return () => {
       revealObserver.disconnect();
-      counterObserver.disconnect();
 
       if (navObserver) navObserver.disconnect();
       if (navSentinel && navSentinel.parentNode) navSentinel.parentNode.removeChild(navSentinel);
@@ -425,6 +374,61 @@ export default function LandingPage() {
 
     };
   }, []);
+
+  // Counter animation for hero stats — re-runs when liveStats loads so the
+  // animation doesn't fire prematurely against 0 while the API is still in flight.
+  useEffect(() => {
+    function animateNum(el, from, to, duration, isFloat, suffix) {
+      suffix = suffix || "";
+      const start = performance.now();
+      const tick = (now) => {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = from + (to - from) * eased;
+        if (to >= 10000) {
+          el.textContent = Math.floor(current).toLocaleString() + suffix;
+        } else if (isFloat) {
+          el.textContent = current.toFixed(1) + suffix;
+        } else {
+          el.textContent = Math.floor(current) + suffix;
+        }
+        if (progress < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    const counterEls = document.querySelectorAll("[data-count], .pill-num");
+    const counterObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const el = entry.target;
+          counterObserver.unobserve(el);
+
+          const dataCount = el.dataset.count;
+          if (dataCount) {
+            const target = parseInt(dataCount);
+            animateNum(el, 0, target, 2000, false);
+            return;
+          }
+
+          const text = el.textContent;
+          const numMatch = text.match(/[\d.]+/);
+          if (numMatch) {
+            const target = parseFloat(numMatch[0]);
+            const suffix = text.replace(numMatch[0], "");
+            const isFloat = text.includes(".");
+            animateNum(el, 0, target, 1500, isFloat, suffix);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+    counterEls.forEach((el) => counterObserver.observe(el));
+
+    return () => counterObserver.disconnect();
+  }, [liveStats]);
 
   const handleLogin = useCallback(() => navigate("/login"), [navigate]);
   const handleRegister = useCallback(() => navigate("/register"), [navigate]);

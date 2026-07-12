@@ -761,18 +761,27 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Long vehicleTypeId = s.getVehicle().getVehicleType().getId();
         // Dung TAT CA phien ban gia (ke ca da bi Manager thay the) de resolve dung
         // gia da ap dung tai thoi diem entryTime, khong bi anh huong boi lan sua gia
-        // sau nay.
-        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vehicleTypeId);
+        // sau nay. Uu tien gia rieng cua toa nha, fallback ve gia global.
+        List<PricingPolicy> policies = pricingPolicyRepository.resolveForBuilding(vehicleTypeId, buildingIdOf(s));
         LocalDateTime refTime = s.getEntryTime() != null ? s.getEntryTime() : LocalDateTime.now();
         return feeCalculatorUtil.resolveHourlyRate(policies, refTime);
+    }
+
+    private Long buildingIdOf(ParkingSession s) {
+        if (s == null || s.getSlot() == null || s.getSlot().getZone() == null
+                || s.getSlot().getZone().getFloor() == null
+                || s.getSlot().getZone().getFloor().getBuilding() == null) {
+            return null;
+        }
+        return s.getSlot().getZone().getFloor().getBuilding().getId();
     }
 
     private SessionResponse toResponse(ParkingSession s) {
         BigDecimal hourlyRate = resolveHourlyRate(s);
         List<PricingPolicy> activePolicies = List.of();
         if (s.getVehicle() != null && s.getVehicle().getVehicleType() != null) {
-            activePolicies = pricingPolicyRepository.findByVehicleType_Id(
-                    s.getVehicle().getVehicleType().getId());
+            activePolicies = pricingPolicyRepository.resolveForBuilding(
+                    s.getVehicle().getVehicleType().getId(), buildingIdOf(s));
         }
         LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
         String bookingType = s.getBooking() != null ? s.getBooking().getBookingType() : null;

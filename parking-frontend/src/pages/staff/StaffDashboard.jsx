@@ -12,7 +12,7 @@ import { unwrapApiData } from "../../utils/api";
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
-import { StaffEmptyState, StaffPageSection, StaffStatCard, StaffStatusBadge } from "./StaffUi";
+import { StaffEmptyState, StaffPageSection, StaffStatBar, StaffStatusBadge } from "./StaffUi";
 
 function formatElapsed(entryTime) {
   if (!entryTime) return "--";
@@ -168,19 +168,21 @@ export default function StaffDashboard() {
       ) : null}
 
       {/* KPI nhanh */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StaffStatCard icon={LogIn} label="Xe đang trong bãi" value={activeSessions.length} hint="Phiên đang ACTIVE" tone="emerald" />
-        <StaffStatCard icon={CreditCard} label="Chờ thanh toán" value={waitingPayments.length} hint="Xe đã ra, chưa thu tiền" tone="amber" />
-        <StaffStatCard icon={CreditCard} label="Tổng tiền chờ thu" value={formatStaffCurrency(pendingAmount)} hint={`${waitingPayments.length} phiên đang chờ`} tone="violet" />
-        <StaffStatCard
-          icon={ShieldAlert}
-          label="Sự cố cần xử lý"
-          value={openExceptions.length + ocrReviews.length}
-          hint="Exception + OCR review — bấm để xử lý"
-          tone="rose"
-          onClick={() => navigate("/staff/exceptions")}
-        />
-      </div>
+      <StaffStatBar
+        items={[
+          { icon: LogIn, label: "Xe đang trong bãi", value: activeSessions.length, hint: "Phiên đang ACTIVE", tone: "emerald" },
+          { icon: CreditCard, label: "Chờ thanh toán", value: waitingPayments.length, hint: "Xe đã ra, chưa thu tiền", tone: "amber" },
+          { icon: CreditCard, label: "Tổng tiền chờ thu", value: formatStaffCurrency(pendingAmount), hint: `${waitingPayments.length} phiên đang chờ`, tone: "violet" },
+          {
+            icon: ShieldAlert,
+            label: "Sự cố cần xử lý",
+            value: openExceptions.length + ocrReviews.length,
+            hint: "Exception + OCR review — bấm để xử lý",
+            tone: "rose",
+            onClick: () => navigate("/staff/exceptions"),
+          },
+        ]}
+      />
 
       {/* Trong tam 1: xe dang trong bai (chi tiet) + bang gia xe (tra cuu nhanh) */}
       <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
@@ -331,7 +333,7 @@ export default function StaffDashboard() {
 
           <button
             type="button"
-            onClick={() => navigate("/staff/requests")}
+            onClick={() => navigate("/staff/notifications?tab=requests")}
             className="rounded-2xl bg-muted/30 p-4 text-left transition-colors hover:bg-muted"
           >
             <p className="text-xs text-muted-foreground">Yêu cầu hỗ trợ mở</p>

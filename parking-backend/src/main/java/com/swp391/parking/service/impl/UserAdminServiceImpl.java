@@ -1,6 +1,7 @@
 package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.ChangeUserRoleRequest;
+import com.swp391.parking.dto.request.CreateStaffRequest;
 import com.swp391.parking.dto.response.UserSummaryResponse;
 import com.swp391.parking.entity.ParkingBuilding;
 import com.swp391.parking.entity.Role;
@@ -13,8 +14,11 @@ import com.swp391.parking.service.ActivityLogService;
 import com.swp391.parking.service.UserAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class UserAdminServiceImpl implements UserAdminService {
     private final RoleRepository roleRepository;
     private final ParkingBuildingRepository buildingRepository;
     private final ActivityLogService activityLogService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -81,11 +86,54 @@ public class UserAdminServiceImpl implements UserAdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy user"));
 
+        if (buildingId == null) {
+            user.setAssignedBuilding(null);
+            return toResponse(userRepository.save(user));
+        }
+
         ParkingBuilding building = buildingRepository.findById(buildingId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy building"));
 
         user.setAssignedBuilding(building);
         return toResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
+    public UserSummaryResponse createStaff(CreateStaffRequest request, Long forcedBuildingId) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new AppException(HttpStatus.CONFLICT, "Username đã tồn tại");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(HttpStatus.CONFLICT, "Email đã được sử dụng");
+        }
+
+        Role staffRole = roleRepository.findByRoleName(Role.RoleName.STAFF)
+                .orElseThrow(() -> new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Role STAFF chưa được khởi tạo trong DB"));
+
+        Long buildingId = forcedBuildingId != null ? forcedBuildingId : request.getBuildingId();
+        ParkingBuilding building = null;
+        if (buildingId != null) {
+            building = buildingRepository.findById(buildingId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy building"));
+        }
+
+        // Tai khoan nhan vien noi bo do Manager/Admin tao truc tiep: active ngay,
+        // khong qua flow OTP xac minh email nhu dang ky cong khai (self-register).
+        User user = User.builder()
+                .username(request.getUsername())
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .phone(request.getPhone())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .status(User.UserStatus.ACTIVE)
+                .assignedBuilding(building)
+                .roles(Set.of(staffRole))
+                .build();
+
+        User saved = userRepository.save(user);
+        activityLogService.log(saved.getUserId(), "STAFF_CREATED", "Tạo tài khoản nhân viên: " + saved.getUsername());
+        return toResponse(saved);
     }
 
     private Role.RoleName parseRole(String role) {
