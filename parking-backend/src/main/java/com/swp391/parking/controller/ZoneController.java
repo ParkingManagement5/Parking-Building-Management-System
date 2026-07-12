@@ -31,7 +31,19 @@ public class ZoneController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<Zone>>> getAll() {
+    public ResponseEntity<ApiResponse<List<Zone>>> getAll(Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (isManager) {
+            var user = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (user.getAssignedBuilding() == null) return ResponseEntity.ok(ApiResponse.success(List.of()));
+            Long buildingId = user.getAssignedBuilding().getId();
+            return ResponseEntity.ok(ApiResponse.success(
+                    zoneRepository.findAll().stream()
+                            .filter(z -> buildingId.equals(z.getFloor().getBuilding().getId()))
+                            .toList()));
+        }
         return ResponseEntity.ok(ApiResponse.success(zoneRepository.findAll()));
     }
 

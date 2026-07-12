@@ -32,7 +32,19 @@ public class ParkingSlotController {
 
     @GetMapping("/all")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll() {
+    public ResponseEntity<ApiResponse<List<ParkingSlot>>> getAll(Authentication authentication) {
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
+        if (isManager) {
+            var user = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"));
+            if (user.getAssignedBuilding() == null) return ResponseEntity.ok(ApiResponse.success(List.of()));
+            Long buildingId = user.getAssignedBuilding().getId();
+            return ResponseEntity.ok(ApiResponse.success(
+                    slotService.getAll().stream()
+                            .filter(s -> buildingId.equals(s.getZone().getFloor().getBuilding().getId()))
+                            .toList()));
+        }
         return ResponseEntity.ok(ApiResponse.success(slotService.getAll()));
     }
 

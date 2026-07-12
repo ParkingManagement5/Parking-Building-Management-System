@@ -93,8 +93,17 @@ public class OcrController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_" + Role.RoleName.STAFF.name()));
     }
 
+    private boolean isManager(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + Role.RoleName.MANAGER.name()));
+    }
+
+    /**
+     * Trả về buildingId của user nếu họ là STAFF hoặc MANAGER (cần scope theo bãi).
+     * ADMIN → null (không giới hạn).
+     */
     private Long resolveStaffBuildingId(Authentication authentication) {
-        if (!isStaff(authentication)) {
+        if (!isStaff(authentication) && !isManager(authentication)) {
             return null;
         }
         return userRepository.findByUsername(authentication.getName())
@@ -103,12 +112,12 @@ public class OcrController {
     }
 
     private void enforceStaffBuildingScope(Long scanId, Authentication authentication) {
-        Long staffBuildingId = resolveStaffBuildingId(authentication);
-        if (staffBuildingId == null) {
+        Long buildingId = resolveStaffBuildingId(authentication);
+        if (buildingId == null) {
             return;
         }
         OcrScanResponse scan = ocrService.getScan(scanId);
-        if (scan.getBuildingId() != null && !staffBuildingId.equals(scan.getBuildingId())) {
+        if (scan.getBuildingId() != null && !buildingId.equals(scan.getBuildingId())) {
             throw new AppException(HttpStatus.NOT_FOUND, "Khong tim thay scan #" + scanId);
         }
     }
