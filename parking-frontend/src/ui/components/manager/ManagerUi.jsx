@@ -40,6 +40,38 @@ export function ManagerStatCard({ icon: Icon, label, value, hint, tone = "violet
   );
 }
 
+export function ManagerStatBar({ items }) {
+  const valueTones = {
+    violet: "text-violet-600 dark:text-violet-300",
+    blue: "text-blue-600 dark:text-blue-300",
+    emerald: "text-emerald-600 dark:text-emerald-300",
+    amber: "text-amber-600 dark:text-amber-300",
+    rose: "text-rose-600 dark:text-rose-300",
+    slate: "text-foreground",
+  };
+
+  return (
+    <div className="flex flex-wrap rounded-2xl border border-border bg-card">
+      {items.map((item, index) => {
+        return (
+          <div
+            key={item.label}
+            className={`flex-1 min-w-[140px] px-4 py-3 leading-tight ${
+              index > 0 ? "border-t border-border sm:border-t-0 sm:border-l" : ""
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="truncate text-[11px] text-muted-foreground">{item.label}</div>
+              <div className={`text-base font-bold ${valueTones[item.tone] || valueTones.slate}`}>{item.value}</div>
+              {item.hint ? <div className="truncate text-[10px] text-muted-foreground/80">{item.hint}</div> : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ManagerSplitLayout({ form, content }) {
   return <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">{form}{content}</div>;
 }
@@ -109,7 +141,7 @@ export function ManagerPrimaryButton({ children, className = "", ...props }) {
   return (
     <button
       {...props}
-      className={`rounded-2xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`whitespace-nowrap rounded-2xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {children}
     </button>
@@ -120,7 +152,7 @@ export function ManagerSecondaryButton({ children, className = "", ...props }) {
   return (
     <button
       {...props}
-      className={`rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${className}`}
+      className={`whitespace-nowrap rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${className}`}
     >
       {children}
     </button>
@@ -138,7 +170,7 @@ export function ManagerStatusBadge({ children, tone = "slate" }) {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone] || tones.slate}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone] || tones.slate}`}>
       {children}
     </span>
   );
@@ -178,8 +210,15 @@ export function ManagerDataTable({ columns, children, minRows = 0 }) {
   );
 }
 
-export function ManagerRow({ children }) {
-  return <tr className="transition-colors hover:bg-muted/30">{children}</tr>;
+export function ManagerRow({ children, onClick, active = false }) {
+  return (
+    <tr
+      onClick={onClick}
+      className={`transition-colors hover:bg-muted/30 ${onClick ? "cursor-pointer" : ""} ${active ? "bg-primary/5" : ""}`}
+    >
+      {children}
+    </tr>
+  );
 }
 
 export function ManagerCell({ children, className = "" }) {

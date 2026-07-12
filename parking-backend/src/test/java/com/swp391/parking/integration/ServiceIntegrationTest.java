@@ -103,7 +103,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         createSlot(zone, "S-A1", ParkingSlot.Status.AVAILABLE);
         createGate(building, "GA-1", Gate.GateType.ENTRY);
 
-        buildingService.deactivate(building.getId());
+        buildingService.deactivate(building.getId(), null);
 
         assertTrue(buildingRepository.findById(building.getId()).isEmpty());
         assertTrue(floorRepository.findByBuildingId(building.getId()).isEmpty());
@@ -121,7 +121,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .floorNumber(2)
             .name("Floor 2")
             .capacity(50)
-            .build());
+            .build(), null);
 
         Floor updated = floorService.update(created.getId(), FloorRequest.builder()
             .buildingId(building.getId())
@@ -129,13 +129,13 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .name("Floor 2 Updated")
             .capacity(70)
             .status(Floor.Status.MAINTENANCE)
-            .build());
+            .build(), null);
 
         VehicleType vehicleType = createVehicleType("Car-B", VehicleType.SlotSize.MEDIUM);
         Zone zone = createZone(updated, vehicleType, "B1");
         createSlot(zone, "S-B1", ParkingSlot.Status.AVAILABLE);
 
-        floorService.deactivate(updated.getId());
+        floorService.deactivate(updated.getId(), null);
 
         assertEquals("Floor 2 Updated", updated.getName());
         assertEquals(Floor.Status.MAINTENANCE, updated.getStatus());
@@ -201,7 +201,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .vehicleTypeId(vehicleType.getId())
             .name("E1")
             .description("Original")
-            .build());
+            .build(), null);
 
         Zone updated = zoneService.update(created.getId(), ZoneRequest.builder()
             .floorId(floor.getId())
@@ -209,10 +209,10 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .name("E1 Updated")
             .description("Updated")
             .status(Zone.Status.MAINTENANCE)
-            .build());
+            .build(), null);
 
         createSlot(updated, "S-E1", ParkingSlot.Status.AVAILABLE);
-        zoneService.deactivate(updated.getId());
+        zoneService.deactivate(updated.getId(), null);
 
         assertEquals("E1 Updated", updated.getName());
         assertEquals(Zone.Status.MAINTENANCE, updated.getStatus());
@@ -231,7 +231,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .zoneId(zone.getId())
             .slotCode("S-F1")
             .slotSize(ParkingSlot.SlotSize.MEDIUM)
-            .build());
+            .build(), null);
 
         assertEquals(1, parkingSlotService.getByZone(zone.getId()).size());
         assertEquals(1, parkingSlotService.getAvailableByVehicleType(vehicleType.getId()).size());
@@ -242,7 +242,7 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         assertThrows(AppException.class, () -> parkingSlotService.validateSelectable(created.getId()));
 
-        parkingSlotService.delete(created.getId());
+        parkingSlotService.delete(created.getId(), null);
         assertTrue(parkingSlotRepository.findById(created.getId()).isEmpty());
     }
 
@@ -316,18 +316,18 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         request.setPricePerHour(new BigDecimal("30000"));
         request.setIsActive(false);
 
-        var created = pricingPolicyService.createPolicy(request);
+        var created = pricingPolicyService.createPolicy(request, null);
         assertFalse(created.getIsActive());
-        assertEquals(1, pricingPolicyService.getAllPolicies().size());
+        assertEquals(1, pricingPolicyService.getAllPolicies(null).size());
 
         request.setPricePerHour(new BigDecimal("35000"));
-        var updated = pricingPolicyService.updatePolicy(created.getPolicyId(), request);
-        var activated = pricingPolicyService.activatePolicy(created.getPolicyId());
+        var updated = pricingPolicyService.updatePolicy(created.getPolicyId(), request, null);
+        var activated = pricingPolicyService.activatePolicy(created.getPolicyId(), null);
 
         assertEquals(new BigDecimal("35000"), updated.getPricePerHour());
         assertTrue(activated.getIsActive());
 
-        pricingPolicyService.deletePolicy(created.getPolicyId());
+        pricingPolicyService.deletePolicy(created.getPolicyId(), null);
         var afterDelete = pricingPolicyRepository.findById(created.getPolicyId());
         assertTrue(afterDelete.isPresent(), "Delete should soft-deactivate, not hard-delete, to preserve historical pricing");
         assertFalse(afterDelete.get().getIsActive());

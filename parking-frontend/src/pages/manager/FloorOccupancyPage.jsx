@@ -2,14 +2,11 @@ import { useEffect, useState } from "react";
 import { floorOccupancyApi } from "../../api/manager/floorOccupancyApi";
 import {
   StaffPageSection,
-  StaffStatCard,
   StaffStatusBadge,
 } from "../staff/StaffUi";
+import { ManagerStatBar } from "../../ui/components/manager/ManagerUi";
 import {
-  Building2,
   RefreshCw,
-  ParkingSquare,
-  CarFront,
   AlertCircle,
 } from "lucide-react";
 
@@ -130,31 +127,15 @@ export default function FloorOccupancyPage() {
         </div>
       )}
 
-      {/* ── Stat cards ── */}
+      {/* ── Stat bar ── */}
       {!loading && floors.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StaffStatCard
-            icon={Building2}
-            label="Tỷ lệ lấp đầy"
-            value={`${overallPct}%`}
-            hint={`${totalOccupied} / ${totalSlots} slot`}
-            tone={pctTone(overallPct)}
-          />
-          <StaffStatCard
-            icon={CarFront}
-            label="Đang có xe"
-            value={totalOccupied}
-            hint="Slot đang bị chiếm"
-            tone="rose"
-          />
-          <StaffStatCard
-            icon={ParkingSquare}
-            label="Còn trống"
-            value={totalAvail}
-            hint="Slot có thể đỗ xe"
-            tone="emerald"
-          />
-        </div>
+        <ManagerStatBar
+          items={[
+            { label: "Tỷ lệ lấp đầy", value: `${overallPct}%`, hint: `${totalOccupied} / ${totalSlots} slot`, tone: pctTone(overallPct) },
+            { label: "Đang có xe", value: totalOccupied, hint: "Slot đang bị chiếm", tone: "rose" },
+            { label: "Còn trống", value: totalAvail, hint: "Slot có thể đỗ", tone: "emerald" },
+          ]}
+        />
       )}
 
       {/* ── Theo từng tòa nhà ── */}

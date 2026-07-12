@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { roleApi } from "../../api/admin/roleApi";
 import { userApi } from "../../api/admin/userApi";
+import { buildingApi } from "../../api/manager/buildingApi";
 import {
   ManagerCell,
   ManagerDataTable,
   ManagerEmptyState,
+  ManagerField,
+  ManagerForm,
   ManagerPanel,
   ManagerPrimaryButton,
   ManagerRow,
@@ -48,6 +51,10 @@ export default function UserManagementPage() {
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [statusChangingId, setStatusChangingId] = useState(null);
+  const [buildings, setBuildings] = useState([]);
+  const [buildingModalUser, setBuildingModalUser] = useState(null);
+  const [buildingDraft, setBuildingDraft] = useState("");
+  const [savingBuilding, setSavingBuilding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +73,22 @@ export default function UserManagementPage() {
       }
     }
 
+    async function loadBuildings() {
+      try {
+        const res = await buildingApi.getAll();
+        if (!cancelled) {
+          setBuildings(unwrapApiData(res.data, []));
+        }
+      } catch (err) {
+        console.error("Failed to load buildings", err);
+        if (!cancelled) {
+          setBuildings([]);
+        }
+      }
+    }
+
     void loadRoles();
+    void loadBuildings();
 
     return () => {
       cancelled = true;
@@ -166,6 +188,40 @@ export default function UserManagementPage() {
     }
   };
 
+  const openBuildingEditor = (user) => {
+    setBuildingModalUser(user);
+    setBuildingDraft(user.assignedBuildingId || "");
+    setActionError("");
+    setActionMessage("");
+  };
+
+  const closeBuildingEditor = () => {
+    setBuildingModalUser(null);
+    setBuildingDraft("");
+    setSavingBuilding(false);
+  };
+
+  const handleSaveBuilding = async () => {
+    if (!buildingModalUser) return;
+    setSavingBuilding(true);
+    setActionError("");
+    setActionMessage("");
+    try {
+      await userApi.assignBuilding(buildingModalUser.userId, buildingDraft || null);
+      await loadUsers();
+      setActionMessage(
+        buildingDraft
+          ? `Đã gán ${buildingModalUser.username} vào toà nhà đã chọn.`
+          : `Đã gỡ ${buildingModalUser.username} khỏi toà nhà.`
+      );
+      closeBuildingEditor();
+    } catch (err) {
+      console.error("Failed to assign building", err);
+      setActionError(err.response?.data?.message || "Không thể gán toà nhà cho người dùng.");
+      setSavingBuilding(false);
+    }
+  };
+
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === "LOCKED" ? "ACTIVE" : "LOCKED";
     const confirmText =
@@ -239,8 +295,15 @@ export default function UserManagementPage() {
         ) : users.length === 0 ? (
           <ManagerEmptyState title="Không có người dùng nào" description="Không có người dùng nào khớp với bộ lọc vai trò hoặc từ khóa tìm kiếm hiện tại." />
         ) : (
-          <ManagerDataTable columns={["Người dùng", "Vai trò", "Trạng thái", "Liên hệ", "Mã người dùng", "Thao tác"]} minRows={PAGE_SIZE}>
-            {paged.map((item) => (
+          <ManagerDataTable columns={["Người dùng", "Vai trò", "Toà nhà", "Trạng thái", "Liên hệ", "Mã người dùng", "Thao tác"]} minRows={PAGE_SIZE}>
+            {paged.map((item) => {
+              const roleValue = roleLabel(item.role);
+              // STAFF: Manager tự gán/gỡ cho nhân viên của mình ở trang "Ca làm việc"
+              // (StaffShiftPage) — Admin chỉ xem, không sửa ở đây để tránh trùng chức năng.
+              // MANAGER: chỉ Admin gán được (Manager không tự gán cho chính mình).
+              const hasBuildingConcept = roleValue === "MANAGER" || roleValue === "STAFF";
+              const canAssignBuildingHere = roleValue === "MANAGER";
+              return (
               <ManagerRow key={item.userId}>
                 <ManagerCell>
                   <div className="flex items-center gap-3">
@@ -259,7 +322,16 @@ export default function UserManagementPage() {
                   </div>
                 </ManagerCell>
                 <ManagerCell>
-                  <ManagerStatusBadge tone={toneForRole(item.role)}>{roleLabel(item.role)}</ManagerStatusBadge>
+                  <ManagerStatusBadge tone={toneForRole(item.role)}>{roleValue}</ManagerStatusBadge>
+                </ManagerCell>
+                <ManagerCell>
+                  {!hasBuildingConcept ? (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  ) : item.assignedBuildingName ? (
+                    <ManagerStatusBadge tone="emerald">{item.assignedBuildingName}</ManagerStatusBadge>
+                  ) : (
+                    <ManagerStatusBadge tone="amber">Chưa gán</ManagerStatusBadge>
+                  )}
                 </ManagerCell>
                 <ManagerCell>
                   <ManagerStatusBadge tone={toneForStatus(item.status)}>{USER_STATUS_LABELS[item.status] || item.status}</ManagerStatusBadge>
@@ -274,15 +346,24 @@ export default function UserManagementPage() {
                     <button
                       type="button"
                       onClick={() => openRoleEditor(item)}
-                      className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                      className="whitespace-nowrap rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
                     >
                       Đổi vai trò
                     </button>
+                    {canAssignBuildingHere && (
+                      <button
+                        type="button"
+                        onClick={() => openBuildingEditor(item)}
+                        className="whitespace-nowrap rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted"
+                      >
+                        Gán toà nhà
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(item)}
                       disabled={statusChangingId === item.userId}
-                      className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                         item.status === "LOCKED"
                           ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
                           : "border-rose-200 text-rose-600 hover:bg-rose-50"
@@ -293,7 +374,8 @@ export default function UserManagementPage() {
                   </div>
                 </ManagerCell>
               </ManagerRow>
-            ))}
+              );
+            })}
           </ManagerDataTable>
         )}
         {totalPages > 1 && (
@@ -357,6 +439,38 @@ export default function UserManagementPage() {
                 {savingRole ? "Đang lưu..." : "Lưu vai trò"}
               </ManagerPrimaryButton>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {buildingModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl">
+            <div className="mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Gán toà nhà</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Chọn toà nhà cho <span className="font-medium text-foreground">{buildingModalUser.fullName || buildingModalUser.username}</span>
+                {" "}({roleLabel(buildingModalUser.role)}).
+              </p>
+            </div>
+            <ManagerForm onSubmit={(e) => { e.preventDefault(); handleSaveBuilding(); }}>
+              <ManagerField label="Toà nhà">
+                <ManagerSelect value={buildingDraft} onChange={(e) => setBuildingDraft(e.target.value)}>
+                  <option value="">Không gán (bỏ trống)</option>
+                  {buildings.map((b) => (
+                    <option key={b.buildingId ?? b.id} value={b.buildingId ?? b.id}>{b.name}</option>
+                  ))}
+                </ManagerSelect>
+              </ManagerField>
+              <div className="flex gap-3">
+                <ManagerSecondaryButton type="button" className="flex-1" onClick={closeBuildingEditor}>
+                  Hủy
+                </ManagerSecondaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1" disabled={savingBuilding}>
+                  {savingBuilding ? "Đang lưu..." : "Lưu"}
+                </ManagerPrimaryButton>
+              </div>
+            </ManagerForm>
           </div>
         </div>
       ) : null}

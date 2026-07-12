@@ -91,9 +91,10 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedSystemConfigs() {
-        ensureConfig("GRACE_PERIOD_MINUTES",    "10", "Thời gian cho phép miễn phí (phút) - xe đỗ dưới thời gian này không tính tiền");
-        ensureConfig("BILLING_BLOCK_MINUTES",   "30", "Đơn vị tính phí (phút) - phí được tính theo từng block thời gian này");
-        ensureConfig("BOOKING_EXPIRE_AFTER_START", "30", "Số phút sau bookingStartTime mà booking CONFIRMED bị auto-expire nếu driver chưa check-in");
+        ensureConfig("GRACE_PERIOD_MINUTES",    "10", "Thời gian miễn phí (phút)");
+        ensureConfig("BILLING_BLOCK_MINUTES",   "30", "Đơn vị tính phí theo block (phút)");
+        ensureConfig("BOOKING_EXPIRE_AFTER_START", "30", "Tự huỷ booking sau (phút)");
+        ensureConfig("BOOKING_CANCEL_WINDOW_MINUTES", "10", "Hạn hoàn cọc khi huỷ (phút)");
     }
 
     private void ensureConfig(String key, String defaultValue, String description) {
@@ -127,7 +128,9 @@ public class DataInitializer implements CommandLineRunner {
             building.setCloseTime(LocalTime.of(22, 0));
             building.setLatitude(seed.latitude());
             building.setLongitude(seed.longitude());
-            building.setIsActive(true);
+            if (isNew) {
+                building.setIsActive(true);
+            }
             building = parkingBuildingRepository.save(building);
 
             normalizeBuildingLayout(building, seed.code(), carVehicleType);

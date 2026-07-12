@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, CalendarDays, Car, Clock3, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
+import { buildingApi } from "../../api/manager/buildingApi";
+import { getRole } from "../../utils/auth";
 import {
   ManagerCell,
   ManagerDataTable,
@@ -15,8 +17,6 @@ import {
   ManagerRow,
   ManagerSecondaryButton,
   ManagerSelect,
-  ManagerStatCard,
-  ManagerStatsRow,
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
@@ -25,7 +25,9 @@ const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", WEEKLY: "T
 const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
 
 export default function PricingPolicyPage() {
+  const isAdmin = getRole() === "ADMIN";
   const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -36,6 +38,7 @@ export default function PricingPolicyPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
     vehicleTypeId: "",
+    buildingId: "",
     timeType: "HOURLY",
     dayType: "WEEKDAY",
     startHour: "",
@@ -48,6 +51,11 @@ export default function PricingPolicyPage() {
     void loadInitialData();
   }, []);
 
+  const buildingMap = useMemo(
+    () => Object.fromEntries(buildings.map((item) => [item.id ?? item.buildingId, item.name])),
+    [buildings]
+  );
+
   const vehicleTypeMap = useMemo(
     () => Object.fromEntries(vehicleTypes.map((item) => [item.id ?? item.vehicleTypeId, item.name])),
     [vehicleTypes]
@@ -55,12 +63,12 @@ export default function PricingPolicyPage() {
 
   async function loadInitialData() {
     try {
-      const [vehicleTypeRes, policyRes] = await Promise.all([
-        vehicleTypeApi.getAll(),
-        pricingPolicyApi.getAll(),
-      ]);
+      const requests = [vehicleTypeApi.getAll(), pricingPolicyApi.getAll()];
+      if (isAdmin) requests.push(buildingApi.getAll());
+      const [vehicleTypeRes, policyRes, buildingRes] = await Promise.all(requests);
       setVehicleTypes(unwrapApiData(vehicleTypeRes.data, []));
       setPolicies(unwrapApiData(policyRes.data, []));
+      if (buildingRes) setBuildings(unwrapApiData(buildingRes.data, []));
     } catch (error) {
       console.error("Failed to load pricing data", error);
       alert("Không tải được danh sách bảng giá");
@@ -71,6 +79,7 @@ export default function PricingPolicyPage() {
     setEditingId(null);
     setForm({
       vehicleTypeId: "",
+      buildingId: "",
       timeType: "HOURLY",
       dayType: "WEEKDAY",
       startHour: "",
@@ -104,6 +113,8 @@ export default function PricingPolicyPage() {
 
     const payload = {
       vehicleTypeId: Number(form.vehicleTypeId),
+      // Admin chỉ tạo được giá global; giá riêng theo toà là việc của Manager quản lý toà đó.
+      buildingId: null,
       timeType: form.timeType,
       dayType: form.dayType,
       startHour: form.startHour ? Number(form.startHour) : null,
@@ -138,6 +149,7 @@ export default function PricingPolicyPage() {
     setEditingId(item.policyId);
     setForm({
       vehicleTypeId: item.vehicleTypeId,
+      buildingId: item.buildingId ?? "",
       timeType: item.timeType,
       dayType: item.dayType,
       startHour: item.startHour ?? "",
@@ -182,79 +194,88 @@ export default function PricingPolicyPage() {
         title="Quản lý bảng giá"
         description="Thiết lập giá theo loại xe, loại ngày và khung giờ."
         action={
-          <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
-            <Plus size={14} /> Thêm bảng giá
-          </ManagerPrimaryButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              {policies.length} bảng giá
+            </span>
+            <span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary">
+              {policies.filter((item) => item.isActive).length} đang bật
+            </span>
+            <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
+              <Plus size={14} /> Thêm bảng giá
+            </ManagerPrimaryButton>
+          </div>
         }
       />
-      <ManagerStatsRow>
-        <ManagerStatCard icon={Banknote} label="Số bảng giá" value={policies.length} hint="Tổng số quy tắc giá đã cấu hình" tone="violet" />
-        <ManagerStatCard icon={Car} label="Loại xe được áp dụng" value={new Set(policies.map((item) => item.vehicleTypeId)).size} hint="Loại xe đã có quy tắc giá" tone="blue" />
-        <ManagerStatCard icon={Clock3} label="Bảng giá theo giờ" value={policies.filter((item) => item.timeType === "HOURLY").length} hint="Tính phí theo giờ" tone="emerald" />
-        <ManagerStatCard icon={CalendarDays} label="Bảng giá đang bật" value={policies.filter((item) => item.isActive).length} hint="Đang được áp dụng" tone="amber" />
-      </ManagerStatsRow>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-        <select
-          value={filterVehicleType}
-          onChange={(e) => { setFilterVehicleType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại xe</option>
-          {vehicleTypes.map((v) => (
-            <option key={v.id ?? v.vehicleTypeId} value={v.id ?? v.vehicleTypeId}>{v.name}</option>
-          ))}
-        </select>
-        <select
-          value={filterTimeType}
-          onChange={(e) => { setFilterTimeType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại thời gian</option>
-          <option value="HOURLY">Theo giờ</option>
-          <option value="DAILY">Theo ngày</option>
-          <option value="WEEKLY">Theo tuần</option>
-          <option value="MONTHLY">Theo tháng</option>
-        </select>
-        <select
-          value={filterDayType}
-          onChange={(e) => { setFilterDayType(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="">Tất cả loại ngày</option>
-          <option value="WEEKDAY">Ngày thường</option>
-          <option value="WEEKEND">Cuối tuần</option>
-          <option value="HOLIDAY">Ngày lễ</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-          className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
-        >
-          <option value="all">Tất cả trạng thái</option>
-          <option value="active">Đang bật</option>
-          <option value="inactive">Đã tắt</option>
-        </select>
-        {(filterVehicleType || filterTimeType || filterDayType || filterStatus !== "all") && (
-          <button
-            onClick={() => { setFilterVehicleType(""); setFilterTimeType(""); setFilterDayType(""); setFilterStatus("all"); setPage(1); }}
-            className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X size={12} /> Xóa lọc
-          </button>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground">{filteredPolicies.length} / {policies.length} chính sách</span>
-      </div>
-
-      <ManagerPanel title="Danh sách bảng giá" subtitle={`${filteredPolicies.length} bảng giá`}>
+      <ManagerPanel
+        title="Danh sách bảng giá"
+        subtitle={`${filteredPolicies.length} / ${policies.length} chính sách`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filterVehicleType}
+              onChange={(e) => { setFilterVehicleType(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            >
+              <option value="">Tất cả loại xe</option>
+              {vehicleTypes.map((v) => (
+                <option key={v.id ?? v.vehicleTypeId} value={v.id ?? v.vehicleTypeId}>{v.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterTimeType}
+              onChange={(e) => { setFilterTimeType(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            >
+              <option value="">Tất cả loại thời gian</option>
+              <option value="HOURLY">Theo giờ</option>
+              <option value="DAILY">Theo ngày</option>
+              <option value="WEEKLY">Theo tuần</option>
+              <option value="MONTHLY">Theo tháng</option>
+            </select>
+            <select
+              value={filterDayType}
+              onChange={(e) => { setFilterDayType(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            >
+              <option value="">Tất cả loại ngày</option>
+              <option value="WEEKDAY">Ngày thường</option>
+              <option value="WEEKEND">Cuối tuần</option>
+              <option value="HOLIDAY">Ngày lễ</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+              className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="active">Đang bật</option>
+              <option value="inactive">Đã tắt</option>
+            </select>
+            {(filterVehicleType || filterTimeType || filterDayType || filterStatus !== "all") && (
+              <button
+                onClick={() => { setFilterVehicleType(""); setFilterTimeType(""); setFilterDayType(""); setFilterStatus("all"); setPage(1); }}
+                className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={12} /> Xóa lọc
+              </button>
+            )}
+          </div>
+        }
+      >
         {filteredPolicies.length === 0 ? (
           <ManagerEmptyState title="Chưa có bảng giá nào" description="Tạo bảng giá để hệ thống tính phí đặt chỗ và thanh toán." />
         ) : (
-          <ManagerDataTable columns={["Loại xe", "Loại thời gian", "Loại ngày", "Khung giờ", "Giá", "Trạng thái", "Thao tác"]} minRows={PAGE_SIZE}>
+          <ManagerDataTable columns={["Loại xe", "Toà nhà", "Loại thời gian", "Loại ngày", "Khung giờ", "Giá", "Trạng thái", "Thao tác"]} minRows={PAGE_SIZE}>
             {pagedPolicies.map((item) => (
               <ManagerRow key={item.policyId}>
                 <ManagerCell>{vehicleTypeMap[item.vehicleTypeId] || item.vehicleTypeId}</ManagerCell>
+                <ManagerCell>
+                  {item.buildingId ? (item.buildingName || buildingMap[item.buildingId] || item.buildingId) : (
+                    <ManagerStatusBadge tone="slate">Mặc định (Global)</ManagerStatusBadge>
+                  )}
+                </ManagerCell>
                 <ManagerCell><ManagerStatusBadge tone="blue">{TIME_TYPE_LABELS[item.timeType] || item.timeType}</ManagerStatusBadge></ManagerCell>
                 <ManagerCell>{DAY_TYPE_LABELS[item.dayType] || item.dayType}</ManagerCell>
                 <ManagerCell>{item.startHour ?? "-"} - {item.endHour ?? "-"}</ManagerCell>
@@ -263,12 +284,16 @@ export default function PricingPolicyPage() {
                   <ManagerStatusBadge tone={item.isActive ? "emerald" : "amber"}>{item.isActive ? "Đang bật" : "Đã tắt"}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
-                  <div className="flex gap-2">
-                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
-                    {item.isActive && (
-                      <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivate(item.policyId)}>Tắt</ManagerSecondaryButton>
-                    )}
-                  </div>
+                  {isAdmin && item.buildingId ? (
+                    <span className="text-xs text-muted-foreground">Do Manager toà đó quản lý</span>
+                  ) : (
+                    <div className="flex gap-2">
+                      <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
+                      {item.isActive && (
+                        <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivate(item.policyId)}>Tắt</ManagerSecondaryButton>
+                      )}
+                    </div>
+                  )}
                 </ManagerCell>
               </ManagerRow>
             ))}
@@ -315,6 +340,12 @@ export default function PricingPolicyPage() {
                   ))}
                 </ManagerSelect>
               </ManagerField>
+              {isAdmin ? (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Áp dụng cho: <span className="font-medium text-foreground">Mặc định (Global — mọi toà nhà)</span>.
+                  Giá riêng theo từng toà do Manager của toà đó tự quản lý.
+                </p>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2">
                 <ManagerField label="Loại thời gian">
                   <ManagerSelect name="timeType" value={form.timeType} onChange={handleChange}>

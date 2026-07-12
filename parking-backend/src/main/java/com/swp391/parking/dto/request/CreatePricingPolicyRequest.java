@@ -11,6 +11,9 @@ public class CreatePricingPolicyRequest {
     @NotNull(message = "Vehicle type ID is required")
     private Long vehicleTypeId;
 
+    /** Chỉ Admin dùng được field này (chọn toà nhà áp dụng riêng, để trống = giá global). Manager tạo policy sẽ luôn bị ép về toà nhà mình quản lý, bỏ qua field này. */
+    private Long buildingId;
+
     @NotBlank(message = "Day type is required")
     private String dayType;
 

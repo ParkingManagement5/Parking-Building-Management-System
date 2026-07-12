@@ -11,7 +11,7 @@ import { getAssignedBuildingId, getAssignedBuildingName } from "../../utils/auth
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import {
   StaffEmptyState, StaffInput, StaffPageSection,
-  StaffSecondaryButton,
+  StaffSecondaryButton, StaffStatBar,
 } from "./StaffUi";
 
 const SLOT_COLORS = {
@@ -160,19 +160,14 @@ export default function MapPage() {
         </div>
       )}
       {/* Header stats */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        {[
-          { label: "Tổng slot", value: stats.total, color: "text-foreground" },
-          { label: "Trống", value: stats.available, color: "text-emerald-600" },
-          { label: "Có xe", value: stats.occupied, color: "text-rose-600" },
-          { label: "Đã đặt", value: stats.reserved, color: "text-amber-600" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border bg-card p-4 text-center">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-          </div>
-        ))}
-      </div>
+      <StaffStatBar
+        items={[
+          { label: "Tổng slot", value: stats.total, tone: "slate" },
+          { label: "Trống", value: stats.available, tone: "emerald" },
+          { label: "Có xe", value: stats.occupied, tone: "rose" },
+          { label: "Đã đặt", value: stats.reserved, tone: "amber" },
+        ]}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         {/* LEFT: Parking Map */}

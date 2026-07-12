@@ -10,8 +10,10 @@ public interface StaffShiftService {
     StaffShiftResponse assignShift(AssignStaffShiftRequest request);
     StaffShiftResponse getStaffShift(Long id);
     List<StaffShiftResponse> getAllStaffShifts();
+    List<StaffShiftResponse> getAllStaffShiftsByBuilding(Long buildingId);
     List<StaffShiftResponse> getByUser(Long userId);
     List<StaffShiftResponse> getByWorkingDate(LocalDate workingDate);
+    List<StaffShiftResponse> getByWorkingDateAndBuilding(LocalDate workingDate, Long buildingId);
     StaffShiftResponse updateStaffShift(Long id, AssignStaffShiftRequest request);
     void deleteStaffShift(Long id);
 }

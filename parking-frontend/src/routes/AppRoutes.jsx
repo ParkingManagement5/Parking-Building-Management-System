@@ -26,12 +26,10 @@ import UnifiedQrScanPage from "../pages/staff/UnifiedQrScanPage";
 import StaffGatePage from "../pages/staff/GatePage";
 import ParkingSessionPage from "../pages/staff/ParkingSessionPage";
 import PaymentProcessingPage from "../pages/staff/PaymentProcessingPage";
-import RequestProcessingPage from "../pages/staff/RequestProcessingPage";
 import ExceptionCasePage from "../pages/staff/ExceptionCasePage";
 import ManagerDashboard from "../pages/manager/ManagerDashboard";
 import ManagerNotificationPage from "../pages/manager/ManagerNotificationPage";
 import ReportsPage from "../pages/manager/ReportsPage";
-import RevenueReportPage from "../pages/manager/RevenueReportPage";
 import FloorOccupancyPage from "../pages/manager/FloorOccupancyPage";
 import ParkingStructurePage from "../pages/parking/ParkingStructurePage";
 import VehicleTypePage from "../pages/parking/VehicleTypePage";
@@ -39,7 +37,6 @@ import PricingPolicyPage from "../pages/manager/PricingPolicyPage";
 import StaffShiftPage from "../pages/manager/StaffShiftPage";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserManagementPage from "../pages/user/UserManagementPage";
-import RoleManagementPage from "../pages/admin/RoleManagementPage";
 import SystemConfigPage from "../pages/admin/SystemConfigPage";
 import ActivityLogPage from "../pages/admin/ActivityLogPage";
 import PortalSettingsPage from "../pages/user/PortalSettingsPage";
@@ -96,7 +93,7 @@ export default function AppRoutes() {
             <Route path="ocr-correction" element={<Navigate to="/staff/exceptions" replace />} />
             <Route path="sessions" element={<ParkingSessionPage />} />
             <Route path="payments" element={<PaymentProcessingPage />} />
-            <Route path="requests" element={<RequestProcessingPage />} />
+            <Route path="requests" element={<Navigate to="/staff/notifications?tab=requests" replace />} />
             <Route path="exceptions" element={<ExceptionCasePage />} />
             <Route path="floor-occupancy" element={<FloorOccupancyPage />} />
             <Route path="notifications" element={<StaffNotificationPage />} />
@@ -117,7 +114,7 @@ export default function AppRoutes() {
             <Route path="pricing-policies" element={<PricingPolicyPage />} />
             <Route path="staff-shifts" element={<StaffShiftPage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="reports/revenue" element={<RevenueReportPage />} />
+            <Route path="reports/revenue" element={<Navigate to="/manager/reports" replace />} />
             <Route path="notifications" element={<ManagerNotificationPage />} />
             <Route path="settings" element={<PortalSettingsPage portal="manager" />} />
           </Route>
@@ -127,9 +124,11 @@ export default function AppRoutes() {
           <Route path="/admin" element={<RolePortalLayout portal="admin" />}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<UserManagementPage />} />
-            <Route path="roles" element={<RoleManagementPage />} />
+            <Route path="roles" element={<Navigate to="/admin/users" replace />} />
             <Route path="system-config" element={<SystemConfigPage />} />
             <Route path="activity-logs" element={<ActivityLogPage />} />
+            <Route path="pricing-policies" element={<PricingPolicyPage />} />
+            <Route path="parking-structure" element={<ParkingStructurePage />} />
             <Route path="settings" element={<PortalSettingsPage portal="admin" />} />
           </Route>
         </Route>

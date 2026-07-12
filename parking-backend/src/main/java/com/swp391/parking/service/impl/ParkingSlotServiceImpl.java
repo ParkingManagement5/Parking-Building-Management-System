@@ -28,8 +28,14 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ParkingSlot> getAll() {
-        return slotRepo.findAll();
+    public List<ParkingSlot> getAll(Long scopeBuildingId) {
+        List<ParkingSlot> all = slotRepo.findAll();
+        if (scopeBuildingId == null) return all;
+        return all.stream()
+                .filter(s -> s.getZone() != null && s.getZone().getFloor() != null
+                        && s.getZone().getFloor().getBuilding() != null
+                        && scopeBuildingId.equals(s.getZone().getFloor().getBuilding().getId()))
+                .toList();
     }
 
     @Override
@@ -58,14 +64,14 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ParkingSlot> getByZone(Long zoneId, Long currentUserId, boolean staffScoped) {
+    public List<ParkingSlot> getByZone(Long zoneId, Long currentUserId, boolean buildingScoped) {
         Zone zone = zoneRepo.findById(zoneId)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy zone ID: " + zoneId));
         Long buildingId = zone.getFloor() != null && zone.getFloor().getBuilding() != null
                 ? zone.getFloor().getBuilding().getId()
                 : null;
-        enforceStaffBuildingScope(buildingId, currentUserId, staffScoped);
+        enforceStaffBuildingScope(buildingId, currentUserId, buildingScoped);
         return getByZone(zoneId);
     }
 
@@ -77,7 +83,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional(readOnly = true)
-    public ParkingSlot getById(Long id, Long currentUserId, boolean staffScoped) {
+    public ParkingSlot getById(Long id, Long currentUserId, boolean buildingScoped) {
         ParkingSlot slot = slotRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                 "Không tìm thấy slot ID: " + id));
@@ -86,21 +92,22 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
                 && slot.getZone().getFloor().getBuilding() != null
                 ? slot.getZone().getFloor().getBuilding().getId()
                 : null;
-        enforceStaffBuildingScope(buildingId, currentUserId, staffScoped);
+        enforceStaffBuildingScope(buildingId, currentUserId, buildingScoped);
         return slot;
     }
 
     @Override
     @Transactional
-    public ParkingSlot create(SlotRequest req) {
+    public ParkingSlot create(SlotRequest req, Long scopeBuildingId) {
+        Zone zone = zoneRepo.findById(req.getZoneId())
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
+                "Không tìm thấy zone ID: " + req.getZoneId()));
+        enforceBuildingOwnership(zone, scopeBuildingId, "tạo slot cho");
+
         if (slotRepo.existsByZoneIdAndSlotCode(req.getZoneId(), req.getSlotCode())) {
             throw new AppException(HttpStatus.CONFLICT,
                 "Mã slot '" + req.getSlotCode() + "' đã tồn tại trong zone này");
         }
-
-        Zone zone = zoneRepo.findById(req.getZoneId())
-            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-                "Không tìm thấy zone ID: " + req.getZoneId()));
 
         ParkingSlot slot = ParkingSlot.builder()
             .zone(zone)
@@ -115,10 +122,11 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional
-    public ParkingSlot update(Long id, SlotRequest req) {
+    public ParkingSlot update(Long id, SlotRequest req, Long scopeBuildingId) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy slot ID: " + id));
+        enforceBuildingOwnership(slot.getZone(), scopeBuildingId, "sửa");
 
         if ((!slot.getZone().getId().equals(req.getZoneId()) || !slot.getSlotCode().equals(req.getSlotCode()))
                 && slotRepo.existsByZoneIdAndSlotCode(req.getZoneId(), req.getSlotCode())) {
@@ -129,6 +137,8 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
         Zone zone = zoneRepo.findById(req.getZoneId())
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                 "Không tìm thấy zone ID: " + req.getZoneId()));
+        // Neu doi sang zone khac, zone moi cung phai thuoc toa nha cua Manager
+        enforceBuildingOwnership(zone, scopeBuildingId, "chuyển slot sang");
 
         slot.setZone(zone);
         slot.setSlotCode(req.getSlotCode());
@@ -175,24 +185,34 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
 
     @Override
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Long scopeBuildingId) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy slot ID: " + id));
+        enforceBuildingOwnership(slot.getZone(), scopeBuildingId, "xoá");
         slotRepo.delete(slot);
     }
 
-    private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean staffScoped) {
-        if (!staffScoped) {
+    private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean buildingScoped) {
+        if (!buildingScoped) {
             return;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chưa được gán toà nhà");
+            throw new AppException(HttpStatus.FORBIDDEN, "Chưa được gán toà nhà");
         }
         if (!currentUser.getAssignedBuilding().getId().equals(buildingId)) {
             throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem slot ngoài toà nhà được phân công");
+        }
+    }
+
+    private void enforceBuildingOwnership(Zone zone, Long scopeBuildingId, String action) {
+        if (scopeBuildingId == null) return;
+        Long buildingId = zone != null && zone.getFloor() != null && zone.getFloor().getBuilding() != null
+                ? zone.getFloor().getBuilding().getId() : null;
+        if (!scopeBuildingId.equals(buildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ được " + action + " slot thuộc toà nhà bạn quản lý");
         }
     }
 }

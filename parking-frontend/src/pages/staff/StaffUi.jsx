@@ -44,6 +44,47 @@ export function StaffStatCard({ icon: Icon, label, value, hint, tone = "violet",
   );
 }
 
+export function StaffStatBar({ items }) {
+  const iconTones = {
+    violet: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+    emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+    rose: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+    slate: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+  };
+
+  return (
+    <div className="flex flex-wrap rounded-2xl border border-border bg-card">
+      {items.map((item, index) => {
+        const Icon = item.icon;
+        const Tag = item.onClick ? "button" : "div";
+        return (
+          <Tag
+            key={item.label}
+            type={item.onClick ? "button" : undefined}
+            onClick={item.onClick}
+            className={`flex flex-1 min-w-[160px] items-center gap-3 px-4 py-3 text-left transition-colors ${
+              index > 0 ? "border-t border-border sm:border-t-0 sm:border-l" : ""
+            } ${item.onClick ? "cursor-pointer hover:bg-muted/40" : ""}`}
+          >
+            {Icon ? (
+              <span className={`flex size-8 shrink-0 items-center justify-center rounded-xl ${iconTones[item.tone] || iconTones.slate}`}>
+                <Icon size={14} />
+              </span>
+            ) : null}
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-[11px] text-muted-foreground">{item.label}</div>
+              <div className="text-base font-bold text-foreground">{item.value}</div>
+              {item.hint ? <div className="truncate text-[10px] text-muted-foreground/80">{item.hint}</div> : null}
+            </div>
+          </Tag>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StaffStatusBadge({ children, tone = "slate" }) {
   const tones = {
     emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -55,7 +96,7 @@ export function StaffStatusBadge({ children, tone = "slate" }) {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone] || tones.slate}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone] || tones.slate}`}>
       {children}
     </span>
   );
@@ -102,7 +143,7 @@ export function StaffPrimaryButton({ children, className = "", ...props }) {
   return (
     <button
       {...props}
-      className={`rounded-2xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`whitespace-nowrap rounded-2xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {children}
     </button>
@@ -113,7 +154,7 @@ export function StaffSecondaryButton({ children, className = "", ...props }) {
   return (
     <button
       {...props}
-      className={`rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${className}`}
+      className={`whitespace-nowrap rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${className}`}
     >
       {children}
     </button>

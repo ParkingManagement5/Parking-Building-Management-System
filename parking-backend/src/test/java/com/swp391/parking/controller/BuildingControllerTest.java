@@ -10,6 +10,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -20,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +34,14 @@ class BuildingControllerTest {
 
     @InjectMocks
     private BuildingController buildingController;
+
+    /** ADMIN authority -> resolveScopeBuildingId() trả về null ngay, không cần mock UserRepository. */
+    private Authentication adminAuth() {
+        Authentication auth = mock(Authentication.class);
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        given(auth.getAuthorities()).willAnswer(invocation -> authorities);
+        return auth;
+    }
 
     @Test
     void getAll_shouldWrapServiceResult() {
@@ -95,9 +107,9 @@ class BuildingControllerTest {
             .closeTime(request.getCloseTime())
             .isActive(true)
             .build();
-        given(buildingService.update(eq(2L), any(BuildingRequest.class))).willReturn(updated);
+        given(buildingService.update(eq(2L), any(BuildingRequest.class), eq(null))).willReturn(updated);
 
-        ResponseEntity<ApiResponse<ParkingBuilding>> response = buildingController.update(2L, request);
+        ResponseEntity<ApiResponse<ParkingBuilding>> response = buildingController.update(2L, request, adminAuth());
 
         assertTrue(response.getStatusCode().is2xxSuccessful());
         assertNotNull(response.getBody());
@@ -106,9 +118,9 @@ class BuildingControllerTest {
 
     @Test
     void deactivate_shouldReturnSuccessMessage() {
-        ResponseEntity<ApiResponse<Void>> response = buildingController.deactivate(3L);
+        ResponseEntity<ApiResponse<Void>> response = buildingController.deactivate(3L, adminAuth());
 
-        verify(buildingService).deactivate(3L);
+        verify(buildingService).deactivate(3L, null);
         assertTrue(response.getStatusCode().is2xxSuccessful());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isSuccess());

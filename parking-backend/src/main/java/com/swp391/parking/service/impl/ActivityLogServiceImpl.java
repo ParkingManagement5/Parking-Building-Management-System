@@ -20,6 +20,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ActivityLogServiceImpl implements ActivityLogService {
 
+    // LOGIN la su kien tan suat cao, gia tri audit thap (khac voi doi vai
+    // tro/trang thai/cau hinh - hiem, gia tri cao, giu vinh vien). Chi giu lai
+    // N ban ghi LOGIN gan nhat moi user de bang activity_log khong bi phinh to
+    // vo han theo thoi gian ("tran du lieu" khi nguoi dung dang nhap nhieu lan).
+    private static final int LOGIN_HISTORY_LIMIT_PER_USER = 5;
+
     private final ActivityLogRepository activityLogRepository;
     private final UserRepository userRepository;
 
@@ -37,6 +43,19 @@ public class ActivityLogServiceImpl implements ActivityLogService {
                 .build();
 
         activityLogRepository.save(entry);
+
+        if ("LOGIN".equals(actionType) && userId != null) {
+            pruneOldLoginEntries(userId);
+        }
+    }
+
+    private void pruneOldLoginEntries(Integer userId) {
+        List<ActivityLog> loginEntries =
+                activityLogRepository.findAllByUser_UserIdAndActionTypeOrderByCreatedAtDesc(userId, "LOGIN");
+        if (loginEntries.size() > LOGIN_HISTORY_LIMIT_PER_USER) {
+            List<ActivityLog> stale = loginEntries.subList(LOGIN_HISTORY_LIMIT_PER_USER, loginEntries.size());
+            activityLogRepository.deleteAll(stale);
+        }
     }
 
     @Override

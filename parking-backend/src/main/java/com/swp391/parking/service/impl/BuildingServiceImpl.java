@@ -71,8 +71,9 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    public ParkingBuilding update(Long id, BuildingRequest req) {
+    public ParkingBuilding update(Long id, BuildingRequest req, Long scopeBuildingId) {
         ParkingBuilding building = getById(id);
+        enforceBuildingOwnership(building.getId(), scopeBuildingId, "sửa");
 
         if (!building.getName().equals(req.getName())
                 && buildingRepo.existsByName(req.getName())) {
@@ -103,8 +104,9 @@ public class BuildingServiceImpl implements BuildingService {
 
     @Override
     @Transactional
-    public void deactivate(Long id) {
+    public void deactivate(Long id, Long scopeBuildingId) {
         ParkingBuilding building = getById(id);
+        enforceBuildingOwnership(building.getId(), scopeBuildingId, "xoá");
 
         gateRepo.deleteAllInBatch(gateRepo.findByBuildingId(building.getId()));
 
@@ -117,5 +119,12 @@ public class BuildingServiceImpl implements BuildingService {
 
         floorRepo.deleteAllInBatch(floors);
         buildingRepo.delete(building);
+    }
+
+    /** MANAGER (scopeBuildingId != null) chỉ được sửa/xoá đúng toà nhà mình quản lý. ADMIN (null) không giới hạn. */
+    private void enforceBuildingOwnership(Long entityBuildingId, Long scopeBuildingId, String action) {
+        if (scopeBuildingId != null && !scopeBuildingId.equals(entityBuildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ được " + action + " toà nhà bạn quản lý");
+        }
     }
 }

@@ -9,13 +9,13 @@ import {
   YAxis,
   Legend,
 } from "recharts";
-import { Car, CircleDollarSign, TrendingUp, X, BarChart2 } from "lucide-react";
+import { Car, X, BarChart2 } from "lucide-react";
 import { reportApi } from "../../api/manager/reportApi";
 import {
   ManagerCell,
   ManagerDataTable,
   ManagerEmptyState,
-  ManagerStatCard,
+  ManagerStatBar,
   ManagerPanel,
   ManagerRow,
 } from "../../ui/components/manager/ManagerUi";
@@ -166,11 +166,18 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Summary stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <ManagerStatCard icon={CircleDollarSign} label="Tổng doanh thu" value={formatCurrency(report?.totalRevenue)} hint="Phí đỗ xe đã thu (PAID)" tone="emerald" />
-        <ManagerStatCard icon={TrendingUp} label="Tổng lượt xe" value={report?.totalSessions ?? 0} hint="Phiên đỗ xe trong khoảng lọc" tone="violet" />
-      </div>
+      <ManagerStatBar
+        items={[
+          { label: "Tổng doanh thu", value: formatCurrency(report?.totalRevenue), hint: "Phí đã thu (PAID)", tone: "emerald" },
+          { label: "Tổng lượt xe", value: report?.totalSessions ?? 0, hint: "Trong khoảng lọc", tone: "violet" },
+          {
+            label: "Doanh thu / lượt",
+            value: formatCurrency(report?.totalSessions ? (report.totalRevenue || 0) / report.totalSessions : 0),
+            hint: "Trung bình mỗi lượt",
+            tone: "blue",
+          },
+        ]}
+      />
 
       {/* ── Time-series chart ── */}
       <ManagerPanel

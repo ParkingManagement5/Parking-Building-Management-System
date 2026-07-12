@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Building2, Car, ChevronRight, DoorOpen, Edit2, Grid3x3, Layers, Plus,
-  Search, ShieldCheck, SquareParking, Trash2, X,
+  ChevronRight, Edit2, Plus,
+  Search, Trash2, X,
 } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
@@ -10,11 +10,12 @@ import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { gateApi } from "../../api/manager/gateApi";
 import {
-  ManagerEmptyState, ManagerField, ManagerForm, ManagerInput,
-  ManagerPageHeader, ManagerPrimaryButton, ManagerSecondaryButton,
-  ManagerSelect, ManagerStatCard, ManagerStatsRow, ManagerStatusBadge,
+  ManagerCell, ManagerDataTable, ManagerEmptyState, ManagerField, ManagerForm, ManagerInput,
+  ManagerPageHeader, ManagerPrimaryButton, ManagerRow, ManagerSecondaryButton,
+  ManagerSelect, ManagerStatBar,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { getAssignedBuildingId, getRole } from "../../utils/auth";
 
 function getBuildingId(item) { return item?.buildingId ?? item?.id; }
 function getFloorId(item) { return item?.floorId ?? item?.id; }
@@ -38,6 +39,16 @@ function statusColor(status) {
   return "bg-slate-400/90";
 }
 
+const TONE_TEXT = {
+  emerald: "text-emerald-600 dark:text-emerald-300",
+  amber: "text-amber-600 dark:text-amber-300",
+  rose: "text-rose-600 dark:text-rose-300",
+  blue: "text-blue-600 dark:text-blue-300",
+  violet: "text-violet-600 dark:text-violet-300",
+  slate: "text-muted-foreground",
+};
+function toneText(tone) { return TONE_TEXT[tone] || TONE_TEXT.slate; }
+
 const SLOT_STATUS_LABELS = { AVAILABLE: "Còn trống", OCCUPIED: "Đang có xe", RESERVED: "Đã đặt trước", MAINTENANCE: "Bảo trì" };
 const GATE_TYPE_LABELS = { ENTRY: "Cổng vào", EXIT: "Cổng ra", BOTH: "Cả hai" };
 const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
@@ -45,6 +56,8 @@ const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
 const SLOT_PAGE_SIZE = 10;
 
 export default function ParkingStructurePage() {
+  const isManager = getRole() === "MANAGER";
+  const assignedBuildingId = getAssignedBuildingId();
   const [buildings, setBuildings] = useState([]);
   const [floors, setFloors] = useState([]);
   const [zones, setZones] = useState([]);
@@ -73,6 +86,15 @@ export default function ParkingStructurePage() {
     void loadAll();
   }, []);
 
+  // Manager chỉ quản lý đúng 1 toà — tự động vào thẳng thay vì bắt chọn giữa
+  // danh sách chỉ có 1 item.
+  useEffect(() => {
+    if (isManager && assignedBuildingId && !selectedBuildingId && buildings.length > 0) {
+      selectBuilding(assignedBuildingId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager, assignedBuildingId, buildings]);
+
   async function loadAll() {
     try {
       const [buildingRes, floorRes, zoneRes, slotRes, vehicleTypeRes, gateRes] = await Promise.all([
@@ -97,7 +119,10 @@ export default function ParkingStructurePage() {
 
   // ── Derived: building summaries (tinh tai cho, khong goi API rieng cho tung building) ──
   const buildingSummaries = useMemo(() => {
-    return buildings.map((b) => {
+    const scoped = isManager
+      ? buildings.filter((b) => String(getBuildingId(b)) === String(assignedBuildingId))
+      : buildings;
+    return scoped.map((b) => {
       const bid = getBuildingId(b);
       const bFloorIds = floors
         .filter((f) => String(f.building?.buildingId ?? f.building?.id) === String(bid))
@@ -476,7 +501,7 @@ export default function ParkingStructurePage() {
         title="Cấu trúc bãi xe"
         description="Quản lý Tòa nhà → Tầng → Zone → Slot và Cổng ra vào trong một nơi duy nhất"
         action={
-          !selectedBuildingId ? (
+          !selectedBuildingId && !isManager ? (
             <ManagerPrimaryButton type="button" onClick={() => openBuildingModal()} className="flex items-center gap-2">
               <Plus size={14} /> Thêm tòa nhà
             </ManagerPrimaryButton>
@@ -520,28 +545,25 @@ export default function ParkingStructurePage() {
                   className="cursor-pointer"
                   onClick={() => selectBuilding(item.id)}
                 >
-                  <div className="mb-4 flex items-start justify-between">
-                    <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10">
-                      <Building2 size={18} className="text-primary" />
-                    </div>
-                    <ManagerStatusBadge tone={item.occupancy >= 85 ? "amber" : "emerald"}>
+                  <div className="mb-1 flex items-start justify-between gap-2">
+                    <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
+                    <span className={`shrink-0 text-xs font-semibold ${item.occupancy >= 85 ? "text-amber-600 dark:text-amber-300" : "text-emerald-600 dark:text-emerald-300"}`}>
                       {item.occupancy >= 85 ? "Gần đầy" : "Bình thường"}
-                    </ManagerStatusBadge>
+                    </span>
                   </div>
-                  <h3 className="text-2xl font-semibold text-foreground">{item.name}</h3>
-                  <p className="mb-3 mt-1 text-sm text-muted-foreground">{item.address}</p>
-                  <div className="mb-4 grid grid-cols-3 gap-3">
-                    <div className="rounded-3xl bg-slate-100/80 p-4 text-center dark:bg-white/5">
-                      <p className="text-2xl font-semibold text-slate-950 dark:text-slate-100">{item.floorsCount}</p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Tầng</p>
+                  <p className="mb-4 text-sm text-muted-foreground">{item.address}</p>
+                  <div className="mb-4 flex items-center gap-5 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Tầng </span>
+                      <span className="font-semibold text-foreground">{item.floorsCount}</span>
                     </div>
-                    <div className="rounded-3xl bg-slate-100/80 p-4 text-center dark:bg-white/5">
-                      <p className="text-2xl font-semibold text-slate-950 dark:text-slate-100">{item.totalSlots}</p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Tổng slot</p>
+                    <div>
+                      <span className="text-muted-foreground">Tổng slot </span>
+                      <span className="font-semibold text-foreground">{item.totalSlots}</span>
                     </div>
-                    <div className="rounded-3xl bg-emerald-50/80 p-4 text-center dark:bg-emerald-500/10">
-                      <p className="text-2xl font-semibold text-emerald-700 dark:text-emerald-300">{item.available}</p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">Còn trống</p>
+                    <div>
+                      <span className="text-muted-foreground">Còn trống </span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-300">{item.available}</span>
                     </div>
                   </div>
                   <div className="mb-1 flex justify-between text-xs text-muted-foreground">
@@ -574,15 +596,18 @@ export default function ParkingStructurePage() {
         )
       ) : (
         <>
-          <ManagerStatsRow>
-            <ManagerStatCard icon={Layers} label="Số tầng" value={buildingFloors.length} hint="Của tòa nhà này" tone="violet" />
-            <ManagerStatCard icon={Grid3x3} label="Số zone (tầng đang xem)" value={floorZones.length} hint={selectedFloor ? selectedFloor.label : "—"} tone="blue" />
-            <ManagerStatCard icon={ShieldCheck} label="Slot còn trống" value={selectedBuilding?.available ?? 0} hint="Toàn bộ tòa nhà" tone="emerald" />
-            <ManagerStatCard icon={SquareParking} label="Tổng slot" value={selectedBuilding?.totalSlots ?? 0} hint="Toàn bộ tòa nhà" tone="amber" />
-          </ManagerStatsRow>
+          <ManagerStatBar
+            items={[
+              { label: "Số tầng", value: buildingFloors.length, hint: "Của tòa nhà này", tone: "violet" },
+              { label: "Số zone", value: floorZones.length, hint: selectedFloor ? selectedFloor.label : "—", tone: "blue" },
+              { label: "Slot còn trống", value: selectedBuilding?.available ?? 0, hint: "Toàn bộ tòa nhà", tone: "emerald" },
+              { label: "Tổng slot", value: selectedBuilding?.totalSlots ?? 0, hint: "Toàn bộ tòa nhà", tone: "amber" },
+            ]}
+          />
 
-          {/* ══════════ CẤP 1 — TẦNG ══════════ */}
-          <div className="rounded-3xl border border-border bg-card p-5">
+          {/* ══════════ TẦNG / CỔNG / ZONE / SLOT — gộp 1 khối ══════════ */}
+          <div className="rounded-3xl border border-border bg-card">
+          <div className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Tầng</h3>
               <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openFloorModal()}>
@@ -629,7 +654,7 @@ export default function ParkingStructurePage() {
           </div>
 
           {/* ══════════ CỔNG (thuộc building, ngang cap voi Tang) ══════════ */}
-          <div className="rounded-3xl border border-border bg-card p-5">
+          <div className="border-t border-border p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Cổng ra vào</h3>
               <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openGateModal()}>
@@ -639,37 +664,35 @@ export default function ParkingStructurePage() {
             {buildingGates.length === 0 ? (
               <ManagerEmptyState title="Chưa có cổng" description="Thêm cổng vào/ra cho tòa nhà này." />
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ManagerDataTable columns={["Cổng", "Loại", "Trạng thái", "Thao tác"]}>
                 {buildingGates.map((gate) => (
-                  <div key={gate.id} className="rounded-2xl border border-border p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                        <DoorOpen size={14} className="text-muted-foreground" /> {gate.gateCode}
-                      </span>
-                      <ManagerStatusBadge tone={gate.gateType === "ENTRY" ? "emerald" : gate.gateType === "EXIT" ? "amber" : "blue"}>
+                  <ManagerRow key={gate.id}>
+                    <ManagerCell className="font-medium">{gate.gateCode}</ManagerCell>
+                    <ManagerCell>
+                      <span className={`font-medium ${toneText(gate.gateType === "ENTRY" ? "emerald" : gate.gateType === "EXIT" ? "amber" : "blue")}`}>
                         {GATE_TYPE_LABELS[gate.gateType] || gate.gateType}
-                      </ManagerStatusBadge>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {gate.isActive !== false ? "Đang hoạt động" : "Ngừng hoạt động"}
-                    </p>
-                    <div className="mt-3 flex gap-2">
-                      <button type="button" onClick={() => openGateModal(gate)} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-muted">
-                        <Edit2 size={11} /> Sửa
-                      </button>
-                      <button type="button" onClick={() => deleteGate(gate.id)} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-rose-200 py-1.5 text-xs text-rose-600 hover:bg-rose-50">
-                        <Trash2 size={11} /> Xóa
-                      </button>
-                    </div>
-                  </div>
+                      </span>
+                    </ManagerCell>
+                    <ManagerCell>
+                      <span className={toneText(gate.isActive !== false ? "emerald" : "slate")}>
+                        {gate.isActive !== false ? "Đang hoạt động" : "Ngừng hoạt động"}
+                      </span>
+                    </ManagerCell>
+                    <ManagerCell>
+                      <div className="flex gap-2">
+                        <ManagerSecondaryButton type="button" onClick={() => openGateModal(gate)}>Sửa</ManagerSecondaryButton>
+                        <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => deleteGate(gate.id)}>Xóa</ManagerSecondaryButton>
+                      </div>
+                    </ManagerCell>
+                  </ManagerRow>
                 ))}
-              </div>
+              </ManagerDataTable>
             )}
           </div>
 
           {/* ══════════ CẤP 2 — ZONE ══════════ */}
           {resolvedFloorId && (
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="border-t border-border p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Zone — {selectedFloor?.label} {selectedFloor?.name}</h3>
                 <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openZoneModal()}>
@@ -679,45 +702,36 @@ export default function ParkingStructurePage() {
               {floorZones.length === 0 ? (
                 <ManagerEmptyState title="Chưa có zone" description="Thêm zone để bắt đầu khai báo slot cho tầng này." />
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <ManagerDataTable columns={["Zone", "Loại xe", "Mô tả", "Trạng thái", "Thao tác"]}>
                   {floorZones.map((zone) => {
                     const isActive = String(selectedZoneId) === String(zone.id);
                     return (
-                      <div
-                        key={zone.id}
-                        className={`rounded-2xl border p-4 transition-all ${isActive ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
-                      >
-                        <div className="cursor-pointer" onClick={() => selectZone(zone.id)}>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-foreground">{zone.name}</span>
-                            <ManagerStatusBadge tone={zone.isActive !== false ? "emerald" : "amber"}>
-                              {zone.isActive !== false ? "Đang hoạt động" : "Ngừng hoạt động"}
-                            </ManagerStatusBadge>
+                      <ManagerRow key={zone.id} onClick={() => selectZone(zone.id)} active={isActive}>
+                        <ManagerCell className="font-medium">{zone.name}</ManagerCell>
+                        <ManagerCell className="text-muted-foreground">{zone.vehicleType?.name || "Không xác định"}</ManagerCell>
+                        <ManagerCell className="text-muted-foreground">{zone.description || "—"}</ManagerCell>
+                        <ManagerCell>
+                          <span className={toneText(zone.isActive !== false ? "emerald" : "amber")}>
+                            {zone.isActive !== false ? "Đang hoạt động" : "Ngừng hoạt động"}
+                          </span>
+                        </ManagerCell>
+                        <ManagerCell>
+                          <div className="flex gap-2">
+                            <ManagerSecondaryButton type="button" onClick={(e) => { e.stopPropagation(); openZoneModal(zone); }}>Sửa</ManagerSecondaryButton>
+                            <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); deleteZone(zone.id); }}>Xóa</ManagerSecondaryButton>
                           </div>
-                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            <Car size={11} /> {zone.vehicleType?.name || "Không xác định"}
-                          </p>
-                          {zone.description && <p className="mt-1 text-xs text-muted-foreground">{zone.description}</p>}
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <button type="button" onClick={() => openZoneModal(zone)} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border py-1.5 text-xs text-muted-foreground hover:bg-muted">
-                            <Edit2 size={11} /> Sửa
-                          </button>
-                          <button type="button" onClick={() => deleteZone(zone.id)} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-rose-200 py-1.5 text-xs text-rose-600 hover:bg-rose-50">
-                            <Trash2 size={11} /> Xóa
-                          </button>
-                        </div>
-                      </div>
+                        </ManagerCell>
+                      </ManagerRow>
                     );
                   })}
-                </div>
+                </ManagerDataTable>
               )}
             </div>
           )}
 
           {/* ══════════ CẤP 3 — SLOT ══════════ */}
           {selectedZone && (
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="border-t border-border p-5">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Slot — {selectedZone.name}</h3>
@@ -728,20 +742,14 @@ export default function ParkingStructurePage() {
                 </ManagerPrimaryButton>
               </div>
 
-              <div className="mb-4 grid grid-cols-3 gap-3">
-                {[
-                  { label: "Còn trống", count: zoneSlotCounts.available, color: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500" },
-                  { label: "Đang có xe", count: zoneSlotCounts.occupied, color: "bg-rose-50 border-rose-200", text: "text-rose-700", dot: "bg-rose-500" },
-                  { label: "Đã đặt trước", count: zoneSlotCounts.reserved, color: "bg-amber-50 border-amber-200", text: "text-amber-700", dot: "bg-amber-500" },
-                ].map((item) => (
-                  <div key={item.label} className={`${item.color} flex items-center gap-3 rounded-2xl border p-4`}>
-                    <div className={`size-3 rounded-full ${item.dot}`} />
-                    <div>
-                      <p className={`text-2xl font-bold ${item.text}`}>{item.count}</p>
-                      <p className={`text-xs ${item.text} opacity-80`}>{item.label}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="mb-4">
+                <ManagerStatBar
+                  items={[
+                    { label: "Còn trống", value: zoneSlotCounts.available, tone: "emerald" },
+                    { label: "Đang có xe", value: zoneSlotCounts.occupied, tone: "rose" },
+                    { label: "Đã đặt trước", value: zoneSlotCounts.reserved, tone: "amber" },
+                  ]}
+                />
               </div>
 
               {zoneSlotCounts.total > 0 && (
@@ -793,22 +801,19 @@ export default function ParkingStructurePage() {
                 ) : (
                   pagedZoneSlots.map((slot) => (
                     <div key={slot.id} className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3">
-                      <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                        <SquareParking size={18} />
-                      </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-foreground">{slot.slotCode}</p>
                         <p className="text-xs text-muted-foreground">{SLOT_SIZE_LABELS[slot.slotSize] || slot.slotSize}</p>
                       </div>
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        className={`text-xs font-medium ${
                           slot.status === "AVAILABLE"
-                            ? "bg-emerald-100 text-emerald-700"
+                            ? "text-emerald-600 dark:text-emerald-300"
                             : slot.status === "OCCUPIED"
-                              ? "bg-rose-100 text-rose-700"
+                              ? "text-rose-600 dark:text-rose-300"
                               : slot.status === "RESERVED"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-slate-100 text-slate-700"
+                                ? "text-amber-600 dark:text-amber-300"
+                                : "text-muted-foreground"
                         }`}
                       >
                         {SLOT_STATUS_LABELS[slot.status] || slot.status}
@@ -822,12 +827,6 @@ export default function ParkingStructurePage() {
                     </div>
                   ))
                 )}
-                {Array.from({ length: Math.max(0, SLOT_PAGE_SIZE - pagedZoneSlots.length) }, (_, index) => (
-                  <div key={`filler-${index}`} aria-hidden="true" className="invisible flex items-center gap-3 rounded-2xl border border-border px-4 py-3">
-                    <div className="size-10 shrink-0" />
-                    <div className="min-w-0 flex-1">&nbsp;</div>
-                  </div>
-                ))}
               </div>
 
               {totalSlotPages > 1 && (
@@ -850,6 +849,7 @@ export default function ParkingStructurePage() {
               )}
             </div>
           )}
+          </div>
         </>
       )}
 

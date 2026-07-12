@@ -174,9 +174,10 @@ public class PaymentServiceImpl implements PaymentService {
         List<PricingPolicy> activePolicies = List.of();
         if (session.getVehicle() != null && session.getVehicle().getVehicleType() != null) {
             // Dung TAT CA phien ban gia de tinh dung phi cho tung doan thoi gian da
-            // qua, ke ca khi Manager da sua gia giua luc xe dang do.
-            activePolicies = pricingPolicyRepository.findByVehicleType_Id(
-                    session.getVehicle().getVehicleType().getId());
+            // qua, ke ca khi Manager da sua gia giua luc xe dang do. Uu tien gia
+            // rieng cua toa nha, fallback ve gia global neu toa chua tu cau hinh.
+            activePolicies = pricingPolicyRepository.resolveForBuilding(
+                    session.getVehicle().getVehicleType().getId(), buildingIdOf(session));
         }
         if (session.getExitTime() == null) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -444,7 +445,7 @@ public class PaymentServiceImpl implements PaymentService {
         BigDecimal hourlyRate = new BigDecimal("20000");
         if (booking.getVehicle() != null && booking.getVehicle().getVehicleType() != null) {
             Long vtId = booking.getVehicle().getVehicleType().getId();
-            policies = pricingPolicyRepository.findByVehicleType_Id(vtId);
+            policies = pricingPolicyRepository.resolveForBuilding(vtId, buildingIdOf(booking));
             hourlyRate = feeCalculatorUtil.resolveHourlyRate(policies, booking.getBookingStartTime());
         }
 
@@ -503,10 +504,28 @@ public class PaymentServiceImpl implements PaymentService {
         }
         Long vtId = session.getVehicle().getVehicleType().getId();
         // Tat ca phien ban gia - resolveHourlyRate se tu chon dung phien ban theo
-        // effectiveFrom tai thoi diem entryTime.
-        List<PricingPolicy> policies = pricingPolicyRepository.findByVehicleType_Id(vtId);
+        // effectiveFrom tai thoi diem entryTime. Uu tien gia rieng cua toa nha.
+        List<PricingPolicy> policies = pricingPolicyRepository.resolveForBuilding(vtId, buildingIdOf(session));
         LocalDateTime refTime = session.getEntryTime() != null ? session.getEntryTime() : LocalDateTime.now();
         return feeCalculatorUtil.resolveHourlyRate(policies, refTime);
+    }
+
+    private Long buildingIdOf(ParkingSession session) {
+        return safeBuildingId(
+                session != null && session.getSlot() != null && session.getSlot().getZone() != null
+                        && session.getSlot().getZone().getFloor() != null
+                        ? session.getSlot().getZone().getFloor().getBuilding() : null);
+    }
+
+    private Long buildingIdOf(Booking booking) {
+        return safeBuildingId(
+                booking != null && booking.getSlot() != null && booking.getSlot().getZone() != null
+                        && booking.getSlot().getZone().getFloor() != null
+                        ? booking.getSlot().getZone().getFloor().getBuilding() : null);
+    }
+
+    private Long safeBuildingId(com.swp391.parking.entity.ParkingBuilding building) {
+        return building != null ? building.getId() : null;
     }
 
     private void validateRefundEligibility(Payment payment) {

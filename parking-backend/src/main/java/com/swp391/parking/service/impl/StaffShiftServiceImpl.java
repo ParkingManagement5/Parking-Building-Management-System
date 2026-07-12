@@ -58,6 +58,15 @@ public class StaffShiftServiceImpl implements StaffShiftService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<StaffShiftResponse> getAllStaffShiftsByBuilding(Long buildingId) {
+        return staffShiftRepository.findAll()
+                .stream()
+                .filter(ss -> matchesBuilding(ss, buildingId))
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
     
     @Override
 public List<StaffShiftResponse> getByUser(Long userId) {
@@ -73,6 +82,21 @@ public List<StaffShiftResponse> getByUser(Long userId) {
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<StaffShiftResponse> getByWorkingDateAndBuilding(LocalDate workingDate, Long buildingId) {
+        return staffShiftRepository.findByWorkingDate(workingDate)
+                .stream()
+                .filter(ss -> matchesBuilding(ss, buildingId))
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private boolean matchesBuilding(StaffShift ss, Long buildingId) {
+        return ss.getUser() != null
+                && ss.getUser().getAssignedBuilding() != null
+                && buildingId.equals(ss.getUser().getAssignedBuilding().getId());
     }
 
     @Override

@@ -8,6 +8,6 @@ public interface BuildingService {
     List<ParkingBuilding> getAll();
     ParkingBuilding getById(Long id);
     ParkingBuilding create(BuildingRequest req);
-    ParkingBuilding update(Long id, BuildingRequest req);
-    void deactivate(Long id);
+    ParkingBuilding update(Long id, BuildingRequest req, Long scopeBuildingId);
+    void deactivate(Long id, Long scopeBuildingId);
 }

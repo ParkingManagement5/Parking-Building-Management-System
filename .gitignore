@@ -29,3 +29,6 @@ ocr-service/*.log
 # AI coding tool skills (local only)
 .agents/
 skills-lock.json
+
+# scratch Playwright verification scripts
+.tmp-pw/

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { notificationApi } from "../../api/notificationApi";
 import { getRole, getUserId, getUsername } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
-import { usePublicTheme } from "../../utils/publicTheme";
+import { useTheme } from "../../utils/theme";
 import "../../assets/css/landing.css";
 import "../../assets/css/dashboard.css";
 
@@ -60,9 +60,8 @@ const CONFIG = {
         label: "Xử lý",
         items: [
           { id: "exceptions", label: "Ngoại lệ" },
-          { id: "requests", label: "Yêu cầu" },
           { id: "floor-occupancy", label: "Lấp đầy theo tầng" },
-          { id: "notifications", label: "Thông báo" },
+          { id: "notifications", label: "Thông báo & Yêu cầu" },
         ],
       },
     ],
@@ -83,7 +82,6 @@ const CONFIG = {
         label: "Báo cáo",
         items: [
           { id: "reports", label: "Báo cáo & Thống kê" },
-          { id: "reports/revenue", label: "Doanh thu" },
         ],
       },
       {
@@ -107,9 +105,20 @@ const CONFIG = {
         label: "Hệ thống",
         items: [
           { id: "users", label: "Người dùng" },
-          { id: "roles", label: "Vai trò" },
           { id: "system-config", label: "Cấu hình" },
           { id: "activity-logs", label: "Nhật ký hoạt động" },
+        ],
+      },
+      {
+        label: "Cấu hình giá",
+        items: [
+          { id: "pricing-policies", label: "Bảng giá" },
+        ],
+      },
+      {
+        label: "Cơ sở hạ tầng",
+        items: [
+          { id: "parking-structure", label: "Cấu trúc bãi xe" },
         ],
       },
     ],
@@ -140,7 +149,10 @@ export default function RolePortalLayout({ portal }) {
   const navigate = useNavigate();
   const location = useLocation();
   const config = CONFIG[portal];
-  const { dark, toggle, className: themeClass } = usePublicTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
+  const themeClass = dark ? "" : "ps-light";
+  const toggle = () => setTheme(dark ? "light" : "dark");
   const username = getUsername() || "User";
   const role = getRole() || portal.toUpperCase();
   const userId = getUserId();

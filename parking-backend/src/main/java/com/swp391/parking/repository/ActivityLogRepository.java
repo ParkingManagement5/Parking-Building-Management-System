@@ -10,4 +10,5 @@ import java.util.List;
 public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> {
     List<ActivityLog> findAllByOrderByCreatedAtDesc();
     List<ActivityLog> findAllByUser_UserIdOrderByCreatedAtDesc(Integer userId);
+    List<ActivityLog> findAllByUser_UserIdAndActionTypeOrderByCreatedAtDesc(Integer userId, String actionType);
 }

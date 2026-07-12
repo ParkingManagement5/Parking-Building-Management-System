@@ -35,23 +35,35 @@ public class FloorServiceImpl implements FloorService {
     }
 
     @Override
-    public List<Floor> getByBuilding(Long buildingId, Long currentUserId, boolean staffScoped) {
-        enforceStaffBuildingScope(buildingId, currentUserId, staffScoped);
+    public List<Floor> getByBuilding(Long buildingId, Long currentUserId, boolean buildingScoped) {
+        enforceStaffBuildingScope(buildingId, currentUserId, buildingScoped);
         return getByBuilding(buildingId);
     }
 
     @Override
-    public Floor getById(Long id, Long currentUserId, boolean staffScoped) {
+    public Floor getById(Long id, Long currentUserId, boolean buildingScoped) {
         Floor floor = floorRepo.findById(id)
             .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                 "Không tìm thấy tầng ID: " + id));
-        enforceStaffBuildingScope(floor.getBuilding() != null ? floor.getBuilding().getId() : null, currentUserId, staffScoped);
+        enforceStaffBuildingScope(floor.getBuilding() != null ? floor.getBuilding().getId() : null, currentUserId, buildingScoped);
         return floor;
     }
 
     @Override
+    public List<Floor> getAll(Long scopeBuildingId) {
+        List<Floor> all = floorRepo.findAll();
+        if (scopeBuildingId == null) return all;
+        return all.stream()
+                .filter(f -> f.getBuilding() != null && scopeBuildingId.equals(f.getBuilding().getId()))
+                .toList();
+    }
+
+    @Override
     @Transactional
-    public Floor create(FloorRequest req) {
+    public Floor create(FloorRequest req, Long scopeBuildingId) {
+        if (scopeBuildingId != null && !scopeBuildingId.equals(req.getBuildingId())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ được tạo tầng cho toà nhà bạn quản lý");
+        }
         if (floorRepo.existsByBuildingIdAndFloorNumber(req.getBuildingId(), req.getFloorNumber())) {
             throw new AppException(HttpStatus.CONFLICT,
                 "Tầng số " + req.getFloorNumber() + " đã tồn tại trong toà nhà này");
@@ -75,10 +87,11 @@ public class FloorServiceImpl implements FloorService {
 
     @Override
     @Transactional
-    public Floor update(Long id, FloorRequest req) {
+    public Floor update(Long id, FloorRequest req, Long scopeBuildingId) {
         Floor floor = floorRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy tầng ID: " + id));
+        enforceBuildingOwnership(floor.getBuilding() != null ? floor.getBuilding().getId() : null, scopeBuildingId, "sửa");
         floor.setName(req.getName());
         floor.setCapacity(req.getCapacity() != null ? req.getCapacity() : floor.getCapacity());
         if (req.getStatus() != null) {
@@ -89,27 +102,34 @@ public class FloorServiceImpl implements FloorService {
 
     @Override
     @Transactional
-    public void deactivate(Long id) {
+    public void deactivate(Long id, Long scopeBuildingId) {
         Floor floor = floorRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy tầng ID: " + id));
+        enforceBuildingOwnership(floor.getBuilding() != null ? floor.getBuilding().getId() : null, scopeBuildingId, "xoá");
         var zones = zoneRepo.findByFloorId(floor.getId());
         zones.forEach(zone -> parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId())));
         zoneRepo.deleteAllInBatch(zones);
         floorRepo.delete(floor);
     }
 
-    private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean staffScoped) {
-        if (!staffScoped) {
+    private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean buildingScoped) {
+        if (!buildingScoped) {
             return;
         }
         User currentUser = userRepository.findById(Math.toIntExact(currentUserId))
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy staff hiện tại"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
         if (currentUser.getAssignedBuilding() == null || currentUser.getAssignedBuilding().getId() == null) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Staff chưa được gán toà nhà");
+            throw new AppException(HttpStatus.FORBIDDEN, "Chưa được gán toà nhà");
         }
         if (!currentUser.getAssignedBuilding().getId().equals(buildingId)) {
             throw new AppException(HttpStatus.FORBIDDEN, "Không có quyền xem tầng ngoài toà nhà được phân công");
+        }
+    }
+
+    private void enforceBuildingOwnership(Long entityBuildingId, Long scopeBuildingId, String action) {
+        if (scopeBuildingId != null && !scopeBuildingId.equals(entityBuildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ được " + action + " tầng thuộc toà nhà bạn quản lý");
         }
     }
 }

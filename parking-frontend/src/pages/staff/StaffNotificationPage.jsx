@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { BellRing } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { BellRing, X } from "lucide-react";
 import { notificationApi } from "../../api/notificationApi";
+import { requestApi } from "../../api/driver/requestApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
 import { formatStaffDateTime } from "./staffPortalState";
@@ -18,19 +20,35 @@ function toneFromType(type, isRead) {
   return "slate";
 }
 
+function todayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function StaffNotificationPage() {
   const userId = getUserId();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "requests" ? "requests" : "notifications";
+
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [filterDate, setFilterDate] = useState(todayDateString());
   const PAGE_SIZE = 8;
+
+  const [requests, setRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [requestError, setRequestError] = useState("");
+
+  function setActiveTab(tab) {
+    setSearchParams(tab === "requests" ? { tab: "requests" } : {});
+  }
 
   async function loadNotifications() {
     if (!userId) {
       setNotifications([]);
       return;
     }
-
     const res = await notificationApi.getByUser(userId);
     setNotifications(unwrapApiData(res.data, []));
   }
@@ -71,13 +89,45 @@ export default function StaffNotificationPage() {
     };
   }, [userId]);
 
+  useEffect(() => {
+    void loadRequests();
+  }, []);
+
+  async function loadRequests() {
+    setRequestsLoading(true);
+    setRequestError("");
+    try {
+      const [openRes, progressRes] = await Promise.all([
+        requestApi.getByStatus("OPEN"),
+        requestApi.getByStatus("IN_PROGRESS"),
+      ]);
+      setRequests([
+        ...unwrapApiData(openRes.data, []),
+        ...unwrapApiData(progressRes.data, []),
+      ]);
+    } catch (err) {
+      console.error("Failed to load requests", err);
+      setRequestError(err.response?.data?.message || "Không tải được danh sách yêu cầu.");
+    } finally {
+      setRequestsLoading(false);
+    }
+  }
+
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.isRead).length,
     [notifications]
   );
 
-  const paged = useMemo(() => notifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [notifications, page]);
-  const totalPages = Math.max(1, Math.ceil(notifications.length / PAGE_SIZE));
+  const filteredNotifications = useMemo(() => {
+    if (!filterDate) return notifications;
+    return notifications.filter((item) => String(item.createdAt || "").slice(0, 10) === filterDate);
+  }, [notifications, filterDate]);
+
+  const paged = useMemo(
+    () => filteredNotifications.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredNotifications, page]
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / PAGE_SIZE));
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -98,99 +148,221 @@ export default function StaffNotificationPage() {
     }
   };
 
+  const assignToMe = async (request) => {
+    const staffId = Number(localStorage.getItem("userId"));
+    if (!staffId) {
+      setRequestError("Không tìm thấy staff userId trong localStorage.");
+      return;
+    }
+    setSavingId(request.requestId);
+    setRequestError("");
+    try {
+      await requestApi.assign(request.requestId, staffId);
+      await loadRequests();
+    } catch (err) {
+      console.error("Assign request failed", err);
+      setRequestError(err.response?.data?.message || "Không assign được request.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const resolveRequest = async (request) => {
+    setSavingId(request.requestId);
+    setRequestError("");
+    try {
+      await requestApi.resolve(request.requestId);
+      await loadRequests();
+    } catch (err) {
+      console.error("Resolve request failed", err);
+      setRequestError(err.response?.data?.message || "Không resolve được request.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Total Notifications</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{notifications.length}</p>
-        </div>
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Unread</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{unreadCount}</p>
-        </div>
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Actions</p>
-          <div className="mt-3 flex gap-3">
-            <StaffPrimaryButton onClick={handleMarkAllAsRead} disabled={unreadCount === 0} className="flex-1">
-              Mark All Read
-            </StaffPrimaryButton>
-            <StaffSecondaryButton onClick={() => void loadNotifications()} className="flex-1">
-              Refresh
-            </StaffSecondaryButton>
+      <StaffPageSection
+        title="Thông báo & Yêu cầu"
+        subtitle={`${unreadCount} thông báo chưa đọc · ${requests.length} yêu cầu cần xử lý`}
+        action={
+          <StaffSecondaryButton onClick={() => { void loadNotifications(); void loadRequests(); }}>
+            Refresh
+          </StaffSecondaryButton>
+        }
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1 rounded-xl border border-border bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("notifications")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === "notifications" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Thông báo{unreadCount > 0 ? ` (${unreadCount})` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("requests")}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === "requests" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Yêu cầu hỗ trợ{requests.length > 0 ? ` (${requests.length})` : ""}
+            </button>
           </div>
-        </div>
-      </div>
 
-      <StaffPageSection title="Notification Feed" subtitle="Live operational updates from the backend">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading notifications...</p>
-        ) : notifications.length === 0 ? (
-          <StaffEmptyState
-            title="No notifications"
-            description="There are currently no alerts for this staff account."
-            tone="success"
-          />
-        ) : (
-          <div className="space-y-3">
-            {paged.map((item) => (
-              <div
-                key={item.notificationId}
-                className={`rounded-2xl border px-4 py-4 transition-colors ${
-                  item.isRead ? "border-border bg-background" : "border-primary/20 bg-primary/5"
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="mt-1 flex size-10 items-center justify-center rounded-2xl bg-background shadow-sm dark:bg-white/5">
-                    <BellRing size={16} className={item.isRead ? "text-slate-500 dark:text-slate-300" : "text-primary"} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-                      <StaffStatusBadge tone={toneFromType(item.type, item.isRead)}>
-                        {item.isRead ? "read" : "unread"}
-                      </StaffStatusBadge>
-                      {item.type ? (
-                        <StaffStatusBadge tone="violet">{String(item.type).toLowerCase()}</StaffStatusBadge>
+          {activeTab === "notifications" ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(event) => { setFilterDate(event.target.value); setPage(1); }}
+                className="rounded-xl border border-border bg-muted px-3 py-2 text-xs outline-none focus:border-primary"
+              />
+              {filterDate ? (
+                <button
+                  type="button"
+                  onClick={() => { setFilterDate(""); setPage(1); }}
+                  className="flex items-center gap-1 rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={12} /> Xem tất cả ngày
+                </button>
+              ) : null}
+              <StaffPrimaryButton onClick={handleMarkAllAsRead} disabled={unreadCount === 0}>
+                Mark All Read
+              </StaffPrimaryButton>
+            </div>
+          ) : null}
+        </div>
+
+        {activeTab === "notifications" ? (
+          <>
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading notifications...</p>
+            ) : filteredNotifications.length === 0 ? (
+              <StaffEmptyState
+                title={notifications.length === 0 ? "No notifications" : "Không có thông báo cho ngày này"}
+                description={
+                  notifications.length === 0
+                    ? "There are currently no alerts for this staff account."
+                    : "Chọn ngày khác hoặc bấm \"Xem tất cả ngày\" để xem toàn bộ."
+                }
+                tone="success"
+              />
+            ) : (
+              <div className="space-y-2">
+                {paged.map((item) => (
+                  <div
+                    key={item.notificationId}
+                    className={`rounded-2xl border px-4 py-3 transition-colors ${
+                      item.isRead ? "border-border bg-background" : "border-primary/20 bg-primary/5"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex size-8 items-center justify-center rounded-xl bg-background shadow-sm dark:bg-white/5">
+                        <BellRing size={14} className={item.isRead ? "text-slate-500 dark:text-slate-300" : "text-primary"} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                          <StaffStatusBadge tone={toneFromType(item.type, item.isRead)}>
+                            {item.isRead ? "read" : "unread"}
+                          </StaffStatusBadge>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.body}</p>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{formatStaffDateTime(item.createdAt)}</span>
+                      {!item.isRead ? (
+                        <StaffSecondaryButton onClick={() => handleMarkAsRead(item.notificationId)}>
+                          Mark Read
+                        </StaffSecondaryButton>
                       ) : null}
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {formatStaffDateTime(item.createdAt)}
-                    </p>
                   </div>
-                  {!item.isRead ? (
-                    <StaffSecondaryButton onClick={() => handleMarkAsRead(item.notificationId)}>
-                      Mark Read
-                    </StaffSecondaryButton>
-                  ) : null}
-                </div>
+                ))}
               </div>
-            ))}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-              <div key={`filler-${index}`} aria-hidden="true" className="invisible rounded-2xl border px-4 py-4">
-                &nbsp;
+            )}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                  className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+                  ← Trước
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
+                  Sau →
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              ← Trước
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => setPage(p)}
-                className={`size-8 rounded-lg text-xs font-bold transition ${p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-                {p}
-              </button>
-            ))}
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed">
-              Sau →
-            </button>
-          </div>
+            )}
+          </>
+        ) : (
+          <>
+            {requestError ? (
+              <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {requestError}
+              </div>
+            ) : null}
+
+            {requests.length === 0 ? (
+              <StaffEmptyState
+                title={requestsLoading ? "Loading requests" : "No open requests"}
+                description="Driver support requests will appear here when they are created."
+                tone="success"
+              />
+            ) : (
+              <div className="space-y-2">
+                {requests.map((item) => (
+                  <div key={item.requestId} className="rounded-2xl border border-border p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">{item.subject || item.requestType}</p>
+                          <StaffStatusBadge tone={item.status === "IN_PROGRESS" ? "blue" : "amber"}>
+                            {String(item.status).toLowerCase()}
+                          </StaffStatusBadge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Request #{item.requestId} - {item.username || `User #${item.userId}`} - {formatStaffDateTime(item.createdAt)}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.description}</p>
+                        {item.assignedStaffName ? (
+                          <p className="mt-1 text-xs text-muted-foreground">Assigned to {item.assignedStaffName}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        {item.status === "OPEN" ? (
+                          <StaffSecondaryButton
+                            type="button"
+                            onClick={() => assignToMe(item)}
+                            disabled={savingId === item.requestId}
+                          >
+                            Assign to me
+                          </StaffSecondaryButton>
+                        ) : null}
+                        <StaffPrimaryButton
+                          type="button"
+                          onClick={() => resolveRequest(item)}
+                          disabled={savingId === item.requestId}
+                        >
+                          {savingId === item.requestId ? "Saving..." : "Resolve"}
+                        </StaffPrimaryButton>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </StaffPageSection>
     </div>
