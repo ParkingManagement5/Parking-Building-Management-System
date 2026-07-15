@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
-import { buildingApi } from "../../api/manager/buildingApi";
-import { getRole } from "../../utils/auth";
 import {
   ManagerCell,
   ManagerDataTable,
@@ -25,9 +23,7 @@ const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", WEEKLY: "T
 const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
 
 export default function PricingPolicyPage() {
-  const isAdmin = getRole() === "ADMIN";
   const [vehicleTypes, setVehicleTypes] = useState([]);
-  const [buildings, setBuildings] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -51,11 +47,6 @@ export default function PricingPolicyPage() {
     void loadInitialData();
   }, []);
 
-  const buildingMap = useMemo(
-    () => Object.fromEntries(buildings.map((item) => [item.id ?? item.buildingId, item.name])),
-    [buildings]
-  );
-
   const vehicleTypeMap = useMemo(
     () => Object.fromEntries(vehicleTypes.map((item) => [item.id ?? item.vehicleTypeId, item.name])),
     [vehicleTypes]
@@ -63,12 +54,9 @@ export default function PricingPolicyPage() {
 
   async function loadInitialData() {
     try {
-      const requests = [vehicleTypeApi.getAll(), pricingPolicyApi.getAll()];
-      if (isAdmin) requests.push(buildingApi.getAll());
-      const [vehicleTypeRes, policyRes, buildingRes] = await Promise.all(requests);
+      const [vehicleTypeRes, policyRes] = await Promise.all([vehicleTypeApi.getAll(), pricingPolicyApi.getAll()]);
       setVehicleTypes(unwrapApiData(vehicleTypeRes.data, []));
       setPolicies(unwrapApiData(policyRes.data, []));
-      if (buildingRes) setBuildings(unwrapApiData(buildingRes.data, []));
     } catch (error) {
       console.error("Failed to load pricing data", error);
       alert("Không tải được danh sách bảng giá");
@@ -113,7 +101,7 @@ export default function PricingPolicyPage() {
 
     const payload = {
       vehicleTypeId: Number(form.vehicleTypeId),
-      // Admin chỉ tạo được giá global; giá riêng theo toà là việc của Manager quản lý toà đó.
+      // buildingId luôn để null - backend tự gán theo toà Manager đang quản lý (resolveScopeBuildingId).
       buildingId: null,
       timeType: form.timeType,
       dayType: form.dayType,
@@ -124,24 +112,22 @@ export default function PricingPolicyPage() {
     };
 
     try {
+      // Backend da tu set dung isActive theo payload.isActive khi create/update roi
+      // (xem PricingPolicyServiceImpl) - KHONG duoc goi them activate(editingId) o day:
+      // khi gia thay doi that su, update() tao ban ghi MOI (id khac) va deactivate ban
+      // ghi CU, nhung editingId van tro ve ban ghi CU - goi activate(editingId) se vo
+      // tinh bat lai gia CU, khien 2 ban ghi cung active va gia moi sua khong hien ra.
       if (editingId) {
         await pricingPolicyApi.update(editingId, payload);
-        if (payload.isActive) {
-          await pricingPolicyApi.activate(editingId);
-        }
       } else {
-        const res = await pricingPolicyApi.create(payload);
-        const created = unwrapApiData(res.data, null);
-        const createdId = created?.policyId || created?.id;
-        if (payload.isActive && createdId) {
-          await pricingPolicyApi.activate(createdId);
-        }
+        await pricingPolicyApi.create(payload);
       }
       await loadInitialData();
+      setPage(1);
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save pricing policy", error);
-      alert("Lưu bảng giá thất bại");
+      alert(error.response?.data?.message || "Lưu bảng giá thất bại");
     }
   };
 
@@ -167,7 +153,7 @@ export default function PricingPolicyPage() {
       await loadInitialData();
     } catch (error) {
       console.error("Failed to deactivate pricing policy", error);
-      alert("Tắt bảng giá thất bại");
+      alert(error.response?.data?.message || "Tắt bảng giá thất bại");
     }
   };
 
@@ -272,7 +258,7 @@ export default function PricingPolicyPage() {
               <ManagerRow key={item.policyId}>
                 <ManagerCell>{vehicleTypeMap[item.vehicleTypeId] || item.vehicleTypeId}</ManagerCell>
                 <ManagerCell>
-                  {item.buildingId ? (item.buildingName || buildingMap[item.buildingId] || item.buildingId) : (
+                  {item.buildingId ? (item.buildingName || item.buildingId) : (
                     <ManagerStatusBadge tone="slate">Mặc định (Global)</ManagerStatusBadge>
                   )}
                 </ManagerCell>
@@ -284,8 +270,8 @@ export default function PricingPolicyPage() {
                   <ManagerStatusBadge tone={item.isActive ? "emerald" : "amber"}>{item.isActive ? "Đang bật" : "Đã tắt"}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
-                  {isAdmin && item.buildingId ? (
-                    <span className="text-xs text-muted-foreground">Do Manager toà đó quản lý</span>
+                  {!item.buildingId ? (
+                    <span className="text-xs text-muted-foreground whitespace-nowrap" title="Bảng giá mặc định cũ, không còn tạo mới được — tạo bảng giá riêng cho toà bạn để ghi đè giá này">Giá mặc định</span>
                   ) : (
                     <div className="flex gap-2">
                       <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
@@ -340,12 +326,6 @@ export default function PricingPolicyPage() {
                   ))}
                 </ManagerSelect>
               </ManagerField>
-              {isAdmin ? (
-                <p className="text-xs text-muted-foreground -mt-2">
-                  Áp dụng cho: <span className="font-medium text-foreground">Mặc định (Global — mọi toà nhà)</span>.
-                  Giá riêng theo từng toà do Manager của toà đó tự quản lý.
-                </p>
-              ) : null}
               <div className="grid gap-4 md:grid-cols-2">
                 <ManagerField label="Loại thời gian">
                   <ManagerSelect name="timeType" value={form.timeType} onChange={handleChange}>

@@ -117,7 +117,7 @@ function resolveHourlyPolicy(policies, dayType, hour, referenceTime) {
 }
 
 const PACKAGE_OPTIONS = [
-  { value: "DAILY", label: "Gói ngày", days: 1, unitLabel: "ngày", desc: "Trọn ngày · thanh toán khi ra cổng" },
+  { value: "DAILY", label: "Gói ngày", days: 1, unitLabel: "ngày", desc: "Trọn ngày · trả trọn gói trước" },
   { value: "WEEKLY", label: "Gói tuần", days: 7, unitLabel: "tuần", desc: "7 ngày · vào/ra tự do · trả trọn gói" },
   { value: "MONTHLY", label: "Gói tháng", days: 30, unitLabel: "tháng", desc: "30 ngày · vào/ra tự do · giá ưu đãi" },
 ];
@@ -268,18 +268,56 @@ export default function BookingPage() {
       .catch(() => setPricingPolicies([]));
   }, [selectedVehicle]);
 
+  const slotGrid = useMemo(
+    () => backendSlots.map((s, i) => ({
+      uiId: s.id || s.slotId || `${i}`,
+      slotId: s.id || s.slotId || "",
+      slotCode: s.slotCode || `S${i + 1}`,
+      status: String(s.status || "available").toLowerCase(),
+      floor: s.zone?.floor?.floorName || s.zone?.floor?.name || "Tầng chưa rõ",
+      zone: s.zone?.zoneName || s.zone?.name || "Khu chưa rõ",
+      building: s.zone?.floor?.building?.name || "Toà chưa rõ",
+      buildingId: s.zone?.floor?.building?.id ?? null,
+    })),
+    [backendSlots],
+  );
+
+  const buildingOptions = useMemo(() => Array.from(new Map(slotGrid.map((s) => [s.building, s.building])).values()), [slotGrid]);
+
+  // Tu chon toa nha khi vao tu nut "Dat cho" o trang Tim bai do xe (truyen
+  // buildingName qua router state) — chi ap dung sau khi da chon xe (buildingOptions
+  // chi co du lieu luc do) va nguoi dung chua tu chon toa nha khac.
+  useEffect(() => {
+    if (!preselectBuildingName || selection.building || !selection.vehicleId) return;
+    if (buildingOptions.includes(preselectBuildingName)) {
+      setSelection((p) => ({ ...p, building: preselectBuildingName }));
+    }
+  }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
+  const floorOptions = useMemo(() => [...new Set(slotGrid.filter((s) => !selection.building || s.building === selection.building).map((s) => s.floor))], [slotGrid, selection.building]);
+  const zoneOptions = useMemo(() => [...new Set(slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor)).map((s) => s.zone))], [slotGrid, selection.building, selection.floor]);
+  const filteredSlotGrid = useMemo(() => slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor) && (!selection.zone || s.zone === selection.zone)), [slotGrid, selection.building, selection.floor, selection.zone]);
+  const selectedSlot = useMemo(() => filteredSlotGrid.find((s) => String(s.slotId || s.uiId) === String(selection.slotId || selection.slotCode) || s.slotCode === selection.slotCode), [filteredSlotGrid, selection.slotCode, selection.slotId]);
+
+  // Backend tra ve pricingPolicies cua TAT CA toa nha cho driver (khong scope
+  // theo building nhu Manager) - phai tu loc theo dung toa dang chon o day,
+  // neu khong bang gia se bi tran/lan giua cac toa (bug goc bao cao).
+  const buildingPricingPolicies = useMemo(
+    () => (selectedSlot?.buildingId ? pricingPolicies.filter((p) => String(p.buildingId) === String(selectedSlot.buildingId)) : []),
+    [pricingPolicies, selectedSlot],
+  );
+
   const hourlyPolicies = useMemo(
-    () => pricingPolicies.filter((p) => !["DAILY","WEEKLY","MONTHLY"].includes(p.timeType)),
-    [pricingPolicies],
+    () => buildingPricingPolicies.filter((p) => !["DAILY","WEEKLY","MONTHLY"].includes(p.timeType)),
+    [buildingPricingPolicies],
   );
 
   const priceByType = useMemo(() => {
     const map = {};
     for (const opt of PACKAGE_OPTIONS) {
-      map[opt.value] = pricingPolicies.filter((p) => p.timeType === opt.value);
+      map[opt.value] = buildingPricingPolicies.filter((p) => p.timeType === opt.value);
     }
     return map;
-  }, [pricingPolicies]);
+  }, [buildingPricingPolicies]);
 
   const effectiveDayType = useMemo(() => {
     const dow = bookingStart.getDay();
@@ -311,35 +349,6 @@ export default function BookingPage() {
     return calculateDeposit(vehicleTypeName, minutesUntilStart);
   }, [selectedVehicle, bookingStart]);
 
-  const slotGrid = useMemo(
-    () => backendSlots.map((s, i) => ({
-      uiId: s.id || s.slotId || `${i}`,
-      slotId: s.id || s.slotId || "",
-      slotCode: s.slotCode || `S${i + 1}`,
-      status: String(s.status || "available").toLowerCase(),
-      floor: s.zone?.floor?.floorName || s.zone?.floor?.name || "Tầng chưa rõ",
-      zone: s.zone?.zoneName || s.zone?.name || "Khu chưa rõ",
-      building: s.zone?.floor?.building?.name || "Toà chưa rõ",
-    })),
-    [backendSlots],
-  );
-
-  const buildingOptions = useMemo(() => Array.from(new Map(slotGrid.map((s) => [s.building, s.building])).values()), [slotGrid]);
-
-  // Tu chon toa nha khi vao tu nut "Dat cho" o trang Tim bai do xe (truyen
-  // buildingName qua router state) — chi ap dung sau khi da chon xe (buildingOptions
-  // chi co du lieu luc do) va nguoi dung chua tu chon toa nha khac.
-  useEffect(() => {
-    if (!preselectBuildingName || selection.building || !selection.vehicleId) return;
-    if (buildingOptions.includes(preselectBuildingName)) {
-      setSelection((p) => ({ ...p, building: preselectBuildingName }));
-    }
-  }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
-  const floorOptions = useMemo(() => [...new Set(slotGrid.filter((s) => !selection.building || s.building === selection.building).map((s) => s.floor))], [slotGrid, selection.building]);
-  const zoneOptions = useMemo(() => [...new Set(slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor)).map((s) => s.zone))], [slotGrid, selection.building, selection.floor]);
-  const filteredSlotGrid = useMemo(() => slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor) && (!selection.zone || s.zone === selection.zone)), [slotGrid, selection.building, selection.floor, selection.zone]);
-  const selectedSlot = useMemo(() => filteredSlotGrid.find((s) => String(s.slotId || s.uiId) === String(selection.slotId || selection.slotCode) || s.slotCode === selection.slotCode), [filteredSlotGrid, selection.slotCode, selection.slotId]);
-
   const selectedVehicleBooking = vehiclesWithStatus.find((v) => String(v.vehicleId) === String(selection.vehicleId));
   const lockedBooking = selectedVehicleBooking?.activeBooking || null;
   const isSelectedVehicleLocked = Boolean(selectedVehicleBooking?.isLocked);
@@ -358,6 +367,20 @@ export default function BookingPage() {
   function handleModeChange(newType) {
     setBookingType(newType);
     setDurationUnits(1);
+  }
+
+  // Input type="datetime-local" chi chan gio truoc "min" o cac trinh duyet
+  // ho tro dung, nhung UI lich/spinner cua Chrome (nhu trong screenshot loi)
+  // van cho bam chon gio truoc "min" ma khong bao loi - neu chap nhan thang
+  // gia tri do, bookingStart co the roi vao qua khu/qua gan hien tai, khien
+  // uoc tinh coc tinh minutesUntilStart am/nho hon 10p va hien nham "Mien phi"
+  // (trong khi thuc te backend se tu choi booking nay). Chan tai day bang cach
+  // ep ve toi thieu "now + 10 phut" thay vi nhan thang gia tri tu input.
+  function handleBookingStartChange(value) {
+    if (!value) return;
+    const picked = new Date(value);
+    const minAllowed = new Date(Date.now() + 10 * 60 * 1000);
+    setBookingStart(picked < minAllowed ? minAllowed : picked);
   }
 
   async function handleConfirm() {
@@ -456,8 +479,12 @@ export default function BookingPage() {
 
   if (effectiveStep === 3 && confirmation) {
     const confIsPackage = confirmation.bookingType !== "HOURLY";
+    // Gói ngày (DAILY) chỉ cho vào/ra 1 lượt (giống 1 lần gửi xe trọn ngày) -
+    // KHÔNG giữ slot RESERVED cho lượt vào lại như WEEKLY/MONTHLY (xem
+    // ParkingSessionServiceImpl.processExit isPassBooking chỉ áp dụng
+    // WEEKLY/MONTHLY) - copy phải phản ánh đúng, không hứa nhầm "vào/ra tự do".
+    const confIsDaily = confirmation.bookingType === "DAILY";
     const confPkgOpt = PACKAGE_OPTIONS.find((o) => o.value === confirmation.bookingType);
-    const isDaily = confirmation.bookingType === "DAILY";
     const rows = [
       ["Mã đặt chỗ", `#${confirmation.bookingId}`],
       ["Trạng thái", confirmation.status, depositPaid ? "text-emerald-600" : "text-amber-600"],
@@ -467,11 +494,11 @@ export default function BookingPage() {
       confIsPackage
         ? ["Hình thức", `${confPkgOpt?.label || confirmation.bookingType} × ${confirmation.durationUnits}`]
         : ["Hình thức", "Theo giờ (tính khi ra)"],
-      ...(confIsPackage && !isDaily
+      ...(confIsPackage
         ? [["Thời hạn", `${confirmation.durationUnits * (confPkgOpt?.days || 7)} ngày`]]
         : []),
       ["Hẹn đến bãi", formatDateTime(confirmation.bookingStartTime)],
-      confIsPackage && !isDaily
+      confIsPackage
         ? ["Phí trọn gói", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"]
         : ["Tiền cọc (giữ chỗ)", `${vnd(confirmation.depositAmount)} VND`, "font-semibold text-primary"],
       ["Hạn TT cọc", formatDateTime(confirmation.expiredAt)],
@@ -481,9 +508,13 @@ export default function BookingPage() {
       ? (depositPaid ? "Đăng ký gói thành công — QR sẵn sàng" : "Đăng ký gói thành công — Cần thanh toán")
       : (depositPaid ? "Đặt chỗ thành công — QR sẵn sàng" : "Đặt chỗ thành công — Cần thanh toán cọc");
     const desc = confIsPackage
-      ? (depositPaid
-          ? "Phí gói đã thanh toán. Vào Lịch sử đặt chỗ để xem mã QR. Vào/ra tự do trong suốt kỳ hạn."
-          : "Thanh toán phí gói qua VNPay để nhận mã QR. Sau đó vào/ra tự do không cần thanh toán thêm.")
+      ? (confIsDaily
+          ? (depositPaid
+              ? "Phí gói ngày đã thanh toán. Vào Lịch sử đặt chỗ để xem mã QR. QR dùng cho 1 lượt vào — ra khỏi bãi là kết thúc lượt gửi."
+              : "Thanh toán phí gói ngày qua VNPay để nhận mã QR. QR dùng cho 1 lượt vào/ra trong ngày.")
+          : (depositPaid
+              ? "Phí gói đã thanh toán. Vào Lịch sử đặt chỗ để xem mã QR. Vào/ra tự do trong suốt kỳ hạn."
+              : "Thanh toán phí gói qua VNPay để nhận mã QR. Sau đó vào/ra tự do không cần thanh toán thêm."))
       : (depositPaid
           ? "Đã thanh toán cọc. Vào Lịch sử đặt chỗ để xem mã QR check-in."
           : "Thanh toán cọc qua VNPay để xác nhận giữ chỗ. Phần còn lại trả khi ra.");
@@ -505,14 +536,24 @@ export default function BookingPage() {
               </div>
             ))}
           </div>
-          {confIsPackage && !isDaily && (
+          {confIsPackage && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 text-left mb-4">
               <p className="font-semibold mb-1">Quyền lợi gói {confPkgOpt?.label}:</p>
               <ul className="space-y-0.5 list-disc list-inside text-xs">
-                <li>Vào/ra bãi nhiều lần trong kỳ hạn</li>
-                <li>Slot {confirmation.slotCode} được giữ riêng cho bạn</li>
-                <li>Không tính phí thêm khi ra giữa kỳ</li>
-                <li>Slot tự giải phóng khi hết kỳ</li>
+                {confIsDaily ? (
+                  <>
+                    <li>Slot {confirmation.slotCode} được giữ riêng cho 1 lượt gửi xe trong ngày</li>
+                    <li>Không phát sinh phí thêm khi ra (đã trả trọn gói)</li>
+                    <li>Ra khỏi bãi là kết thúc lượt — muốn gửi lại cần đặt booking mới</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Vào/ra bãi nhiều lần trong kỳ hạn</li>
+                    <li>Slot {confirmation.slotCode} được giữ riêng cho bạn</li>
+                    <li>Không tính phí thêm khi ra giữa kỳ</li>
+                    <li>Slot tự giải phóng khi hết kỳ</li>
+                  </>
+                )}
               </ul>
             </div>
           )}
@@ -768,7 +809,7 @@ export default function BookingPage() {
                 <input type="datetime-local"
                   value={formatLocalDateTime(bookingStart).slice(0, 16)}
                   min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-                  onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
+                  onChange={(e) => handleBookingStartChange(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
                 <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
               </div>
@@ -875,7 +916,7 @@ export default function BookingPage() {
               </div>
 
               {/* Bảng giá gói */}
-              {pricingPolicies.length > 0 && PACKAGE_OPTIONS.some((o) => priceByType[o.value]?.length > 0) && (
+              {buildingPricingPolicies.length > 0 && PACKAGE_OPTIONS.some((o) => priceByType[o.value]?.length > 0) && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Bảng giá gói</label>
                   <div className="rounded-xl border border-primary/30 overflow-x-auto">
@@ -928,7 +969,7 @@ export default function BookingPage() {
                 <input type="datetime-local"
                   value={formatLocalDateTime(bookingStart).slice(0, 16)}
                   min={formatLocalDateTime(new Date(Date.now() + 10 * 60 * 1000)).slice(0, 16)}
-                  onChange={(e) => { if (e.target.value) setBookingStart(new Date(e.target.value)); }}
+                  onChange={(e) => handleBookingStartChange(e.target.value)}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground" />
                 <p className="mt-1 text-xs text-muted-foreground">Phải cách hiện tại ít nhất 10 phút</p>
               </div>
@@ -972,15 +1013,13 @@ export default function BookingPage() {
                 })()}
                 {estimatedCost != null && (
                   <div className="flex justify-between items-center pt-2 border-t border-emerald-200 dark:border-emerald-500/30 mt-1">
-                    <span className="font-semibold">
-                      {bookingType === "DAILY" ? "Phí dự tính (trả khi ra)" : "Phí trọn gói cần thanh toán"}
-                    </span>
+                    <span className="font-semibold">Phí trọn gói cần thanh toán</span>
                     <span className="font-bold text-base">{vnd(estimatedCost)}đ</span>
                   </div>
                 )}
                 <p className="text-xs opacity-75 pt-1">
                   {bookingType === "DAILY"
-                    ? "Slot được giữ trọn ngày. Thanh toán phí khi ra cổng."
+                    ? "Thanh toán 1 lần qua VNPay. QR dùng cho 1 lượt vào/ra trong ngày."
                     : "Thanh toán 1 lần qua VNPay. Sau đó vào/ra tự do."}
                 </p>
               </div>

@@ -70,12 +70,16 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
             }
             String key = comboKey(p);
             PricingPolicy current = latestByCombo.get(key);
-            if (current == null || effectiveFromOf(p).isAfter(effectiveFromOf(current))) {
+            if (current == null || isBetterRepresentative(p, current)) {
                 latestByCombo.put(key, p);
             }
         }
+        // Sap xep MOI sua/tao GAN DAY NHAT len dau (khong phai theo policyId tang dan):
+        // sua gia thuc su se tao ban ghi MOI (policyId lon hon), neu sort tang dan thi
+        // dong vua sua se bi day xuong CUOI danh sach/trang cuoi, khien Manager tuong
+        // nham "sua khong co tac dung" vi khong thay thay doi tren man hinh dang xem.
         return latestByCombo.values().stream()
-                .sorted(Comparator.comparing(PricingPolicy::getPolicyId))
+                .sorted(Comparator.comparing(this::effectiveFromOf).reversed())
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -124,6 +128,24 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
                 .build();
         newVersion = pricingPolicyRepository.save(newVersion);
         return toResponse(newVersion);
+    }
+
+    /**
+     * "candidate" co nen thay the "current" lam ban ghi dai dien cho 1 combo tren
+     * man hinh quan ly khong. Uu tien is_active TRUOC effectiveFrom: 1 ban ghi
+     * DANG active luon dai dien dung hon 1 ban ghi da tat, bat ke effectiveFrom
+     * cua ban da tat lon hay nho hon (tranh phu thuoc effectiveFrom de so sanh
+     * giua 2 ban khac trang thai active - de sai lech neu co chenh lech gio giua
+     * cac nguon ghi du lieu khac nhau). Chi dung effectiveFrom de so sanh khi
+     * 2 ban CUNG trang thai active.
+     */
+    private boolean isBetterRepresentative(PricingPolicy candidate, PricingPolicy current) {
+        boolean candidateActive = Boolean.TRUE.equals(candidate.getIsActive());
+        boolean currentActive = Boolean.TRUE.equals(current.getIsActive());
+        if (candidateActive != currentActive) {
+            return candidateActive;
+        }
+        return effectiveFromOf(candidate).isAfter(effectiveFromOf(current));
     }
 
     private String comboKey(PricingPolicy p) {

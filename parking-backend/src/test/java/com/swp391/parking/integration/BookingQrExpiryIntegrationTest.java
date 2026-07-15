@@ -246,6 +246,7 @@ class BookingQrExpiryIntegrationTest extends AbstractIntegrationTestSupport {
         var zone = createZone(floor, vehicleType, "Booking QR Zone " + slotCode);
         ParkingSlot slot = createSlot(zone, slotCode, ParkingSlot.Status.AVAILABLE);
         Vehicle vehicle = createVehicle(driver, vehicleType, licensePlate);
+        createBuildingPricingPolicy(vehicleType, building, true);
 
         CreateBookingRequest request = new CreateBookingRequest();
         request.setVehicleId(vehicle.getId());

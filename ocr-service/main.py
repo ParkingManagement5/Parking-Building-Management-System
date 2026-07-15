@@ -84,13 +84,9 @@ def decode_image(image_bytes: bytes):
     return image
 
 
-def crop_likely_plate(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    white_mask = cv2.inRange(hsv, np.array([0, 0, 145]), np.array([180, 90, 255]))
-    contours, _ = cv2.findContours(white_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+def _plate_rect_candidates(mask, image_area):
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     candidates = []
-    image_area = image.shape[0] * image.shape[1]
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
         area = w * h
@@ -103,6 +99,29 @@ def crop_likely_plate(image):
         ratio = w / max(h, 1)
         if 1.2 <= ratio <= 6.5:
             candidates.append((area, x, y, w, h))
+    return candidates
+
+
+def crop_likely_plate(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    image_area = image.shape[0] * image.shape[1]
+
+    white_mask = cv2.inRange(hsv, np.array([0, 0, 145]), np.array([180, 90, 255]))
+    candidates = _plate_rect_candidates(white_mask, image_area)
+
+    if not candidates:
+        # Fallback rieng cho bien mau (vang: xe kinh doanh van tai, xanh
+        # duong: co quan nha nuoc, do: quan doi/ngoai giao) - CHI thu khi
+        # khong tim duoc bien trang, khong gop chung mask voi trang. Da thu
+        # gop chung 1 mask/candidate pool nhung mau mo rong lam lo ra vung
+        # lon hon (vd vien crom sang bong tren luoi tan nhiet) thang the
+        # ung vien bien so that theo tieu chi "dien tich lon nhat", gay
+        # regression tren anh xe mau xanh la - nen tach rieng thanh fallback.
+        yellow = cv2.inRange(hsv, np.array([15, 60, 120]), np.array([35, 255, 255]))
+        blue = cv2.inRange(hsv, np.array([95, 60, 60]), np.array([130, 255, 255]))
+        red = cv2.inRange(hsv, np.array([0, 70, 70]), np.array([10, 255, 255])) | \
+            cv2.inRange(hsv, np.array([170, 70, 70]), np.array([180, 255, 255]))
+        candidates = _plate_rect_candidates(yellow | blue | red, image_area)
 
     if not candidates:
         return image

@@ -185,8 +185,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
         String bookingType = session.getBooking() != null ? session.getBooking().getBookingType() : null;
         LocalDateTime bookingEndTime = session.getBooking() != null ? session.getBooking().getBookingEndTime() : null;
-        BigDecimal serverBaseFee = feeCalculatorUtil.calculateSessionFee(
+        BigDecimal combinedFee = feeCalculatorUtil.calculateSessionFee(
                 session.getEntryTime(), session.getExitTime(), activePolicies, serverRate, bookingType, bookingEndTime);
+        // Tach rieng phan phu troi (qua han goi) khoi phi goc, thay vi gop het
+        // vao baseFee - de driver/staff thay ro trong bill vi sao phai tra
+        // hon gia goi da tra truoc, khong phai 1 con so mo ho.
+        BigDecimal serverOvertimeFee = feeCalculatorUtil.calculateOvertimeFee(
+                bookingType, session.getExitTime(), bookingEndTime, activePolicies, serverRate);
+        BigDecimal serverBaseFee = combinedFee.subtract(serverOvertimeFee);
 
         BigDecimal serverDeposit = BigDecimal.ZERO;
         if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
@@ -194,7 +200,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         BigDecimal serverTotal = FeeCalculatorUtil.calculateTotal(
-                serverBaseFee, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, serverDeposit);
+                serverBaseFee, serverOvertimeFee, BigDecimal.ZERO, BigDecimal.ZERO, serverDeposit);
 
         Integer resolvedBookingId = bookingId;
         try {
@@ -214,7 +220,7 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setPaymentMethod(paymentMethod);
         payment.setAppliedRate(serverRate);
         payment.setBaseFee(serverBaseFee);
-        payment.setOvertimeFee(BigDecimal.ZERO);
+        payment.setOvertimeFee(serverOvertimeFee);
         payment.setPenaltyFee(BigDecimal.ZERO);
         payment.setDiscount(BigDecimal.ZERO);
         payment.setDepositDeducted(serverDeposit);

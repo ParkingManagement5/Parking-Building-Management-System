@@ -10,4 +10,12 @@ import java.util.List;
 public interface StaffShiftRepository extends JpaRepository<StaffShift, Long> {
     List<StaffShift> findByUserUserId(int userId);
     List<StaffShift> findByWorkingDate(LocalDate workingDate);
+
+    /** Ca chua check-in va da qua ngay lam viec - ung vien de danh dau ABSENT. */
+    List<StaffShift> findByCheckInTimeIsNullAndAttendanceStatusAndWorkingDateBefore(
+            StaffShift.AttendanceStatus attendanceStatus, LocalDate workingDate);
+
+    /** Ca hom nay chua check-in - can loc them theo gio ket thuc ca o service layer. */
+    List<StaffShift> findByCheckInTimeIsNullAndAttendanceStatusAndWorkingDate(
+            StaffShift.AttendanceStatus attendanceStatus, LocalDate workingDate);
 }

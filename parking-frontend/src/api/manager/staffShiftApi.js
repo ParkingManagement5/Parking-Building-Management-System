@@ -11,4 +11,7 @@ export const staffShiftApi = {
   update: (id, data) => axiosClient.put(`/staff-shifts/${id}`, data),
 
   delete: (id) => axiosClient.delete(`/staff-shifts/${id}`),
+
+  checkIn: (id) => axiosClient.post(`/staff-shifts/${id}/check-in`),
+  checkOut: (id) => axiosClient.post(`/staff-shifts/${id}/check-out`),
 };

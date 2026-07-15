@@ -28,9 +28,12 @@ public class PricingPolicyController {
     private final PricingPolicyService pricingPolicyService;
     private final UserRepository userRepository;
 
+    // Admin khong con dat/sua/xem bang gia nua - moi Manager toan quyen tu cau
+    // hinh gia rieng cho dung toa nha minh quan ly, tranh 2 noi cung sua 1 gia.
+
     @PostMapping
     @Operation(summary = "Create pricing policy")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> create(
             @Valid @RequestBody CreatePricingPolicyRequest request, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success("Policy created",
@@ -39,17 +42,17 @@ public class PricingPolicyController {
 
     @GetMapping
     @Operation(summary = "Get all pricing policies")
-    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER')")
     public ResponseEntity<ApiResponse<List<PricingPolicyResponse>>> getAll(Authentication authentication) {
-        // DRIVER/STAFF không có khái niệm "toà nhà đang quản lý" -> xem như Admin
-        // (không lọc) để vẫn thấy được giá áp dụng khi tra cứu/thanh toán.
+        // DRIVER/STAFF khong co khai niem "toa nha dang quan ly" -> khong loc theo
+        // scope de van thay duoc gia ap dung khi tra cuu/dat cho/thanh toan.
         Long scope = isManager(authentication) ? resolveScopeBuildingId(authentication) : null;
         return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getAllPolicies(scope)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get pricing policy by ID")
-    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER','ADMIN')")
+    @PreAuthorize("hasAnyRole('DRIVER','STAFF','MANAGER')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> getOne(@PathVariable Long id, Authentication authentication) {
         Long scope = isManager(authentication) ? resolveScopeBuildingId(authentication) : null;
         return ResponseEntity.ok(ApiResponse.success(pricingPolicyService.getPolicy(id, scope)));
@@ -57,7 +60,7 @@ public class PricingPolicyController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update pricing policy")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody CreatePricingPolicyRequest request, Authentication authentication) {
@@ -67,7 +70,7 @@ public class PricingPolicyController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Deactivate pricing policy (soft-delete, preserves history for fee recalculation)")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id, Authentication authentication) {
         pricingPolicyService.deletePolicy(id, resolveScopeBuildingId(authentication));
         return ResponseEntity.ok(ApiResponse.success("Đã tắt bảng giá", null));
@@ -75,7 +78,7 @@ public class PricingPolicyController {
 
     @PatchMapping("/{id}/activate")
     @Operation(summary = "Activate pricing policy")
-    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<PricingPolicyResponse>> activate(@PathVariable Long id, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.success("Policy activated",
                 pricingPolicyService.activatePolicy(id, resolveScopeBuildingId(authentication))));
@@ -86,11 +89,8 @@ public class PricingPolicyController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
     }
 
-    /** null = ADMIN (không giới hạn). MANAGER luôn trả về buildingId của họ, hoặc lỗi nếu chưa được gán. */
+    /** MANAGER luon tra ve buildingId cua ho, hoac loi neu chua duoc gan. */
     private Long resolveScopeBuildingId(Authentication authentication) {
-        if (!isManager(authentication)) {
-            return null;
-        }
         User user = userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
         if (user.getAssignedBuilding() == null) {

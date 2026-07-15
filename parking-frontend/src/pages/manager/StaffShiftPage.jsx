@@ -55,6 +55,15 @@ function shiftTone(shiftName) {
   return "slate";
 }
 
+// Cham mau tinh trang diem danh, hien canh ten nhan vien trong luoi ca lam.
+const ATTENDANCE_DOT = {
+  NOT_STARTED: { color: "bg-slate-300 dark:bg-slate-600", label: "Chưa check-in" },
+  ON_TIME: { color: "bg-emerald-500", label: "Đúng giờ" },
+  LATE: { color: "bg-amber-500", label: "Trễ giờ" },
+  ABSENT: { color: "bg-rose-500", label: "Vắng ca" },
+  COMPLETED: { color: "bg-emerald-500", label: "Đã hoàn thành ca" },
+};
+
 export default function StaffShiftPage() {
   const isManager = getRole() === "MANAGER";
   const assignedBuildingId = getAssignedBuildingId();
@@ -410,17 +419,24 @@ export default function StaffShiftPage() {
                             {entries.length === 0 ? (
                               <Plus size={13} className="text-transparent transition-colors group-hover:text-muted-foreground" />
                             ) : (
-                              entries.map((item) => (
-                                <span
-                                  key={item.staffShiftId}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
-                                  onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleEdit(item); } }}
-                                >
-                                  <ManagerStatusBadge tone={shiftTone(shift.shiftName)}>{item.userName}</ManagerStatusBadge>
-                                </span>
-                              ))
+                              entries.map((item) => {
+                                const attendance = ATTENDANCE_DOT[item.attendanceStatus] || ATTENDANCE_DOT.NOT_STARTED;
+                                return (
+                                  <span
+                                    key={item.staffShiftId}
+                                    role="button"
+                                    tabIndex={0}
+                                    title={attendance.label}
+                                    onClick={(e) => { e.stopPropagation(); handleEdit(item); }}
+                                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleEdit(item); } }}
+                                  >
+                                    <ManagerStatusBadge tone={shiftTone(shift.shiftName)}>
+                                      <span className={`mr-1.5 inline-block size-1.5 rounded-full ${attendance.color}`} />
+                                      {item.userName}
+                                    </ManagerStatusBadge>
+                                  </span>
+                                );
+                              })
                             )}
                           </button>
                         </td>

@@ -218,6 +218,14 @@ export default function PaymentProcessingPage() {
       const payment = unwrapApiData(paymentRes.data, null);
       if (!payment?.paymentId) throw new Error("Backend payment response missing paymentId");
       setPendingPaymentMap((prev) => ({ ...prev, [session.sessionId]: buildPendingPaymentState(payment, session) }));
+      // Doi tu VNPay sang Cash: xoa QR VNPay cu dang hien (neu co), vi phieu
+      // thu da duoc backend cap nhat lai thanh CASH (dung 1 ban ghi, khong tao trung).
+      setVnpayQrMap((prev) => {
+        if (!(session.sessionId in prev)) return prev;
+        const next = { ...prev };
+        delete next[session.sessionId];
+        return next;
+      });
     } catch (err) {
       setError(err.response?.data?.message || "Không tạo được thanh toán.");
     } finally {
@@ -345,37 +353,47 @@ export default function PaymentProcessingPage() {
                             </p>
                           )}
                         </div>
-                        <StaffSelect
-                          value={methodMap[item.sessionId] || "CASH"}
-                          onChange={(event) =>
-                            setMethodMap((prev) => ({
-                              ...prev,
-                              [item.sessionId]: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="CASH">Cash</option>
-                          <option value="VNPAY">VNPay</option>
-                        </StaffSelect>
-                        <StaffPrimaryButton
-                          type="button"
-                          onClick={() =>
-                            pendingPaymentMap[item.sessionId] && (methodMap[item.sessionId] || "CASH") === "CASH"
-                              ? confirmCashPayment(item)
-                              : createPayment(item)
-                          }
-                          disabled={processingId === item.sessionId}
-                        >
-                          {processingId === item.sessionId
-                            ? "Processing..."
-                            : pendingPaymentMap[item.sessionId] && (methodMap[item.sessionId] || "CASH") === "CASH"
-                              ? pendingPaymentMap[item.sessionId].amount === 0
-                                ? "Hoàn tất (Miễn phí)"
-                                : "Xác nhận tiền mặt"
-                              : (methodMap[item.sessionId] || "CASH") === "VNPAY"
-                                ? "Tạo QR VNPay"
-                                : "Tạo phiếu thu tiền mặt"}
-                        </StaffPrimaryButton>
+                        {(() => {
+                          const selectedMethod = methodMap[item.sessionId] || "CASH";
+                          const storedMethod = pendingPaymentMap[item.sessionId]?.payment?.paymentMethod;
+                          // Chi "xac nhan" thang khi phuong thuc dang chon TRUNG voi phuong
+                          // thuc da luu trong phieu thu - neu doi sang phuong thuc khac (vd
+                          // Cash -> VNPay) thi phai tao/cap nhat lai phieu truoc (backend tu
+                          // tai su dung dung 1 ban ghi, khong tao trung).
+                          const canConfirmDirectly =
+                            Boolean(pendingPaymentMap[item.sessionId]) && selectedMethod === "CASH" && storedMethod === "CASH";
+                          return (
+                            <>
+                              <StaffSelect
+                                value={selectedMethod}
+                                onChange={(event) =>
+                                  setMethodMap((prev) => ({
+                                    ...prev,
+                                    [item.sessionId]: event.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="CASH">Cash</option>
+                                <option value="VNPAY">VNPay</option>
+                              </StaffSelect>
+                              <StaffPrimaryButton
+                                type="button"
+                                onClick={() => (canConfirmDirectly ? confirmCashPayment(item) : createPayment(item))}
+                                disabled={processingId === item.sessionId}
+                              >
+                                {processingId === item.sessionId
+                                  ? "Processing..."
+                                  : canConfirmDirectly
+                                    ? pendingPaymentMap[item.sessionId].amount === 0
+                                      ? "Hoàn tất (Miễn phí)"
+                                      : "Xác nhận tiền mặt"
+                                    : selectedMethod === "VNPAY"
+                                      ? "Tạo QR VNPay"
+                                      : "Tạo phiếu thu tiền mặt"}
+                              </StaffPrimaryButton>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     {vnpayQrMap[item.sessionId] ? (
@@ -386,6 +404,24 @@ export default function PaymentProcessingPage() {
                         <div className="min-w-0 flex flex-col justify-center gap-1">
                           <p className="text-sm font-semibold text-foreground">QR VNPay – Khách quét để thanh toán</p>
                           <p className="text-xs text-muted-foreground">Khách hàng dùng app ngân hàng hoặc VNPay quét mã này. Hệ thống tự xác nhận sau khi thanh toán.</p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <a
+                              href={vnpayQrMap[item.sessionId]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500"
+                            >
+                              Mở link thanh toán
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard.writeText(vnpayQrMap[item.sessionId])}
+                              className="rounded-lg border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
+                            >
+                              Copy link
+                            </button>
+                          </div>
+                          <p className="mt-1 text-[11px] text-muted-foreground">Quét mã không được? Dùng link trên — mở trực tiếp hoặc gửi cho khách (Zalo, SMS...).</p>
                           <button type="button" onClick={() => { setVnpayQrMap((p) => { const n = {...p}; delete n[item.sessionId]; return n; }); void loadPendingPayments(); }}
                             className="mt-2 self-start rounded-lg border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted">
                             Làm mới trạng thái
@@ -393,6 +429,19 @@ export default function PaymentProcessingPage() {
                         </div>
                       </div>
                     ) : pendingPaymentMap[item.sessionId] ? (
+                      pendingPaymentMap[item.sessionId].payment.paymentMethod === "VNPAY" ? (
+                        <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-amber-50/40 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+                          <p className="text-sm font-semibold text-foreground">
+                            Đã tạo yêu cầu VNPay – Payment #{pendingPaymentMap[item.sessionId].payment.paymentId}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Chưa có mã QR để khách quét (có thể do trang vừa tải lại). Bấm "Tạo QR VNPay" ở trên để lấy mã QR mới — hệ thống dùng lại đúng phiếu thanh toán này, không tạo trùng.
+                          </p>
+                          <p className="mt-2 text-xs font-semibold text-foreground">
+                            Số tiền: {formatStaffCurrency(pendingPaymentMap[item.sessionId].amount)}
+                          </p>
+                        </div>
+                      ) : (
                       <div className="mt-4 grid gap-4 rounded-2xl border border-dashed border-border bg-muted/20 p-4 sm:grid-cols-[120px_1fr]">
                         <div className="rounded-2xl bg-white p-3">
                           <QRCodeSVG value={pendingPaymentMap[item.sessionId].payload} size={96} level="M" includeMargin={false} />
@@ -407,6 +456,7 @@ export default function PaymentProcessingPage() {
                           </p>
                         </div>
                       </div>
+                      )
                     ) : null}
                   </div>
                 ))}

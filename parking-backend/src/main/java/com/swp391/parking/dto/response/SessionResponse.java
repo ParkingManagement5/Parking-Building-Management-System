@@ -28,6 +28,8 @@ public class SessionResponse {
     private BigDecimal calculatedFee;
     private BigDecimal hourlyRate;
     private BigDecimal depositAmount;
+    private String bookingType;
+    private LocalDateTime bookingEndTime;
     // Location info populated from slot → zone → floor → building
     private Long buildingId;
     private String buildingName;

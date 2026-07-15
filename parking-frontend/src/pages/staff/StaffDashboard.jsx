@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CreditCard, LogIn, ShieldAlert } from "lucide-react";
+import { Bell, Clock3, CreditCard, LogIn, ShieldAlert } from "lucide-react";
 import { notificationApi } from "../../api/notificationApi";
 import { staffShiftApi } from "../../api/manager/staffShiftApi";
 import { requestApi } from "../../api/driver/requestApi";
@@ -23,6 +23,19 @@ function formatElapsed(entryTime) {
   const minutes = totalMinutes % 60;
   return hours > 0 ? `${hours}h ${minutes}p` : `${minutes}p`;
 }
+
+function todayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const ATTENDANCE_BADGE = {
+  NOT_STARTED: { tone: "slate", label: "Chưa check-in" },
+  ON_TIME: { tone: "emerald", label: "Đúng giờ" },
+  LATE: { tone: "amber", label: "Trễ giờ" },
+  ABSENT: { tone: "rose", label: "Vắng ca" },
+  COMPLETED: { tone: "emerald", label: "Đã hoàn thành" },
+};
 
 function settledData(result, failures, fallback = [], widgetName = "widget") {
   if (result.status !== "fulfilled") {
@@ -47,6 +60,8 @@ export default function StaffDashboard() {
   const [openExceptions, setOpenExceptions] = useState([]);
   const [pricingPolicies, setPricingPolicies] = useState([]);
   const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [attendanceBusy, setAttendanceBusy] = useState(false);
+  const [attendanceError, setAttendanceError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -124,12 +139,47 @@ export default function StaffDashboard() {
   );
 
   const upcomingShifts = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayDateString();
     return staffShifts
       .filter((item) => String(item.workingDate || "") >= today)
       .sort((a, b) => String(a.workingDate).localeCompare(String(b.workingDate)))
       .slice(0, 4);
   }, [staffShifts]);
+
+  const todayShift = useMemo(() => {
+    const today = todayDateString();
+    return staffShifts.find((item) => String(item.workingDate || "") === today) || null;
+  }, [staffShifts]);
+
+  async function handleCheckIn() {
+    if (!todayShift) return;
+    setAttendanceBusy(true);
+    setAttendanceError("");
+    try {
+      const res = await staffShiftApi.checkIn(todayShift.staffShiftId);
+      const updated = unwrapApiData(res.data, null);
+      setStaffShifts((prev) => prev.map((s) => (s.staffShiftId === updated.staffShiftId ? updated : s)));
+    } catch (err) {
+      setAttendanceError(err.response?.data?.message || "Check-in thất bại.");
+    } finally {
+      setAttendanceBusy(false);
+    }
+  }
+
+  async function handleCheckOut() {
+    if (!todayShift) return;
+    setAttendanceBusy(true);
+    setAttendanceError("");
+    try {
+      const res = await staffShiftApi.checkOut(todayShift.staffShiftId);
+      const updated = unwrapApiData(res.data, null);
+      setStaffShifts((prev) => prev.map((s) => (s.staffShiftId === updated.staffShiftId ? updated : s)));
+    } catch (err) {
+      setAttendanceError(err.response?.data?.message || "Check-out thất bại.");
+    } finally {
+      setAttendanceBusy(false);
+    }
+  }
 
   const recentActivity = useMemo(() => {
     const sessionActivities = activeSessions.slice(0, 4).map((item) => ({
@@ -164,6 +214,45 @@ export default function StaffDashboard() {
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
           {error}
+        </div>
+      ) : null}
+
+      {/* Check-in/check-out ca hom nay */}
+      {todayShift ? (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Clock3 size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Ca {todayShift.shiftName} · {todayShift.startTime}–{todayShift.endTime}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <StaffStatusBadge tone={(ATTENDANCE_BADGE[todayShift.attendanceStatus] || ATTENDANCE_BADGE.NOT_STARTED).tone}>
+                    {(ATTENDANCE_BADGE[todayShift.attendanceStatus] || ATTENDANCE_BADGE.NOT_STARTED).label}
+                  </StaffStatusBadge>
+                  {todayShift.checkInTime && <span>Check-in {formatStaffDateTime(todayShift.checkInTime)}</span>}
+                  {todayShift.checkOutTime && <span>· Check-out {formatStaffDateTime(todayShift.checkOutTime)}</span>}
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              {attendanceError && <span className="text-xs text-rose-600">{attendanceError}</span>}
+              {!todayShift.checkInTime ? (
+                <button type="button" onClick={handleCheckIn} disabled={attendanceBusy}
+                  className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60">
+                  {attendanceBusy ? "Đang xử lý..." : "Check-in"}
+                </button>
+              ) : !todayShift.checkOutTime ? (
+                <button type="button" onClick={handleCheckOut} disabled={attendanceBusy}
+                  className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60">
+                  {attendanceBusy ? "Đang xử lý..." : "Check-out"}
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 

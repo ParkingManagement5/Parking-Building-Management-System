@@ -202,6 +202,20 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         Gate entryGate = createGate(building, "ENTRY-WI", Gate.GateType.ENTRY);
         Gate exitGate = createGate(building, "EXIT-WI", Gate.GateType.EXIT);
 
+        // Toa nha phai co bang gia rieng (Manager tu set) truoc khi cho walk-in vao -
+        // khong con fallback ve gia global nua.
+        pricingPolicyRepository.save(PricingPolicy.builder()
+                .vehicleType(vehicleType)
+                .building(building)
+                .dayType("WEEKDAY")
+                .timeType("HOURLY")
+                .startHour(0)
+                .endHour(24)
+                .pricePerHour(new BigDecimal("15000"))
+                .effectiveFrom(LocalDateTime.of(2020, 1, 1, 0, 0))
+                .isActive(true)
+                .build());
+
         long vehiclesBefore = vehicleRepository.count();
 
         mockMvc.perform(post("/api/v1/sessions/entry")
@@ -281,8 +295,9 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         LocalDateTime policyEffectiveFrom = LocalDateTime.of(2020, 1, 1, 0, 0);
         pricingPolicyRepository.save(PricingPolicy.builder()
                 .vehicleType(vehicleType)
+                .building(building)
                 .dayType("WEEKDAY")
-                .timeType("DAY")
+                .timeType("HOURLY")
                 .startHour(6)
                 .endHour(22)
                 .pricePerHour(new BigDecimal("15000"))
@@ -291,8 +306,9 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
                 .build());
         pricingPolicyRepository.save(PricingPolicy.builder()
                 .vehicleType(vehicleType)
+                .building(building)
                 .dayType("WEEKDAY")
-                .timeType("NIGHT")
+                .timeType("HOURLY")
                 .startHour(22)
                 .endHour(6)
                 .pricePerHour(new BigDecimal("12000"))

@@ -139,6 +139,15 @@ public class BookingServiceImpl implements BookingService {
         String bookingType = request.getBookingType() != null && !request.getBookingType().isBlank()
                 ? request.getBookingType().toUpperCase() : "HOURLY";
 
+        // Toa nha phai duoc chinh Manager cua toa do tu cau hinh gia rieng cho loai
+        // xe + loai dat cho nay truoc thi moi cho dat - khong con fallback ve gia
+        // global cua Admin nua (Admin khong con quyen dat/sua gia).
+        if (!pricingPolicyRepository.existsByVehicleType_IdAndBuilding_IdAndTimeTypeAndIsActiveTrue(
+                vehicle.getVehicleType().getId(), buildingIdOf(slot), bookingType)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Toà nhà chưa cấu hình bảng giá cho loại xe/hình thức đặt chỗ này. Vui lòng liên hệ quản lý bãi.");
+        }
+
         LocalDateTime endTime;
         if ("HOURLY".equals(bookingType)) {
             endTime = request.getBookingEndTime() != null
@@ -171,15 +180,13 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // Tính deposit (tiền đặt chỗ — mất nếu không đến)
-        // Flat-rate booking (DAILY/WEEKLY/MONTHLY) mien coc
         BigDecimal deposit;
         if ("HOURLY".equals(bookingType)) {
             deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
-        } else if ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType)) {
-            // Prepay tron goi: driver tra toan bo phi flat-rate truoc khi nhan QR
-            deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime, buildingIdOf(slot));
         } else {
-            deposit = BigDecimal.ZERO; // DAILY: mien coc, tra luc ra
+            // Flat-rate booking theo goi (DAILY/WEEKLY/MONTHLY): prepay toan bo phi
+            // truoc khi nhan QR, khong duoc mien coc rieng cho DAILY nua
+            deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime, buildingIdOf(slot));
         }
 
         Booking booking = Booking.builder()
@@ -198,11 +205,9 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         log.info("Booking #{} tạo bởi user #{}, deposit={}", booking.getId(), currentUserId, deposit);
 
-        String paymentHint = ("WEEKLY".equals(bookingType) || "MONTHLY".equals(bookingType))
-                ? "Vui lòng thanh toán phí trọn gói để nhận QR."
-                : "DAILY".equals(bookingType)
-                        ? "Đặt chỗ thành công, thanh toán khi ra khỏi bãi."
-                        : "Vui lòng thanh toán cọc để nhận QR.";
+        String paymentHint = "HOURLY".equals(bookingType)
+                ? "Vui lòng thanh toán cọc để nhận QR."
+                : "Vui lòng thanh toán phí trọn gói để nhận QR.";
         notificationService.notify(currentUserId,
                 "Đặt chỗ thành công",
                 "Booking #" + booking.getId() + " cho slot " + slot.getSlotCode() + " đã được tạo. " + paymentHint,

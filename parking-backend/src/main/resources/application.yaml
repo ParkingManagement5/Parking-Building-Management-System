@@ -21,6 +21,16 @@ spring:
     show-sql: false
     open-in-view: false
     defer-datasource-initialization: true
+    properties:
+      hibernate:
+        jdbc:
+          # MySQL session dang o time_zone=SYSTEM (theo gio he dieu hanh, +07:00),
+          # nhung khong khai bao thang nay thi Hibernate 6 tu convert LocalDateTime
+          # sang UTC truoc khi gui xuong JDBC - MySQL lai hieu gia tri nhan duoc la
+          # gio dia phuong (vi DATETIME khong mang timezone), lam moi gio/ngay ghi
+          # qua Hibernate (booking, session, pricing effectiveFrom...) bi lui 7 tieng
+          # so voi thuc te. Khai bao dung mui gio de Hibernate khong tu convert sai.
+          time_zone: Asia/Ho_Chi_Minh
 
   sql:
     init:

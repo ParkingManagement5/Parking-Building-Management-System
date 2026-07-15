@@ -110,12 +110,6 @@ const CONFIG = {
         ],
       },
       {
-        label: "Cấu hình giá",
-        items: [
-          { id: "pricing-policies", label: "Bảng giá" },
-        ],
-      },
-      {
         label: "Cơ sở hạ tầng",
         items: [
           { id: "parking-structure", label: "Cấu trúc bãi xe" },

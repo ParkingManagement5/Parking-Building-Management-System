@@ -32,25 +32,29 @@ public interface PricingPolicyRepository extends JpaRepository<PricingPolicy, Lo
 
     List<PricingPolicy> findByBuildingIsNull();
 
+    /** Kiem tra 1 toa nha da co it nhat 1 policy active (Manager tu set) cho 1 loai xe + 1 time_type chua. */
+    boolean existsByVehicleType_IdAndBuilding_IdAndTimeTypeAndIsActiveTrue(Long vehicleTypeId, Long buildingId, String timeType);
+
     /**
-     * Danh sach policy (TAT CA phien ban) ap dung cho 1 toa nha + loai xe:
-     * uu tien policy rieng cua toa nha, neu toa chua tu cau hinh thi fallback
-     * ve policy global (building_id IS NULL).
+     * Danh sach policy (TAT CA phien ban) ap dung cho 1 toa nha + loai xe.
+     *
+     * KHONG con fallback ve gia global (building_id IS NULL) nua: moi Manager toan
+     * quyen tu cau hinh gia rieng cho toa minh, Admin khong con dat/sua gia chung
+     * duoc nua. Neu buildingId=null (hiem gap trong thuc te, chi con lai cho du
+     * lieu lich su/global cu), tra ve dung policy global nhu truoc.
      */
     default List<PricingPolicy> resolveForBuilding(Long vehicleTypeId, Long buildingId) {
         if (buildingId == null) {
-            return findByVehicleType_Id(vehicleTypeId);
+            return findByVehicleType_IdAndBuildingIsNull(vehicleTypeId);
         }
-        List<PricingPolicy> scoped = findByVehicleType_IdAndBuilding_Id(vehicleTypeId, buildingId);
-        return scoped.isEmpty() ? findByVehicleType_IdAndBuildingIsNull(vehicleTypeId) : scoped;
+        return findByVehicleType_IdAndBuilding_Id(vehicleTypeId, buildingId);
     }
 
     /** Giong resolveForBuilding nhung chi lay phien ban dang active. */
     default List<PricingPolicy> resolveActiveForBuilding(Long vehicleTypeId, Long buildingId) {
         if (buildingId == null) {
-            return findByVehicleType_IdAndIsActiveTrue(vehicleTypeId);
+            return findByVehicleType_IdAndBuildingIsNullAndIsActiveTrue(vehicleTypeId);
         }
-        List<PricingPolicy> scoped = findByVehicleType_IdAndBuilding_IdAndIsActiveTrue(vehicleTypeId, buildingId);
-        return scoped.isEmpty() ? findByVehicleType_IdAndBuildingIsNullAndIsActiveTrue(vehicleTypeId) : scoped;
+        return findByVehicleType_IdAndBuilding_IdAndIsActiveTrue(vehicleTypeId, buildingId);
     }
 }

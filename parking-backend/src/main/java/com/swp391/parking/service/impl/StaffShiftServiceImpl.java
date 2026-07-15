@@ -16,12 +16,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class StaffShiftServiceImpl implements StaffShiftService {
+
+    // Duoc phep check-in som toi da bao nhieu phut truoc gio bat dau ca.
+    private static final long EARLY_CHECKIN_WINDOW_MINUTES = 30;
+    // Check-in trong khoang nay tinh tu gio bat dau ca van la ON_TIME, qua thi LATE.
+    private static final long LATE_THRESHOLD_MINUTES = 15;
 
     private final StaffShiftRepository staffShiftRepository;
     private final ShiftRepository shiftRepository;
@@ -122,6 +128,84 @@ public List<StaffShiftResponse> getByUser(Long userId) {
         staffShiftRepository.delete(staffShift);
     }
 
+    @Override
+    public StaffShiftResponse checkIn(Long id, Long currentUserId) {
+        StaffShift staffShift = staffShiftRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "StaffShift not found"));
+        ensureOwnShift(staffShift, currentUserId);
+
+        if (staffShift.getCheckInTime() != null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ca này đã check-in rồi");
+        }
+        LocalDate today = LocalDate.now();
+        if (!staffShift.getWorkingDate().equals(today)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chỉ có thể check-in cho ca làm việc của ngày hôm nay");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime shiftStart = LocalDateTime.of(staffShift.getWorkingDate(), staffShift.getShift().getStartTime());
+        LocalDateTime earliestAllowed = shiftStart.minusMinutes(EARLY_CHECKIN_WINDOW_MINUTES);
+        if (now.isBefore(earliestAllowed)) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Chưa đến giờ check-in. Chỉ được check-in sớm nhất " + EARLY_CHECKIN_WINDOW_MINUTES + " phút trước giờ bắt đầu ca");
+        }
+
+        staffShift.setCheckInTime(now);
+        staffShift.setAttendanceStatus(
+                now.isAfter(shiftStart.plusMinutes(LATE_THRESHOLD_MINUTES))
+                        ? StaffShift.AttendanceStatus.LATE
+                        : StaffShift.AttendanceStatus.ON_TIME);
+        staffShift = staffShiftRepository.save(staffShift);
+        return toResponse(staffShift);
+    }
+
+    @Override
+    public StaffShiftResponse checkOut(Long id, Long currentUserId) {
+        StaffShift staffShift = staffShiftRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "StaffShift not found"));
+        ensureOwnShift(staffShift, currentUserId);
+
+        if (staffShift.getCheckInTime() == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Chưa check-in thì không thể check-out");
+        }
+        if (staffShift.getCheckOutTime() != null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Ca này đã check-out rồi");
+        }
+
+        staffShift.setCheckOutTime(LocalDateTime.now());
+        staffShift.setAttendanceStatus(StaffShift.AttendanceStatus.COMPLETED);
+        staffShift = staffShiftRepository.save(staffShift);
+        return toResponse(staffShift);
+    }
+
+    @Override
+    public void markAbsentForPastShifts() {
+        LocalDate today = LocalDate.now();
+
+        // Ca cua nhung ngay truoc, chua tung check-in -> chac chan ABSENT.
+        List<StaffShift> pastDays = staffShiftRepository
+                .findByCheckInTimeIsNullAndAttendanceStatusAndWorkingDateBefore(StaffShift.AttendanceStatus.NOT_STARTED, today);
+
+        // Ca hom nay nhung da qua gio ket thuc ma chua check-in -> ABSENT.
+        LocalDateTime now = LocalDateTime.now();
+        List<StaffShift> todayShifts = staffShiftRepository
+                .findByCheckInTimeIsNullAndAttendanceStatusAndWorkingDate(StaffShift.AttendanceStatus.NOT_STARTED, today)
+                .stream()
+                .filter(ss -> now.isAfter(LocalDateTime.of(ss.getWorkingDate(), ss.getShift().getEndTime())))
+                .toList();
+
+        pastDays.forEach(ss -> ss.setAttendanceStatus(StaffShift.AttendanceStatus.ABSENT));
+        todayShifts.forEach(ss -> ss.setAttendanceStatus(StaffShift.AttendanceStatus.ABSENT));
+        staffShiftRepository.saveAll(pastDays);
+        staffShiftRepository.saveAll(todayShifts);
+    }
+
+    private void ensureOwnShift(StaffShift staffShift, Long currentUserId) {
+        if (!staffShift.getUser().getUserId().equals(currentUserId.intValue())) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ có thể tự check-in/check-out ca làm của chính mình");
+        }
+    }
+
     private void ensureStaffUser(User user) {
         boolean isStaff = user.getRoles() != null
                 && user.getRoles().stream().anyMatch(role -> role.getRoleName() == Role.RoleName.STAFF);
@@ -140,6 +224,9 @@ public List<StaffShiftResponse> getByUser(Long userId) {
                 .workingDate(staffShift.getWorkingDate())
                 .startTime(staffShift.getShift().getStartTime())
                 .endTime(staffShift.getShift().getEndTime())
+                .checkInTime(staffShift.getCheckInTime())
+                .checkOutTime(staffShift.getCheckOutTime())
+                .attendanceStatus(staffShift.getAttendanceStatus().name())
                 .build();
     }
 }

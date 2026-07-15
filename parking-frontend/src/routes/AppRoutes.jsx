@@ -127,7 +127,6 @@ export default function AppRoutes() {
             <Route path="roles" element={<Navigate to="/admin/users" replace />} />
             <Route path="system-config" element={<SystemConfigPage />} />
             <Route path="activity-logs" element={<ActivityLogPage />} />
-            <Route path="pricing-policies" element={<PricingPolicyPage />} />
             <Route path="parking-structure" element={<ParkingStructurePage />} />
             <Route path="settings" element={<PortalSettingsPage portal="admin" />} />
           </Route>

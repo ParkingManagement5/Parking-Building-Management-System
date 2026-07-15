@@ -16,4 +16,7 @@ public interface StaffShiftService {
     List<StaffShiftResponse> getByWorkingDateAndBuilding(LocalDate workingDate, Long buildingId);
     StaffShiftResponse updateStaffShift(Long id, AssignStaffShiftRequest request);
     void deleteStaffShift(Long id);
+    StaffShiftResponse checkIn(Long id, Long currentUserId);
+    StaffShiftResponse checkOut(Long id, Long currentUserId);
+    void markAbsentForPastShifts();
 }

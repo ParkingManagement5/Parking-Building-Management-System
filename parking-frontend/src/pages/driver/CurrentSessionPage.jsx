@@ -58,6 +58,8 @@ function buildDisplayItems(mySessions, myBookings) {
   return items;
 }
 
+const PACKAGE_LABELS = { DAILY: "Gói ngày", WEEKLY: "Gói tuần", MONTHLY: "Gói tháng" };
+
 const BADGE_MAP = {
   EXIT_QR: { bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Đang đỗ" },
   WAITING_PAYMENT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
@@ -94,8 +96,22 @@ function WaitingPaymentAction() {
 function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigate, generatingId }) {
   const { displayMode } = item;
   const isSession = item.source === "session";
+  const isPackage = Boolean(item.bookingType) && item.bookingType !== "HOURLY";
+  const packageLabel = PACKAGE_LABELS[item.bookingType] || item.bookingType;
   const badge = BADGE_MAP[displayMode] || BADGE_MAP.SYNCING;
   const exitQr = exitQrs[item.sessionId] || null;
+
+  const tiles = isPackage
+    ? [
+        [isSession ? "Giờ vào" : "Hẹn đến", isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)],
+        ["Loại gói", packageLabel],
+        ["Hết hạn gói", item.bookingEndTime ? formatDateTime(item.bookingEndTime) : "—"],
+      ]
+    : [
+        [isSession ? "Giờ vào" : "Hẹn đến", isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)],
+        [isSession ? "Phí tạm tính" : "Tính phí", isSession && item.calculatedFee != null ? formatCurrency(item.calculatedFee) : "Tính khi ra bãi"],
+        ["Đơn giá", item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/giờ` : "Theo loại xe"],
+      ];
 
   return (
     <div className="space-y-4">
@@ -106,7 +122,12 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
             <h2 className="text-lg font-bold">{item.buildingName || item.parkingBuildingName || "Parking Building"}</h2>
             <p className="text-sm text-white/75 mt-0.5">{item.zoneName || "Zone"} - {item.slotCode || item.parkingSlotCode || "Slot"}</p>
           </div>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.bg}`}>{badge.label}</span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.bg}`}>{badge.label}</span>
+            {isPackage && (
+              <span className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">{packageLabel}</span>
+            )}
+          </div>
         </div>
 
         <div className="text-center mb-5">
@@ -125,12 +146,14 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
           )}
         </div>
 
+        {isPackage && (displayMode === "ENTRY_QR" || displayMode === "EXIT_QR") && (
+          <div className="mb-3 rounded-xl border border-emerald-300/40 bg-white/10 px-3 py-2 text-center text-xs text-white/85">
+            Đã thanh toán trọn gói · Vào/ra tự do trong kỳ hạn, không tính thêm phí
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-3 text-sm">
-          {[
-            [isSession ? "Giờ vào" : "Hẹn đến", isSession ? formatDateTime(item.entryTime) : formatDateTime(item.bookingStartTime || item.reservedAt || item.createdAt)],
-            [isSession ? "Phí tạm tính" : "Tính phí", isSession && item.calculatedFee != null ? formatCurrency(item.calculatedFee) : "Tính khi ra bãi"],
-            ["Đơn giá", item.hourlyRate ? `${formatCurrency(item.hourlyRate)}/giờ` : "Theo loại xe"],
-          ].map(([label, val]) => (
+          {tiles.map(([label, val]) => (
             <div key={label} className="rounded-xl bg-white/10 p-3">
               <p className="text-xs text-white/60">{label}</p>
               <p className="font-semibold mt-0.5">{val}</p>
@@ -214,16 +237,29 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
             </div>
             <p className="mt-3 font-mono text-xs text-muted-foreground">{shortToken(item.qrToken)}</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground mt-2">Đưa QR cho staff ở cổng vào. Sau khi quét, phiên chuyển sang ACTIVE.</p>
+            {isPackage && (
+              <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+                Đã thanh toán trọn gói {packageLabel.toLowerCase()} — dùng lại đúng QR này cho mỗi lần vào bãi trong kỳ hạn.
+              </p>
+            )}
           </>
         ) : displayMode === "PENDING_DEPOSIT" ? (
           <>
-            <p className="text-sm font-semibold text-foreground">Chờ thanh toán đặt cọc</p>
+            <p className="text-sm font-semibold text-foreground">{isPackage ? "Chờ thanh toán trọn gói" : "Chờ thanh toán đặt cọc"}</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
-              Chưa thanh toán cọc. Vui lòng thanh toán để nhận Entry QR.
-              {item.depositAmount > 0 && <span className="block mt-1 font-medium text-foreground">Số tiền cọc: {formatCurrency(item.depositAmount)}</span>}
+              {isPackage
+                ? "Chưa thanh toán phí gói. Vui lòng thanh toán trọn gói để nhận Entry QR."
+                : "Chưa thanh toán cọc. Vui lòng thanh toán để nhận Entry QR."}
+              {item.depositAmount > 0 && (
+                <span className="block mt-1 font-medium text-foreground">
+                  {isPackage ? "Phí trọn gói: " : "Số tiền cọc: "}{formatCurrency(item.depositAmount)}
+                </span>
+              )}
             </p>
             <button type="button" onClick={() => navigate("/driver/bookings")}
-              className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Thanh toán đặt cọc</button>
+              className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
+              {isPackage ? "Thanh toán trọn gói" : "Thanh toán đặt cọc"}
+            </button>
           </>
         ) : displayMode === "QR_EXPIRED" ? (
           <>

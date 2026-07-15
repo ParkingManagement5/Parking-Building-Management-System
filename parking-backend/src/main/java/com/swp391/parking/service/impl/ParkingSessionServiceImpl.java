@@ -3,6 +3,7 @@ package com.swp391.parking.service.impl;
 import com.swp391.parking.dto.request.SessionEntryRequest;
 import com.swp391.parking.dto.request.SessionExitRequest;
 import com.swp391.parking.dto.request.SessionQrScanRequest;
+import com.swp391.parking.dto.response.PaymentResponse;
 import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.*;
@@ -24,9 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,6 +60,12 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     public SessionResponse processEntry(SessionEntryRequest request) {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
+
+        // Staff chi duoc xu ly vao/ra o dung toa nha duoc phan cong - truoc day
+        // KHONG co check nay, khien staff toa B co the vo tinh (hoac co y) cho
+        // xe vao/ra o toa A ma khong bi chan, lam sai lech slot/session cua toa do.
+        enforceStaffBuildingScope(request.getStaffUserId(),
+                gate.getBuilding() != null ? gate.getBuilding().getId() : null);
 
         if (!Boolean.TRUE.equals(gate.getIsActive())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Gate " + gate.getGateCode() + " đang inactive");
@@ -312,6 +321,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
         }
 
+        // Toa nha phai duoc chinh Manager cua toa do tu cau hinh gia HOURLY rieng
+        // truoc thi moi cho xe walk-in vao - khong con fallback ve gia global cua
+        // Admin nua (Admin khong con quyen dat/sua gia).
+        Long walkInBuildingId = slot.getZone() != null && slot.getZone().getFloor() != null
+                && slot.getZone().getFloor().getBuilding() != null
+                ? slot.getZone().getFloor().getBuilding().getId() : null;
+        if (!pricingPolicyRepository.existsByVehicleType_IdAndBuilding_IdAndTimeTypeAndIsActiveTrue(
+                vehicle.getVehicleType().getId(), walkInBuildingId, "HOURLY")) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "Toà nhà chưa cấu hình bảng giá theo giờ cho loại xe này. Vui lòng liên hệ quản lý bãi.");
+        }
+
         slot.setStatus(ParkingSlot.Status.OCCUPIED);
         parkingSlotRepository.save(slot);
 
@@ -332,6 +353,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     @Transactional
     public SessionResponse processExit(Long sessionId, SessionExitRequest request) {
         ParkingSession session = getSessionEntity(sessionId);
+
+        // Staff chi duoc cho xe ra dung toa nha duoc phan cong - ap dung ca cho
+        // processExitQr() vi no goi qua ham nay. Truoc day thieu check nay khien
+        // staff toa B quet bien/QR van dong duoc session cua toa A (bug nghiem
+        // trong: sai lech du lieu slot/booking giua cac toa).
+        enforceStaffBuildingScope(request.getStaffUserId(), buildingIdOf(session));
+
         if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session không ACTIVE (hiện: " + session.getStatus() + ")");
@@ -428,24 +456,11 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
 
-        notificationService.notify(session.getUserId(),
-                "Xe đã ra bãi",
-                "Xe " + session.getVehicle().getLicensePlate() + " đã ra khỏi bãi. Vui lòng chờ thanh toán.",
-                "warning", "SESSION", session.getId().intValue());
-
-        Long exitBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
-        if (exitBuildingId != null) {
-            notificationService.notifyStaffInBuilding(exitBuildingId, "Xe ra bãi",
-                    "Xe " + session.getVehicle().getLicensePlate() + " đã ra. Chờ thanh toán phí đỗ xe.",
-                    "warning", "SESSION", session.getId().intValue());
-        } else {
-            notificationService.notifyAllStaff("Xe ra bãi",
-                    "Xe " + session.getVehicle().getLicensePlate() + " đã ra. Chờ thanh toán phí đỗ xe.",
-                    "warning", "SESSION", session.getId().intValue());
-        }
-
-        // Tao san parking fee PENDING de staff co the thu CASH hoac sinh QR VNPay ngay.
-        paymentService.createParkingFee(
+        // Tao san parking fee PENDING de staff co the thu CASH hoac sinh QR VNPay ngay -
+        // tao TRUOC khi gui thong bao de lay dung so tien da tinh (gom ca phu troi
+        // qua han goi neu co), thay vi bao chung chung "cho thanh toan" khong ro
+        // ly do can tra hon gia goi da tra truoc.
+        PaymentResponse feeResult = paymentService.createParkingFee(
                 session.getId().intValue(),
                 booking != null && booking.getId() != null ? booking.getId().intValue() : null,
                 null,
@@ -458,6 +473,31 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 BigDecimal.ZERO,
                 Payment.PaymentMethod.CASH
         );
+
+        boolean hasOvertime = feeResult.getOvertimeFee() != null
+                && feeResult.getOvertimeFee().compareTo(BigDecimal.ZERO) > 0;
+        String driverMessage = hasOvertime
+                ? "Xe " + session.getVehicle().getLicensePlate() + " đã ra khỏi bãi. Do đỗ quá hạn gói "
+                        + booking.getBookingType() + ", phát sinh phụ trội " + formatVnd(feeResult.getOvertimeFee())
+                        + "đ. Tổng cần thanh toán: " + formatVnd(feeResult.getTotalAmount()) + "đ."
+                : "Xe " + session.getVehicle().getLicensePlate() + " đã ra khỏi bãi. Vui lòng chờ thanh toán.";
+        notificationService.notify(session.getUserId(),
+                "Xe đã ra bãi",
+                driverMessage,
+                "warning", "SESSION", session.getId().intValue());
+
+        Long exitBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
+        String staffMessage = hasOvertime
+                ? "Xe " + session.getVehicle().getLicensePlate() + " đã ra (quá hạn gói " + booking.getBookingType()
+                        + ", phụ trội " + formatVnd(feeResult.getOvertimeFee()) + "đ). Chờ thanh toán phí đỗ xe."
+                : "Xe " + session.getVehicle().getLicensePlate() + " đã ra. Chờ thanh toán phí đỗ xe.";
+        if (exitBuildingId != null) {
+            notificationService.notifyStaffInBuilding(exitBuildingId, "Xe ra bãi",
+                    staffMessage, "warning", "SESSION", session.getId().intValue());
+        } else {
+            notificationService.notifyAllStaff("Xe ra bãi",
+                    staffMessage, "warning", "SESSION", session.getId().intValue());
+        }
 
         return toResponse(session);
     }
@@ -754,17 +794,45 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         return currentUser.getAssignedBuilding().getId();
     }
 
-    private BigDecimal resolveHourlyRate(ParkingSession s) {
+    /**
+     * "Don gia" hien thi cho FE: gia theo khung gio dang ap dung TAI THOI DIEM refTime
+     * (hien tai neu session con ACTIVE, hoac luc ra neu da COMPLETED) - khong phai gia
+     * luc entryTime. Xe do qua dem sang ngay se thay Don gia tu dong chuyen sang gia
+     * ngay, khop voi cach Phi tam tinh da tinh (calculateSessionFee tu chia theo tung
+     * khung gio da di qua). Van dung TAT CA phien ban gia (ke ca da bi Manager thay the)
+     * de resolve dung gia da/dang ap dung, khong bi anh huong boi lan sua gia SAU refTime.
+     */
+    private BigDecimal resolveHourlyRate(ParkingSession s, LocalDateTime refTime) {
         if (s.getVehicle() == null || s.getVehicle().getVehicleType() == null) {
             return new BigDecimal("20000");
         }
         Long vehicleTypeId = s.getVehicle().getVehicleType().getId();
-        // Dung TAT CA phien ban gia (ke ca da bi Manager thay the) de resolve dung
-        // gia da ap dung tai thoi diem entryTime, khong bi anh huong boi lan sua gia
-        // sau nay. Uu tien gia rieng cua toa nha, fallback ve gia global.
         List<PricingPolicy> policies = pricingPolicyRepository.resolveForBuilding(vehicleTypeId, buildingIdOf(s));
-        LocalDateTime refTime = s.getEntryTime() != null ? s.getEntryTime() : LocalDateTime.now();
         return feeCalculatorUtil.resolveHourlyRate(policies, refTime);
+    }
+
+    /**
+     * Chan staff xu ly vao/ra o toa nha khac voi toa duoc phan cong. Chi ap
+     * dung khi user co assignedBuilding (staff/manager thuc su duoc gan toa) -
+     * ADMIN hoac tai khoan chua gan toa nao thi bo qua, giong dung pattern da
+     * dung o GET /sessions/{id} va PaymentService.enforceSessionBuildingScope.
+     */
+    private void enforceStaffBuildingScope(Long staffUserId, Long targetBuildingId) {
+        if (staffUserId == null || targetBuildingId == null) return;
+        User staff = userRepository.findById(Math.toIntExact(staffUserId)).orElse(null);
+        if (staff == null || staff.getAssignedBuilding() == null
+                || staff.getAssignedBuilding().getId() == null) {
+            return;
+        }
+        if (!staff.getAssignedBuilding().getId().equals(targetBuildingId)) {
+            throw new AppException(HttpStatus.FORBIDDEN,
+                    "Bạn không được phân công cho toà nhà này, không thể xử lý xe vào/ra ở đây");
+        }
+    }
+
+    private static String formatVnd(BigDecimal amount) {
+        if (amount == null) return "0";
+        return NumberFormat.getInstance(new Locale("vi", "VN")).format(amount);
     }
 
     private Long buildingIdOf(ParkingSession s) {
@@ -777,13 +845,13 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     }
 
     private SessionResponse toResponse(ParkingSession s) {
-        BigDecimal hourlyRate = resolveHourlyRate(s);
+        LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
+        BigDecimal hourlyRate = resolveHourlyRate(s, endTime);
         List<PricingPolicy> activePolicies = List.of();
         if (s.getVehicle() != null && s.getVehicle().getVehicleType() != null) {
             activePolicies = pricingPolicyRepository.resolveForBuilding(
                     s.getVehicle().getVehicleType().getId(), buildingIdOf(s));
         }
-        LocalDateTime endTime = s.getExitTime() != null ? s.getExitTime() : LocalDateTime.now();
         String bookingType = s.getBooking() != null ? s.getBooking().getBookingType() : null;
         LocalDateTime bookingEndTime = s.getBooking() != null ? s.getBooking().getBookingEndTime() : null;
         BigDecimal calculatedFee = s.getEntryTime() != null
@@ -820,6 +888,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .calculatedFee(calculatedFee)
                 .hourlyRate(hourlyRate)
                 .depositAmount(depositAmount)
+                .bookingType(bookingType)
+                .bookingEndTime(bookingEndTime)
                 .buildingId(building != null ? building.getId() : null)
                 .buildingName(building != null ? building.getName() : null)
                 .floorId(floor != null ? floor.getId() : null)

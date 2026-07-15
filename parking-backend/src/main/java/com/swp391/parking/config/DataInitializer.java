@@ -56,20 +56,16 @@ public class DataInitializer implements CommandLineRunner {
     // go dau truc tiep) vi platform dang compile bang Cp1252 chu khong phai UTF-8
     // (pom.xml chua khai bao sourceEncoding) - escape la ASCII thuan nen doc
     // dung bat ke encoding nao, tranh bi mojibake nhu vai cho khac trong repo.
+    // Chi con 4 building chinh thuc dung cho demo (da bo 9 building phu -
+    // Pi Pink/Tao Dan/Landmark 81/Phu My Hung/Cong Hoa/Go Vap/Aeon Tan Phu/
+    // Binh Tan Hub/Sala Thu Thiem - de tranh bi tu dong tai tao moi lan app
+    // khoi dong, dung dung 4 toa nha that su duoc dung: FPT HCM, Ben Bach
+    // Dang, Le Van Tam, Tan Son Nhat).
     private static final List<BuildingSeed> HCMC_BUILDINGS = List.of(
             new BuildingSeed("B\u00e3i xe FPT HCM", "L\u00f4 E2a-7, \u0110\u01b0\u1eddng D1, Long Th\u1ea1nh M\u1ef9, Th\u1ee7 \u0110\u1ee9c, TP.HCM", "0900000010", "parking@fpt.edu.vn", "B\u00e3i \u0111\u1ed7 xe demo 2 t\u1ea7ng \u00f4 t\u00f4 t\u1ea1i khu FPT HCM", 10.8413, 106.8098, "FPTHCM"),
-            new BuildingSeed("B\u00e3i xe Pi Pink", "53 V\u00f5 V\u0103n T\u1ea7n, Ph\u01b0\u1eddng V\u00f5 Th\u1ecb S\u00e1u, Qu\u1eadn 3, TP.HCM", "0900000011", "pipink@parking.vn", "B\u00e3i \u0111\u1ed7 xe Pi Pink layout demo 2 t\u1ea7ng \u00f4 t\u00f4", 10.7813, 106.6917, "PIPINK"),
             new BuildingSeed("B\u00e3i xe B\u1ebfn B\u1ea1ch \u0110\u1eb1ng", "T\u00f4n \u0110\u1ee9c Th\u1eafng, B\u1ebfn Ngh\u00e9, Qu\u1eadn 1, TP.HCM", "0900000012", "bachdang@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 g\u1ea7n ph\u1ed1 \u0111i b\u1ed9 Nguy\u1ec5n Hu\u1ec7", 10.7729, 106.7053, "BACHDANG"),
-            new BuildingSeed("B\u00e3i xe Tao \u0110\u00e0n", "Tr\u01b0\u01a1ng \u0110\u1ecbnh, Ph\u01b0\u1eddng B\u1ebfn Th\u00e0nh, Qu\u1eadn 1, TP.HCM", "0900000013", "taodan@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 ph\u1ee5c v\u1ee5 khu c\u00f4ng vi\u00ean Tao \u0110\u00e0n", 10.7774, 106.6922, "TAODAN"),
             new BuildingSeed("B\u00e3i xe L\u00ea V\u0103n T\u00e1m", "Hai B\u00e0 Tr\u01b0ng, \u0110a Kao, Qu\u1eadn 1, TP.HCM", "0900000014", "levantam@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 g\u1ea7n c\u00f4ng vi\u00ean L\u00ea V\u0103n T\u00e1m", 10.7873, 106.7001, "LEVANTAM"),
-            new BuildingSeed("B\u00e3i xe Landmark 81", "208 Nguy\u1ec5n H\u1eefu C\u1ea3nh, Ph\u01b0\u1eddng 22, B\u00ecnh Th\u1ea1nh, TP.HCM", "0900000015", "landmark81@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 cho khu Landmark 81", 10.7958, 106.7213, "LANDMARK81"),
-            new BuildingSeed("B\u00e3i xe T\u00e2n S\u01a1n Nh\u1ea5t", "Tr\u01b0\u1eddng S\u01a1n, Ph\u01b0\u1eddng 2, T\u00e2n B\u00ecnh, TP.HCM", "0900000016", "tsn@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 g\u1ea7n s\u00e2n bay T\u00e2n S\u01a1n Nh\u1ea5t", 10.8128, 106.6668, "TSN"),
-            new BuildingSeed("B\u00e3i xe Ph\u00fa M\u1ef9 H\u01b0ng", "T\u00f4n D\u1eadt Ti\u00ean, T\u00e2n Phong, Qu\u1eadn 7, TP.HCM", "0900000017", "phumyhung@parking.vn", "B\u00e3i \u0111\u1ed7 xe 2 t\u1ea7ng \u00f4 t\u00f4 cho khu \u0111\u00f4 th\u1ecb Ph\u00fa M\u1ef9 H\u01b0ng", 10.7288, 106.7229, "PMH"),
-            new BuildingSeed("B\u00e3i xe C\u1ed9ng H\u00f2a", "C\u1ed9ng H\u00f2a, Ph\u01b0\u1eddng 13, T\u00e2n B\u00ecnh, TP.HCM", "0900000018", "conghoa@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 d\u1ecdc tr\u1ee5c \u0111\u01b0\u1eddng C\u1ed9ng H\u00f2a", 10.8017, 106.6425, "CONGHOA"),
-            new BuildingSeed("B\u00e3i xe G\u00f2 V\u1ea5p Center", "Quang Trung, Ph\u01b0\u1eddng 10, G\u00f2 V\u1ea5p, TP.HCM", "0900000019", "govap@parking.vn", "B\u00e3i \u0111\u1ed7 xe 2 t\u1ea7ng \u00f4 t\u00f4 cho khu G\u00f2 V\u1ea5p Center", 10.8396, 106.6699, "GOVAP"),
-            new BuildingSeed("B\u00e3i xe Aeon T\u00e2n Ph\u00fa", "30 B\u1edd Bao T\u00e2n Th\u1eafng, S\u01a1n K\u1ef3, T\u00e2n Ph\u00fa, TP.HCM", "0900000020", "tanphu@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 cho khu mua s\u1eafm ph\u00eda T\u00e2y S\u00e0i G\u00f2n", 10.8007, 106.6204, "AEONTANPHU"),
-            new BuildingSeed("B\u00e3i xe B\u00ecnh T\u00e2n Hub", "Kinh D\u01b0\u01a1ng V\u01b0\u01a1ng, An L\u1ea1c, B\u00ecnh T\u00e2n, TP.HCM", "0900000021", "binhtan@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 k\u1ebft n\u1ed1i c\u1eeda ng\u00f5 mi\u1ec1n T\u00e2y", 10.7443, 106.6142, "BINHTAN"),
-            new BuildingSeed("B\u00e3i xe Sala Th\u1ee7 Thi\u00eam", "10 Mai Ch\u00ed Th\u1ecd, Th\u1ee7 Thi\u00eam, Th\u1ee7 \u0110\u1ee9c, TP.HCM", "0900000022", "sala@parking.vn", "B\u00e3i \u0111\u1ed7 xe 2 t\u1ea7ng \u00f4 t\u00f4 cho khu Th\u1ee7 Thi\u00eam", 10.7762, 106.7296, "SALA")
+            new BuildingSeed("B\u00e3i xe T\u00e2n S\u01a1n Nh\u1ea5t", "Tr\u01b0\u1eddng S\u01a1n, Ph\u01b0\u1eddng 2, T\u00e2n B\u00ecnh, TP.HCM", "0900000016", "tsn@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 g\u1ea7n s\u00e2n bay T\u00e2n S\u01a1n Nh\u1ea5t", 10.8128, 106.6668, "TSN")
     );
 
     private final UserRepository userRepository;

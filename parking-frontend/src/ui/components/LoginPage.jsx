@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../api/auth/authApi";
 import { usePublicTheme } from "../../utils/publicTheme";
@@ -68,6 +68,7 @@ export default function LoginPage() {
     password: "",
   });
   const [overview, setOverview] = useState({ total: 0, available: 0, occupied: 0 });
+  const googleInitializedRef = useRef(false);
 
   const isLocalhost = typeof window !== "undefined"
     && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -94,6 +95,13 @@ export default function LoginPage() {
 
     const initializeGoogle = () => {
       if (!window.google?.accounts?.id) return;
+      // React StrictMode chay effect 2 lan o dev - guard nay tranh goi initialize()
+      // trung lap (gay warning "initialize() is called multiple times" tu Google SDK).
+      if (googleInitializedRef.current) {
+        setGoogleReady(true);
+        return;
+      }
+      googleInitializedRef.current = true;
 
       window.google.accounts.id.initialize({
         client_id: clientId,
@@ -189,10 +197,46 @@ export default function LoginPage() {
     }
     if (window.google?.accounts?.id) {
       setError("");
+      setGoogleLoading(true);
+
+      // Khi Chrome tu chuyen sang dung FedCM ngam duoi API prompt() kieu cu, va
+      // FedCM's navigator.credentials.get() bi reject (vd trinh duyet chua dang
+      // nhap Google account nao), Google KHONG goi lai callback ben duoi nua -
+      // nut bam vao im lang, khong co gi xay ra, khong bao loi (dung nhu canh
+      // bao "may stop functioning when FedCM becomes mandatory" cua GSI_LOGGER).
+      // Dat timeout fallback: neu callback khong chay trong 1 khoang du dai, tu
+      // bao loi thay vi de nguoi dung cho vo ich khong biet chuyen gi dang xay ra.
+      //
+      // 3s ban dau qua ngan: UI chon tai khoan/"Dang xac minh..." cua Chrome co
+      // the mat hon 3s de hien/xac minh xong (dac biet lan dau trong phien), khien
+      // fallback bao loi "khong phan hoi" trong luc flow van dang chay binh thuong
+      // va se thanh cong ngay sau do - gay hoang mang gia. Tang len 10s de giam
+      // false-positive; neu login van thanh cong sau khi loi da hien, callback
+      // credential ben initialize() se tu clear loi nay (xem setError("") o duoi).
+      let callbackFired = false;
+      const fallbackTimer = setTimeout(() => {
+        if (callbackFired) return;
+        setGoogleLoading(false);
+        setError("Google login không phản hồi (thường do trình duyệt chưa đăng nhập tài khoản Google nào, hoặc FedCM bị chặn). Vui lòng đăng nhập bằng username/password.");
+        console.error("[Google Login] prompt callback did not fire within timeout — likely FedCM silently rejected.");
+      }, 10000);
+
       window.google.accounts.id.prompt((notification) => {
+        callbackFired = true;
+        clearTimeout(fallbackTimer);
+
         if (notification.isNotDisplayed()) {
+          // Ly do pho bien nhat ("opt_out_or_no_session") la trinh duyet CHUA
+          // dang nhap tai khoan Google nao - FedCM khong co gi de hien cho
+          // nguoi dung chon.
+          const reason = notification.getNotDisplayedReason?.() || "unknown_reason";
           setGoogleLoading(false);
-          setError("");
+          setError(
+            reason === "opt_out_or_no_session"
+              ? "Trình duyệt chưa đăng nhập tài khoản Google nào. Vào accounts.google.com đăng nhập trước, rồi bấm lại — hoặc dùng username/password."
+              : `Google login hiện không khả dụng (${reason}). Vui lòng đăng nhập bằng username/password.`
+          );
+          console.error("[Google Login] prompt not displayed, reason:", reason);
         } else if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
           setGoogleLoading(false);
           setError("");

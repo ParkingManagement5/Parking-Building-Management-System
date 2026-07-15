@@ -2,6 +2,7 @@ package com.swp391.parking.dto.response;
 
 import lombok.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -14,4 +15,7 @@ public class StaffShiftResponse {
     private LocalDate workingDate;
     private LocalTime startTime;
     private LocalTime endTime;
+    private LocalDateTime checkInTime;
+    private LocalDateTime checkOutTime;
+    private String attendanceStatus;
 }

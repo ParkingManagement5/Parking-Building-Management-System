@@ -9,6 +9,8 @@ import {
 } from "./staffPortalState";
 import { StaffEmptyState, StaffInput, StaffPageSection, StaffStatusBadge } from "./StaffUi";
 
+const PACKAGE_LABELS = { DAILY: "Gói ngày", WEEKLY: "Gói tuần", MONTHLY: "Gói tháng" };
+
 export default function ParkingSessionPage() {
   const [keyword, setKeyword] = useState("");
   const [sessions, setSessions] = useState([]);
@@ -26,8 +28,17 @@ export default function ParkingSessionPage() {
     return Number(policy?.pricePerHour ?? 20000);
   }
 
+  function isPackageSession(session) {
+    return Boolean(session?.bookingType && session.bookingType !== "HOURLY");
+  }
+
   function resolveCurrentFee(session) {
     if (!session) return 0;
+    // Session theo gói (DAILY/WEEKLY/MONTHLY) da tra tron goi truoc, khong tinh
+    // luy ke theo gio nhu session di le - dung thang calculatedFee tu backend.
+    if (isPackageSession(session)) {
+      return session.calculatedFee != null ? Number(session.calculatedFee) : Number(session.depositAmount || 0);
+    }
     if (session.status === "ACTIVE") {
       return computeSessionFee(session.entryTime, session.exitTime || new Date(), resolveHourlyRate(session));
     }
@@ -119,6 +130,9 @@ export default function ParkingSessionPage() {
                       <StaffStatusBadge tone={item.status === "ACTIVE" ? "emerald" : item.status === "WAITING_PAYMENT" ? "amber" : "slate"}>
                         {String(item.status || "unknown").toLowerCase()}
                       </StaffStatusBadge>
+                      {isPackageSession(item) && (
+                        <StaffStatusBadge tone="blue">{PACKAGE_LABELS[item.bookingType] || item.bookingType}</StaffStatusBadge>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Session #{item.sessionId} - Slot {item.slotCode}
@@ -131,7 +145,7 @@ export default function ParkingSessionPage() {
                       <p className="mt-1 text-sm font-medium text-foreground">{formatStaffDateTime(item.entryTime)}</p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Current Fee</p>
+                      <p className="text-xs text-muted-foreground">{isPackageSession(item) ? "Phí trọn gói" : "Current Fee"}</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
                         {formatStaffCurrency(resolveCurrentFee(item))}
                       </p>

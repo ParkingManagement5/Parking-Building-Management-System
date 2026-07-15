@@ -120,6 +120,20 @@ public class StaffShiftController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/check-in")
+    @PreAuthorize("hasRole('STAFF')")
+    @Operation(summary = "Staff check-in for their own shift")
+    public ResponseEntity<StaffShiftResponse> checkIn(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(staffShiftService.checkIn(id, resolveCurrentUserId(authentication)));
+    }
+
+    @PostMapping("/{id}/check-out")
+    @PreAuthorize("hasRole('STAFF')")
+    @Operation(summary = "Staff check-out for their own shift")
+    public ResponseEntity<StaffShiftResponse> checkOut(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(staffShiftService.checkOut(id, resolveCurrentUserId(authentication)));
+    }
+
     private boolean isStaff(Authentication authentication) {
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_STAFF"));

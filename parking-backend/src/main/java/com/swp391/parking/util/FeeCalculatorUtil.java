@@ -72,8 +72,13 @@ public class FeeCalculatorUtil {
         rate = latestEffectiveRate(hourly, refTime, p -> dayType.equalsIgnoreCase(p.getDayType()));
         if (rate != null) return rate;
 
-        // Ưu tiên 3: match timeRange (bỏ qua dayType)
-        rate = latestEffectiveRate(hourly, refTime, p -> isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
+        // Ưu tiên 3: match timeRange cụ thể (bỏ qua dayType) — chỉ áp dụng cho policy
+        // CÓ khai báo khung giờ. Policy không khai báo giờ (start/end = null) không được
+        // xét ở bước này, vì isInTimeRange(null,null) luôn trả true — nếu để lọt qua sẽ
+        // khiến 1 policy chỉ dành cho 1 dayType (vd WEEKEND) áp dụng nhầm sang dayType
+        // khác (vd WEEKDAY), ghi đè giá đúng của khung giờ đó.
+        rate = latestEffectiveRate(hourly, refTime,
+                p -> p.getStartHour() != null && p.getEndHour() != null && isInTimeRange(hour, p.getStartHour(), p.getEndHour()));
         if (rate != null) return rate;
 
         rate = latestEffectiveRate(hourly, refTime, p -> true);
@@ -146,6 +151,24 @@ public class FeeCalculatorUtil {
             return calculateSessionFee(entryTime, exitTime, policies, fallbackRate);
         }
         return calculateFlatFee(entryTime, exitTime, policies, fallbackRate, bookingType.toUpperCase(), bookingEndTime);
+    }
+
+    /**
+     * Tach rieng phan phi phu troi (qua han bookingEndTime) khoi tong phi -
+     * dung de hien thi/thong bao rieng cho driver thay vi gop chung vao 1 con
+     * so "baseFee" khong ro trong do co bao nhieu la phi goi, bao nhieu la
+     * phat sinh do do qua han. Chi ap dung cho booking dai han (DAILY/WEEKLY/
+     * MONTHLY) va khi exitTime thuc su vuot bookingEndTime - HOURLY hoac
+     * khong vuot han luon tra ve ZERO.
+     */
+    public BigDecimal calculateOvertimeFee(String bookingType,
+                                           LocalDateTime exitTime,
+                                           LocalDateTime bookingEndTime,
+                                           List<PricingPolicy> policies,
+                                           BigDecimal fallbackRate) {
+        if (bookingType == null || "HOURLY".equalsIgnoreCase(bookingType)) return BigDecimal.ZERO;
+        if (bookingEndTime == null || exitTime == null || !exitTime.isAfter(bookingEndTime)) return BigDecimal.ZERO;
+        return calculateSessionFee(bookingEndTime, exitTime, policies, fallbackRate);
     }
 
     private static final long DAILY_UNIT_HOURS   = 24;

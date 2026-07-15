@@ -20,6 +20,7 @@ import {
 } from "./StaffUi";
 
 const LOW_CONFIDENCE_PROCESS_STATUS = "MANUAL_REVIEW";
+const PACKAGE_LABELS = { DAILY: "Gói ngày", WEEKLY: "Gói tuần", MONTHLY: "Gói tháng" };
 
 function canonicalPlate(value) {
   return String(value ?? "")
@@ -112,6 +113,8 @@ export default function UnifiedScanPage() {
   const bookingStatus = String(lookupData?.status || "").toUpperCase();
   const isConfirmedBooking = lookupType === "BOOKING" && bookingStatus === "CONFIRMED";
   const isPendingPaymentBooking = lookupType === "BOOKING" && bookingStatus === "PENDING_PAYMENT";
+  const isPackageBooking = lookupType === "BOOKING" && Boolean(lookupData?.bookingType) && lookupData.bookingType !== "HOURLY";
+  const packageBookingLabel = isPackageBooking ? (PACKAGE_LABELS[lookupData.bookingType] || lookupData.bookingType) : null;
 
   useEffect(() => { loadVehicleTypes(); return () => stopCamera(); }, []);
 
@@ -670,9 +673,19 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                       <div className="flex items-center gap-3">
                         <LogOut size={20} className="text-amber-600" />
-                        <div>
-                          <p className="font-bold text-foreground">EXIT — Xe đang trong bãi</p>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-foreground">EXIT — Xe đang trong bãi</p>
+                            {lookupData?.bookingType && lookupData.bookingType !== "HOURLY" && (
+                              <StaffStatusBadge tone="blue">{PACKAGE_LABELS[lookupData.bookingType] || lookupData.bookingType}</StaffStatusBadge>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">Session #{lookupData?.sessionId} • Slot {lookupData?.slotCode} • Vào {formatStaffDateTime(lookupData?.entryTime)}</p>
+                          {lookupData?.bookingType && lookupData.bookingType !== "HOURLY" && (
+                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                              Xe theo gói — đã thanh toán trọn gói, không thu thêm phí khi ra.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -704,18 +717,31 @@ export default function UnifiedScanPage() {
                         ) : (
                           <QrCode size={20} className="text-blue-600" />
                         )}
-                        <div>
-                          <p className="font-bold text-foreground">
-                            {isPendingPaymentBooking
-                              ? "BOOKING - Chưa thanh toán cọc, không cho vào"
-                              : "BOOKING - Xe có booking, cần QR"}
-                          </p>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-foreground">
+                              {isPendingPaymentBooking
+                                ? isPackageBooking ? "BOOKING - Chưa thanh toán gói, không cho vào" : "BOOKING - Chưa thanh toán cọc, không cho vào"
+                                : "BOOKING - Xe có booking, cần QR"}
+                            </p>
+                            <StaffStatusBadge tone={isPackageBooking ? "blue" : "slate"}>
+                              {isPackageBooking ? packageBookingLabel : "Theo giờ"}
+                            </StaffStatusBadge>
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             Booking #{lookupData?.bookingId} - Slot {lookupData?.slotCode} - {bookingStatus || "UNKNOWN"}
+                            {isPackageBooking && lookupData?.bookingEndTime && ` - Hết hạn gói ${formatStaffDateTime(lookupData.bookingEndTime)}`}
                           </p>
                           {isPendingPaymentBooking && (
                             <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                              Khách cần thanh toán xong để booking chuyển sang CONFIRMED trước khi staff cho xe vào.
+                              {isPackageBooking
+                                ? "Khách cần thanh toán trọn gói để booking chuyển sang CONFIRMED trước khi staff cho xe vào."
+                                : "Khách cần thanh toán xong để booking chuyển sang CONFIRMED trước khi staff cho xe vào."}
+                            </p>
+                          )}
+                          {isPackageBooking && !isPendingPaymentBooking && (
+                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                              Đã thanh toán trọn gói — không thu thêm phí lúc vào/ra trong kỳ hạn.
                             </p>
                           )}
                         </div>
