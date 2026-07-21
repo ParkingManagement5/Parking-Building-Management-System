@@ -119,8 +119,8 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
       <div className="rounded-2xl border border-emerald-200 bg-emerald-600 p-6 text-white dark:border-emerald-500/20 dark:bg-emerald-900">
         <div className="flex items-start justify-between mb-4 gap-3">
           <div>
-            <h2 className="text-lg font-bold">{item.buildingName || item.parkingBuildingName || "Parking Building"}</h2>
-            <p className="text-sm text-white/75 mt-0.5">{item.zoneName || "Zone"} - {item.slotCode || item.parkingSlotCode || "Slot"}</p>
+            <h2 className="text-lg font-bold">{item.buildingName || item.parkingBuildingName || "Bãi đỗ xe"}</h2>
+            <p className="text-sm text-white/75 mt-0.5">{item.zoneName || "Khu vực"} - {item.slotCode || item.parkingSlotCode || "Chỗ"}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge.bg}`}>{badge.label}</span>
@@ -167,7 +167,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
         <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
           {[
             ["Biển số", item.licensePlate || item.vehiclePlate || "Xe đã liên kết"],
-            ["Tòa nhà", item.buildingName || item.parkingBuildingName || "Parking Building"],
+            ["Tòa nhà", item.buildingName || item.parkingBuildingName || "Bãi đỗ xe"],
             ["Trạng thái", badge.label],
             ["Tầng", item.floorName || "Chờ xác nhận"],
             ["Khu vực", item.zoneName || "Chờ xác nhận"],
@@ -207,7 +207,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
         ) : displayMode === "EXIT_QR" ? (
           exitQr?.qrToken ? (
             <>
-              <p className="text-sm font-semibold text-foreground mb-3">Exit QR Code</p>
+              <p className="text-sm font-semibold text-foreground mb-3">Mã QR ra bãi</p>
               <div className="rounded-2xl bg-white p-4 shadow-sm">
                 <QRCodeSVG value={exitQr.qrToken} size={200} level="H" includeMargin />
               </div>
@@ -219,7 +219,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-foreground">Exit QR Code</p>
+              <p className="text-sm font-semibold text-foreground">Mã QR ra bãi</p>
               <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Tạo QR khi bạn sẵn sàng ra cổng.</p>
               <button type="button" onClick={() => onCreateExitQr(item.sessionId)} disabled={generatingId === item.sessionId}
                 className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
@@ -231,7 +231,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
           )
         ) : displayMode === "ENTRY_QR" ? (
           <>
-            <p className="text-sm font-semibold text-foreground mb-3">Entry QR Code</p>
+            <p className="text-sm font-semibold text-foreground mb-3">Mã QR vào bãi</p>
             <div className="rounded-2xl bg-white p-4 shadow-sm">
               <QRCodeSVG value={item.qrToken} size={200} level="H" includeMargin />
             </div>

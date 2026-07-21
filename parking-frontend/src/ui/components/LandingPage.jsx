@@ -448,7 +448,7 @@ export default function LandingPage() {
             <a href="#" onClick={(e) => { e.preventDefault(); navigate("/public-slots"); }}>Bản đồ slot</a>
           </div>
           <div className="nav-actions">
-            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Chế độ sáng" : "Chế độ tối"}>
               {dark ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
               ) : (
@@ -466,7 +466,7 @@ export default function LandingPage() {
             className={`nav-mobile-btn ${mobileMenuOpen ? "active" : ""}`}
             id="navMobileBtn"
             ref={mobileBtnRef}
-            aria-label="Menu"
+            aria-label="Menu chính"
             aria-expanded={mobileMenuOpen}
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
@@ -758,7 +758,7 @@ export default function LandingPage() {
               <div className="bento-img-box">
                 <img
                   src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=480&q=80&auto=format"
-                  alt="Dashboard analytics"
+                  alt="Thống kê bảng điều khiển"
                   loading="lazy"
                 />
               </div>
@@ -901,7 +901,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="container footer-bottom">
-          <p>2026 ParkSmart. All rights reserved.</p>
+          <p>2026 ParkSmart. Bảo lưu mọi quyền.</p>
         </div>
       </footer>
     </div>

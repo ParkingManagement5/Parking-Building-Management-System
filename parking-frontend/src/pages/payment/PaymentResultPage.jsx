@@ -117,7 +117,7 @@ export default function PaymentResultPage() {
         setBackendReady(true);
         setSyncMessage(
           isParkingFee
-            ? "VNPay đã báo thành công. Nếu phiên chưa cập nhật ngay, vui lòng mở lại Current Session sau vài giây."
+            ? "VNPay đã báo thành công. Nếu phiên chưa cập nhật ngay, vui lòng mở lại Phiên đỗ xe hiện tại sau vài giây."
             : "VNPay đã báo thành công. Nếu QR chưa hiện ngay, vui lòng mở lại Lịch sử đặt chỗ sau vài giây."
         );
       }
@@ -198,7 +198,7 @@ export default function PaymentResultPage() {
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle size={14} className="animate-spin" />
             {backendReady
-              ? `Chuyển về ${isParkingFee ? "Current Session" : "Lịch sử đặt chỗ"} sau ${countdown}s...`
+              ? `Chuyển về ${isParkingFee ? "Phiên đỗ xe hiện tại" : "Lịch sử đặt chỗ"} sau ${countdown}s...`
               : (syncMessage || "Đang đợi backend xác nhận giao dịch...")}
           </div>
         ) : (
@@ -212,7 +212,7 @@ export default function PaymentResultPage() {
             onClick={() => navigate(successPath, { replace: true })}
             className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            {isParkingFee ? "Về Current Session" : "Về Lịch sử đặt chỗ"}
+            {isParkingFee ? "Về Phiên đỗ xe hiện tại" : "Về Lịch sử đặt chỗ"}
           </button>
           <button
             onClick={() => navigate("/driver", { replace: true })}

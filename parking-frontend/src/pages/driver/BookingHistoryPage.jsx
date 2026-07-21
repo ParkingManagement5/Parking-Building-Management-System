@@ -9,6 +9,7 @@ import {
   formatDateTime,
   getBookingStatus,
   getStatusClasses,
+  getStatusLabel,
 } from "./driverPortalUtils";
 
 const CONFIRMED_CANCEL_WINDOW_MS = 10 * 60 * 1000;
@@ -16,11 +17,11 @@ const CONFIRMED_CANCEL_WINDOW_MS = 10 * 60 * 1000;
 function StatusBadge({ status }) {
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium uppercase ${getStatusClasses(
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
         status
       )}`}
     >
-      {String(status || "pending")}
+      {getStatusLabel(status)}
     </span>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { unwrapApiData } from "../../utils/api";
-import { formatCurrency, formatDateTime, getStatusClasses } from "./driverPortalUtils";
+import { formatCurrency, formatDateTime, getStatusClasses, getStatusLabel } from "./driverPortalUtils";
 
 function describePayment(item) {
   if (item.paymentType === "DEPOSIT") {
@@ -102,7 +102,7 @@ export default function PaymentHistoryPage() {
                         item.status || item.paymentStatus || "paid"
                       )}`}
                     >
-                      {item.status || item.paymentStatus || "PAID"}
+                      {getStatusLabel(item.status || item.paymentStatus || "paid")}
                     </span>
                   </td>
                 </tr>

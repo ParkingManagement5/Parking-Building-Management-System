@@ -106,8 +106,8 @@ export default function MyVehiclesPage() {
     const payload = {
       vehicleTypeId: Number(form.vehicleTypeId),
       licensePlate: form.licensePlate.trim().toUpperCase(),
-      brand: form.brand || "Unknown",
-      model: form.model || "Unknown",
+      brand: form.brand || "Không rõ",
+      model: form.model || "Không rõ",
       color: form.color || "",
     };
 

@@ -20,6 +20,16 @@ function toneFromType(type, isRead) {
   return "slate";
 }
 
+const REQUEST_STATUS_LABELS = {
+  OPEN: "Đang mở",
+  IN_PROGRESS: "Đang xử lý",
+  RESOLVED: "Đã xử lý",
+};
+
+function requestStatusLabel(status) {
+  return REQUEST_STATUS_LABELS[String(status || "").toUpperCase()] || status;
+}
+
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -188,7 +198,7 @@ export default function StaffNotificationPage() {
         subtitle={`${unreadCount} thông báo chưa đọc · ${requests.length} yêu cầu cần xử lý`}
         action={
           <StaffSecondaryButton onClick={() => { void loadNotifications(); void loadRequests(); }}>
-            Refresh
+            Làm mới
           </StaffSecondaryButton>
         }
       >
@@ -232,7 +242,7 @@ export default function StaffNotificationPage() {
                 </button>
               ) : null}
               <StaffPrimaryButton onClick={handleMarkAllAsRead} disabled={unreadCount === 0}>
-                Mark All Read
+                Đánh dấu đã đọc tất cả
               </StaffPrimaryButton>
             </div>
           ) : null}
@@ -241,13 +251,13 @@ export default function StaffNotificationPage() {
         {activeTab === "notifications" ? (
           <>
             {loading ? (
-              <p className="text-sm text-muted-foreground">Loading notifications...</p>
+              <p className="text-sm text-muted-foreground">Đang tải thông báo...</p>
             ) : filteredNotifications.length === 0 ? (
               <StaffEmptyState
-                title={notifications.length === 0 ? "No notifications" : "Không có thông báo cho ngày này"}
+                title={notifications.length === 0 ? "Không có thông báo" : "Không có thông báo cho ngày này"}
                 description={
                   notifications.length === 0
-                    ? "There are currently no alerts for this staff account."
+                    ? "Hiện chưa có cảnh báo nào cho tài khoản nhân viên này."
                     : "Chọn ngày khác hoặc bấm \"Xem tất cả ngày\" để xem toàn bộ."
                 }
                 tone="success"
@@ -269,7 +279,7 @@ export default function StaffNotificationPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
                           <StaffStatusBadge tone={toneFromType(item.type, item.isRead)}>
-                            {item.isRead ? "read" : "unread"}
+                            {item.isRead ? "Đã đọc" : "Chưa đọc"}
                           </StaffStatusBadge>
                         </div>
                         <p className="mt-1 truncate text-xs text-muted-foreground">{item.body}</p>
@@ -277,7 +287,7 @@ export default function StaffNotificationPage() {
                       <span className="shrink-0 text-xs text-muted-foreground">{formatStaffDateTime(item.createdAt)}</span>
                       {!item.isRead ? (
                         <StaffSecondaryButton onClick={() => handleMarkAsRead(item.notificationId)}>
-                          Mark Read
+                          Đánh dấu đã đọc
                         </StaffSecondaryButton>
                       ) : null}
                     </div>
@@ -314,8 +324,8 @@ export default function StaffNotificationPage() {
 
             {requests.length === 0 ? (
               <StaffEmptyState
-                title={requestsLoading ? "Loading requests" : "No open requests"}
-                description="Driver support requests will appear here when they are created."
+                title={requestsLoading ? "Đang tải yêu cầu" : "Không có yêu cầu nào đang mở"}
+                description="Yêu cầu hỗ trợ từ tài xế sẽ hiện ở đây khi được tạo."
                 tone="success"
               />
             ) : (
@@ -327,7 +337,7 @@ export default function StaffNotificationPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm font-semibold text-foreground">{item.subject || item.requestType}</p>
                           <StaffStatusBadge tone={item.status === "IN_PROGRESS" ? "blue" : "amber"}>
-                            {String(item.status).toLowerCase()}
+                            {requestStatusLabel(item.status)}
                           </StaffStatusBadge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -335,7 +345,7 @@ export default function StaffNotificationPage() {
                         </p>
                         <p className="mt-1 truncate text-xs text-muted-foreground">{item.description}</p>
                         {item.assignedStaffName ? (
-                          <p className="mt-1 text-xs text-muted-foreground">Assigned to {item.assignedStaffName}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Đã giao cho {item.assignedStaffName}</p>
                         ) : null}
                       </div>
 
@@ -346,7 +356,7 @@ export default function StaffNotificationPage() {
                             onClick={() => assignToMe(item)}
                             disabled={savingId === item.requestId}
                           >
-                            Assign to me
+                            Nhận xử lý
                           </StaffSecondaryButton>
                         ) : null}
                         <StaffPrimaryButton
@@ -354,7 +364,7 @@ export default function StaffNotificationPage() {
                           onClick={() => resolveRequest(item)}
                           disabled={savingId === item.requestId}
                         >
-                          {savingId === item.requestId ? "Saving..." : "Resolve"}
+                          {savingId === item.requestId ? "Đang lưu..." : "Xử lý xong"}
                         </StaffPrimaryButton>
                       </div>
                     </div>

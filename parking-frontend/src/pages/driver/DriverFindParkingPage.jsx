@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
+  ArrowLeft,
   CalendarPlus,
-  ChevronDown,
   ExternalLink,
   List as ListIcon,
   Map as MapIcon,
@@ -91,6 +91,7 @@ function spreadNearbyBuildings(buildings) {
 
 export default function DriverFindParkingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const mapRef = useRef(null);
   const leafletRef = useRef(null);
   const markersRef = useRef([]);
@@ -104,9 +105,10 @@ export default function DriverFindParkingPage() {
   const [vehicleType, setVehicleType] = useState("CAR");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("near");
-  const [view, setView] = useState("list");
-  const [expandedBuilding, setExpandedBuilding] = useState(null);
-  const [activeBuildingId, setActiveBuildingId] = useState(null);
+  // Cho phep vao thang tab Ban do + mo dung toa nha qua navigate state (vd tu
+  // nut "Chi duong toi xe" o Dashboard), thay vi luon phai bam tay tu dau.
+  const [view, setView] = useState(() => location.state?.view || "list");
+  const [activeBuildingId, setActiveBuildingId] = useState(() => location.state?.buildingId ?? null);
 
   // So do zone/slot chi tiet khi mo mot toa nha tren tab Ban do
   const [planFloorId, setPlanFloorId] = useState(null);
@@ -387,18 +389,21 @@ export default function DriverFindParkingPage() {
 
           <div className="flex gap-1 rounded-xl border border-border bg-background p-1">
             {[["CAR", "🚗 Ô tô"], ["MOTORBIKE", "🏍️ Xe máy"]].map(([val, label]) => (
-              <button key={val} type="button" onClick={() => { setVehicleType(val); setExpandedBuilding(null); }}
+              <button key={val} type="button" onClick={() => setVehicleType(val)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${vehicleType === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                 {label}
               </button>
             ))}
           </div>
 
-          <select value={sort} onChange={(e) => setSort(e.target.value)}
-            className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground outline-none">
-            <option value="near">Sắp xếp: Gần nhất</option>
-            <option value="most">Sắp xếp: Nhiều chỗ nhất</option>
-          </select>
+          <div className="flex gap-1 rounded-xl border border-border bg-background p-1">
+            {[["near", "Gần nhất"], ["most", "Nhiều chỗ nhất"]].map(([val, label]) => (
+              <button key={val} type="button" onClick={() => setSort(val)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${sort === val ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex gap-1 rounded-xl border border-border bg-background p-1">
             <button type="button" onClick={() => setView("list")}
@@ -439,7 +444,6 @@ export default function DriverFindParkingPage() {
       {view === "list" && visibleBuildings.length > 0 && (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visibleBuildings.map((b) => {
-            const isOpen = expandedBuilding === b.id;
             return (
               <div key={b.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -466,48 +470,9 @@ export default function DriverFindParkingPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    Từ <span className="font-mono font-semibold text-foreground">{referencePrice != null ? `${vnd(referencePrice)}đ` : "--"}</span>/giờ
-                  </span>
-                  {b.free > 0 && (
-                    <button type="button" onClick={() => setExpandedBuilding(isOpen ? null : b.id)}
-                      className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
-                      Xem theo tầng/khu <ChevronDown size={12} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                    </button>
-                  )}
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Từ <span className="font-mono font-semibold text-foreground">{referencePrice != null ? `${vnd(referencePrice)}đ` : "--"}</span>/giờ
                 </div>
-
-                {isOpen && (
-                  <div className="mt-3 space-y-2.5 rounded-xl border border-border bg-muted/30 p-3">
-                    {b.floors.map((floor) => {
-                      const zonesWithFree = floor.zones
-                        .map((zone) => ({ ...zone, freeSlots: zone.slots.filter((s) => s.status === "AVAILABLE") }))
-                        .filter((zone) => zone.freeSlots.length > 0);
-                      if (zonesWithFree.length === 0) return null;
-                      return (
-                        <div key={floor.id}>
-                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{floor.name}</p>
-                          {zonesWithFree.map((zone) => (
-                            <div key={zone.id} className="mb-1.5 last:mb-0">
-                              <div className="mb-1 flex items-center justify-between text-[11px]">
-                                <span className="font-medium text-foreground">{zone.name}</span>
-                                <span className="text-muted-foreground">{zone.freeSlots.length} vị trí</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1">
-                                {zone.freeSlots.map((slot) => (
-                                  <span key={slot.id} className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                    {slot.slotCode}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 <div className="mt-3 flex gap-2">
                   {driverPos && Number.isFinite(b.latitude) && Number.isFinite(b.longitude) && (
@@ -528,7 +493,66 @@ export default function DriverFindParkingPage() {
       )}
 
       {view === "map" && (
-        <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr]">
+        <>
+        {/* Chon 1 toa roi thi hien thang so do — thay cho ban do+danh sach,
+            khong con phai cuon xuong qua het ban do moi thay so do nhu truoc. */}
+        {planBuilding && (
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <button type="button" onClick={() => setActiveBuildingId(null)}
+                  className="mb-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+                  <ArrowLeft size={13} /> Quay lại bản đồ
+                </button>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{planBuilding.name}</p>
+                <h2 className="text-base font-bold text-foreground">Sơ đồ {planFloor ? planFloor.name : "tầng"}</h2>
+                {sessionForPlanBuilding && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                    <MapPin size={11} /> Bạn có slot {sessionForPlanBuilding.slotCode} tại toà này
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={() => setActiveBuildingId(null)}
+                className="shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                <X size={14} />
+              </button>
+            </div>
+
+            {planFloor ? (
+              <div className="grid gap-3 xl:grid-cols-[1fr_240px]">
+                <div className="space-y-2">
+                  {planStaticLayout
+                    ? <StaticFloorPlanMap plan={planStaticLayout} sections={planFloor.zones} session={sessionForPlanBuilding}
+                        activeZone={planActiveZone} zoom={planZoom} onSlotClick={(slot, st) => { setSelSlot(slot); setSelSt(st); }} />
+                    : <ParkingMap sections={planFloor.zones} session={sessionForPlanBuilding} activeZone={planActiveZone}
+                        zoom={planZoom} onSlotClick={(slot, st) => { setSelSlot(slot); setSelSt(st); }}
+                        floorIdx={planFloor.floorIndex} totalFloors={planBuilding.floors.length} />}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <FloorTabs floors={planBuilding.floors} selectedId={planFloor.id} onSelect={setPlanFloorId} />
+                    <ZoomCtrl zoom={planZoom} onZoom={(d) => setPlanZoom((z) => Math.max(60, Math.min(200, z + d)))}
+                      onReset={() => setPlanZoom(100)} onFs={() => {}} />
+                  </div>
+                </div>
+                <aside>
+                  {selSlot
+                    ? <DetailPanel slot={selSlot} st={selSt} session={sessionForPlanBuilding} zone={selSlotZone} floor={planFloor} />
+                    : <div className="rounded-2xl border border-border bg-background p-5 text-center">
+                        <MapPin className="mx-auto size-5 text-muted-foreground mb-2" />
+                        <p className="text-[10px] text-muted-foreground">Bấm vào 1 vị trí để xem chi tiết</p>
+                      </div>}
+                </aside>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Toà nhà này chưa có dữ liệu sơ đồ.</p>
+            )}
+          </div>
+        )}
+
+        {/* Luon giu ban do trong DOM (chi an bang CSS khi dang xem so do) —
+            Leaflet gan lien voi node DOM nay, go het ra roi mount lai se lam
+            no bi "mo coi" (con tham chieu toi node da bien mat), gay loi
+            hinh anh chong len nhau nhu vua gap. */}
+        <div className={`grid gap-3 lg:grid-cols-[1.3fr_1fr] ${planBuilding ? "hidden" : ""}`}>
           <div className="overflow-hidden rounded-2xl border border-border" style={{ height: 560 }}>
             <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
           </div>
@@ -547,55 +571,8 @@ export default function DriverFindParkingPage() {
               </button>
             ))}
           </div>
-
-          {planBuilding && (
-            <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-4">
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{planBuilding.name}</p>
-                  <h2 className="text-base font-bold text-foreground">Sơ đồ {planFloor ? planFloor.name : "tầng"}</h2>
-                  {sessionForPlanBuilding && (
-                    <p className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                      <MapPin size={11} /> Bạn có slot {sessionForPlanBuilding.slotCode} tại toà này
-                    </p>
-                  )}
-                </div>
-                <button type="button" onClick={() => setActiveBuildingId(null)}
-                  className="shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                  <X size={14} />
-                </button>
-              </div>
-
-              {planFloor ? (
-                <div className="grid gap-3 xl:grid-cols-[1fr_240px]">
-                  <div className="space-y-2">
-                    {planStaticLayout
-                      ? <StaticFloorPlanMap plan={planStaticLayout} sections={planFloor.zones} session={sessionForPlanBuilding}
-                          activeZone={planActiveZone} zoom={planZoom} onSlotClick={(slot, st) => { setSelSlot(slot); setSelSt(st); }} />
-                      : <ParkingMap sections={planFloor.zones} session={sessionForPlanBuilding} activeZone={planActiveZone}
-                          zoom={planZoom} onSlotClick={(slot, st) => { setSelSlot(slot); setSelSt(st); }}
-                          floorIdx={planFloor.floorIndex} totalFloors={planBuilding.floors.length} />}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <FloorTabs floors={planBuilding.floors} selectedId={planFloor.id} onSelect={setPlanFloorId} />
-                      <ZoomCtrl zoom={planZoom} onZoom={(d) => setPlanZoom((z) => Math.max(60, Math.min(200, z + d)))}
-                        onReset={() => setPlanZoom(100)} onFs={() => {}} />
-                    </div>
-                  </div>
-                  <aside>
-                    {selSlot
-                      ? <DetailPanel slot={selSlot} st={selSt} session={sessionForPlanBuilding} zone={selSlotZone} floor={planFloor} />
-                      : <div className="rounded-2xl border border-border bg-background p-5 text-center">
-                          <MapPin className="mx-auto size-5 text-muted-foreground mb-2" />
-                          <p className="text-[10px] text-muted-foreground">Bấm vào 1 vị trí để xem chi tiết</p>
-                        </div>}
-                  </aside>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Toà nhà này chưa có dữ liệu sơ đồ.</p>
-              )}
-            </div>
-          )}
         </div>
+        </>
       )}
     </div>
   );

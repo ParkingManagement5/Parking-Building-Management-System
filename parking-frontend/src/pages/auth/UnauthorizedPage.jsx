@@ -3,7 +3,7 @@ export default function UnauthorizedPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>403</h1>
-        <p>You do not have permission to access this page.</p>
+        <p>Bạn không có quyền truy cập trang này.</p>
       </div>
     </div>
   );

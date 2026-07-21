@@ -26,7 +26,7 @@ const FLOOR_ORDER = ["B3", "B2", "B1", "G", "1F", "2F", "3F", "4F", "5F"];
 
 function mapFloorLabel(floor) {
   const floorNumber = Number(floor.floorNumber);
-  if (Number.isNaN(floorNumber)) return floor.name || `Floor ${getFloorId(floor)}`;
+  if (Number.isNaN(floorNumber)) return floor.name || `Tầng ${getFloorId(floor)}`;
   if (floorNumber < 0) return `B${Math.abs(floorNumber)}`;
   if (floorNumber === 0) return "G";
   return `${floorNumber}F`;
@@ -762,7 +762,7 @@ export default function ParkingStructurePage() {
                       <button
                         key={slot.id}
                         type="button"
-                        title={`${slot.slotCode} — ${slot.status}`}
+                        title={`${slot.slotCode} — ${SLOT_STATUS_LABELS[slot.status] || slot.status}`}
                         onClick={() => openSlotModal(slot)}
                         className={`${statusColor(String(slot.status || "").toUpperCase())} rounded-lg py-3 text-[11px] font-bold text-white transition hover:scale-105`}
                       >

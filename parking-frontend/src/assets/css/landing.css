@@ -137,8 +137,21 @@
 
 html { scroll-behavior: smooth; }
 
-.ps-landing, .auth-layout {
-  font-family: Arial, Helvetica, -apple-system, BlinkMacSystemFont, sans-serif;
+/* Landing (trang tiep thi/gioi thieu) dung font Outfit rieng nhu comment
+   dau file da ghi ro — truoc day khai bao "Outfit" nhung lai de font-family
+   la Arial/Helvetica (bug), nen tren thuc te bi roi ve font he thong mac
+   dinh, khac han Inter dung xuyen suot phan con lai cua app.
+   auth-layout (dang nhap/dang ky) la trang chuc nang, khong phai landing —
+   bo font rieng de dong bo Inter voi toan bo app, tranh cam giac "khac". */
+.ps-landing {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.auth-layout {
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;

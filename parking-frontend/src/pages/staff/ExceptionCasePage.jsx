@@ -15,6 +15,32 @@ import {
 const EXIT_TYPES = ["EXIT_VERIFICATION_FAILED", "LOST_QR"];
 const ENTRY_TYPES = ["BOOKING_MISMATCH", "PLATE_UNVERIFIED", "SYSTEM_ERROR", "SESSION_CONFLICT"];
 
+const EXCEPTION_STATUS_LABELS = {
+  OPEN: "Đang mở",
+  IN_PROGRESS: "Đang xử lý",
+  RESOLVED: "Đã xử lý",
+};
+
+function exceptionStatusLabel(status) {
+  return EXCEPTION_STATUS_LABELS[String(status || "").toUpperCase()] || status;
+}
+
+const EXCEPTION_TYPE_LABELS = {
+  PLATE_UNVERIFIED: "Chưa xác minh biển số",
+  BOOKING_MISMATCH: "Booking không khớp",
+  EXIT_VERIFICATION_FAILED: "Xác thực ra cổng thất bại",
+  LOST_QR: "Mất QR",
+  SESSION_CONFLICT: "Xung đột session",
+  SYSTEM_ERROR: "Lỗi hệ thống",
+};
+
+function exceptionTypeLabel(type) {
+  return (
+    EXCEPTION_TYPE_LABELS[String(type || "").toUpperCase()] ||
+    String(type || "").replace(/_/g, " ")
+  );
+}
+
 function exceptionMeta(type) {
   switch (type) {
     case "PLATE_UNVERIFIED":
@@ -375,9 +401,9 @@ export default function ExceptionCasePage() {
         )}
       </StaffPageSection>
 
-      <StaffPageSection title="Operational Exceptions" subtitle="Review abnormal gate, plate, and session situations from backend">
+      <StaffPageSection title="Sự cố vận hành" subtitle="Xem lại các tình huống bất thường về cổng, biển số và phiên đỗ xe từ hệ thống">
         <div className="mb-4 flex justify-end">
-          <StaffSecondaryButton type="button" onClick={loadCases} disabled={loading}>Refresh</StaffSecondaryButton>
+          <StaffSecondaryButton type="button" onClick={loadCases} disabled={loading}>Làm mới</StaffSecondaryButton>
         </div>
 
         {error ? (
@@ -388,8 +414,8 @@ export default function ExceptionCasePage() {
 
         {activeCases.length === 0 ? (
           <StaffEmptyState
-            title={loading ? "Loading exception cases" : "No open exception cases"}
-            description="New issues from entry, QR, OCR, or payment flows will appear here."
+            title={loading ? "Đang tải danh sách sự cố" : "Không có sự cố nào đang mở"}
+            description="Sự cố mới từ luồng vào bãi, quét QR, OCR, hoặc thanh toán sẽ hiện ở đây."
             tone="success"
           />
         ) : (
@@ -406,9 +432,9 @@ export default function ExceptionCasePage() {
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{item.exceptionType}</p>
+                        <p className="text-sm font-semibold text-foreground">{exceptionTypeLabel(item.exceptionType)}</p>
                         <StaffStatusBadge tone={item.status === "IN_PROGRESS" ? "blue" : "amber"}>
-                          {String(item.status).toLowerCase()}
+                          {exceptionStatusLabel(item.status)}
                         </StaffStatusBadge>
                         <StaffStatusBadge tone={meta.priorityTone}>{meta.priority}</StaffStatusBadge>
                       </div>
@@ -469,7 +495,7 @@ export default function ExceptionCasePage() {
                       )}
 
                       {item.resolvedBy ? (
-                        <p className="mt-2 text-xs text-muted-foreground">Assigned/resolved by user #{item.resolvedBy}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Đã giao/xử lý bởi người dùng #{item.resolvedBy}</p>
                       ) : null}
                     </div>
 
@@ -477,14 +503,14 @@ export default function ExceptionCasePage() {
                       {/* OPEN: assign */}
                       {item.status === "OPEN" && (
                         <StaffSecondaryButton type="button" onClick={() => assignToMe(item)} disabled={saving}>
-                          Assign to me
+                          Nhận xử lý
                         </StaffSecondaryButton>
                       )}
 
                       {/* IN_PROGRESS: action buttons based on type */}
                       {item.status === "IN_PROGRESS" && !canForceExit && isEntryType && (
                         <StaffSecondaryButton type="button" onClick={() => navigate("/staff/scan")}>
-                          Toi cong scan
+                          Tới cổng scan
                         </StaffSecondaryButton>
                       )}
                       {item.status === "IN_PROGRESS" && isEntryType && item.exceptionType === "SESSION_CONFLICT" && (
@@ -494,7 +520,7 @@ export default function ExceptionCasePage() {
                       )}
                       {item.status === "IN_PROGRESS" && !canForceExit && (
                         <StaffPrimaryButton type="button" onClick={() => resolveCase(item)} disabled={saving}>
-                          {saving ? "Saving..." : "Da xu ly xong"}
+                          {saving ? "Đang lưu..." : "Đã xử lý xong"}
                         </StaffPrimaryButton>
                       )}
                     </div>
@@ -530,7 +556,7 @@ export default function ExceptionCasePage() {
         )}
       </StaffPageSection>
 
-      <StaffPageSection title="Resolved Gần Đây" subtitle="Case đã xử lý xong và chờ đóng hồ sơ">
+      <StaffPageSection title="Đã xử lý gần đây" subtitle="Case đã xử lý xong và chờ đóng hồ sơ">
         {resolvedCases.length === 0 ? (
           <StaffEmptyState
             title={loading ? "Đang tải case đã xử lý" : "Chưa có case nào chờ đóng hồ sơ"}
@@ -545,8 +571,8 @@ export default function ExceptionCasePage() {
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{item.exceptionType}</p>
-                        <StaffStatusBadge tone="emerald">resolved</StaffStatusBadge>
+                        <p className="text-sm font-semibold text-foreground">{exceptionTypeLabel(item.exceptionType)}</p>
+                        <StaffStatusBadge tone="emerald">Đã xử lý</StaffStatusBadge>
                         <StaffStatusBadge tone={meta.priorityTone}>{meta.priority}</StaffStatusBadge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -559,7 +585,7 @@ export default function ExceptionCasePage() {
                     </div>
                     <div className="flex gap-3">
                       <StaffSecondaryButton type="button" onClick={() => closeCase(item)} disabled={savingId === item.exceptionId}>
-                        {savingId === item.exceptionId ? "Saving..." : "Close"}
+                        {savingId === item.exceptionId ? "Đang lưu..." : "Đóng"}
                       </StaffSecondaryButton>
                     </div>
                   </div>

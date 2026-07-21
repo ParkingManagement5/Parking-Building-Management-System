@@ -184,23 +184,23 @@ export default function UnifiedScanPage() {
 
   function buildExceptionContext(exceptionType, reasonOverride = "") {
     const currentGate = gates.find((g) => String(g.gateId || g.id) === String(gateId));
-    const gateLabel = currentGate?.gateName || currentGate?.gateCode || `Gate ${gateId || "?"}`;
+    const gateLabel = currentGate?.gateName || currentGate?.gateCode || `Cổng ${gateId || "?"}`;
     const segments = [
-      `Reason: ${reasonOverride || error || ocrError || "Staff không thể hoàn tất luồng scan thường."}`,
-      `Gate: ${gateLabel}`,
-      `Building: ${assignedLabel || buildingId || "N/A"}`,
-      `Plate OCR/Final: ${plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN"}`,
-      pendingLowConfidenceScan?.detectedPlate ? `Detected plate: ${pendingLowConfidenceScan.detectedPlate}` : null,
+      `Lý do: ${reasonOverride || error || ocrError || "Staff không thể hoàn tất luồng scan thường."}`,
+      `Cổng: ${gateLabel}`,
+      `Toà nhà: ${assignedLabel || buildingId || "N/A"}`,
+      `Biển số OCR/Cuối: ${plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN"}`,
+      pendingLowConfidenceScan?.detectedPlate ? `Biển số phát hiện: ${pendingLowConfidenceScan.detectedPlate}` : null,
       pendingLowConfidenceScan?.plateConfidenceScore != null
-        ? `Confidence: ${Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%`
+        ? `Độ tin cậy: ${Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%`
         : confidence != null
-          ? `Confidence: ${confidence}%`
+          ? `Độ tin cậy: ${confidence}%`
           : null,
-      `Lookup type: ${lookupType || "UNRESOLVED"}`,
-      lookupData?.sessionId ? `Session: #${lookupData.sessionId}` : null,
+      `Loại tra cứu: ${lookupType || "UNRESOLVED"}`,
+      lookupData?.sessionId ? `Phiên: #${lookupData.sessionId}` : null,
       lookupData?.bookingId ? `Booking: #${lookupData.bookingId}` : null,
-      qrToken.trim() ? "QR: provided" : "QR: missing",
-      pendingLowConfidenceScan?.scanId ? `OCR scan: #${pendingLowConfidenceScan.scanId}` : null,
+      qrToken.trim() ? "QR: có" : "QR: không có",
+      pendingLowConfidenceScan?.scanId ? `Quét OCR: #${pendingLowConfidenceScan.scanId}` : null,
     ].filter(Boolean);
 
     return {
@@ -236,7 +236,7 @@ export default function UnifiedScanPage() {
         type: "EXCEPTION",
         sessionId: lookupData?.sessionId || pendingLowConfidenceScan?.scanId || "N/A",
         licensePlate: plate || pendingLowConfidenceScan?.detectedPlate || "UNKNOWN",
-        slotCode: "Exception queue",
+        slotCode: "Hàng chờ xử lý",
         status: exceptionType,
         time: new Date().toISOString(),
       });
@@ -585,10 +585,10 @@ export default function UnifiedScanPage() {
               )}
               {/* Gate select */}
               <div className="mb-4 grid gap-3 md:grid-cols-2">
-                <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel || `Building #${assignedId}`}</div>
+                <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel || `Toà nhà #${assignedId}`}</div>
                 <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
                   <option value="">Chọn cổng</option>
-                  {gates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
+                  {gates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Cổng ${g.gateId || g.id}`} ({g.gateType})</option>)}
                 </StaffSelect>
               </div>
 
@@ -597,7 +597,7 @@ export default function UnifiedScanPage() {
                 <div className="relative flex min-h-52 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/20 bg-slate-900 dark:bg-[#0f172a]">
                   <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 size-full object-cover ${cameraOn ? "opacity-100" : "opacity-0"}`} />
                   {cameraOn && <div className="pointer-events-none absolute inset-x-[18%] top-1/2 h-20 -translate-y-1/2 rounded-xl border-2 border-emerald-400/80 shadow-[0_0_0_999px_rgba(2,6,23,0.35)]" />}
-                  {platePreview && !cameraOn && <img src={platePreview} alt="Plate" className="absolute inset-0 size-full object-contain opacity-60" />}
+                  {platePreview && !cameraOn && <img src={platePreview} alt="Biển số" className="absolute inset-0 size-full object-contain opacity-60" />}
                   {scanning ? (
                     <div className="relative z-10 space-y-3 text-center">
                       <div className="mx-auto size-10 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
@@ -614,7 +614,7 @@ export default function UnifiedScanPage() {
 
               <div className="mt-4 grid gap-3 sm:grid-cols-5">
                 <StaffSecondaryButton type="button" onClick={cameraOn ? stopCamera : startCamera} disabled={scanning} className="flex items-center justify-center gap-2">
-                  {cameraOn ? <VideoOff size={15} /> : <Video size={15} />} {cameraOn ? "Stop" : "Camera"}
+                  {cameraOn ? <VideoOff size={15} /> : <Video size={15} />} {cameraOn ? "Dừng" : "Camera"}
                 </StaffSecondaryButton>
                 <StaffPrimaryButton type="button" onClick={handleCapture} disabled={scanning || !cameraOn} className="flex items-center justify-center gap-2">
                   <Camera size={15} /> Chụp
@@ -624,7 +624,7 @@ export default function UnifiedScanPage() {
                   <input type="file" accept="image/*" className="sr-only" onChange={handleFile} />
                 </label>
                 <StaffSecondaryButton type="button" onClick={resetAll} disabled={scanning} className="flex items-center justify-center gap-2">
-                  <RefreshCw size={15} /> Reset
+                  <RefreshCw size={15} /> Đặt lại
                 </StaffSecondaryButton>
                 <StaffSecondaryButton type="button" onClick={openManualEntry} disabled={scanning} className="flex items-center justify-center gap-2">
                   <ScanLine size={15} /> Nhập tay
@@ -650,10 +650,10 @@ export default function UnifiedScanPage() {
             <StaffPageSection title="Kết quả xác minh" subtitle="Hệ thống tự động phân loại — scan QR nếu cần">
               {/* Plate result */}
               <div className="flex items-center gap-4 rounded-2xl border border-border bg-muted/20 p-4">
-                {platePreview && <img src={platePreview} alt="Plate" className="h-16 w-24 rounded-xl border border-border object-contain bg-slate-950" />}
+                {platePreview && <img src={platePreview} alt="Biển số" className="h-16 w-24 rounded-xl border border-border object-contain bg-slate-950" />}
                 <div>
                   <p className="font-mono text-2xl font-bold text-foreground">{plate}</p>
-                  {confidence != null && <p className={`text-xs ${confidence >= 80 ? "text-emerald-600" : "text-amber-600"}`}>{confidence}% confidence</p>}
+                  {confidence != null && <p className={`text-xs ${confidence >= 80 ? "text-emerald-600" : "text-amber-600"}`}>Độ tin cậy {confidence}%</p>}
                 </div>
                 <StaffSecondaryButton type="button" onClick={() => { setStep(1); setLookupType(null); }} className="ml-auto text-xs">
                   Scan lại
@@ -675,12 +675,12 @@ export default function UnifiedScanPage() {
                         <LogOut size={20} className="text-amber-600" />
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-bold text-foreground">EXIT — Xe đang trong bãi</p>
+                            <p className="font-bold text-foreground">RA BÃI — Xe đang trong bãi</p>
                             {lookupData?.bookingType && lookupData.bookingType !== "HOURLY" && (
                               <StaffStatusBadge tone="blue">{PACKAGE_LABELS[lookupData.bookingType] || lookupData.bookingType}</StaffStatusBadge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">Session #{lookupData?.sessionId} • Slot {lookupData?.slotCode} • Vào {formatStaffDateTime(lookupData?.entryTime)}</p>
+                          <p className="text-sm text-muted-foreground">Phiên #{lookupData?.sessionId} • Chỗ đỗ {lookupData?.slotCode} • Vào {formatStaffDateTime(lookupData?.entryTime)}</p>
                           {lookupData?.bookingType && lookupData.bookingType !== "HOURLY" && (
                             <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
                               Xe theo gói — đã thanh toán trọn gói, không thu thêm phí khi ra.
@@ -697,7 +697,7 @@ export default function UnifiedScanPage() {
                         <QrCode size={20} className="text-blue-600" />
                         <div>
                           <p className="font-bold text-foreground">BOOKING — Xe có booking, cần QR</p>
-                          <p className="text-sm text-muted-foreground">Booking #{lookupData?.bookingId} • Slot {lookupData?.slotCode} • {String(lookupData?.status || "")}</p>
+                          <p className="text-sm text-muted-foreground">Booking #{lookupData?.bookingId} • Chỗ đỗ {lookupData?.slotCode} • {String(lookupData?.status || "")}</p>
                         </div>
                       </div>
                     </div>
@@ -729,7 +729,7 @@ export default function UnifiedScanPage() {
                             </StaffStatusBadge>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Booking #{lookupData?.bookingId} - Slot {lookupData?.slotCode} - {bookingStatus || "UNKNOWN"}
+                            Booking #{lookupData?.bookingId} - Chỗ đỗ {lookupData?.slotCode} - {bookingStatus || "UNKNOWN"}
                             {isPackageBooking && lookupData?.bookingEndTime && ` - Hết hạn gói ${formatStaffDateTime(lookupData.bookingEndTime)}`}
                           </p>
                           {isPendingPaymentBooking && (
@@ -753,7 +753,7 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                       <div className="flex items-center gap-3">
                         <LogIn size={20} className="text-emerald-600" />
-                        <p className="font-bold text-foreground">WALK-IN — Xe đã đăng ký, cho vào trực tiếp</p>
+                        <p className="font-bold text-foreground">KHÁCH VÃNG LAI — Xe đã đăng ký, cho vào trực tiếp</p>
                       </div>
                     </div>
                   )}
@@ -762,7 +762,7 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                       <div className="flex items-center gap-3">
                         <AlertTriangle size={20} className="text-amber-600" />
-                        <p className="font-bold text-foreground">WALK-IN — Xe chưa đăng ký (tự tạo khi entry)</p>
+                        <p className="font-bold text-foreground">KHÁCH VÃNG LAI — Xe chưa đăng ký (tự tạo khi vào bãi)</p>
                       </div>
                       <div className="mt-3">
                         <label className="mb-1.5 block text-sm font-medium text-foreground">
@@ -787,7 +787,7 @@ export default function UnifiedScanPage() {
                     <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/20 dark:bg-rose-500/10">
                       <div className="flex items-center gap-3">
                         <XCircle size={20} className="text-rose-600" />
-                        <p className="font-bold text-foreground">BLOCKED — {lookupData}</p>
+                        <p className="font-bold text-foreground">BỊ CHẶN — {lookupData}</p>
                       </div>
                     </div>
                   )}
@@ -800,7 +800,7 @@ export default function UnifiedScanPage() {
                       </p>
                       <div className="flex gap-2">
                         <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
-                          placeholder="Paste QR token" className="flex-1" />
+                          placeholder="Dán mã QR" className="flex-1" />
                         <StaffPrimaryButton type="button" onClick={openQrModal} className="flex items-center gap-2 shrink-0">
                           <QrCode size={15} /> Scan QR
                         </StaffPrimaryButton>
@@ -819,8 +819,8 @@ export default function UnifiedScanPage() {
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="flex items-center rounded-2xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold text-primary">{assignedLabel}</div>
                         <StaffSelect value={gateId} onChange={(e) => setGateId(e.target.value)}>
-                          <option value="">Chọn cổng ({lookupType === "EXIT" ? "EXIT" : "ENTRY"})</option>
-                          {filteredGates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Gate ${g.gateId || g.id}`} ({g.gateType})</option>)}
+                          <option value="">Chọn cổng ({lookupType === "EXIT" ? "RA" : "VÀO"})</option>
+                          {filteredGates.map((g) => <option key={g.gateId || g.id} value={g.gateId || g.id}>{g.gateName || g.gateCode || `Cổng ${g.gateId || g.id}`} ({g.gateType})</option>)}
                         </StaffSelect>
                       </div>
 
@@ -881,9 +881,9 @@ export default function UnifiedScanPage() {
               <h3 className="text-lg font-bold text-foreground">
                 {result.type === "EXIT" ? "Xe đã ra bãi" : result.type === "EXCEPTION" ? "Đã tạo exception" : "Xe đã vào bãi"}
               </h3>
-              {platePreview && <img src={platePreview} alt="Plate" className="mx-auto mt-3 max-h-20 rounded-xl border border-border object-contain bg-slate-950" />}
+              {platePreview && <img src={platePreview} alt="Biển số" className="mx-auto mt-3 max-h-20 rounded-xl border border-border object-contain bg-slate-950" />}
               <div className="mt-4 space-y-2 rounded-2xl bg-white/60 dark:bg-white/5 p-4 text-left">
-                {[["Session", result.sessionId], ["Biển số", result.licensePlate], ["Slot", result.slotCode], ["Trạng thái", result.status], ["Thời gian", formatStaffDateTime(result.time)]].map(([k, v]) => (
+                {[["Phiên", result.sessionId], ["Biển số", result.licensePlate], ["Chỗ đỗ", result.slotCode], ["Trạng thái", result.status], ["Thời gian", formatStaffDateTime(result.time)]].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-muted-foreground">{k}</span><span className="font-medium text-foreground">{v}</span>
                   </div>
@@ -921,7 +921,7 @@ export default function UnifiedScanPage() {
                         <p className="text-xs text-muted-foreground">#{item.sessionId} • {item.slotCode}</p>
                       </div>
                     </div>
-                    <StaffStatusBadge tone={item.type === "EXIT" ? "amber" : "emerald"}>{item.type.toLowerCase()}</StaffStatusBadge>
+                    <StaffStatusBadge tone={item.type === "EXIT" ? "amber" : "emerald"}>{item.type === "EXIT" ? "Ra bãi" : "Vào bãi"}</StaffStatusBadge>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">{formatStaffDateTime(item.time)}</p>
                 </div>
@@ -937,7 +937,7 @@ export default function UnifiedScanPage() {
           <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <QrCode size={20} /> Scan QR Code
+                <QrCode size={20} /> Quét mã QR
               </h3>
               <button type="button" onClick={closeQrModal} className="rounded-full p-2 text-muted-foreground hover:bg-muted transition">
                 <X size={18} />
@@ -979,7 +979,7 @@ export default function UnifiedScanPage() {
             <div className="mt-5 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
               <div className="overflow-hidden rounded-2xl border border-border bg-slate-950">
                 {platePreview ? (
-                  <img src={platePreview} alt="Low confidence OCR" className="h-full w-full object-contain" />
+                  <img src={platePreview} alt="Ảnh OCR độ tin cậy thấp" className="h-full w-full object-contain" />
                 ) : (
                   <div className="flex min-h-48 items-center justify-center text-sm text-white/50">Không có ảnh preview</div>
                 )}
@@ -987,9 +987,9 @@ export default function UnifiedScanPage() {
 
               <form onSubmit={handleLowConfidenceConfirm} className="space-y-4">
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  OCR phát hiện <span className="font-semibold">{pendingLowConfidenceScan.detectedPlate || "UNKNOWN"}</span> với
+                  OCR phát hiện <span className="font-semibold">{pendingLowConfidenceScan.detectedPlate || "UNKNOWN"}</span> với độ tin cậy
                   {" "}
-                  <span className="font-semibold">{Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%</span> confidence.
+                  <span className="font-semibold">{Math.round((pendingLowConfidenceScan.plateConfidenceScore || 0) * 100)}%</span>.
                 </div>
 
                 <div className="rounded-2xl border border-border bg-muted/20 p-4">

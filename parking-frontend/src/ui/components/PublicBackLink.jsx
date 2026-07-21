@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 export default function PublicBackLink({
   to = "/",
-  label = "Back to public",
+  label = "Về trang chủ",
   className = "",
 }) {
   return (

@@ -6,12 +6,12 @@ import { unwrapApiData } from "../../utils/api";
 
 function formatDate(value) {
   if (!value) {
-    return "Not available";
+    return "Chưa có dữ liệu";
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Not available";
+    return "Chưa có dữ liệu";
   }
 
   return new Intl.DateTimeFormat("en-GB", {
@@ -32,6 +32,18 @@ function normalizeRole(value) {
 function roleLabel(value) {
   const role = normalizeRole(value);
   return role.charAt(0) + role.slice(1).toLowerCase();
+}
+
+const STATUS_LABELS = {
+  ACTIVE: "Đang hoạt động",
+  INACTIVE: "Ngừng hoạt động",
+  LOCKED: "Đã khóa",
+  SUSPENDED: "Đã khóa",
+};
+
+function statusLabel(value) {
+  const status = String(value || "ACTIVE").trim().toUpperCase();
+  return STATUS_LABELS[status] || status;
 }
 
 function roleBadgeClasses(value) {
@@ -63,7 +75,7 @@ function roleAvatarClasses(value) {
 export default function DriverProfilePage() {
   const username = getUsername() || "driver";
   const role = normalizeRole(getRole() || "DRIVER");
-  const userId = getUserId() || "Unknown";
+  const userId = getUserId() || "Không rõ";
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -108,7 +120,7 @@ export default function DriverProfilePage() {
         });
       } catch (error) {
         if (mounted) {
-          setProfileMessage(getErrorMessage(error, "Cannot load profile"));
+          setProfileMessage(getErrorMessage(error, "Không tải được hồ sơ"));
         }
       } finally {
         if (mounted) {
@@ -158,10 +170,10 @@ export default function DriverProfilePage() {
         }));
       }
 
-      setProfileMessage(res.data?.message || "Profile updated successfully");
+      setProfileMessage(res.data?.message || "Cập nhật hồ sơ thành công");
       setEditMode(false);
     } catch (error) {
-      setProfileMessage(getErrorMessage(error, "Cannot update profile"));
+      setProfileMessage(getErrorMessage(error, "Không cập nhật được hồ sơ"));
     } finally {
       setSavingProfile(false);
     }
@@ -173,14 +185,14 @@ export default function DriverProfilePage() {
 
     try {
       const res = await profileApi.changePassword(passwordForm);
-      setPasswordMessage(res.data?.message || "Password updated successfully");
+      setPasswordMessage(res.data?.message || "Đổi mật khẩu thành công");
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       });
     } catch (error) {
-      setPasswordMessage(getErrorMessage(error, "Cannot update password"));
+      setPasswordMessage(getErrorMessage(error, "Không đổi được mật khẩu"));
     } finally {
       setSavingPassword(false);
     }
@@ -199,7 +211,7 @@ export default function DriverProfilePage() {
           </div>
           <div>
             <h2 className="font-bold text-foreground">{profile.fullName || profile.username}</h2>
-            <p className="text-sm text-muted-foreground">{profile.email || "No email yet"}</p>
+            <p className="text-sm text-muted-foreground">{profile.email || "Chưa có email"}</p>
             <span
               className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${roleBadgeClasses(
                 role
@@ -212,7 +224,7 @@ export default function DriverProfilePage() {
             onClick={() => setEditMode((value) => !value)}
             className="ml-auto bg-primary/10 text-primary px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
           >
-            {editMode ? "Close Edit" : "Edit Profile"}
+            {editMode ? "Đóng chỉnh sửa" : "Chỉnh sửa hồ sơ"}
           </button>
         </div>
 
@@ -223,18 +235,18 @@ export default function DriverProfilePage() {
         ) : null}
 
         {loading ? (
-          <div className="text-sm text-muted-foreground">Loading profile...</div>
+          <div className="text-sm text-muted-foreground">Đang tải hồ sơ...</div>
         ) : null}
 
         {!loading && !editMode && (
           <div className="grid grid-cols-2 gap-4">
             {[
-              ["Full Name", profile.fullName || "Not available"],
-              ["Username", profile.username || username],
-              ["Email", profile.email || "Not available"],
-              ["Phone", profile.phone || "Not available"],
-              ["Member Since", formatDate(profile.createdAt)],
-              ["Status", profile.status || "ACTIVE"],
+              ["Họ và tên", profile.fullName || "Chưa có dữ liệu"],
+              ["Tên đăng nhập", profile.username || username],
+              ["Email", profile.email || "Chưa có dữ liệu"],
+              ["Số điện thoại", profile.phone || "Chưa có dữ liệu"],
+              ["Thành viên từ", formatDate(profile.createdAt)],
+              ["Trạng thái", statusLabel(profile.status)],
             ].map(([key, value]) => (
               <div key={key}>
                 <p className="text-xs text-muted-foreground mb-0.5">{key}</p>
@@ -248,7 +260,7 @@ export default function DriverProfilePage() {
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">
-                Full Name
+                Họ và tên
               </label>
               <input
                 value={profile.fullName}
@@ -269,12 +281,12 @@ export default function DriverProfilePage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">
-                  Phone
+                  Số điện thoại
                 </label>
                 <input
                   value={profile.phone}
                   onChange={(event) => handleProfileChange("phone", event.target.value)}
-                  placeholder="Enter phone"
+                  placeholder="Nhập số điện thoại"
                   className="w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
@@ -284,7 +296,7 @@ export default function DriverProfilePage() {
               disabled={savingProfile}
               className="bg-primary text-primary-foreground px-5 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
             >
-              {savingProfile ? "Saving..." : "Save Profile"}
+              {savingProfile ? "Đang lưu..." : "Lưu hồ sơ"}
             </button>
           </div>
         )}
@@ -296,9 +308,9 @@ export default function DriverProfilePage() {
             <User size={18} />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground text-sm">Reset Password</h3>
+            <h3 className="font-semibold text-foreground text-sm">Đặt lại mật khẩu</h3>
             <p className="text-xs text-muted-foreground">
-              Connected to backend password update endpoint.
+              Đã kết nối với API cập nhật mật khẩu ở máy chủ.
             </p>
           </div>
         </div>
@@ -308,30 +320,22 @@ export default function DriverProfilePage() {
           </div>
         ) : null}
         <div className="space-y-3">
-          {["Current Password", "New Password", "Confirm New Password"].map((field) => (
-            <div key={field}>
+          {[
+            { key: "currentPassword", label: "Mật khẩu hiện tại" },
+            { key: "newPassword", label: "Mật khẩu mới" },
+            { key: "confirmPassword", label: "Xác nhận mật khẩu mới" },
+          ].map(({ key, label }) => (
+            <div key={key}>
               <label className="block text-xs font-medium text-muted-foreground mb-1">
-                {field}
+                {label}
               </label>
               <input
                 type="password"
-                value={passwordForm[
-                  field === "Current Password"
-                    ? "currentPassword"
-                    : field === "New Password"
-                      ? "newPassword"
-                      : "confirmPassword"
-                ]}
+                value={passwordForm[key]}
                 onChange={(event) =>
                   setPasswordForm((prev) => ({
                     ...prev,
-                    [
-                      field === "Current Password"
-                        ? "currentPassword"
-                        : field === "New Password"
-                          ? "newPassword"
-                          : "confirmPassword"
-                    ]: event.target.value,
+                    [key]: event.target.value,
                   }))
                 }
                 placeholder="........"
@@ -344,10 +348,10 @@ export default function DriverProfilePage() {
             disabled={savingPassword}
             className="bg-primary text-primary-foreground px-5 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors mt-1 disabled:opacity-60"
           >
-            {savingPassword ? "Updating..." : "Reset Password"}
+            {savingPassword ? "Đang cập nhật..." : "Đặt lại mật khẩu"}
           </button>
           <p className="text-xs text-muted-foreground">
-            Session user id: {profile.userId || userId} - role: {roleLabel(role)}
+            Mã người dùng phiên: {profile.userId || userId} - Vai trò: {roleLabel(role)}
           </p>
         </div>
       </div>

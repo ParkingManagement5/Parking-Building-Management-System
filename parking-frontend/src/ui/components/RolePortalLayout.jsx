@@ -11,7 +11,7 @@ const CONFIG = {
   driver: {
     basePath: "/driver",
     role: "driver",
-    label: "Driver Portal",
+    label: "Cổng Tài xế",
     menuGroups: [
       { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
@@ -44,7 +44,7 @@ const CONFIG = {
   staff: {
     basePath: "/staff",
     role: "staff",
-    label: "Staff Portal",
+    label: "Cổng Nhân viên",
     menuGroups: [
       { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
@@ -52,7 +52,7 @@ const CONFIG = {
         items: [
           { id: "scan", label: "Scan" },
           { id: "gate", label: "Bản đồ bãi" },
-          { id: "sessions", label: "Sessions" },
+          { id: "sessions", label: "Phiên đỗ xe" },
           { id: "payments", label: "Thanh toán" },
         ],
       },
@@ -69,13 +69,14 @@ const CONFIG = {
   manager: {
     basePath: "/manager",
     role: "manager",
-    label: "Manager Portal",
+    label: "Cổng Quản lý",
     menuGroups: [
       { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
         label: "Cơ sở hạ tầng",
         items: [
           { id: "parking-structure", label: "Cấu trúc bãi xe" },
+          { id: "floor-plan-editor", label: "Sơ đồ mặt bằng (thử nghiệm)" },
         ],
       },
       {
@@ -98,7 +99,7 @@ const CONFIG = {
   admin: {
     basePath: "/admin",
     role: "admin",
-    label: "Admin Portal",
+    label: "Cổng Quản trị",
     menuGroups: [
       { label: "Tổng quan", items: [{ id: "overview", label: "Trang chủ" }] },
       {
@@ -330,7 +331,7 @@ export default function RolePortalLayout({ portal }) {
           </div>
 
           <div className="dash-nav-right">
-            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Chế độ sáng" : "Chế độ tối"}>
               {dark ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="5" />

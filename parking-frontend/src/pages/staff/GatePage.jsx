@@ -21,6 +21,13 @@ const SLOT_COLORS = {
   MAINTENANCE: "bg-slate-400/60 text-slate-600",
 };
 
+const SLOT_STATUS_LABELS = {
+  AVAILABLE: "Còn trống",
+  OCCUPIED: "Đang có xe",
+  RESERVED: "Đã đặt trước",
+  MAINTENANCE: "Bảo trì",
+};
+
 export default function MapPage() {
   const navigate = useNavigate();
   // buildingId là cố định — luôn lấy từ assignedBuilding trong token
@@ -185,7 +192,7 @@ export default function MapPage() {
                 );
               })}
             </div>
-            <button type="button" onClick={refresh} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition" title="Refresh">
+            <button type="button" onClick={refresh} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition" title="Làm mới">
               <RefreshCw size={14} />
             </button>
           </div>
@@ -220,7 +227,7 @@ export default function MapPage() {
                       const code = (slot.slotCode || "").split("-").pop() || slot.slotCode;
                       return (
                         <div key={slot.id || slot.slotId}
-                          title={`${slot.slotCode} — ${status}`}
+                          title={`${slot.slotCode} — ${SLOT_STATUS_LABELS[status] || status}`}
                           className={`flex items-center justify-center rounded-xl py-2.5 text-xs font-bold transition-colors ${SLOT_COLORS[status] || SLOT_COLORS.AVAILABLE}`}>
                           {code}
                         </div>
@@ -275,7 +282,7 @@ export default function MapPage() {
                       </div>
                     </div>
                     <StaffSecondaryButton type="button" onClick={() => navigate("/staff/payments")} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5">
-                      <CreditCard size={12} /> Pay
+                      <CreditCard size={12} /> Thanh toán
                     </StaffSecondaryButton>
                   </div>
                 ))}

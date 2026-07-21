@@ -8,10 +8,6 @@ export default defineConfig([
   globalIgnores([
     'dist',
     'src/ui/components/ui/**',
-    'src/ui/components/figma/**',
-    'src/ui/components/DriverDashboard.jsx',
-    'src/ui/components/ManagerDashboard.jsx',
-    'src/ui/components/StaffDashboard.jsx',
   ]),
   {
     files: ['**/*.{js,jsx}'],

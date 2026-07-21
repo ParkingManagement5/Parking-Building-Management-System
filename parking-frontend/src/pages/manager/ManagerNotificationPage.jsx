@@ -10,6 +10,18 @@ import {
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 
+const NOTIFICATION_TYPE_LABELS = {
+  info: "Thông tin",
+  success: "Thành công",
+  warning: "Cảnh báo",
+  error: "Lỗi",
+};
+
+function notificationTypeLabel(type) {
+  const key = String(type || "info").toLowerCase();
+  return NOTIFICATION_TYPE_LABELS[key] || type || "Thông tin";
+}
+
 export default function ManagerNotificationPage() {
   const [notifications, setNotifications] = useState([]);
   const [page, setPage] = useState(1);
@@ -130,7 +142,7 @@ export default function ManagerNotificationPage() {
                       <ManagerStatusBadge tone={item.isRead ? "emerald" : "amber"}>
                         {item.isRead ? "Đã đọc" : "Chưa đọc"}
                       </ManagerStatusBadge>
-                      <ManagerStatusBadge tone="blue">{item.type || "INFO"}</ManagerStatusBadge>
+                      <ManagerStatusBadge tone="blue">{notificationTypeLabel(item.type)}</ManagerStatusBadge>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">{item.body || item.message || "Không có nội dung"}</p>
                     <p className="mt-2 text-xs text-muted-foreground">{item.createdAt || "Không rõ thời gian"}</p>

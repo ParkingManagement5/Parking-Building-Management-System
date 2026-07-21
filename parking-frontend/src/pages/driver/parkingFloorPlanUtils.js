@@ -11,12 +11,12 @@ export const PAL = {
   maintenance: { label: "Bảo trì",      fill: "#d1d5db", text: "#6b7280", ring: "#9ca3af", dot: "bg-gray-400" },
 };
 
-export const $c = (s) => s?.slotCode || s?.parkingSlotCode || "Slot";
+export const $c = (s) => s?.slotCode || s?.parkingSlotCode || "Chỗ đỗ";
 export const $i = (s) => s?.id || s?.slotId || s?.parkingSlotId;
 export const $zi = (z) => z?.id || z?.zoneId;
-export const $zn = (z) => z?.name || z?.zoneName || "Zone";
+export const $zn = (z) => z?.name || z?.zoneName || "Khu vực";
 export const $fi2 = (f) => f?.id || f?.floorId || f?.parkingFloorId;
-export const $fn = (f) => f?.name || f?.floorName || "Floor";
+export const $fn = (f) => f?.name || f?.floorName || "Tầng";
 export const $vt = (z) => z?.vehicleType?.name || z?.vehicleTypeName || z?.vehicleType || "--";
 export function $fx(f, fb = 1) {
   const r = f?.floorNumber || f?.level || f?.index;

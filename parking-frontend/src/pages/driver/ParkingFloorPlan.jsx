@@ -1,66 +1,142 @@
 import { useState } from "react";
 import { ChevronRight, MapPin, Maximize2, Minus, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { PAL, $c, $zi, $zn, $fn, $vt, $s, srt } from "./parkingFloorPlanUtils";
+import { PAL, $c, $zi, $zn, $fn, $vt, $s, $m, srt } from "./parkingFloorPlanUtils";
 
 // So do zone/slot dung chung giua "So do phien hien tai" (co booking, to sang
 // dung slot cua minh) va preview khi duyet bai tren ban do "Tim cho do" (chua
 // co booking, chi xem layout + trang thai mau). Component tu nhan biet co
 // session hay khong qua tham so `session` — session=null se khong to sang gi.
 
+// Mau chu/vien mo (slate) dung chung cho Legend va vach loi vao — kieu web
+// dich vu than thien, khong con giong ban ve CAD/ky thuat nua.
+const INK_SOFT = "#64748b";
+
+// Mot o do: khung bo goc mem, mau nen theo trang thai (con trong/da dat/dang
+// co xe) — giong the/card trong app dich vu hon la ky hieu ban ve ky thuat.
 function Slot({ slot, ses, x, y, w, h, onClick }) {
   const st = $s(slot, ses), c = PAL[st] || PAL.available, mine = st === "mine";
+  const empty = st === "available";
   const [hov, setHov] = useState(false);
+  const rx = Math.min(8, w * 0.12);
   return (
     <g className="cursor-pointer" onClick={() => onClick(slot, st)}
       onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
-      {mine && <rect x={x - 2} y={y - 2} width={w + 4} height={h + 4} rx={5} fill="none"
-        stroke={c.ring} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.8}>
+      <rect x={x} y={y} width={w} height={h} rx={rx} fill={empty ? (hov ? "#e2e8f0" : "#f1f5f9") : c.fill} opacity={empty ? 1 : hov ? 0.85 : 0.7} />
+      <rect x={x} y={y} width={w} height={h} rx={rx} fill="none" stroke={empty ? "#cbd5e1" : c.ring} strokeWidth={empty ? 1 : 1.6} />
+      {mine && <rect x={x - 2} y={y - 2} width={w + 4} height={h + 4} rx={rx + 2} fill="none"
+        stroke={c.ring} strokeWidth={1.8} strokeDasharray="4 3" opacity={0.9}>
         <animate attributeName="stroke-dashoffset" from="0" to="14" dur="1.5s" repeatCount="indefinite" />
       </rect>}
-      <rect x={x} y={y} width={w} height={h} rx={4}
-        fill={hov ? c.ring : c.fill} stroke={c.ring} strokeWidth={hov ? 1.2 : 0.5}
-        style={{ transition: "fill 0.15s" }} />
       <text x={x + w / 2} y={y + h / 2 + 0.5} textAnchor="middle" dominantBaseline="central"
-        fill={mine || hov ? "#fff" : c.text} fontSize={10} fontWeight="700"
-        fontFamily="system-ui" className="select-none pointer-events-none">{$c(slot)}</text>
+        fontSize={Math.max(7, Math.min(13, w * 0.19))} fontWeight="700" fontFamily="system-ui" className="select-none pointer-events-none"
+        fill={empty ? INK_SOFT : c.text}>{$c(slot)}</text>
     </g>
   );
 }
 
+// Toa do luoi o do dung chung giua ZoneCell (ve) va route (tim duong toi
+// dung o) — tach rieng de route co the tinh chinh xac vi tri tung o thay vi
+// chi biet toa do ca khu vuc.
+const ZONE_COLS = 3;
+const ZONE_PAD_X = 6, ZONE_PAD_TOP = 8, ZONE_PAD_BOT = 8;
+const ZONE_COL_GAP = 12, ZONE_AISLE_GAP = 22;
+// Ty le cao:rong ~2:1 giong dung o do trong ban ve mau da duyet (khong con
+// keo dan cho vua het khu vuc — luon giu dung ty le, du con du khong gian.
+const SLOT_ASPECT = 2;
+
+function computeZoneGrid(zw, zh, n) {
+  const count = n || 1;
+  const nRows = Math.ceil(count / ZONE_COLS);
+  const colsInLastRow = count - (nRows - 1) * ZONE_COLS;
+  const availW = zw - ZONE_PAD_X * 2;
+  const availH = zh - ZONE_PAD_TOP - ZONE_PAD_BOT;
+  const colGap = Math.max(4, Math.min(ZONE_COL_GAP, availW * 0.04));
+  const aisleGap = Math.max(4, Math.min(ZONE_AISLE_GAP, availH * 0.08));
+
+  const maxWByWidth = (availW - (ZONE_COLS - 1) * colGap) / ZONE_COLS;
+  const maxHByHeight = (availH - (nRows - 1) * aisleGap) / nRows;
+  const maxWByHeight = maxHByHeight / SLOT_ASPECT;
+  const slotW = Math.max(8, Math.min(maxWByWidth, maxWByHeight));
+  const slotH = slotW * SLOT_ASPECT;
+  const colStep = slotW + colGap;
+  const rowStep = slotH + aisleGap;
+
+  // Can giua luoi (co dung ty le) trong khu vuc, phong khi con du khong gian.
+  const gridW = ZONE_COLS * colStep - colGap;
+  const gridH = nRows * rowStep - aisleGap;
+  const offsetX = Math.max(0, (availW - gridW) / 2);
+  const offsetY = Math.max(0, (availH - gridH) / 2);
+
+  return { nRows, colsInLastRow, slotW, colStep, slotH, rowStep, aisleGap, offsetX, offsetY };
+}
+
+function slotRectAt(pz, grid, index) {
+  const ri = Math.floor(index / ZONE_COLS);
+  const ci = index % ZONE_COLS;
+  const rowCols = ri === grid.nRows - 1 ? grid.colsInLastRow : ZONE_COLS;
+  const rowCenterOffsetX = ((ZONE_COLS - rowCols) * grid.colStep) / 2;
+  return {
+    x: pz.x + ZONE_PAD_X + grid.offsetX + rowCenterOffsetX + ci * grid.colStep,
+    y: pz.y + ZONE_PAD_TOP + grid.offsetY + ri * grid.rowStep,
+    w: grid.slotW, h: grid.slotH, ri, ci,
+  };
+}
+
+// Chi ve o do that (khong con khung/nhan "zone" — zone chi la don vi du lieu
+// noi bo, khong phai vat the that trong bai xe nen bo het the/nhan de giong
+// ban ve ky thuat that, bot roi mat). isActive chi con dung de highlight nhe
+// khu chua slot cua driver khi da co booking.
 function ZoneCell({ zone, ses, x, y, zw, zh, onSlotClick, isActive }) {
   const slots = srt(zone.slots || []);
-  const name = $zn(zone);
-  const avail = slots.filter((s) => String(s.status || "").toLowerCase() === "available").length;
-  const hH = 24, padX = 10, padTop = hH + 8, padBot = 8;
-  const slotW = (zw - padX * 2 - 10) / 2;
-  const nRows = Math.ceil(slots.length / 2);
-  const slotH = Math.min(26, Math.max(18, (zh - padTop - padBot - (nRows - 1) * 6) / nRows));
-  const rowStep = slotH + 6;
-  const pairs = [];
-  for (let i = 0; i < slots.length; i += 2) pairs.push(slots.slice(i, i + 2));
+  const grid = computeZoneGrid(zw, zh, slots.length);
 
   return (
     <g>
-      <rect x={x} y={y} width={zw} height={zh} rx={6}
-        fill={isActive ? "#eff6ff" : "#f8fafc"}
-        stroke={isActive ? "#3b82f6" : "#cbd5e1"}
-        strokeWidth={isActive ? 1.5 : 0.8} />
-      <rect x={x} y={y} width={zw} height={hH} rx={6} fill={isActive ? "#3b82f6" : "#475569"} />
-      <rect x={x} y={y + hH - 4} width={zw} height={4} fill={isActive ? "#3b82f6" : "#475569"} />
-      <text x={x + 6} y={y + hH / 2 + 0.5} dominantBaseline="central"
-        fontSize={10} fontWeight="700" fill="#fff" fontFamily="system-ui" className="select-none">{name}</text>
-      <text x={x + zw - 6} y={y + hH / 2 + 0.5} textAnchor="end" dominantBaseline="central"
-        fontSize={8} fill="rgba(255,255,255,0.7)" fontFamily="system-ui" className="select-none">{avail} trống</text>
-      {pairs.map((pair, ri) => {
-        const ry = y + padTop + ri * rowStep;
-        const lx = x + padX, rx2 = x + zw - padX - slotW;
+      {isActive && (
+        <rect x={x} y={y} width={zw} height={zh} rx={10} fill="none" stroke="#2563eb" strokeWidth={1.4} strokeDasharray="6 4" opacity={0.8} />
+      )}
+      {Array.from({ length: grid.nRows - 1 }).map((_, ri) => {
+        // Vach loi vao (aisle) giua 2 hang o — the hien huong xe di chuyen
+        // giua cac hang, khong phai duong dan booking (luon hien, khong doi
+        // theo trang thai dat cho).
+        const midY = y + ZONE_PAD_TOP + grid.offsetY + grid.slotH + ri * grid.rowStep + grid.aisleGap / 2;
         return (
-          <g key={ri}>
-            {pair[0] && <Slot slot={pair[0]} ses={ses} x={lx} y={ry} w={slotW} h={slotH} onClick={onSlotClick} />}
-            {pair[1] && <Slot slot={pair[1]} ses={ses} x={rx2} y={ry} w={slotW} h={slotH} onClick={onSlotClick} />}
-            {ri < pairs.length - 1 && <line x1={x + padX} y1={ry + slotH + 4} x2={x + zw - padX} y2={ry + slotH + 4}
-              stroke="#cbd5e1" strokeWidth={0.6} strokeDasharray="3 3" />}
+          <line key={`aisle-${ri}`} x1={x + ZONE_PAD_X} y1={midY} x2={x + zw - ZONE_PAD_X} y2={midY}
+            stroke={INK_SOFT} strokeWidth={0.8} strokeDasharray="3 3" opacity={0.5} />
+        );
+      })}
+      {slots.map((slot, i) => {
+        const r = slotRectAt({ x, y }, grid, i);
+        return (
+          <Slot key={slot.id || slot.slotId || i} slot={slot} ses={ses}
+            x={r.x} y={r.y} w={r.w} h={r.h} onClick={onSlotClick} />
+        );
+      })}
+    </g>
+  );
+}
+
+// ── Chú giải nhỏ gọn, thân thiện kiểu web dịch vụ (không còn khung viền
+// kép/la bàn/thước tỉ lệ/khung tên như bản vẽ kỹ thuật trước đây). ──
+
+function Legend({ x, y }) {
+  const rows = [
+    { swatch: "route", label: "Đường tới chỗ đã đặt" },
+    { swatch: "mine", label: "Vị trí của bạn" },
+    { swatch: "occupied", label: "Đang có xe" },
+    { swatch: "reserved", label: "Đã đặt trước" },
+  ];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {rows.map((r, i) => {
+        const ry = i * 17;
+        return (
+          <g key={r.label}>
+            {r.swatch === "route"
+              ? <line x1={2} y1={ry + 7} x2={18} y2={ry + 7} stroke="#f97316" strokeWidth={2.4} strokeDasharray="4 3" strokeLinecap="round" />
+              : <rect x={2} y={ry + 2} width={16} height={10} rx={3} fill={(PAL[r.swatch] || PAL.available).fill} opacity={0.75} stroke={(PAL[r.swatch] || PAL.available).ring} strokeWidth={1.2} />}
+            <text x={24} y={ry + 9.5} fontSize={8} fill={INK_SOFT} fontFamily="system-ui" className="select-none">{r.label}</text>
           </g>
         );
       })}
@@ -89,7 +165,7 @@ export function ParkingMap({ sections, session, activeZone, zoom, onSlotClick, f
 
   return (
     <div className="rounded-2xl border border-border bg-slate-100 dark:bg-slate-800/50 overflow-hidden">
-      <svg viewBox={`0 0 ${vbW} ${contentH}`} className="block w-full h-auto" style={{ maxHeight: `${zoom * 5.5}px` }}>
+      <svg viewBox={`0 0 ${vbW} ${contentH}`} className="block w-full h-auto" style={{ maxHeight: `${zoom * 5.5}px`, colorScheme: "light" }}>
         <rect width={vbW} height={contentH} fill="#e2e8f0" rx={12} />
         <rect x={4} y={4} width={vbW - 8} height={contentH - 8} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.8} rx={10} />
 
@@ -161,22 +237,106 @@ export function ParkingMap({ sections, session, activeZone, zoom, onSlotClick, f
   );
 }
 
+const SHEET_MARGIN_X = 14;
+const SHEET_MARGIN_TOP = 14;
+const SHEET_MARGIN_BOTTOM = 76;
+
 export function StaticFloorPlanMap({ plan, sections, session, activeZone, zoom, onSlotClick }) {
-  const { vbW, vbH, bg, decorations, zones: planZones } = plan;
+  const { vbW, vbH, bg, decorations, zones: planZones, route } = plan;
+  const outerW = vbW + SHEET_MARGIN_X * 2;
+  const outerH = vbH + SHEET_MARGIN_TOP + SHEET_MARGIN_BOTTOM;
+
+  const activeBox = activeZone && planZones.find((pz) => {
+    const n = $zn(activeZone);
+    return n === pz.match || n.startsWith(pz.match) || pz.match.startsWith(n);
+  });
+
   return (
     <div className="rounded-2xl border border-border bg-slate-100 dark:bg-slate-800/50 overflow-hidden">
-      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="block w-full h-auto" style={{ maxHeight: `${zoom * 5.5}px` }}>
-        <rect width={vbW} height={vbH} fill={bg || "#e2e8f0"} rx={12} />
+      <svg viewBox={`0 0 ${outerW} ${outerH}`} className="block w-full h-auto" style={{ maxHeight: `${zoom * 5.5}px`, colorScheme: "light" }}>
+        <rect width={outerW} height={outerH} rx={16} fill={bg || "#f4f1e8"} />
+        <Legend x={SHEET_MARGIN_X + 8} y={vbH + SHEET_MARGIN_TOP + 14} />
+        <g transform={`translate(${SHEET_MARGIN_X},${SHEET_MARGIN_TOP})`}>
         {decorations.map((d, i) => {
           if (d.type === "rect") return (
-            <rect key={i} x={d.x} y={d.y} width={d.w} height={d.h} rx={d.rx ?? 0} fill={d.fill || "none"} stroke={d.stroke || "none"} strokeWidth={d.sw || 0} />
+            <rect key={i} x={d.x} y={d.y} width={d.w} height={d.h} rx={d.rx ?? 6} fill={d.fill || "none"} stroke={d.stroke || "none"} strokeWidth={d.sw || 0} />
+          );
+          if (d.type === "path") return (
+            <path key={i} d={d.d} fill={d.fill || "none"} stroke={d.stroke || "none"} strokeWidth={d.sw || 0}
+              strokeDasharray={d.dash || undefined} opacity={d.opacity ?? 1} />
           );
           if (d.type === "text") return (
             <text key={i} x={d.x} y={d.y} textAnchor={d.anchor || "start"} dominantBaseline="central" fontSize={d.fontSize || 10}
               fill={d.fill || "#000"} fontFamily="system-ui" className="select-none pointer-events-none">{d.text}</text>
           );
+          if (d.type === "lane") {
+            const vertical = d.dir === "v";
+            const midX = d.x + d.w / 2, midY = d.y + d.h / 2;
+            const arrowStops = d.arrows === false ? [] : [0.28, 0.72];
+            return (
+              <g key={i}>
+                <rect x={d.x} y={d.y} width={d.w} height={d.h} fill={d.fill || "#c8d6e5"} />
+                {vertical
+                  ? <line x1={midX} y1={d.y + 10} x2={midX} y2={d.y + d.h - 10} stroke="#fff" strokeWidth={1.4} strokeDasharray="10 8" opacity={0.6} />
+                  : <line x1={d.x + 10} y1={midY} x2={d.x + d.w - 10} y2={midY} stroke="#fff" strokeWidth={1.4} strokeDasharray="10 8" opacity={0.6} />}
+                {arrowStops.map((p, ai) => {
+                  const cx = vertical ? midX : d.x + d.w * p;
+                  const cy = vertical ? d.y + d.h * p : midY;
+                  const pts = vertical
+                    ? `${cx - 5},${cy - 5} ${cx},${cy + 5} ${cx + 5},${cy - 5}`
+                    : `${cx - 5},${cy - 5} ${cx + 5},${cy} ${cx - 5},${cy + 5}`;
+                  return <polygon key={ai} points={pts} fill="#fff" opacity={0.55} />;
+                })}
+                {d.label && (
+                  <text x={midX} y={vertical ? midY : midY - 9} textAnchor="middle" fontSize={7.5}
+                    fill={d.labelFill || "#64748b"} fontFamily="system-ui" className="select-none pointer-events-none"
+                    transform={vertical ? `rotate(-90 ${midX} ${midY})` : undefined}>{d.label}</text>
+                )}
+              </g>
+            );
+          }
           return null;
         })}
+        {route && activeBox && (() => {
+          const zoneSlots = srt(activeZone?.slots || []);
+          const slotIdx = Math.max(0, zoneSlots.findIndex((s) => $m(s, session)));
+          const grid = computeZoneGrid(activeBox.w, activeBox.h, zoneSlots.length);
+          const slotRect = slotRectAt(activeBox, grid, slotIdx);
+          const slotCenterX = slotRect.x + slotRect.w / 2;
+          const zoneMidY = activeBox.y + activeBox.h / 2;
+          const enterFromTop = zoneMidY > route.laneY;
+          // O do nam doc (2:1) nen phai do THANG vao tu canh tren/duoi cua o
+          // (giong xe lui/tien thang vao cho that).
+          // - Hang NGOAI (sat lan xe chinh): di thang tu lan vao luon, khong
+          //   can vong qua cot nao ca.
+          // - Hang TRONG (phia sau hang ngoai): phai di theo khe ho giua 2
+          //   cot (an toan, khong cat qua o hang ngoai) roi moi re vao.
+          const outerRowIndex = enterFromTop ? 0 : grid.nRows - 1;
+          const isOuterRow = slotRect.ri === outerRowIndex;
+          // Dung dung tai vien ngoai o (khong chay de len chu/vien ben trong).
+          const nearEdgeY = enterFromTop ? slotRect.y : slotRect.y + slotRect.h;
+          let d;
+          if (isOuterRow) {
+            d = `M${route.entryX} ${route.entryY} L${route.entryX} ${route.laneY} L${slotCenterX} ${route.laneY} L${slotCenterX} ${nearEdgeY}`;
+          } else {
+            const colGapWidth = grid.colStep - grid.slotW;
+            const corridorOnRight = slotRect.ci < ZONE_COLS - 1;
+            const corridorX = corridorOnRight
+              ? slotRect.x + slotRect.w + colGapWidth / 2
+              : slotRect.x - colGapWidth / 2;
+            d = `M${route.entryX} ${route.entryY} L${route.entryX} ${route.laneY} L${corridorX} ${route.laneY} L${corridorX} ${nearEdgeY} L${slotCenterX} ${nearEdgeY}`;
+          }
+          return (
+            <g>
+              <path d={d} fill="none" stroke="#f97316" strokeWidth={2.4} strokeDasharray="7 5" opacity={0.9}>
+                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1s" repeatCount="indefinite" />
+              </path>
+              <circle cx={route.entryX} cy={route.entryY} r={5} fill="#f97316" stroke="#fff" strokeWidth={1.5} />
+              <text x={route.entryX} y={route.entryY - 10} textAnchor="middle" fontSize={8} fontWeight="700"
+                fill="#f97316" fontFamily="system-ui" className="select-none pointer-events-none">BẠN VÀO ĐÂY</text>
+            </g>
+          );
+        })()}
         {planZones.map((pz, i) => {
           const zone = sections.find((s) => $zn(s) === pz.match || $zn(s).startsWith(pz.match) || pz.match.startsWith($zn(s)));
           if (!zone) return null;
@@ -185,6 +345,7 @@ export function StaticFloorPlanMap({ plan, sections, session, activeZone, zoom, 
               onSlotClick={onSlotClick} isActive={String($zi(zone)) === String($zi(activeZone))} />
           );
         })}
+        </g>
       </svg>
     </div>
   );

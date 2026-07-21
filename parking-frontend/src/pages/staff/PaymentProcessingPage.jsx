@@ -280,7 +280,7 @@ export default function PaymentProcessingPage() {
         subtitle={`${filteredSessions.length} đang chờ · ${recentPayments.length} gần đây${lastSyncedAt ? ` · đồng bộ ${formatStaffDateTime(lastSyncedAt)}` : ""}`}
         action={
           <StaffSecondaryButton type="button" onClick={() => void loadPendingPayments()} disabled={loading}>
-            {isAutoRefreshing ? "Refreshing..." : "Refresh"}
+            {isAutoRefreshing ? "Đang làm mới..." : "Làm mới"}
           </StaffSecondaryButton>
         }
       >
@@ -290,13 +290,13 @@ export default function PaymentProcessingPage() {
             <input
               value={query}
               onChange={(event) => { setQuery(event.target.value); setPage(1); }}
-              placeholder="Search plate, session, or slot"
+              placeholder="Tìm biển số, phiên, hoặc chỗ đỗ"
               className="w-full rounded-2xl border border-border bg-muted py-2.5 pl-9 pr-3 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10"
             />
           </div>
           <StaffSelect value={methodFilter} onChange={(event) => { setMethodFilter(event.target.value); setPage(1); }}>
-            <option value="ALL">All methods</option>
-            <option value="CASH">Cash</option>
+            <option value="ALL">Tất cả phương thức</option>
+            <option value="CASH">Tiền mặt</option>
             <option value="VNPAY">VNPay</option>
           </StaffSelect>
         </div>
@@ -315,8 +315,8 @@ export default function PaymentProcessingPage() {
 
             {filteredSessions.length === 0 ? (
               <StaffEmptyState
-                title={loading ? "Loading pending payments" : "No matching pending payments"}
-                description="Sessions appear here after staff records vehicle exit."
+                title={loading ? "Đang tải thanh toán chờ xử lý" : "Không tìm thấy thanh toán phù hợp"}
+                description="Phiên đỗ xe sẽ hiện ở đây sau khi nhân viên ghi nhận xe ra."
                 tone="success"
               />
             ) : (
@@ -327,16 +327,16 @@ export default function PaymentProcessingPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
-                          <StaffStatusBadge tone="amber">waiting payment</StaffStatusBadge>
+                          <StaffStatusBadge tone="amber">Chờ thanh toán</StaffStatusBadge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Session #{item.sessionId} - Slot {item.slotCode} - {formatStaffDateTime(item.entryTime)}
+                          Phiên #{item.sessionId} - Chỗ đỗ {item.slotCode} - {formatStaffDateTime(item.entryTime)}
                         </p>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
                         <div className="rounded-2xl bg-muted/30 p-3">
                           <p className="text-xs text-muted-foreground">
-                            {pendingPaymentMap[item.sessionId] ? "Payable Amount" : "Payment Amount"}
+                            {pendingPaymentMap[item.sessionId] ? "Số tiền cần thanh toán" : "Số tiền thanh toán"}
                           </p>
                           {(pendingPaymentMap[item.sessionId]
                             ? pendingPaymentMap[item.sessionId].amount
@@ -382,7 +382,7 @@ export default function PaymentProcessingPage() {
                                 disabled={processingId === item.sessionId}
                               >
                                 {processingId === item.sessionId
-                                  ? "Processing..."
+                                  ? "Đang xử lý..."
                                   : canConfirmDirectly
                                     ? pendingPaymentMap[item.sessionId].amount === 0
                                       ? "Hoàn tất (Miễn phí)"
@@ -418,7 +418,7 @@ export default function PaymentProcessingPage() {
                               onClick={() => navigator.clipboard.writeText(vnpayQrMap[item.sessionId])}
                               className="rounded-lg border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted"
                             >
-                              Copy link
+                              Sao chép link
                             </button>
                           </div>
                           <p className="mt-1 text-[11px] text-muted-foreground">Quét mã không được? Dùng link trên — mở trực tiếp hoặc gửi cho khách (Zalo, SMS...).</p>
@@ -432,7 +432,7 @@ export default function PaymentProcessingPage() {
                       pendingPaymentMap[item.sessionId].payment.paymentMethod === "VNPAY" ? (
                         <div className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-amber-50/40 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
                           <p className="text-sm font-semibold text-foreground">
-                            Đã tạo yêu cầu VNPay – Payment #{pendingPaymentMap[item.sessionId].payment.paymentId}
+                            Đã tạo yêu cầu VNPay – Thanh toán #{pendingPaymentMap[item.sessionId].payment.paymentId}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
                             Chưa có mã QR để khách quét (có thể do trang vừa tải lại). Bấm "Tạo QR VNPay" ở trên để lấy mã QR mới — hệ thống dùng lại đúng phiếu thanh toán này, không tạo trùng.
@@ -448,7 +448,7 @@ export default function PaymentProcessingPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-foreground">
-                            Tiền mặt – Payment #{pendingPaymentMap[item.sessionId].payment.paymentId}
+                            Tiền mặt – Thanh toán #{pendingPaymentMap[item.sessionId].payment.paymentId}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">Thu tiền mặt từ khách, bấm "Xác nhận tiền mặt" để hoàn tất.</p>
                           <p className="mt-2 text-xs font-semibold text-foreground">
@@ -487,7 +487,7 @@ export default function PaymentProcessingPage() {
               Gần đây ({recentPayments.length})
             </h4>
             {recentPayments.length === 0 ? (
-              <StaffEmptyState title="No recent payments" description="Paid records will appear after processing." />
+              <StaffEmptyState title="Chưa có thanh toán gần đây" description="Các giao dịch đã thanh toán sẽ hiện sau khi xử lý." />
             ) : (
               <div className="space-y-2">
                 {recentPayments.map((item) => (
@@ -497,9 +497,9 @@ export default function PaymentProcessingPage() {
                         <CreditCard size={14} />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Payment #{item.paymentId}</p>
+                        <p className="text-sm font-semibold text-foreground">Thanh toán #{item.paymentId}</p>
                         <p className="text-xs text-muted-foreground">
-                          Session #{item.sessionId} - {item.paymentMethod}
+                          Phiên #{item.sessionId} - {item.paymentMethod}
                         </p>
                       </div>
                     </div>
@@ -517,11 +517,11 @@ export default function PaymentProcessingPage() {
 
       {receipt ? (
         <StaffPageSection
-          title="Latest Receipt"
-          subtitle="Payment confirmation generated from the last processed session"
+          title="Biên lai gần nhất"
+          subtitle="Xác nhận thanh toán từ phiên đỗ xe vừa xử lý"
           action={
             <StaffSecondaryButton type="button" onClick={() => setReceipt(null)}>
-              Clear Receipt
+              Xoá biên lai
             </StaffSecondaryButton>
           }
         >
@@ -531,23 +531,25 @@ export default function PaymentProcessingPage() {
                 <ReceiptText size={18} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">Payment #{receipt.paymentId}</p>
-                <p className="text-xs text-muted-foreground">{receipt.transactionRef || "No transaction reference"}</p>
+                <p className="text-sm font-semibold text-foreground">Thanh toán #{receipt.paymentId}</p>
+                <p className="text-xs text-muted-foreground">{receipt.transactionRef || "Không có mã giao dịch"}</p>
               </div>
               <div className="ml-auto">
-                <StaffStatusBadge tone="emerald">{String(receipt.paymentStatus || "paid").toLowerCase()}</StaffStatusBadge>
+                <StaffStatusBadge tone="emerald">
+                  {String(receipt.paymentStatus || "paid").toLowerCase() === "paid" ? "Đã thanh toán" : String(receipt.paymentStatus || "").toLowerCase()}
+                </StaffStatusBadge>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
-                ["Plate", receipt.licensePlate || "--"],
-                ["Session", `#${receipt.sessionId}`],
-                ["Slot", receipt.slotCode || "--"],
-                ["Method", receipt.paymentMethod || "--"],
-                ["Entry", formatStaffDateTime(receipt.entryTime)],
-                ["Exit", formatStaffDateTime(receipt.exitTime || receipt.paidAt)],
-                ["Paid At", formatStaffDateTime(receipt.paidAt)],
-                ["Total", formatStaffCurrency(receipt.totalAmount ?? receipt.durationFee)],
+                ["Biển số", receipt.licensePlate || "--"],
+                ["Phiên", `#${receipt.sessionId}`],
+                ["Chỗ đỗ", receipt.slotCode || "--"],
+                ["Phương thức", receipt.paymentMethod || "--"],
+                ["Giờ vào", formatStaffDateTime(receipt.entryTime)],
+                ["Giờ ra", formatStaffDateTime(receipt.exitTime || receipt.paidAt)],
+                ["Thanh toán lúc", formatStaffDateTime(receipt.paidAt)],
+                ["Tổng cộng", formatStaffCurrency(receipt.totalAmount ?? receipt.durationFee)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl bg-background/80 p-3">
                   <p className="text-xs text-muted-foreground">{label}</p>

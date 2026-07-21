@@ -1,42 +1,24 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowRight, Bell, Clock3, Navigation, ReceiptText } from "lucide-react";
 import { bookingApi } from "../../api/driver/bookingApi";
 import { driverSessionApi } from "../../api/driver/sessionApi";
-import { driverVehicleApi } from "../../api/driver/driverVehicleApi";
 import { paymentApi } from "../../api/driver/paymentApi";
 import { notificationApi } from "../../api/notificationApi";
-import { getUserId } from "../../utils/auth";
+import { getUserId, getUsername } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
-import {
-  formatCurrency,
-  formatDuration,
-  formatRelativeTime,
-  getBookingStatus,
-  getStatusClasses,
-} from "./driverPortalUtils";
+import { formatCurrency, formatDuration } from "./driverPortalUtils";
 
-function StatusBadge({ status }) {
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClasses(status)}`}
-    >
-      {String(status || "pending").toLowerCase()}
-    </span>
-  );
-}
+// Dashboard chi giu dung thu can biet NGAY khi mo app: viec can xu ly (chua
+// thanh toan, booking chua hoan tat) uu tien tren cung, roi moi den phien
+// dang do (thong tin, khong khan). Cac so lieu phu (so xe, chi tieu thang,
+// lich su booking/thong bao) chuyen sang dung trang cua no thay vi nhoi het
+// len trang chinh — tranh cam giac "qua nhieu thong tin".
 
 function isOpenBooking(item) {
   const status = String(item?.status || item?.bookingStatus || "").toUpperCase();
   const qrUsed = item?.qrUsed === true || Boolean(item?.qrUsedAt);
   return status === "PENDING_PAYMENT" || (status === "CONFIRMED" && !qrUsed);
-}
-
-function resolveSessionStart(item) {
-  return item?.entryTime || item?.startTime || item?.checkInTime || item?.createdAt || item?.bookingStartTime;
-}
-
-function resolveSessionEnd(item) {
-  return item?.exitTime || item?.endTime || item?.checkOutTime || null;
 }
 
 function resolveBookingStart(item) {
@@ -53,76 +35,29 @@ function bookingPriority(item) {
 function pickActiveBooking(bookings) {
   const openBookings = bookings.filter(isOpenBooking);
   if (!openBookings.length) return null;
-
   return [...openBookings].sort((a, b) => {
     const priorityDiff = bookingPriority(a) - bookingPriority(b);
     if (priorityDiff !== 0) return priorityDiff;
-
     const startA = resolveBookingStart(a) ? new Date(resolveBookingStart(a)).getTime() : Number.MAX_SAFE_INTEGER;
     const startB = resolveBookingStart(b) ? new Date(resolveBookingStart(b)).getTime() : Number.MAX_SAFE_INTEGER;
-    if (startA !== startB) return startA - startB;
-
-    const createdA = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const createdB = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return createdB - createdA;
+    return startA - startB;
   })[0];
 }
 
-function resolveHeroMetric(record, isSessionRecord) {
-  if (!record) return "--:--";
-  if (isSessionRecord) {
-    return formatDuration(resolveSessionStart(record), resolveSessionEnd(record) || new Date().toISOString());
-  }
-
-  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Chờ cọc";
-  if (status === "CONFIRMED") return "Chờ vào";
-  return "--:--";
-}
-
-function resolveHeroMetricLabel(record, isSessionRecord) {
-  if (isSessionRecord) return "Thời gian";
-
-  const status = String(record?.status || record?.bookingStatus || "").toUpperCase();
-  if (status === "PENDING_PAYMENT") return "Trạng thái";
-  if (status === "CONFIRMED") return "Điều kiện";
-  return "Thời gian";
-}
-
-function resolveHeroTitle(record, isSessionRecord) {
-  if (!record) return "Chưa có phiên đỗ xe";
-  if (isSessionRecord) {
-    return record?.slotCode ? `Xe đang đỗ tại ${record.slotCode}` : "Xe đang đỗ trong bãi";
-  }
-  return record?.buildingName || record?.parkingBuildingName || "Chờ xe vào bãi";
-}
-
-function resolveHeroSubtitle(record, isSessionRecord) {
-  if (!record) return "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
-  const slotLabel = record?.slotCode || record?.parkingSlotCode || "Chờ xác nhận";
-  const plateLabel = record?.licensePlate || record?.vehiclePlate || "Xe đã liên kết";
-
-  if (isSessionRecord) {
-    return `${slotLabel} - ${plateLabel}`;
-  }
-
-  const startLabel = resolveBookingStart(record) ? formatRelativeTime(resolveBookingStart(record)) : "Sắp đến lượt";
-  return `${slotLabel} - ${plateLabel} - ${startLabel}`;
+function greetingForNow() {
+  const h = new Date().getHours();
+  if (h < 11) return "Chào buổi sáng";
+  if (h < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
 }
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState([
-    { label: "Xe đã đăng ký", value: "0", action: "/driver/vehicles" },
-    { label: "Booking đang mở", value: "0", action: "/driver/booking" },
-    { label: "Phiên hiện tại", value: "--:--", action: "/driver/current-session" },
-    { label: "Thông báo", value: "0", action: "/driver/notifications" },
-    { label: "Chi tiêu tháng", value: "$0", action: "/driver/payments" },
-  ]);
   const [activeBooking, setActiveBooking] = useState(null);
-  const [currentDriverSession, setCurrentDriverSession] = useState(null);
-  const [recentBookings, setRecentBookings] = useState([]);
-  const [recentNotifications, setRecentNotifications] = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+  const [unpaidSession, setUnpaidSession] = useState(null);
+  const [openBookingCount, setOpenBookingCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,53 +65,23 @@ export default function DriverDashboard() {
     async function loadDashboard() {
       try {
         const userId = getUserId();
-        const [vehiclesRes, bookingsRes, sessionsRes, paymentsRes, notificationsRes] =
-          await Promise.allSettled([
-            driverVehicleApi.getMyVehicles(),
-            bookingApi.getMyBookings(),
-            driverSessionApi.getMySessions(),
-            paymentApi.getMyPayments(),
-            userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
-          ]);
-
+        const [bookingsRes, sessionsRes, , notificationsRes] = await Promise.allSettled([
+          bookingApi.getMyBookings(),
+          driverSessionApi.getMySessions(),
+          paymentApi.getMyPayments(),
+          userId ? notificationApi.getByUser(userId) : Promise.resolve({ data: [] }),
+        ]);
         if (cancelled) return;
 
-        const vehicles = vehiclesRes.status === "fulfilled" ? unwrapApiData(vehiclesRes.value.data, []) : [];
         const bookings = bookingsRes.status === "fulfilled" ? unwrapApiData(bookingsRes.value.data, []) : [];
         const sessions = sessionsRes.status === "fulfilled" ? unwrapApiData(sessionsRes.value.data, []) : [];
-        const payments = paymentsRes.status === "fulfilled" ? unwrapApiData(paymentsRes.value.data, []) : [];
         const notifications = notificationsRes.status === "fulfilled" ? unwrapApiData(notificationsRes.value.data, []) : [];
 
-        const active = pickActiveBooking(bookings);
-        const activeSession = sessions.find((s) => String(s.status || "").toUpperCase() === "ACTIVE") || null;
-        const waitingPaymentSession = sessions.find((s) => String(s.status || "").toUpperCase() === "WAITING_PAYMENT") || null;
-        const currentSession = activeSession || waitingPaymentSession || null;
-
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthlyExpenses = payments
-          .filter((p) => String(p.paymentStatus || "").toUpperCase() === "PAID")
-          .filter((p) => new Date(p.paidAt || p.createdAt || 0) >= monthStart)
-          .reduce((sum, p) => sum + Number(p.amount || p.totalAmount || 0), 0);
-
-        setStats([
-          { label: "Xe đã đăng ký", value: String(vehicles.length), action: "/driver/vehicles" },
-          { label: "Booking đang mở", value: String(bookings.filter(isOpenBooking).length), action: "/driver/booking" },
-          {
-            label: "Phiên hiện tại",
-            value: currentSession
-              ? formatDuration(resolveSessionStart(currentSession), resolveSessionEnd(currentSession) || new Date().toISOString())
-              : "--:--",
-            action: "/driver/current-session",
-          },
-          { label: "Thông báo", value: String(notifications.filter((n) => !n.isRead).length), action: "/driver/notifications" },
-          { label: "Chi tiêu tháng", value: formatCurrency(monthlyExpenses), action: "/driver/payments" },
-        ]);
-
-        setActiveBooking(active);
-        setCurrentDriverSession(currentSession);
-        setRecentBookings(bookings.slice(0, 3));
-        setRecentNotifications(notifications.slice(0, 4));
+        setActiveBooking(pickActiveBooking(bookings));
+        setActiveSession(sessions.find((s) => String(s.status || "").toUpperCase() === "ACTIVE") || null);
+        setUnpaidSession(sessions.find((s) => String(s.status || "").toUpperCase() === "WAITING_PAYMENT") || null);
+        setOpenBookingCount(bookings.filter(isOpenBooking).length);
+        setUnreadCount(notifications.filter((n) => !n.isRead).length);
       } catch (error) {
         console.error("Load driver dashboard failed:", error);
       }
@@ -186,130 +91,115 @@ export default function DriverDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const heroRecord = currentDriverSession || activeBooking;
-  const heroIsSession = Boolean(currentDriverSession);
-  const heroStatus = currentDriverSession
-    ? String(currentDriverSession.status || "").toUpperCase()
-    : getBookingStatus(activeBooking);
-  const heroTitle = heroRecord?.buildingName || heroRecord?.parkingBuildingName || "Chưa có phiên đỗ xe";
-  const heroSubtitle = heroRecord
-    ? `${heroRecord.slotCode || heroRecord.parkingSlotCode || "Chỗ chờ xác nhận"} - ${heroRecord.licensePlate || heroRecord.vehiclePlate || "Xe đã liên kết"}`
-    : "Tạo booking để xem phiên đỗ xe hiện tại tại đây";
-  const heroDuration = resolveHeroMetric(heroRecord, heroIsSession);
-  const heroDurationLabel = resolveHeroMetricLabel(heroRecord, heroIsSession);
-  const heroStatusLabel = currentDriverSession
-    ? heroStatus.toLowerCase()
-    : activeBooking ? getBookingStatus(activeBooking) : "waiting";
-  const heroDisplayTitle = resolveHeroTitle(heroRecord, heroIsSession);
-  const heroDisplaySubtitle = resolveHeroSubtitle(heroRecord, heroIsSession);
+  const hasAttention = Boolean(unpaidSession || activeBooking);
 
   return (
-    <div className="space-y-5">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {stats.map((item) => (
-          <button
-            key={item.label}
-            onClick={() => navigate(item.action)}
-            className="rounded-2xl border border-border bg-card p-4 text-left transition hover:border-emerald-300 hover:shadow-sm"
-          >
-            <div className="text-2xl font-bold text-foreground">{item.value}</div>
-            <div className="text-xs text-muted-foreground mt-1">{item.label}</div>
-          </button>
-        ))}
-      </div>
+    <div className="mx-auto max-w-4xl space-y-5">
+      <p className="text-base text-muted-foreground">
+        {greetingForNow()}, <span className="font-semibold text-foreground">{getUsername() || "bạn"}</span>
+      </p>
 
-      {/* Hero active session */}
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-600 p-6 text-white dark:border-emerald-500/20 dark:bg-emerald-900">
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
-          <div>
-            <p className="text-xs text-white/70 mb-1">Phiên đỗ xe hiện tại</p>
-            <h2 className="text-xl font-bold">{heroDisplayTitle}</h2>
-            <p className="text-sm text-white/80 mt-0.5">{heroDisplaySubtitle}</p>
-          </div>
-          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center">
-            <div className="text-2xl font-bold font-mono">{heroDuration}</div>
-            <div className="text-xs text-white/60">{heroDurationLabel}</div>
-          </div>
-        </div>
+      {hasAttention && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cần chú ý</p>
 
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            ["Trạng thái", heroStatusLabel],
-            ["Phí ước tính", formatCurrency((heroIsSession ? heroRecord?.calculatedFee : heroRecord?.depositAmount) || 0)],
-            ["Biển số xe", heroRecord?.licensePlate || heroRecord?.vehiclePlate || "Chưa gán"],
-          ].map(([label, val]) => (
-            <div key={label} className="rounded-xl bg-white/10 p-3">
-              <p className="text-xs text-white/60">{label}</p>
-              <p className="text-sm font-semibold mt-0.5 capitalize">{val}</p>
+          {unpaidSession && (
+            <div className="flex items-start gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-500/25 dark:bg-rose-500/10">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-rose-600 text-white">
+                <AlertTriangle size={22} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-rose-700 dark:text-rose-300">
+                  Chưa thanh toán {formatCurrency(unpaidSession.calculatedFee || unpaidSession.totalAmount || 0)}
+                </p>
+                <p className="text-sm text-rose-700/80 dark:text-rose-300/70 mt-1">
+                  Phiên đỗ tại {unpaidSession.slotCode || "chỗ đã đỗ"} · {unpaidSession.buildingName || "đã kết thúc"}
+                </p>
+              </div>
+              <button type="button" onClick={() => navigate("/driver/payments")}
+                className="shrink-0 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700">
+                Thanh toán ngay
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      {/* Recent bookings + notifications */}
-      <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-5">
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground text-sm">Booking gần đây</h3>
-            <button onClick={() => navigate("/driver/bookings")} className="text-xs text-emerald-600 hover:underline">
-              Xem tất cả
-            </button>
-          </div>
-          <div className="divide-y divide-border">
-            {recentBookings.map((item, index) => (
-              <div key={item.bookingId || item.id || index} className="flex items-center justify-between py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {item.buildingName || item.parkingBuildingName || "Parking Building"} - {item.slotCode || item.parkingSlotCode || "Slot"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {item.bookingDate || item.createdAt || "Vừa tạo"}
-                  </p>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <p className="text-sm font-semibold text-foreground">
-                    {formatCurrency(item.depositAmount || 0)}
-                  </p>
-                  <StatusBadge status={getBookingStatus(item)} />
-                </div>
-              </div>
-            ))}
-            {recentBookings.length === 0 && (
-              <p className="py-6 text-sm text-muted-foreground">Chưa có booking nào.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground text-sm">Thông báo gần đây</h3>
-            <button onClick={() => navigate("/driver/notifications")} className="text-xs text-emerald-600 hover:underline">
-              Xem tất cả
-            </button>
-          </div>
-          <div className="divide-y divide-border">
-            {recentNotifications.map((item, index) => (
-              <div key={item.notificationId || index} className="py-3">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {item.title || "Thông báo"}
-                  </p>
-                  {!item.isRead && <span className="size-2 rounded-full bg-emerald-500 shrink-0" />}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {item.body || item.message || item.content || "Không có chi tiết"}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  {formatRelativeTime(item.createdAt || item.sentAt)}
+          {activeBooking && (
+            <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-500/25 dark:bg-amber-500/10">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-600 text-white">
+                <Clock3 size={22} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-amber-800 dark:text-amber-300">Booking chưa hoàn tất</p>
+                <p className="text-sm text-amber-800/80 dark:text-amber-300/70 mt-1">
+                  {activeBooking.buildingName || activeBooking.parkingBuildingName || "Bãi xe"} ·{" "}
+                  {String(activeBooking.status || "").toUpperCase() === "PENDING_PAYMENT" ? "Chờ đặt cọc" : "Chờ vào bãi"}
                 </p>
               </div>
-            ))}
-            {recentNotifications.length === 0 && (
-              <p className="py-6 text-sm text-muted-foreground">Chưa có thông báo nào.</p>
-            )}
+              <button type="button" onClick={() => navigate("/driver/bookings")}
+                className="shrink-0 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700">
+                Xem chi tiết
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeSession ? (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Xe đang đỗ</p>
+          <div className="rounded-2xl border border-border bg-card p-8 border-l-4 border-l-primary">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="size-2 rounded-full bg-primary" /> {activeSession.slotCode || "Đang đỗ"}
+                </p>
+                <h2 className="text-3xl font-semibold text-foreground mt-2">
+                  {activeSession.licensePlate || activeSession.vehiclePlate || "Xe của bạn"}
+                </h2>
+                <p className="text-base text-muted-foreground mt-1">{activeSession.buildingName || "Bãi xe"}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-4xl font-semibold text-foreground tabular-nums">
+                  {formatDuration(activeSession.entryTime || activeSession.startTime, new Date().toISOString())}
+                </p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mt-1">Thời gian</p>
+              </div>
+            </div>
+            <div className="mt-7 flex gap-3">
+              <button type="button" onClick={() => navigate("/driver/current-session")}
+                className="flex-1 rounded-xl border border-border py-3 text-base font-semibold text-foreground transition hover:bg-muted">
+                Xem chi tiết
+              </button>
+              <button type="button"
+                onClick={() => navigate("/driver/find-parking", { state: { view: "map", buildingId: activeSession.buildingId } })}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition hover:bg-primary/90">
+                <Navigation size={18} /> Chỉ đường tới xe
+              </button>
+            </div>
           </div>
         </div>
+      ) : !hasAttention && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-base text-muted-foreground mb-4">Bạn chưa có xe nào đang đỗ.</p>
+          <button type="button" onClick={() => navigate("/driver/find-parking")}
+            className="rounded-xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition hover:bg-primary/90">
+            Tìm chỗ đỗ gần bạn
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <button type="button" onClick={() => navigate("/driver/bookings")}
+          className="flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-border bg-card py-4 text-base font-medium text-muted-foreground transition hover:bg-muted">
+          <ReceiptText size={18} /> Booking &amp; lịch sử
+          {openBookingCount > 0 && <span className="font-semibold text-foreground">({openBookingCount})</span>}
+          <ArrowRight size={16} />
+        </button>
+        <button type="button" onClick={() => navigate("/driver/notifications")}
+          className="flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-border bg-card py-4 text-base font-medium text-muted-foreground transition hover:bg-muted">
+          <Bell size={18} /> Thông báo
+          {unreadCount > 0 && <span className="font-semibold text-foreground">({unreadCount})</span>}
+        </button>
       </div>
     </div>
   );

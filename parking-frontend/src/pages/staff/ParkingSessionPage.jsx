@@ -98,13 +98,13 @@ export default function ParkingSessionPage() {
   return (
     <div className="space-y-5">
       <StaffPageSection
-        title="Parking Sessions"
-        subtitle={`${activeCount} active · ${completedCount} completed · ${sessions.length} total`}
+        title="Phiên đỗ xe"
+        subtitle={`${activeCount} đang hoạt động · ${completedCount} hoàn tất · ${sessions.length} tổng cộng`}
       >
         <StaffInput
           value={keyword}
           onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
-          placeholder="Filter by plate, session ID, or slot"
+          placeholder="Lọc theo biển số, mã phiên, hoặc chỗ đỗ"
           className="mb-4"
         />
 
@@ -116,8 +116,8 @@ export default function ParkingSessionPage() {
 
         {filteredSessions.length === 0 ? (
           <StaffEmptyState
-            title={loading ? "Loading sessions" : "No session records"}
-            description="Backend vehicle entry confirmations will populate this list."
+            title={loading ? "Đang tải phiên đỗ xe" : "Không có phiên đỗ xe nào"}
+            description="Danh sách sẽ được điền khi có xác nhận xe vào bãi từ hệ thống."
           />
         ) : (
           <div className="space-y-3">
@@ -128,31 +128,35 @@ export default function ParkingSessionPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
                       <StaffStatusBadge tone={item.status === "ACTIVE" ? "emerald" : item.status === "WAITING_PAYMENT" ? "amber" : "slate"}>
-                        {String(item.status || "unknown").toLowerCase()}
+                        {{
+                          ACTIVE: "Đang hoạt động",
+                          WAITING_PAYMENT: "Chờ thanh toán",
+                          COMPLETED: "Hoàn tất",
+                        }[item.status] || "Không xác định"}
                       </StaffStatusBadge>
                       {isPackageSession(item) && (
                         <StaffStatusBadge tone="blue">{PACKAGE_LABELS[item.bookingType] || item.bookingType}</StaffStatusBadge>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Session #{item.sessionId} - Slot {item.slotCode}
+                      Phiên #{item.sessionId} - Chỗ đỗ {item.slotCode}
                     </p>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[460px]">
                     <div className="rounded-2xl bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Entry</p>
+                      <p className="text-xs text-muted-foreground">Giờ vào</p>
                       <p className="mt-1 text-sm font-medium text-foreground">{formatStaffDateTime(item.entryTime)}</p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">{isPackageSession(item) ? "Phí trọn gói" : "Current Fee"}</p>
+                      <p className="text-xs text-muted-foreground">{isPackageSession(item) ? "Phí trọn gói" : "Phí hiện tại"}</p>
                       <p className="mt-1 text-sm font-medium text-foreground">
                         {formatStaffCurrency(resolveCurrentFee(item))}
                       </p>
                     </div>
                     <div className="rounded-2xl bg-muted/30 p-3">
-                      <p className="text-xs text-muted-foreground">Exit</p>
-                      <p className="mt-1 text-sm font-medium text-foreground">{item.exitTime ? formatStaffDateTime(item.exitTime) : "Still parked"}</p>
+                      <p className="text-xs text-muted-foreground">Giờ ra</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{item.exitTime ? formatStaffDateTime(item.exitTime) : "Đang đỗ"}</p>
                     </div>
                   </div>
                 </div>

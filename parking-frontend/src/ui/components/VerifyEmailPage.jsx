@@ -52,8 +52,8 @@ export default function VerifyEmailPage() {
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState(
     initialEmail
-      ? `We sent a verification code to ${initialEmail}.`
-      : "Enter the verification code from your email."
+      ? `Chúng tôi đã gửi mã xác minh đến ${initialEmail}.`
+      : "Nhập mã xác minh từ email của bạn."
   );
   const [error, setError] = useState("");
 
@@ -74,7 +74,7 @@ export default function VerifyEmailPage() {
       const nextRoute = saveAuth(data);
       navigate(nextRoute);
     } catch (err) {
-      setError(err.response?.data?.message || "Verification failed. Please check the OTP.");
+      setError(err.response?.data?.message || "Xác minh thất bại. Vui lòng kiểm tra lại mã OTP.");
     } finally {
       setLoading(false);
     }
@@ -86,9 +86,9 @@ export default function VerifyEmailPage() {
 
     try {
       await authApi.resendVerification({ username });
-      setMessage("A new OTP has been sent. Please check your email.");
+      setMessage("Mã OTP mới đã được gửi. Vui lòng kiểm tra email.");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not resend OTP.");
+      setError(err.response?.data?.message || "Không gửi lại được mã OTP.");
     } finally {
       setResending(false);
     }
@@ -109,17 +109,17 @@ export default function VerifyEmailPage() {
                 <ShieldCheck size={34} />
               </div>
               <h1 className="text-4xl font-bold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white">
-                Verify your email
+                Xác minh email của bạn
               </h1>
               <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-200">
-                Your username is used for sign in. Email verification activates the account and protects the booking flow.
+                Tên đăng nhập dùng để đăng nhập. Xác minh email sẽ kích hoạt tài khoản và bảo vệ quy trình đặt chỗ.
               </p>
               <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/5">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
-                  Login after verify
+                  Đăng nhập sau khi xác minh
                 </p>
                 <p className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">
-                  {username || "your username"} + password
+                  {username || "tên đăng nhập của bạn"} + mật khẩu
                 </p>
                 {maskedEmail ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">{maskedEmail}</p> : null}
               </div>
@@ -133,9 +133,9 @@ export default function VerifyEmailPage() {
             >
               <div>
                 <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-200">
-                  Email OTP
+                  Mã OTP qua Email
                 </p>
-                <h2 className="text-3xl font-bold text-slate-950 dark:text-white">Enter verification code</h2>
+                <h2 className="text-3xl font-bold text-slate-950 dark:text-white">Nhập mã xác minh</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">{message}</p>
               </div>
 
@@ -147,7 +147,7 @@ export default function VerifyEmailPage() {
 
               <div className="space-y-2">
                 <label htmlFor="verify-username" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                  Username or Email
+                  Tên đăng nhập hoặc Email
                 </label>
                 <div className="relative">
                   <UserRound size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -163,7 +163,7 @@ export default function VerifyEmailPage() {
 
               <div className="space-y-2">
                 <label htmlFor="verify-otp" className="text-sm font-medium text-slate-600 dark:text-slate-200">
-                  OTP Code
+                  Mã OTP
                 </label>
                 <div className="relative">
                   <MailCheck size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -185,7 +185,7 @@ export default function VerifyEmailPage() {
                 disabled={loading || otp.length !== 6}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#4f46e5] text-base font-semibold text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Verifying..." : "Verify account"}
+                {loading ? "Đang xác minh..." : "Xác minh tài khoản"}
                 {!loading ? <ArrowRight size={16} /> : null}
               </button>
 
@@ -196,7 +196,7 @@ export default function VerifyEmailPage() {
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
               >
                 <RefreshCw size={16} className={resending ? "animate-spin" : ""} />
-                {resending ? "Sending..." : "Resend OTP"}
+                {resending ? "Đang gửi..." : "Gửi lại mã OTP"}
               </button>
             </form>
           </section>

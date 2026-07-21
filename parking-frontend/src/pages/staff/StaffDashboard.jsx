@@ -95,17 +95,17 @@ export default function StaffDashboard() {
         if (cancelled) return;
 
         const failures = [];
-        setStaffShifts(settledData(shiftRes, failures, [], "shifts"));
-        setNotifications(settledData(notificationRes, failures, [], "notifications"));
-        setActiveSessions(settledData(activeSessionRes, failures, [], "active sessions"));
-        setWaitingPayments(settledData(waitingPaymentRes, failures, [], "payments"));
-        setOpenRequests(settledData(requestRes, failures, [], "requests"));
-        setOcrReviews(settledData(ocrRes, failures, [], "OCR reviews"));
-        setOpenExceptions(settledData(exceptionRes, failures, [], "exceptions"));
-        setPricingPolicies(settledData(pricingRes, failures, [], "pricing"));
-        setVehicleTypes(settledData(vehicleTypeRes, failures, [], "vehicle types"));
+        setStaffShifts(settledData(shiftRes, failures, [], "ca làm việc"));
+        setNotifications(settledData(notificationRes, failures, [], "thông báo"));
+        setActiveSessions(settledData(activeSessionRes, failures, [], "phiên đang hoạt động"));
+        setWaitingPayments(settledData(waitingPaymentRes, failures, [], "thanh toán"));
+        setOpenRequests(settledData(requestRes, failures, [], "yêu cầu"));
+        setOcrReviews(settledData(ocrRes, failures, [], "kiểm tra OCR"));
+        setOpenExceptions(settledData(exceptionRes, failures, [], "sự cố"));
+        setPricingPolicies(settledData(pricingRes, failures, [], "bảng giá"));
+        setVehicleTypes(settledData(vehicleTypeRes, failures, [], "loại xe"));
         if (failures.length > 0) {
-          setError(`Some widgets failed to load: ${failures.join(", ")}. Data shown may be incomplete.`);
+          setError(`Một số phần không tải được: ${failures.join(", ")}. Dữ liệu hiển thị có thể chưa đầy đủ.`);
         }
       } catch (err) {
         console.error("Load staff dashboard failed:", err);
@@ -185,21 +185,21 @@ export default function StaffDashboard() {
     const sessionActivities = activeSessions.slice(0, 4).map((item) => ({
       id: `session-${item.sessionId}`,
       plate: item.licensePlate,
-      action: `Entered slot ${item.slotCode}`,
+      action: `Đã vào chỗ đỗ ${item.slotCode}`,
       type: "entry",
       time: item.entryTime,
     }));
     const paymentActivities = waitingPayments.slice(0, 3).map((item) => ({
       id: `payment-${item.sessionId}`,
       plate: item.licensePlate,
-      action: `Waiting payment ${formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}`,
+      action: `Chờ thanh toán ${formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}`,
       type: "payment",
       time: item.exitTime || item.entryTime,
     }));
     const ocrActivities = ocrReviews.slice(0, 3).map((item) => ({
       id: `ocr-${item.scanId}`,
       plate: item.detectedPlate || "UNKNOWN",
-      action: "OCR scan needs staff review",
+      action: "Quét OCR cần nhân viên kiểm tra lại",
       type: "exception",
       time: item.scannedAt,
     }));

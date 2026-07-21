@@ -24,14 +24,14 @@ function normalizeSlot(item) {
     id: item.slotId ?? item.id,
     code: item.slotCode || `SLOT-${item.slotId ?? item.id}`,
     buildingId: item.zone?.floor?.building?.buildingId ?? item.zone?.floor?.building?.id,
-    building: item.zone?.floor?.building?.name || "Unknown building",
+    building: item.zone?.floor?.building?.name || "Toà nhà không xác định",
     floorId: item.zone?.floor?.floorId ?? item.zone?.floor?.id,
     floorNumber: item.zone?.floor?.floorNumber,
-    floor: item.zone?.floor?.name || "Unknown floor",
+    floor: item.zone?.floor?.name || "Tầng không xác định",
     zoneId: item.zone?.zoneId ?? item.zone?.id,
-    zone: item.zone?.name || "Unknown zone",
+    zone: item.zone?.name || "Khu vực không xác định",
     vehicleTypeId: item.zone?.vehicleType?.vehicleTypeId ?? item.zone?.vehicleType?.id,
-    vehicleType: item.zone?.vehicleType?.name || "Unknown vehicle type",
+    vehicleType: item.zone?.vehicleType?.name || "Loại xe không xác định",
     status: toDisplayStatus(item.status),
     rawStatus: String(item.status || "AVAILABLE").toUpperCase(),
   };
@@ -439,7 +439,7 @@ export default function PublicSlotListPage() {
           {zone.slots.map((slot) => (
             <div
               key={slot.id}
-              title={`${slot.code} - ${slot.status}`}
+              title={`${slot.code} - ${SLOT_LABELS[slot.status]}`}
               style={{
                 borderRadius: 12,
                 padding: "11px 8px",

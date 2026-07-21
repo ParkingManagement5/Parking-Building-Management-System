@@ -35,6 +35,7 @@ import ParkingStructurePage from "../pages/parking/ParkingStructurePage";
 import VehicleTypePage from "../pages/parking/VehicleTypePage";
 import PricingPolicyPage from "../pages/manager/PricingPolicyPage";
 import StaffShiftPage from "../pages/manager/StaffShiftPage";
+import FloorPlanEditorPage from "../pages/manager/FloorPlanEditorPage";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import UserManagementPage from "../pages/user/UserManagementPage";
 import SystemConfigPage from "../pages/admin/SystemConfigPage";
@@ -105,6 +106,7 @@ export default function AppRoutes() {
           <Route path="/manager" element={<RolePortalLayout portal="manager" />}>
             <Route index element={<ManagerDashboard />} />
             <Route path="parking-structure" element={<ParkingStructurePage />} />
+            <Route path="floor-plan-editor" element={<FloorPlanEditorPage />} />
             <Route path="buildings" element={<Navigate to="/manager/parking-structure" replace />} />
             <Route path="floors" element={<Navigate to="/manager/parking-structure" replace />} />
             <Route path="zones" element={<Navigate to="/manager/parking-structure" replace />} />

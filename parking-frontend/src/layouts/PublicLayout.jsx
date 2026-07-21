@@ -65,7 +65,7 @@ export default function PublicLayout() {
           </div>
 
           <div className="nav-actions">
-            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+            <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Chế độ sáng" : "Chế độ tối"}>
               {dark ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="5" />

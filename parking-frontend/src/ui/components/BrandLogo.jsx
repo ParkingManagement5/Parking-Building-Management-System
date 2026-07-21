@@ -69,7 +69,7 @@ export default function BrandLogo({
         </span>
         {showSubtitle ? (
           <span className={`block font-semibold uppercase tracking-[0.18em] text-muted-foreground ${config.subtitle} ${subtitleClassName}`}>
-            Parking Building Management System
+            Hệ thống Quản lý Bãi đỗ xe
           </span>
         ) : null}
       </div>

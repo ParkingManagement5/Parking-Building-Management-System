@@ -107,7 +107,7 @@ export default function LoginPage() {
         client_id: clientId,
         callback: async (response) => {
           if (!response?.credential) {
-            setError("Google login did not return a credential.");
+            setError("Google login không trả về thông tin xác thực.");
             return;
           }
 
@@ -127,7 +127,7 @@ export default function LoginPage() {
             } else if (networkFail) {
               setError("Không kết nối được server. Kiểm tra backend đang chạy chưa.");
             } else {
-              setError(`Google login thất bại (HTTP ${httpStatus ?? "unknown"}). Kiểm tra Console/Network tab.`);
+              setError(`Đăng nhập Google thất bại (HTTP ${httpStatus ?? "không rõ"}). Kiểm tra tab Console/Network.`);
             }
             console.error("[Google Login] err:", err);
           } finally {
@@ -192,7 +192,7 @@ export default function LoginPage() {
   const handleGoogleLogin = () => {
     if (!isLocalhost) {
       setGoogleLoading(false);
-      setError("Google login chỉ hỗ trợ trên localhost. Hãy đăng nhập bằng username/password.");
+      setError("Đăng nhập Google chỉ hỗ trợ trên localhost. Hãy đăng nhập bằng tên đăng nhập/mật khẩu.");
       return;
     }
     if (window.google?.accounts?.id) {
@@ -217,7 +217,7 @@ export default function LoginPage() {
       const fallbackTimer = setTimeout(() => {
         if (callbackFired) return;
         setGoogleLoading(false);
-        setError("Google login không phản hồi (thường do trình duyệt chưa đăng nhập tài khoản Google nào, hoặc FedCM bị chặn). Vui lòng đăng nhập bằng username/password.");
+        setError("Đăng nhập Google không phản hồi (thường do trình duyệt chưa đăng nhập tài khoản Google nào, hoặc FedCM bị chặn). Vui lòng đăng nhập bằng tên đăng nhập/mật khẩu.");
         console.error("[Google Login] prompt callback did not fire within timeout — likely FedCM silently rejected.");
       }, 10000);
 
@@ -233,8 +233,8 @@ export default function LoginPage() {
           setGoogleLoading(false);
           setError(
             reason === "opt_out_or_no_session"
-              ? "Trình duyệt chưa đăng nhập tài khoản Google nào. Vào accounts.google.com đăng nhập trước, rồi bấm lại — hoặc dùng username/password."
-              : `Google login hiện không khả dụng (${reason}). Vui lòng đăng nhập bằng username/password.`
+              ? "Trình duyệt chưa đăng nhập tài khoản Google nào. Vào accounts.google.com đăng nhập trước, rồi bấm lại — hoặc dùng tên đăng nhập/mật khẩu."
+              : `Đăng nhập Google hiện không khả dụng (${reason}). Vui lòng đăng nhập bằng tên đăng nhập/mật khẩu.`
           );
           console.error("[Google Login] prompt not displayed, reason:", reason);
         } else if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
@@ -253,7 +253,7 @@ export default function LoginPage() {
             <span className="nav-logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg></span>
             <span className="nav-logo-text">ParkSmart</span>
           </a>
-          <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Light mode" : "Dark mode"}>
+          <button className="theme-toggle-btn" onClick={toggle} title={dark ? "Chế độ sáng" : "Chế độ tối"}>
             {dark ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
             ) : (
@@ -284,14 +284,14 @@ export default function LoginPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="username">Username hoặc Email</label>
+              <label htmlFor="username">Tên đăng nhập hoặc Email</label>
               <input
                 id="username"
                 type="text"
                 required
                 value={form.username}
                 onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-                placeholder="Nhập username hoặc email"
+                placeholder="Nhập tên đăng nhập hoặc email"
               />
             </div>
 
@@ -319,7 +319,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   className="toggle-pw"
-                  aria-label={showPw ? "Hide password" : "Show password"}
+                  aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                   onClick={() => setShowPw((value) => !value)}
                 >
                   {showPw ? (
@@ -394,10 +394,10 @@ export default function LoginPage() {
         <div className="auth-illustration">
           <div className="auth-stat-block">
             <div className="auth-stat-header">
-              <h3>Live Occupancy</h3>
+              <h3>Tình trạng chỗ đỗ</h3>
               <span className="auth-live-badge">
                 <span className="auth-live-dot" />
-                Live
+                Trực tiếp
               </span>
             </div>
             <div className="auth-stat-grid">

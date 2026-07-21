@@ -136,6 +136,9 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         JOIN FETCH f.building b
         JOIN FETCH z.vehicleType
         WHERE b.isActive = true
+          AND ps.isActive = true
+          AND z.isActive = true
+          AND f.isActive = true
         """)
     List<ParkingSlot> findAllWithDetails();
 

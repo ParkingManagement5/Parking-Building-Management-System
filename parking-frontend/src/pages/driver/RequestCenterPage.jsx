@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { requestApi } from "../../api/driver/requestApi";
 import { unwrapApiData } from "../../utils/api";
-import { formatDateTime, getStatusClasses } from "./driverPortalUtils";
+import { formatDateTime, getStatusClasses, getStatusLabel } from "./driverPortalUtils";
 
 export default function RequestCenterPage() {
   const [requests, setRequests] = useState([]);
@@ -185,7 +185,7 @@ export default function RequestCenterPage() {
                     item.status || "pending"
                   )}`}
                 >
-                  {item.status || "PENDING"}
+                  {getStatusLabel(item.status || "pending")}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">

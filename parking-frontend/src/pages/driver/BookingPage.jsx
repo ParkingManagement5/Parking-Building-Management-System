@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "../../ui/components/ui/select";
 import { unwrapApiData } from "../../utils/api";
+import { $fx } from "./parkingFloorPlanUtils";
 
 function slotClasses(status, active) {
   if (active) return "bg-primary text-primary-foreground shadow-md shadow-primary/20 ring-2 ring-primary/40";
@@ -275,6 +276,7 @@ export default function BookingPage() {
       slotCode: s.slotCode || `S${i + 1}`,
       status: String(s.status || "available").toLowerCase(),
       floor: s.zone?.floor?.floorName || s.zone?.floor?.name || "Tầng chưa rõ",
+      floorIndex: $fx(s.zone?.floor),
       zone: s.zone?.zoneName || s.zone?.name || "Khu chưa rõ",
       building: s.zone?.floor?.building?.name || "Toà chưa rõ",
       buildingId: s.zone?.floor?.building?.id ?? null,
@@ -293,7 +295,14 @@ export default function BookingPage() {
       setSelection((p) => ({ ...p, building: preselectBuildingName }));
     }
   }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
-  const floorOptions = useMemo(() => [...new Set(slotGrid.filter((s) => !selection.building || s.building === selection.building).map((s) => s.floor))], [slotGrid, selection.building]);
+  const floorOptions = useMemo(() => {
+    const byName = new Map();
+    for (const s of slotGrid) {
+      if (selection.building && s.building !== selection.building) continue;
+      if (!byName.has(s.floor)) byName.set(s.floor, s.floorIndex);
+    }
+    return [...byName.keys()].sort((a, b) => byName.get(a) - byName.get(b));
+  }, [slotGrid, selection.building]);
   const zoneOptions = useMemo(() => [...new Set(slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor)).map((s) => s.zone))], [slotGrid, selection.building, selection.floor]);
   const filteredSlotGrid = useMemo(() => slotGrid.filter((s) => (!selection.building || s.building === selection.building) && (!selection.floor || s.floor === selection.floor) && (!selection.zone || s.zone === selection.zone)), [slotGrid, selection.building, selection.floor, selection.zone]);
   const selectedSlot = useMemo(() => filteredSlotGrid.find((s) => String(s.slotId || s.uiId) === String(selection.slotId || selection.slotCode) || s.slotCode === selection.slotCode), [filteredSlotGrid, selection.slotCode, selection.slotId]);
@@ -674,7 +683,13 @@ export default function BookingPage() {
                 <div className="grid grid-cols-2 gap-3">
                   {buildingOptions.map((b) => (
                     <button key={b} onClick={() => {
-                        setSelection((p) => ({ ...p, building: b, floor: "", zone: "", slotCode: "", slotId: "" }));
+                        const byName = new Map();
+                        for (const s of slotGrid) {
+                          if (s.building !== b) continue;
+                          if (!byName.has(s.floor)) byName.set(s.floor, s.floorIndex);
+                        }
+                        const firstFloor = [...byName.keys()].sort((x, y) => byName.get(x) - byName.get(y))[0] || "";
+                        setSelection((p) => ({ ...p, building: b, floor: firstFloor, zone: "", slotCode: "", slotId: "" }));
                         setOpenPanel("floorZone");
                       }}
                       className={`p-4 rounded-xl border-2 text-left transition-all ${selection.building === b ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
@@ -703,10 +718,10 @@ export default function BookingPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">Tầng</label>
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {floorOptions.map((f) => (
                       <button key={f} onClick={() => setSelection((p) => ({ ...p, floor: f, zone: "", slotCode: "", slotId: "" }))}
-                        className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.floor === f ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
+                        className={`p-2.5 rounded-xl border text-sm text-center transition-all ${selection.floor === f ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
                         {f}
                       </button>
                     ))}
@@ -714,13 +729,13 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">Khu vực</label>
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {zoneOptions.map((z) => (
                       <button key={z} onClick={() => {
                           setSelection((p) => ({ ...p, zone: z, slotCode: "", slotId: "" }));
                           if (selection.floor) setOpenPanel("slot");
                         }}
-                        className={`w-full text-left p-2.5 rounded-xl border text-sm transition-all ${selection.zone === z ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
+                        className={`p-2.5 rounded-xl border text-sm text-center transition-all ${selection.zone === z ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-foreground"}`}>
                         {z}
                       </button>
                     ))}

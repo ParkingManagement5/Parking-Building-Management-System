@@ -17,7 +17,7 @@ export function formatCurrency(value) {
 
 export function formatDateTime(value) {
   if (!value) {
-    return "Not available";
+    return "Chưa có dữ liệu";
   }
 
   const date = new Date(value);
@@ -25,7 +25,7 @@ export function formatDateTime(value) {
     return String(value);
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -33,7 +33,7 @@ export function formatDateTime(value) {
 
 export function formatRelativeTime(value) {
   if (!value) {
-    return "Just now";
+    return "Vừa xong";
   }
 
   const date = new Date(value);
@@ -45,16 +45,16 @@ export function formatRelativeTime(value) {
   const diffMin = Math.max(1, Math.round(diffMs / 60000));
 
   if (diffMin < 60) {
-    return `${diffMin} min ago`;
+    return `${diffMin} phút trước`;
   }
 
   const diffHour = Math.round(diffMin / 60);
   if (diffHour < 24) {
-    return `${diffHour} hr ago`;
+    return `${diffHour} giờ trước`;
   }
 
   const diffDay = Math.round(diffHour / 24);
-  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+  return `${diffDay} ngày trước`;
 }
 
 export function formatDuration(fromValue, toValue) {
@@ -80,6 +80,35 @@ export function getBookingStatus(item) {
   return String(
     item?.status || item?.bookingStatus || item?.sessionStatus || "pending"
   ).toLowerCase();
+}
+
+export function getStatusLabel(status) {
+  const key = String(status || "pending").toLowerCase();
+  const labels = {
+    active: "Đang hoạt động",
+    available: "Còn trống",
+    confirmed: "Đã xác nhận",
+    checked_in: "Đã vào bãi",
+    completed: "Hoàn tất",
+    paid: "Đã thanh toán",
+    read: "Đã đọc",
+    pending: "Đang chờ",
+    reserved: "Đã đặt trước",
+    processing: "Đang xử lý",
+    unread: "Chưa đọc",
+    inactive: "Không hoạt động",
+    refunded: "Đã hoàn tiền",
+    waiting_payment: "Chờ thanh toán",
+    cancelled: "Đã huỷ",
+    failed: "Thất bại",
+  };
+
+  if (labels[key]) {
+    return labels[key];
+  }
+
+  const raw = String(status || "pending");
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 export function getStatusClasses(status) {
