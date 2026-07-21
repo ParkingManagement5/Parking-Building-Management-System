@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: parking-backend
+
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/parking_system?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: root
+    password: 12345
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: never
+
+server:
+  port: 8080
+
+jwt:
+  secret: swp391-parking-dev-secret-key-must-be-at-least-256-bits-long-string
+  expiration: 86400000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs

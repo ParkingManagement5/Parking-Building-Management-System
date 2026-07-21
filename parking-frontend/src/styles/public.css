@@ -1,0 +1,105 @@
+.public-navbar {
+  min-height: 68px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 28px 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.public-menu {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr);
+  align-items: center;
+  gap: 30px;
+}
+
+.public-menu a {
+  color: #64748b;
+  font-size: 0.98rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.public-menu a:hover,
+.public-menu a.active {
+  color: var(--primary-color);
+}
+
+.public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.public-menu-brand {
+  justify-self: center;
+  padding: 0 4px;
+}
+
+.public-brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6d5efc, #5b45ea);
+  color: white;
+  box-shadow: 0 10px 22px rgba(91, 69, 234, 0.24);
+}
+
+.public-brand-name {
+  color: #1e293b;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.public-section {
+  padding: 48px;
+}
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.service-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.service-card h3 {
+  margin-top: 0;
+}
+
+.service-card p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .public-navbar {
+    padding: 16px 20px;
+    justify-content: center;
+  }
+
+  .public-menu {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
