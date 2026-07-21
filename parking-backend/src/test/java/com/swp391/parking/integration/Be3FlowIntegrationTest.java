@@ -392,7 +392,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
 
     @Test
     @WithMockUser(username = "staff-plate-entry", roles = "STAFF")
-    void bookingEntrySessionLookupAndExitQrShouldUseCanonicalPlateComparison() throws Exception {
+    void bookingEntryAndSessionLookupShouldUseCanonicalPlateComparison() throws Exception {
         User staff = createUser("staff-plate-entry", Role.RoleName.STAFF);
         User driver = createUser("driver-plate-entry", Role.RoleName.DRIVER);
         ParkingBuilding building = createBuilding("Plate Entry Tower");
@@ -435,39 +435,33 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].sessionId").value(activeSession.getId()));
 
-        String exitQr = qrTokenUtil.generateExitQrToken(
-                activeSession.getId(),
-                driver.getUserId().longValue(),
-                vehicle.getLicensePlate(),
-                booking.getId(),
-                LocalDateTime.now().plusMinutes(30));
-
-        mockMvc.perform(post("/api/v1/sessions/exit/qr")
+        // Exit da bo QR hoan toan - staff xac minh bang bien so OCR/nhap tay (xem
+        // processExit's plateVerified). Bien khong khop -> tu choi; bien khop
+        // (kieu goc/co dau cham deu duoc canonical hoa) -> cho ra thanh cong.
+        mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "qrToken": "%s",
                       "gateId": %d,
                       "licensePlate": "51A-99998",
                       "staffUserId": %d
                     }
-                    """.formatted(exitQr, exitGate.getId(), staff.getUserId())))
+                    """.formatted(exitGate.getId(), staff.getUserId())))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false));
 
         assertThat(parkingSessionRepository.findById(activeSession.getId()).orElseThrow().getStatus())
             .isEqualTo(ParkingSession.SessionStatus.ACTIVE);
 
-        mockMvc.perform(post("/api/v1/sessions/exit/qr")
+        mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "qrToken": "%s",
                       "gateId": %d,
                       "licensePlate": "51A-999.99",
                       "staffUserId": %d
                     }
-                    """.formatted(exitQr, exitGate.getId(), staff.getUserId())))
+                    """.formatted(exitGate.getId(), staff.getUserId())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             // Vao-ra tuc thi => phi = 0d => tu dong hoan tat, khong dung o

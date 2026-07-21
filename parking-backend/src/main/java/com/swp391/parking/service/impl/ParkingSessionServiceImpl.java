@@ -2,9 +2,7 @@ package com.swp391.parking.service.impl;
 
 import com.swp391.parking.dto.request.SessionEntryRequest;
 import com.swp391.parking.dto.request.SessionExitRequest;
-import com.swp391.parking.dto.request.SessionQrScanRequest;
 import com.swp391.parking.dto.response.PaymentResponse;
-import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.*;
 import com.swp391.parking.exception.AppException;
@@ -31,7 +29,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -190,7 +187,7 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     /**
      * Staff override: cho xe vào khi QR entry thất bại.
      * Bỏ qua QR, tìm booking CONFIRMED theo biển số, tạo session gắn booking bình thường.
-     * Exit vẫn cần QR (generateExitQr từ app driver), payment vẫn tính đủ.
+     * Exit xac minh qua bien so OCR/nhap tay (xem plateVerified trong processExit), payment vẫn tính đủ.
      */
     private ParkingSession processBookingStaffOverride(SessionEntryRequest request, Gate gate) {
         if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
@@ -354,10 +351,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     public SessionResponse processExit(Long sessionId, SessionExitRequest request) {
         ParkingSession session = getSessionEntity(sessionId);
 
-        // Staff chi duoc cho xe ra dung toa nha duoc phan cong - ap dung ca cho
-        // processExitQr() vi no goi qua ham nay. Truoc day thieu check nay khien
-        // staff toa B quet bien/QR van dong duoc session cua toa A (bug nghiem
-        // trong: sai lech du lieu slot/booking giua cac toa).
+        // Staff chi duoc cho xe ra dung toa nha duoc phan cong. Truoc day thieu
+        // check nay khien staff toa B quet bien/QR van dong duoc session cua
+        // toa A (bug nghiem trong: sai lech du lieu slot/booking giua cac toa).
         enforceStaffBuildingScope(request.getStaffUserId(), buildingIdOf(session));
 
         if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
@@ -367,9 +363,18 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         boolean isWalkIn = session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_AUTO
                 || session.getEntryMode() == ParkingSession.EntryMode.WALK_IN_MANUAL;
         boolean staffForceExit = Boolean.TRUE.equals(request.getStaffForceExit());
-        if (!isWalkIn && !Boolean.TRUE.equals(request.getQrVerified()) && !staffForceExit) {
+        // Exit QR da bi loai bo khoi luong chinh (UnifiedQrScanPage.jsx) - staff
+        // gio xac minh xe qua OCR/nhap tay bien so ngay tai cong, khop voi bien
+        // so cua xe tren session duoc tim bang getActiveByPlate. Day la dieu kien
+        // xac thuc thay the cho qrVerified (van giu qrVerified/staffForceExit de
+        // tuong thich nguoc voi cac luong khac con dung, vd exception "mat QR").
+        boolean plateVerified = request.getLicensePlate() != null
+                && !request.getLicensePlate().isBlank()
+                && session.getVehicle() != null
+                && LicensePlateUtil.equivalent(request.getLicensePlate(), session.getVehicle().getLicensePlate());
+        if (!isWalkIn && !plateVerified && !Boolean.TRUE.equals(request.getQrVerified()) && !staffForceExit) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Exit requires a valid driver Exit QR");
+                    "Exit requires a verified license plate matching the session's vehicle");
         }
 
         Gate gate = gateRepository.findById(request.getGateId())
@@ -500,65 +505,6 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         }
 
         return toResponse(session);
-    }
-
-    @Override
-    @Transactional
-    public SessionResponse processExitQr(SessionQrScanRequest request) {
-        Long sessionId = parseExitQrSessionId(request.getQrToken());
-
-        ParkingSession session = getSessionEntity(sessionId);
-        String sessionPlate = session.getVehicle() != null ? session.getVehicle().getLicensePlate() : null;
-
-        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Thiếu biển số xe. Cần xác minh biển số khớp với session (biển: " + sessionPlate + ")");
-        }
-        if (sessionPlate != null && !LicensePlateUtil.equivalent(request.getLicensePlate(), sessionPlate)) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Biển số không khớp. Session cho xe " + sessionPlate + " nhưng biển scan là " + request.getLicensePlate());
-        }
-
-        SessionExitRequest exitRequest = new SessionExitRequest();
-        exitRequest.setGateId(request.getGateId());
-        exitRequest.setStaffUserId(request.getStaffUserId());
-        exitRequest.setQrVerified(true);
-        return processExit(sessionId, exitRequest);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public QrTokenResponse generateExitQr(Long sessionId, Long currentUserId) {
-        ParkingSession session = getSessionEntity(sessionId);
-        if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Chỉ session ACTIVE mới tạo được Exit QR");
-        }
-        if (!Objects.equals(session.getUserId(), currentUserId)) {
-            throw new AppException(HttpStatus.FORBIDDEN,
-                    "Không thể tạo Exit QR cho session của người khác");
-        }
-        if (session.getVehicle() == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST,
-                    "Session chưa có thông tin xe");
-        }
-
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
-        String token = qrTokenUtil.generateExitQrToken(
-                session.getId(),
-                session.getUserId(),
-                session.getVehicle().getLicensePlate(),
-                session.getBooking() != null ? session.getBooking().getId() : null,
-                expiresAt
-        );
-
-        return QrTokenResponse.builder()
-                .qrToken(token)
-                .purpose("EXIT")
-                .expiresAt(expiresAt)
-                .sessionId(session.getId())
-                .licensePlate(session.getVehicle().getLicensePlate())
-                .build();
     }
 
     @Override
@@ -714,45 +660,6 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .map(user -> user.getUserId().longValue())
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST,
                         "Không tìm thấy user để tạo walk-in"));
-    }
-
-    private Long claimLong(Claims claims, String key) {
-        Object value = claims.get(key);
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        if (value instanceof String text && !text.isBlank()) {
-            return Long.parseLong(text);
-        }
-        return null;
-    }
-
-    private Long parseExitQrSessionId(String qrToken) {
-        try {
-            return qrTokenUtil.parseExitSessionId(qrToken);
-        } catch (JwtException | IllegalArgumentException compactError) {
-            String msg = compactError.getMessage();
-            if (msg != null && msg.toLowerCase().contains("expired")) {
-                throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Exit QR đã hết hạn. Yêu cầu driver tạo lại Exit QR mới từ Current Session.");
-            }
-            try {
-                Claims claims = qrTokenUtil.parseQrToken(qrToken);
-                if (!"QR_SESSION_EXIT".equals(claims.getSubject()) || !"EXIT".equals(claims.get("purpose", String.class))) {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "QR này không phải Exit QR");
-                }
-                Long sessionId = claimLong(claims, "session_id");
-                if (sessionId == null) {
-                    throw new AppException(HttpStatus.BAD_REQUEST, "Exit QR thiếu session_id");
-                }
-                return sessionId;
-            } catch (AppException ae) {
-                throw ae;
-            } catch (JwtException | IllegalArgumentException jwtError) {
-                throw new AppException(HttpStatus.BAD_REQUEST,
-                        "Exit QR không hợp lệ. Kiểm tra lại token hoặc yêu cầu driver tạo mới.");
-            }
-        }
     }
 
     private Optional<Vehicle> findByEquivalentLicensePlate(String licensePlate) {

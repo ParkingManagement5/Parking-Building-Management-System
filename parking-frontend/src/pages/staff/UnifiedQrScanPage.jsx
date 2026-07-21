@@ -492,11 +492,7 @@ export default function UnifiedScanPage() {
     try {
       let res;
       if (lookupType === "EXIT") {
-        if (qrToken.trim()) {
-          res = await sessionApi.exitByQr({ qrToken: qrToken.trim(), gateId: Number(gateId), licensePlate: plate, staffUserId: Number(localStorage.getItem("userId")) || null });
-        } else {
-          res = await sessionApi.exit(lookupData.sessionId, { gateId: Number(gateId), staffUserId: Number(localStorage.getItem("userId")) || null, qrVerified: false });
-        }
+        res = await sessionApi.exit(lookupData.sessionId, { gateId: Number(gateId), staffUserId: Number(localStorage.getItem("userId")) || null, licensePlate: plate });
       } else if (isPendingPaymentBooking) {
         throw new Error("Booking chưa thanh toán cọc. Không thể cho xe vào.");
       } else if (isConfirmedBooking && qrToken.trim()) {
@@ -792,11 +788,11 @@ export default function UnifiedScanPage() {
                     </div>
                   )}
 
-                  {/* QR input — for BOOKING entry + EXIT with QR */}
-                  {(isConfirmedBooking || lookupType === "EXIT") && (
+                  {/* QR input — chỉ cho BOOKING entry, exit đã chuyển hoàn toàn sang OCR/nhập tay biển số */}
+                  {isConfirmedBooking && (
                     <div className="rounded-2xl border border-border bg-muted/20 p-4">
                       <p className="text-sm font-semibold text-foreground mb-2">
-                        {isConfirmedBooking ? "Scan QR booking của driver (khuyến nghị – có thể bỏ qua)" : "Exit QR của driver (nếu có)"}
+                        Scan QR booking của driver (khuyến nghị – có thể bỏ qua)
                       </p>
                       <div className="flex gap-2">
                         <StaffInput value={qrToken} onChange={(e) => setQrToken(e.target.value)}
@@ -828,7 +824,7 @@ export default function UnifiedScanPage() {
 
                       {isConfirmedBooking && !qrToken.trim() && (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                          Không có QR — hệ thống sẽ dùng <strong>Staff Override</strong>: xe vào không cần QR, booking vẫn được liên kết. Driver vẫn dùng Exit QR trên app để ra bình thường.
+                          Không có QR — hệ thống sẽ dùng <strong>Staff Override</strong>: xe vào không cần QR, booking vẫn được liên kết. Khi ra, staff quét/nhập biển số như bình thường, không cần QR.
                         </div>
                       )}
 

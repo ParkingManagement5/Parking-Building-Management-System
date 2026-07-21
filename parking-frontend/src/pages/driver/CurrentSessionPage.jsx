@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { bookingApi } from "../../api/driver/bookingApi";
@@ -37,7 +37,7 @@ function buildDisplayItems(mySessions, myBookings) {
   mySessions.forEach((s) => {
     const status = String(s.status || "").toUpperCase();
     if (status === "ACTIVE") {
-      items.push({ ...s, source: "session", displayMode: "EXIT_QR", _key: `s-${s.sessionId}` });
+      items.push({ ...s, source: "session", displayMode: "PARKED", _key: `s-${s.sessionId}` });
       if (s.bookingId) sessionBookingIds.add(s.bookingId);
     } else if (status === "WAITING_PAYMENT") {
       items.push({ ...s, source: "session", displayMode: "WAITING_PAYMENT", _key: `s-${s.sessionId}` });
@@ -61,7 +61,7 @@ function buildDisplayItems(mySessions, myBookings) {
 const PACKAGE_LABELS = { DAILY: "Gói ngày", WEEKLY: "Gói tuần", MONTHLY: "Gói tháng" };
 
 const BADGE_MAP = {
-  EXIT_QR: { bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Đang đỗ" },
+  PARKED: { bg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", label: "Đang đỗ" },
   WAITING_PAYMENT: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
   WAITING_PAYMENT_PENDING_SESSION: { bg: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", label: "Chờ thanh toán" },
   ENTRY_QR: { bg: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300", label: "Đã xác nhận" },
@@ -93,13 +93,12 @@ function WaitingPaymentAction() {
 }
 
 
-function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigate, generatingId }) {
+function SessionCard({ item, onReload, onError, navigate }) {
   const { displayMode } = item;
   const isSession = item.source === "session";
   const isPackage = Boolean(item.bookingType) && item.bookingType !== "HOURLY";
   const packageLabel = PACKAGE_LABELS[item.bookingType] || item.bookingType;
   const badge = BADGE_MAP[displayMode] || BADGE_MAP.SYNCING;
-  const exitQr = exitQrs[item.sessionId] || null;
 
   const tiles = isPackage
     ? [
@@ -146,7 +145,7 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
           )}
         </div>
 
-        {isPackage && (displayMode === "ENTRY_QR" || displayMode === "EXIT_QR") && (
+        {isPackage && (displayMode === "ENTRY_QR" || displayMode === "PARKED") && (
           <div className="mb-3 rounded-xl border border-emerald-300/40 bg-white/10 px-3 py-2 text-center text-xs text-white/85">
             Đã thanh toán trọn gói · Vào/ra tự do trong kỳ hạn, không tính thêm phí
           </div>
@@ -204,31 +203,13 @@ function SessionCard({ item, exitQrs, onCreateExitQr, onReload, onError, navigat
               <RefreshCw size={14} /> Tải lại trạng thái
             </button>
           </>
-        ) : displayMode === "EXIT_QR" ? (
-          exitQr?.qrToken ? (
-            <>
-              <p className="text-sm font-semibold text-foreground mb-3">Mã QR ra bãi</p>
-              <div className="rounded-2xl bg-white p-4 shadow-sm">
-                <QRCodeSVG value={exitQr.qrToken} size={200} level="H" includeMargin />
-              </div>
-              <button type="button" onClick={() => navigator.clipboard.writeText(exitQr.qrToken)}
-                className="mt-3 w-full rounded-xl bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-muted text-left break-all">
-                {exitQr.qrToken}
-              </button>
-              <p className="text-xs text-muted-foreground mt-2">Đưa QR cho staff ở cổng ra. Hết hạn lúc {formatDateTime(exitQr.expiresAt)}.</p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-semibold text-foreground">Mã QR ra bãi</p>
-              <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">Tạo QR khi bạn sẵn sàng ra cổng.</p>
-              <button type="button" onClick={() => onCreateExitQr(item.sessionId)} disabled={generatingId === item.sessionId}
-                className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
-                {generatingId === item.sessionId
-                  ? <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" /> Đang tạo...</span>
-                  : "Tạo Exit QR"}
-              </button>
-            </>
-          )
+        ) : displayMode === "PARKED" ? (
+          <>
+            <p className="text-sm font-semibold text-foreground">Xe đang đỗ trong bãi</p>
+            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
+              Khi ra cổng, nhân viên sẽ quét biển số xe bạn để xác nhận — không cần xuất trình QR.
+            </p>
+          </>
         ) : displayMode === "ENTRY_QR" ? (
           <>
             <p className="text-sm font-semibold text-foreground mb-3">Mã QR vào bãi</p>
@@ -297,8 +278,6 @@ export default function CurrentSessionPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [generatingId, setGeneratingId] = useState(null);
-  const [exitQrs, setExitQrs] = useState({});
   const [error, setError] = useState("");
 
   const loadSession = useCallback(async () => {
@@ -346,20 +325,6 @@ export default function CurrentSessionPage() {
     return () => clearInterval(interval);
   }, [loadSession]);
 
-  async function handleCreateExitQr(sessionId) {
-    setGeneratingId(sessionId);
-    setError("");
-    try {
-      const res = await driverSessionApi.createExitQr(sessionId);
-      setExitQrs((prev) => ({ ...prev, [sessionId]: unwrapApiData(res.data, null) }));
-    } catch (qrError) {
-      console.error("Failed to create exit QR", qrError);
-      setError(qrError.response?.data?.message || "Không tạo được Exit QR.");
-    } finally {
-      setGeneratingId(null);
-    }
-  }
-
   if (loading) {
     return (
       <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
@@ -400,12 +365,9 @@ export default function CurrentSessionPage() {
         <SessionCard
           key={item._key}
           item={item}
-          exitQrs={exitQrs}
-          onCreateExitQr={handleCreateExitQr}
           onReload={loadSession}
           onError={setError}
           navigate={navigate}
-          generatingId={generatingId}
         />
       ))}
     </div>

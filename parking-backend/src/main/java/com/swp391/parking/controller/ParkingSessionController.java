@@ -2,9 +2,7 @@ package com.swp391.parking.controller;
 
 import com.swp391.parking.dto.request.SessionEntryRequest;
 import com.swp391.parking.dto.request.SessionExitRequest;
-import com.swp391.parking.dto.request.SessionQrScanRequest;
 import com.swp391.parking.dto.response.ApiResponse;
-import com.swp391.parking.dto.response.QrTokenResponse;
 import com.swp391.parking.dto.response.SessionResponse;
 import com.swp391.parking.entity.Role;
 import com.swp391.parking.exception.AppException;
@@ -60,34 +58,10 @@ public class ParkingSessionController {
                 sessionService.processExit(id, request)));
     }
 
-    @PostMapping("/exit/qr")
-    @PreAuthorize("hasAnyRole('STAFF','MANAGER','ADMIN')")
-    @Operation(summary = "Scan Exit QR and record gate exit")
-    public ResponseEntity<ApiResponse<SessionResponse>> exitByQr(
-            @Valid @RequestBody SessionQrScanRequest request,
-            Authentication authentication) {
-        request.setStaffUserId(resolveStaffUserId(authentication));
-        return ResponseEntity.ok(ApiResponse.success("Exit QR hợp lệ, xe đang chờ thanh toán",
-                sessionService.processExitQr(request)));
-    }
-
     private Long resolveStaffUserId(Authentication authentication) {
         return userRepository.findByUsername(authentication.getName())
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
                 .getUserId().longValue();
-    }
-
-    @PostMapping("/{id}/exit-qr")
-    @PreAuthorize("hasRole('DRIVER')")
-    @Operation(summary = "Driver creates a short-lived Exit QR for an active session")
-    public ResponseEntity<ApiResponse<QrTokenResponse>> createExitQr(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails ud) {
-        Long userId = userRepository.findByUsername(ud.getUsername())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "User không tồn tại"))
-                .getUserId().longValue();
-        return ResponseEntity.ok(ApiResponse.success("Exit QR đã được tạo",
-                sessionService.generateExitQr(id, userId)));
     }
 
     @GetMapping("/{id}")

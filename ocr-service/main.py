@@ -97,9 +97,32 @@ def _plate_rect_candidates(mask, image_area):
         if area < image_area * 0.006:
             continue
         ratio = w / max(h, 1)
-        if 1.2 <= ratio <= 6.5:
-            candidates.append((area, x, y, w, h))
+        # Bien oto 1 hang dai (~3:1-5:1) nhung bien xe may 2 hang (tinh +
+        # ky hieu tren, so seri duoi) gan vuong (~0.9:1-1.3:1) - can nguong
+        # duoi thap hon de khong loai nham ngay tu buoc phat hien vung.
+        if 0.85 <= ratio <= 6.5:
+            candidates.append((area, x, y, w, h, contour))
     return candidates
+
+
+def _deskew_angle(contour) -> float:
+    # Camera cong co dinh chup xe di qua o goc cheo la nguyen nhan pho bien
+    # gay doc sai — minAreaRect cho goc nghieng thuc te cua bien so (khac
+    # boundingRect luon truc dung), dung de xoay lai truoc khi doc.
+    angle = cv2.minAreaRect(contour)[-1]
+    if angle < -45:
+        angle += 90
+    elif angle > 45:
+        angle -= 90
+    return angle
+
+
+def _rotate(image, angle: float):
+    if abs(angle) < 1.5:
+        return image
+    h, w = image.shape[:2]
+    matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+    return cv2.warpAffine(image, matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
 
 def crop_likely_plate(image):
@@ -121,18 +144,25 @@ def crop_likely_plate(image):
         blue = cv2.inRange(hsv, np.array([95, 60, 60]), np.array([130, 255, 255]))
         red = cv2.inRange(hsv, np.array([0, 70, 70]), np.array([10, 255, 255])) | \
             cv2.inRange(hsv, np.array([170, 70, 70]), np.array([180, 255, 255]))
-        candidates = _plate_rect_candidates(yellow | blue | red, image_area)
+        # Bien xe dien (nen xanh la, VN ap dung tu 2022) - tach rieng khoi cac
+        # mau con lai vi ly do tuong tu: gop chung mask de bi nhieu vung xanh
+        # la khac (cay, bien bao) lan at ung vien bien so that.
+        green = cv2.inRange(hsv, np.array([35, 60, 60]), np.array([85, 255, 255]))
+        candidates = _plate_rect_candidates(yellow | blue | red | green, image_area)
 
     if not candidates:
         return image
 
-    _, x, y, w, h = max(candidates, key=lambda item: item[0])
-    pad = int(max(w, h) * 0.04)
+    _, x, y, w, h, contour = max(candidates, key=lambda item: item[0])
+    # Pad rong hon truoc day (0.04 -> 0.08) de xoay deskew khong bi cat mat
+    # canh bien so.
+    pad = int(max(w, h) * 0.08)
     x1 = max(0, x - pad)
     y1 = max(0, y - pad)
     x2 = min(image.shape[1], x + w + pad)
     y2 = min(image.shape[0], y + h + pad)
-    return image[y1:y2, x1:x2]
+    cropped = image[y1:y2, x1:x2]
+    return _rotate(cropped, _deskew_angle(contour))
 
 
 def preprocess_variants(image) -> Iterable[np.ndarray]:
