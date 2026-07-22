@@ -1,81 +1,51 @@
-Table parking_building {
-  building_id int [pk, increment]
-  name varchar(100) [not null]
-  address varchar(255) [not null]
-  operating_hours varchar(50)
-  total_floors int
-  status varchar(20) [not null] // ACTIVE, INACTIVE, MAINTENANCE
-  created_at datetime
-  updated_at datetime
-}
+// ============================================================================
+// parking_db — MySQL 8.0 — ERD đầy đủ, dbdiagram.io-ready
+// Nguồn: parking-backend/docs/parking_db_schema.sql (mysqldump 2026-07-22 14:54)
+//         đối chiếu trực tiếp với toàn bộ entity JPA trong
+//         parking-backend/src/main/java/com/swp391/parking/entity/*.java
+// Thay thế bản ERD.dbml cũ (18/6) đã lỗi thời — bản đó thiếu is_active,
+// slot_size, assigned_building_id, building_id (pricing_policy/request/
+// exception_case), booking_type, effective_from, latitude/longitude...
+//
+// *** LƯU Ý QUAN TRỌNG — 1 chỗ lệch giữa code và DB thật ***
+// Bảng `staff_shift` bên dưới có 3 cột (attendance_status, check_in_time,
+// check_out_time) được StaffShift.java / StaffShiftServiceImpl /
+// StaffShiftAttendanceScheduler dùng thật, nhưng CHƯA tồn tại trong DB thật
+// (dev/prod chạy ddl-auto: none, không có migration nào thêm 3 cột này —
+// chỉ test dùng ddl-auto: create-drop nên Hibernate tự tạo, che mất lỗi).
+// => Chạy tính năng điểm danh ca làm trên DB thật sẽ lỗi
+//    "Unknown column 'attendance_status'". Cần ALTER TABLE (script ở cuối
+//    file) TRƯỚC khi các cột này thực sự tồn tại — hiện tại chúng được vẽ
+//    trong ERD này vì đã là một phần thiết kế/code chính thức, nhưng đánh
+//    dấu rõ bằng comment "PENDING MIGRATION" để không bị hiểu nhầm là đã có.
+// ============================================================================
 
-Table floor {
-  floor_id int [pk, increment]
-  building_id int [not null, ref: > parking_building.building_id]
-  floor_number int [not null]
-  floor_name varchar(50)
-  status varchar(20) [not null] // ACTIVE, INACTIVE, MAINTENANCE
-  created_at datetime
-  updated_at datetime
-}
-
-Table vehicle_type {
-  vehicle_type_id int [pk, increment]
-  name varchar(50) [not null, unique] // MOTORBIKE, CAR, ELECTRIC_CAR
-  created_at datetime
-  updated_at datetime
-}
-
-Table zone {
-  zone_id int [pk, increment]
-  floor_id int [not null, ref: > floor.floor_id]
-  vehicle_type_id int [not null, ref: > vehicle_type.vehicle_type_id]
-  zone_name varchar(50) [not null]
-  status varchar(20) [not null] // ACTIVE, INACTIVE, MAINTENANCE
-  created_at datetime
-  updated_at datetime
-}
-
-Table parking_slot {
-  slot_id int [pk, increment]
-  zone_id int [not null, ref: > zone.zone_id]
-  slot_code varchar(20) [not null, unique]
-  priority int
-  distance_to_gate int
-  status varchar(20) [not null] // AVAILABLE, RESERVED, OCCUPIED, MAINTENANCE
-  created_at datetime
-  updated_at datetime
-}
-
-Table gate {
-  gate_id int [pk, increment]
-  building_id int [not null, ref: > parking_building.building_id]
-  gate_code varchar(50) [not null, unique]
-  gate_type varchar(20) [not null] // ENTRY, EXIT, BOTH
-  created_at datetime
-  updated_at datetime
-}
-
+// ── AUTH & USERS ────────────────────────────────────────────────
 Table users {
   user_id int [pk, increment]
-  username varchar(50) [not null, unique]
+  username varchar(50) [unique, not null]
   full_name varchar(100) [not null]
-  email varchar(100) [not null, unique]
+  email varchar(100) [unique, not null]
   phone varchar(20)
   password_hash varchar(255) [not null]
-  status varchar(20) [not null] // ACTIVE, INACTIVE, LOCKED
+  email_verification_code varchar(10)
+  email_verification_expires_at datetime
+  password_reset_otp varchar(10)
+  password_reset_otp_expires_at datetime
+  status varchar(20) [not null] // PENDING, ACTIVE, INACTIVE, LOCKED
   created_at datetime
   updated_at datetime
+  assigned_building_id int [ref: > parking_building.building_id] // NULL = Admin/Driver; STAFF/MANAGER gán 1 building
 }
 
 Table role {
   role_id int [pk, increment]
-  role_name varchar(50) [not null, unique] // ADMIN, MANAGER, STAFF, DRIVER
+  role_name varchar(50) [unique, not null] // ADMIN, MANAGER, STAFF, DRIVER
 }
 
 Table user_role {
-  user_id int [not null, ref: > users.user_id]
-  role_id int [not null, ref: > role.role_id]
+  user_id int [ref: > users.user_id, not null]
+  role_id int [ref: > role.role_id, not null]
 
   indexes {
     (user_id, role_id) [pk]
@@ -84,110 +54,153 @@ Table user_role {
 
 Table password_reset_token {
   token_id int [pk, increment]
-  user_id int [not null, ref: > users.user_id]
-  token varchar(255) [not null, unique]
+  user_id int [ref: > users.user_id, not null]
+  token varchar(255) [unique, not null]
   expires_at datetime [not null]
-  used boolean [not null, default: false]
+  used tinyint [not null, default: 0]
   created_at datetime
+}
+
+// ── FACILITY HIERARCHY: Building → Floor → Zone → Slot / Gate ──
+Table parking_building {
+  building_id int [pk, increment]
+  name varchar(100) [not null]
+  address varchar(255) [not null]
+  phone varchar(20)
+  email varchar(100)
+  description text
+  open_time time [not null]
+  close_time time [not null]
+  is_active tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime
+  latitude double
+  longitude double
+}
+
+Table floor {
+  floor_id int [pk, increment]
+  building_id int [ref: > parking_building.building_id, not null]
+  floor_number int [not null]
+  floor_name varchar(50) [not null]
+  capacity int [not null, default: 0]
+  is_active tinyint [not null, default: 1] // ACTIVE=1 / INACTIVE,MAINTENANCE=0 (Status enum ở app layer)
+  created_at datetime [not null]
+  updated_at datetime
+
+  indexes {
+    (building_id, floor_number) [unique]
+  }
+}
+
+Table zone {
+  zone_id int [pk, increment]
+  floor_id int [ref: > floor.floor_id, not null]
+  vehicle_type_id int [ref: > vehicle_type.vehicle_type_id, not null]
+  zone_name varchar(50) [not null]
+  description varchar(255)
+  is_active tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime
+
+  indexes {
+    (floor_id, zone_name) [unique]
+  }
+}
+
+Table parking_slot {
+  slot_id int [pk, increment]
+  zone_id int [ref: > zone.zone_id, not null]
+  slot_code varchar(20) [not null]
+  slot_size varchar(20) [not null] // SMALL, MEDIUM, LARGE
+  priority int
+  distance_to_gate int
+  status varchar(20) [not null] // AVAILABLE, RESERVED, OCCUPIED, MAINTENANCE
+  is_active tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime
+
+  indexes {
+    (zone_id, slot_code) [unique]
+  }
+}
+
+Table gate {
+  gate_id int [pk, increment]
+  building_id int [ref: > parking_building.building_id, not null]
+  gate_code varchar(50) [unique, not null]
+  gate_type varchar(20) [not null] // ENTRY, EXIT, BOTH
+  is_active tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime
+}
+
+Table vehicle_type {
+  vehicle_type_id int [pk, increment]
+  name varchar(50) [unique, not null] // MOTORBIKE, CAR, ELECTRIC_CAR, ...
+  description varchar(255)
+  slot_size varchar(20) [not null] // SMALL, MEDIUM, LARGE
+  hourly_rate decimal(10,2) [not null, default: 0.00]
+  daily_rate decimal(10,2)
+  is_active tinyint [not null, default: 1]
+  created_at datetime [not null]
+  updated_at datetime
 }
 
 Table vehicle {
   vehicle_id int [pk, increment]
-  owner_user_id int [not null, ref: > users.user_id]
-  vehicle_type_id int [not null, ref: > vehicle_type.vehicle_type_id]
-  license_plate varchar(20) [not null, unique]
-  created_at datetime
+  owner_user_id int [ref: > users.user_id, not null]
+  vehicle_type_id int [ref: > vehicle_type.vehicle_type_id, not null]
+  license_plate varchar(20) [unique, not null]
+  brand varchar(50)
+  model varchar(50)
+  color varchar(30)
+  is_active tinyint [not null, default: 1] // "Vô hiệu hóa" = soft-disable, giữ lịch sử booking/session
+  created_at datetime [not null]
   updated_at datetime
 }
 
-// ── BOOKING ───────────────────────────────────────────────────
-// Thay đổi v2:
-//   - Bỏ bảng ticket, thay bằng qr_token (JWT-signed)
-//   - Thêm deposit_amount, deposit_paid_at cho phí cọc
-//   - Áp dụng cọc cho CAR và ELECTRIC_CAR
+// ── BOOKING & SESSION ────────────────────────────────────────────
 Table booking {
   booking_id int [pk, increment]
-  user_id int [not null, ref: > users.user_id]
-  vehicle_id int [not null, ref: > vehicle.vehicle_id]
-  slot_id int [not null, ref: > parking_slot.slot_id]
+  user_id int [ref: > users.user_id, not null]
+  vehicle_id int [ref: > vehicle.vehicle_id, not null]
+  slot_id int [ref: > parking_slot.slot_id, not null]
   booking_start_time datetime
   booking_end_time datetime
+  booking_type varchar(20) [not null, default: 'HOURLY'] // HOURLY, DAILY, WEEKLY, MONTHLY
   reserved_at datetime
-  expired_at datetime // = MIN(now+15p, booking_start_time-5p)
-
-  // QR thay ticket - sinh sau khi payment DEPOSIT/FULL paid
-  qr_token varchar(500) [unique] // JWT: {booking_id, license_plate, slot_id, expired_at}
-  qr_issued_at datetime           // thời điểm sinh QR
-  qr_used_at datetime             // thời điểm check-in, NULL = chưa dùng
-
-  // Phí cọc - chỉ CAR và ELECTRIC_CAR, tính theo khoảng cách đến giờ đến
-  // 30p-2h: 10k | 2-4h: 15k | 4-6h: 20k | >6h: 30k | <30p: 0đ
-  deposit_amount decimal(10,2) [default: 0]
-  deposit_paid_at datetime        // NULL nếu không cọc
-
+  expired_at datetime // = MIN(now + QR_EXPIRE_BUFFER_MINUTES, start_time - 5p)
+  qr_token varchar(500) [unique] // JWT ký: {booking_id, license_plate, slot_id, expired_at}
+  qr_issued_at datetime
+  qr_used_at datetime // NULL = QR chưa dùng để check-in
+  deposit_amount decimal(10,2) [default: 0.00] // chỉ CAR/ELECTRIC_CAR, escalate theo lead-time
+  deposit_paid_at datetime
   status varchar(30) [not null]
-  // PENDING_PAYMENT, CONFIRMED, CHECKED_IN, EXPIRED, CANCELLED, COMPLETED
-
+  // PENDING_PAYMENT, CONFIRMED, CHECKED_IN, WAITING_PAYMENT, EXPIRED, CANCELLED, COMPLETED
   created_at datetime
   updated_at datetime
 }
 
 Table parking_session {
   session_id int [pk, increment]
-  booking_id int [ref: > booking.booking_id] // NULL nếu walk-in
-  slot_id int [not null, ref: > parking_slot.slot_id]
-  user_id int [not null, ref: > users.user_id]
-  vehicle_id int [not null, ref: > vehicle.vehicle_id]
+  booking_id int [ref: > booking.booking_id] // NULL = walk-in (không qua booking)
+  slot_id int [ref: > parking_slot.slot_id, not null]
+  user_id int [ref: > users.user_id, not null]
+  vehicle_id int [ref: > vehicle.vehicle_id, not null]
   entry_gate_id int [ref: > gate.gate_id]
   exit_gate_id int [ref: > gate.gate_id]
   entry_time datetime
   exit_time datetime
-  entry_mode varchar(20) [not null] // BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL
-  status varchar(30) [not null] // ACTIVE, WAITING_PAYMENT, COMPLETED, EXCEPTION
-  created_at datetime
-  updated_at datetime
-}
-
-// ── PAYMENT ───────────────────────────────────────────────────
-// Thay đổi v2:
-//   - Thêm payment_type để phân biệt tiền cọc và phí đỗ xe
-Table payment {
-  payment_id int [pk, increment]
-  session_id int [ref: > parking_session.session_id] // NULL nếu là DEPOSIT
-  booking_id int [ref: > booking.booking_id]          // dùng cho DEPOSIT trước khi có session
-  policy_id int [ref: > pricing_policy.policy_id]
-  payment_type varchar(20) [not null] // DEPOSIT, PARKING_FEE
-  applied_rate decimal(10,2)
-  base_fee decimal(12,2)
-  overtime_fee decimal(12,2)
-  penalty_fee decimal(12,2)
-  discount decimal(12,2)
-  deposit_deducted decimal(12,2)  // số tiền cọc đã trừ vào tổng (chỉ PARKING_FEE)
-  total_amount decimal(12,2) [not null]
-  transaction_ref varchar(100) [unique]
-  payment_method varchar(20) [not null] // CASH, MOCK, VNPAY
-  payment_status varchar(20) [not null] // PENDING, PAID, FAILED, REFUNDED, CANCELLED
-  paid_at datetime
-  created_at datetime
-  updated_at datetime
-}
-
-Table pricing_policy {
-  policy_id int [pk, increment]
-  vehicle_type_id int [not null, ref: > vehicle_type.vehicle_type_id]
-  time_type varchar(20) [not null] // HOURLY, DAILY, OVERNIGHT
-  day_type varchar(20) [not null] // WEEKDAY, WEEKEND, HOLIDAY
-  start_hour int
-  end_hour int
-  price_per_hour decimal(10,2) [not null]
-  is_active boolean [not null, default: true]
+  entry_mode varchar(20) [not null] // BOOKING, WALK_IN_AUTO, WALK_IN_MANUAL, BOOKING_STAFF_OVERRIDE
+  status varchar(30) [not null] // ACTIVE, WAITING_PAYMENT, COMPLETED
   created_at datetime
   updated_at datetime
 }
 
 Table gate_log {
   gate_log_id int [pk, increment]
-  gate_id int [not null, ref: > gate.gate_id]
+  gate_id int [ref: > gate.gate_id, not null]
   session_id int [ref: > parking_session.session_id]
   staff_user_id int [ref: > users.user_id]
   license_plate varchar(20)
@@ -204,30 +217,70 @@ Table ocr_scan {
   gate_id int [ref: > gate.gate_id]
   image_path varchar(500)
   detected_plate varchar(20)
-  plate_confidence_score float
+  plate_confidence_score float // ngưỡng auto-confirm mặc định 0.85
   corrected_plate varchar(20)
-  staff_vehicle_type_id int [ref: > vehicle_type.vehicle_type_id]
-  is_corrected boolean [not null, default: false]
-  corrected_by int [ref: > users.user_id]
+  is_corrected tinyint [not null, default: 0]
+  corrected_by_user_id int [ref: > users.user_id]
   corrected_at datetime
   correction_reason varchar(255)
   trigger_type varchar(20) [not null] // ENTRY, EXIT
   process_status varchar(30) [not null]
   // AUTO_APPROVED, MANUAL_REVIEW, STAFF_APPROVED, CORRECTED_AFTER_APPROVAL, FAILED
   scanned_at datetime
+  created_at datetime [not null]
+  updated_at datetime
 }
 
+// ── PAYMENT & PRICING ────────────────────────────────────────────
+Table pricing_policy {
+  policy_id int [pk, increment]
+  vehicle_type_id int [ref: > vehicle_type.vehicle_type_id, not null]
+  building_id int [ref: > parking_building.building_id] // NULL = chính sách toàn hệ thống (Admin); có giá trị = riêng building (Manager)
+  time_type varchar(20) [not null] // HOURLY, DAILY, OVERNIGHT
+  day_type varchar(20) [not null] // WEEKDAY, WEEKEND, HOLIDAY
+  start_hour int
+  end_hour int
+  price_per_hour decimal(10,2) [not null]
+  effective_from datetime [not null]
+  is_active tinyint [not null, default: 1]
+  created_at datetime
+  updated_at datetime
+}
+
+Table payment {
+  payment_id int [pk, increment]
+  session_id int [ref: > parking_session.session_id] // NULL nếu là DEPOSIT (chưa có session)
+  booking_id int [ref: > booking.booking_id]
+  policy_id int [ref: > pricing_policy.policy_id]
+  payment_type varchar(20) [not null] // DEPOSIT, PARKING_FEE
+  applied_rate decimal(10,2)
+  base_fee decimal(12,2)
+  overtime_fee decimal(12,2)
+  penalty_fee decimal(12,2)
+  discount decimal(12,2)
+  deposit_deducted decimal(12,2) // chỉ dùng cho PARKING_FEE
+  total_amount decimal(12,2) [not null]
+  transaction_ref varchar(100) [unique]
+  payment_method varchar(20) [not null] // CASH, VNPAY
+  payment_status varchar(20) [not null] // PENDING, PAID, FAILED, REFUNDED
+  paid_at datetime
+  created_at datetime
+  updated_at datetime
+}
+
+// ── SUPPORT: REQUEST & EXCEPTION ─────────────────────────────────
 Table request {
   request_id int [pk, increment]
-  user_id int [not null, ref: > users.user_id]
+  user_id int [ref: > users.user_id, not null]
   assigned_staff_id int [ref: > users.user_id]
   request_type varchar(30) [not null] // LOST_QR, WRONG_FEE, CANNOT_FIND_CAR, OTHER
   subject varchar(200)
   description text
-  status varchar(20) [not null] // PENDING, PROCESSING, RESOLVED, REJECTED, CLOSED
+  status varchar(20) [not null] // OPEN, IN_PROGRESS, RESOLVED, CLOSED
   resolved_at datetime
   created_at datetime
   updated_at datetime
+  building_id int // không có FK constraint trong DB, chỉ lưu để lọc theo building
 }
 
 Table exception_case {
@@ -235,23 +288,28 @@ Table exception_case {
   session_id int [ref: > parking_session.session_id]
   request_id int [ref: > request.request_id]
   exception_type varchar(30) [not null]
+  // LOST_QR, WRONG_FEE, CANNOT_FIND_CAR, SYSTEM_ERROR, OTHER,
+  // PLATE_UNVERIFIED, BOOKING_MISMATCH, EXIT_VERIFICATION_FAILED, SESSION_CONFLICT
   description varchar(500)
-  status varchar(20) [not null] // OPEN, PROCESSING, RESOLVED, CLOSED
+  status varchar(20) [not null] // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  assigned_to int // không có FK constraint trong DB (nên là users.user_id ở app layer)
   resolved_by int [ref: > users.user_id]
   resolved_at datetime
   created_at datetime
   updated_at datetime
+  booking_id int // không có FK constraint trong DB, chỉ lưu tham chiếu
 }
 
+// ── NOTIFICATION & AUDIT ──────────────────────────────────────────
 Table notification {
   notification_id int [pk, increment]
-  user_id int [not null, ref: > users.user_id]
+  user_id int [ref: > users.user_id, not null]
   title varchar(200) [not null]
   body text
   type varchar(50)
   entity_type varchar(30)
   entity_id int
-  is_read boolean [not null, default: false]
+  is_read tinyint [not null, default: 0]
   created_at datetime
 }
 
@@ -264,6 +322,16 @@ Table activity_log {
   created_at datetime
 }
 
+Table system_config {
+  config_id bigint [pk, increment]
+  config_key varchar(100) [unique, not null] // BOOKING_MIN_ADVANCE_MINUTES, QR_EXPIRE_BUFFER_MINUTES, BOOKING_CANCEL_WINDOW_MINUTES, BOOKING_EXPIRE_AFTER_START
+  config_value varchar(255)
+  description varchar(255)
+  updated_by int [ref: > users.user_id]
+  updated_at datetime
+}
+
+// ── STAFF SHIFT ────────────────────────────────────────────────
 Table shift {
   shift_id int [pk, increment]
   shift_name varchar(50) [not null]
@@ -274,16 +342,29 @@ Table shift {
 
 Table staff_shift {
   staff_shift_id int [pk, increment]
-  staff_user_id int [not null, ref: > users.user_id]
-  shift_id int [not null, ref: > shift.shift_id]
+  staff_user_id int [ref: > users.user_id, not null]
+  shift_id int [ref: > shift.shift_id, not null]
   working_date date [not null]
+
+  // *** PENDING MIGRATION — 3 cột dưới đây CHƯA có trong DB thật ***
+  // Được StaffShift.java / StaffShiftServiceImpl / StaffShiftAttendanceScheduler
+  // dùng thật (auto-mark ABSENT khi bỏ ca), nhưng dev/prod DB chưa có migration
+  // thêm cột này (ddl-auto: none). Chạy ALTER TABLE ở cuối file trước khi coi
+  // 3 cột này là "đã tồn tại" trên DB thật.
+  check_in_time datetime // [PENDING MIGRATION]
+  check_out_time datetime // [PENDING MIGRATION]
+  attendance_status varchar(20) [not null, default: 'NOT_STARTED']
+  // [PENDING MIGRATION] NOT_STARTED, ON_TIME, LATE, ABSENT, COMPLETED
 }
 
-Table system_config {
-  config_id bigint [pk, increment]
-  config_key varchar(100) [not null, unique]
-  config_value varchar(255)
-  description varchar(255)
-  updated_by int [ref: > users.user_id]
-  updated_at datetime
-}
+// ============================================================================
+// Script migration còn thiếu (chạy trên DB thật trước khi export lại dump):
+//
+// ALTER TABLE staff_shift
+//   ADD COLUMN check_in_time datetime NULL,
+//   ADD COLUMN check_out_time datetime NULL,
+//   ADD COLUMN attendance_status varchar(20) NOT NULL DEFAULT 'NOT_STARTED';
+//
+// Sau khi chạy xong, xóa 2 dòng comment "PENDING MIGRATION" ở bảng staff_shift
+// phía trên — lúc đó ERD này phản ánh đúng 100% DB thật, không cần sửa gì thêm.
+// ============================================================================
