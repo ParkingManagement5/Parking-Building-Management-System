@@ -28,7 +28,11 @@ ocr-service/*.log
 
 # AI coding tool skills (local only)
 .agents/
+.claude/
 skills-lock.json
+
+# root-level scratch docs (not parking-backend/docs/)
+/docs/
 
 # scratch Playwright verification scripts
 .tmp-pw/
