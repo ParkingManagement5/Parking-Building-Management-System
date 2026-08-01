@@ -337,6 +337,82 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
     }
 
     @Test
+    @WithMockUser(username = "staff-daily-prepaid", roles = "STAFF")
+    void dailyPrepaidBookingShouldNotChargeAgainAtExitWhenPackageRateChanged() throws Exception {
+        User staff = createUser("staff-daily-prepaid", Role.RoleName.STAFF);
+        User driver = createUser("driver-daily-prepaid", Role.RoleName.DRIVER);
+        ParkingBuilding building = createBuilding("Daily Prepaid Tower");
+        staff = assignBuilding(staff, building);
+        var floor = createFloor(building, 1);
+        VehicleType vehicleType = createVehicleType("Daily Prepaid Car", VehicleType.SlotSize.MEDIUM);
+        var zone = createZone(floor, vehicleType, "Daily Prepaid Zone");
+        ParkingSlot slot = createSlot(zone, "DP-01", ParkingSlot.Status.OCCUPIED);
+        Gate entryGate = createGate(building, "ENTRY-DP", Gate.GateType.ENTRY);
+        Vehicle vehicle = createVehicle(driver, vehicleType, "61A-10000");
+
+        LocalDateTime start = LocalDateTime.of(2026, 7, 20, 8, 0);
+        Booking booking = Booking.builder()
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .slot(slot)
+            .bookingStartTime(start)
+            .bookingEndTime(start.plusDays(1))
+            .bookingType("DAILY")
+            .reservedAt(start.minusHours(1))
+            .expiredAt(start.plusDays(1))
+            .depositAmount(new BigDecimal("100000"))
+            .depositPaidAt(start.minusMinutes(30))
+            .status(Booking.BookingStatus.WAITING_PAYMENT)
+            .build();
+        booking = bookingRepository.save(booking);
+
+        pricingPolicyRepository.save(PricingPolicy.builder()
+            .vehicleType(vehicleType)
+            .building(building)
+            .dayType("WEEKDAY")
+            .timeType("DAILY")
+            .startHour(0)
+            .endHour(24)
+            .pricePerHour(new BigDecimal("200000"))
+            .effectiveFrom(LocalDateTime.of(2026, 7, 1, 0, 0))
+            .isActive(true)
+            .build());
+
+        ParkingSession session = ParkingSession.builder()
+            .booking(booking)
+            .slot(slot)
+            .userId(driver.getUserId().longValue())
+            .vehicle(vehicle)
+            .entryGate(entryGate)
+            .entryTime(start)
+            .exitTime(start.plusHours(23))
+            .entryMode(ParkingSession.EntryMode.BOOKING)
+            .status(ParkingSession.SessionStatus.WAITING_PAYMENT)
+            .build();
+        session = parkingSessionRepository.save(session);
+
+        mockMvc.perform(post("/api/v1/payments/parking-fee")
+                .param("sessionId", session.getId().toString())
+                .param("bookingId", booking.getId().toString())
+                .param("totalAmount", "999999")
+                .param("paymentMethod", Payment.PaymentMethod.CASH.name()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.paymentStatus").value("PAID"))
+            .andExpect(jsonPath("$.data.baseFee").value(100000))
+            .andExpect(jsonPath("$.data.depositDeducted").value(100000))
+            .andExpect(jsonPath("$.data.totalAmount").value(0));
+
+        Payment finalFee = paymentRepository.findAll().stream()
+            .filter(payment -> payment.getPaymentType() == Payment.PaymentType.PARKING_FEE)
+            .findFirst()
+            .orElseThrow();
+        assertThat(finalFee.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(parkingSessionRepository.findById(session.getId()).orElseThrow().getStatus())
+            .isEqualTo(ParkingSession.SessionStatus.COMPLETED);
+    }
+
+    @Test
     @WithMockUser(username = "staff-plate-scan", roles = "STAFF")
     void plateVariantsShouldFindConfirmedBookingAndPreventWalkInDuplicate() throws Exception {
         User staff = createUser("staff-plate-scan", Role.RoleName.STAFF);

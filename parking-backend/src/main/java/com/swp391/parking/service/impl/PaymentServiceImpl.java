@@ -183,8 +183,9 @@ public class PaymentServiceImpl implements PaymentService {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "Session #" + sessionId + " chưa có thời gian ra (exitTime null), không thể tính phí");
         }
-        String bookingType = session.getBooking() != null ? session.getBooking().getBookingType() : null;
-        LocalDateTime bookingEndTime = session.getBooking() != null ? session.getBooking().getBookingEndTime() : null;
+        Booking booking = session.getBooking();
+        String bookingType = booking != null ? booking.getBookingType() : null;
+        LocalDateTime bookingEndTime = booking != null ? booking.getBookingEndTime() : null;
         BigDecimal combinedFee = feeCalculatorUtil.calculateSessionFee(
                 session.getEntryTime(), session.getExitTime(), activePolicies, serverRate, bookingType, bookingEndTime);
         // Tach rieng phan phu troi (qua han goi) khoi phi goc, thay vi gop het
@@ -192,12 +193,13 @@ public class PaymentServiceImpl implements PaymentService {
         // hon gia goi da tra truoc, khong phai 1 con so mo ho.
         BigDecimal serverOvertimeFee = feeCalculatorUtil.calculateOvertimeFee(
                 bookingType, session.getExitTime(), bookingEndTime, activePolicies, serverRate);
-        BigDecimal serverBaseFee = combinedFee.subtract(serverOvertimeFee);
-
         BigDecimal serverDeposit = BigDecimal.ZERO;
-        if (session.getBooking() != null && session.getBooking().getDepositAmount() != null) {
-            serverDeposit = session.getBooking().getDepositAmount();
+        if (booking != null && booking.getDepositAmount() != null) {
+            serverDeposit = booking.getDepositAmount();
         }
+        BigDecimal serverBaseFee = isPrepaidFlatBooking(booking)
+                ? serverDeposit
+                : combinedFee.subtract(serverOvertimeFee);
 
         BigDecimal serverTotal = FeeCalculatorUtil.calculateTotal(
                 serverBaseFee, serverOvertimeFee, BigDecimal.ZERO, BigDecimal.ZERO, serverDeposit);
@@ -532,6 +534,17 @@ public class PaymentServiceImpl implements PaymentService {
 
     private Long safeBuildingId(com.swp391.parking.entity.ParkingBuilding building) {
         return building != null ? building.getId() : null;
+    }
+
+    private boolean isPrepaidFlatBooking(Booking booking) {
+        if (booking == null || booking.getBookingType() == null) {
+            return false;
+        }
+        if ("HOURLY".equalsIgnoreCase(booking.getBookingType())) {
+            return false;
+        }
+        return booking.getDepositAmount() != null
+                && booking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0;
     }
 
     private void validateRefundEligibility(Payment payment) {

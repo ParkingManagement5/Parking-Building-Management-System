@@ -22,9 +22,28 @@ VALID_PROVINCES = {
     "90", "92", "93", "94", "95", "97", "98", "99",
 }
 SPECIAL_SERIES = ("CD", "HC", "KT", "LD", "MK", "NG", "NN", "QT", "T")
-SERIES_PATTERN = r"(?:[A-Z]\d|[A-Z]{1,2})"
+# Cho phep 1 dau "-"/"." lac giua chu va so cua series (vd "H-7" thay vi "H7")
+# - OCR/deskew doi khi doc nham 1 khe/vet xuoc nho tren bien that giua 2 ky tu
+# nay thanh dau gach ngang, khien series bi hieu nham chi la "H" (1 chu), day
+# ca chu so "7" xuong nhap vao serial (vd "99-H7 7060" bi doc thanh "99H-77060"
+# -> ra ket qua sai "99H-770.60" thay vi dung phai la "99-H7-7060"). Series duoc
+# lam sach lai (bo dau) o normalize_plate truoc khi dung.
+SERIES_PATTERN = r"(?:[A-Z][-.]?\d|[A-Z]{1,2})"
 PLATE_PATTERN = re.compile(
     rf"(?<![A-Z0-9])(\d{{2}})[-.]?({SERIES_PATTERN})[-.]?(\d{{4}}|\d{{5}}|\d{{3}}[.]\d{{2}})(?![A-Z0-9])"
+)
+# Bien 1 hang (oto: chu series don, vd "A", serial 5 so - "18A-123.45") va bien
+# 2 hang (xe may: chu+so, vd "H7", serial 4 so) co the CUNG chiu dai ky tu
+# (vd "18A12345" 8 ky tu co the la oto "18-A-12345" HOAC xe may "18-A1-2345"),
+# regex don khong the tu phan biet chac chan — PLATE_PATTERN (chu+so truoc)
+# dung khi khong biet hinh dang bien; 2 pattern rieng duoi day dung khi da biet
+# ti le khung bien that (xem is_single_line trong crop_likely_plate) de uu
+# tien dung huong ngay tu dau, thay vi doan mu.
+CAR_SERIES_PATTERN = re.compile(
+    r"(?<![A-Z0-9])(\d{2})[-.]?([A-Z]{1,2})[-.]?(\d{4}|\d{5}|\d{3}[.]\d{2})(?![A-Z0-9])"
+)
+MOTORBIKE_SERIES_PATTERN = re.compile(
+    r"(?<![A-Z0-9])(\d{2})[-.]?([A-Z][-.]?\d)[-.]?(\d{4}|\d{5}|\d{3}[.]\d{2})(?![A-Z0-9])"
 )
 
 
@@ -38,7 +57,7 @@ def warm_easyocr():
     get_reader()
 
 
-def normalize_plate(text: str | None) -> str | None:
+def normalize_plate(text: str | None, prefer_single_line: bool | None = None) -> str | None:
     if not text:
         return None
 
@@ -50,14 +69,26 @@ def normalize_plate(text: str | None) -> str | None:
     )
     compact = re.sub(r"[^A-Z0-9.-]", "", compact)
 
-    for province, series, serial in PLATE_PATTERN.findall(compact):
-        serial = serial.replace(".", "")
-        if not is_supported_plate(province, series, serial):
-            continue
-        prefix = format_prefix(province, series)
-        if len(serial) == 5:
-            return f"{prefix}-{serial[:3]}.{serial[3:]}"
-        return f"{prefix}-{serial}"
+    # Da biet ti le khung bien that (tu anh) thi thu dung huong truoc (oto: chu
+    # series don + serial 5 so; xe may: chu+so + serial 4 so) - chi roi ve
+    # PLATE_PATTERN chung (uu tien chu+so mac dinh) khi khong ro hinh dang bien.
+    if prefer_single_line is True:
+        patterns = (CAR_SERIES_PATTERN, MOTORBIKE_SERIES_PATTERN)
+    elif prefer_single_line is False:
+        patterns = (MOTORBIKE_SERIES_PATTERN, CAR_SERIES_PATTERN)
+    else:
+        patterns = (PLATE_PATTERN,)
+
+    for pattern in patterns:
+        for province, series, serial in pattern.findall(compact):
+            series = series.replace("-", "").replace(".", "")
+            serial = serial.replace(".", "")
+            if not is_supported_plate(province, series, serial):
+                continue
+            prefix = format_prefix(province, series)
+            if len(serial) == 5:
+                return f"{prefix}-{serial[:3]}.{serial[3:]}"
+            return f"{prefix}-{serial}"
 
     return None
 
@@ -151,9 +182,15 @@ def crop_likely_plate(image):
         candidates = _plate_rect_candidates(yellow | blue | red | green, image_area)
 
     if not candidates:
-        return image
+        return image, None
 
     _, x, y, w, h, contour = max(candidates, key=lambda item: item[0])
+    # Ti le khung phat hien duoc: bien oto 1 hang dai (~3:1-5:1) svs bien xe may
+    # 2 hang gan vuong (~0.9:1-1.3:1) - khoang cach 2 nhom nay rat xa nhau (1.3
+    # den 3.0 khong nhom nao roi vao) nen nguong 2.0 an toan de phan biet, dung
+    # lam goi y uu tien pattern doc series trong normalize_plate (xem
+    # CAR_SERIES_PATTERN/MOTORBIKE_SERIES_PATTERN).
+    is_single_line = (w / max(h, 1)) >= 2.0
     # Pad rong hon truoc day (0.04 -> 0.08) de xoay deskew khong bi cat mat
     # canh bien so.
     pad = int(max(w, h) * 0.08)
@@ -162,11 +199,13 @@ def crop_likely_plate(image):
     x2 = min(image.shape[1], x + w + pad)
     y2 = min(image.shape[0], y + h + pad)
     cropped = image[y1:y2, x1:x2]
-    return _rotate(cropped, _deskew_angle(contour))
+    return _rotate(cropped, _deskew_angle(contour)), is_single_line
 
 
-def preprocess_variants(image) -> Iterable[np.ndarray]:
-    plate = crop_likely_plate(image)
+def preprocess_variants(plate) -> Iterable[np.ndarray]:
+    # Nhan anh DA CROP san (tu crop_likely_plate) - chi lo phan resize/tang
+    # cuong do, tach rieng khoi buoc crop de crop_likely_plate co the tra ve
+    # them is_single_line ma khong bi vuong xung dot yield/return cua generator.
     if plate.shape[1] > 900:
         ratio = 900 / plate.shape[1]
         plate = cv2.resize(plate, None, fx=ratio, fy=ratio, interpolation=cv2.INTER_AREA)
@@ -219,7 +258,8 @@ def read_candidates(image):
     candidates = []
     raw_attempts = []
 
-    variants = list(preprocess_variants(image))
+    plate_crop, is_single_line = crop_likely_plate(image)
+    variants = list(preprocess_variants(plate_crop))
     read_modes = [{}]
 
     for mode_index, kwargs in enumerate(read_modes):
@@ -228,7 +268,7 @@ def read_candidates(image):
             raw_text = ordered_text(results)
             if raw_text:
                 raw_attempts.append(raw_text)
-            plate = normalize_plate(raw_text)
+            plate = normalize_plate(raw_text, prefer_single_line=is_single_line)
             confidences = [float(conf) for _, _, conf in results]
             confidence = sum(confidences) / len(confidences) if confidences else 0.0
             if plate:
@@ -274,7 +314,7 @@ def read_candidates(image):
                 raw_text = ordered_text(results)
                 if raw_text:
                     raw_attempts.append(raw_text)
-                plate = normalize_plate(raw_text)
+                plate = normalize_plate(raw_text, prefer_single_line=is_single_line)
                 confidences = [float(conf) for _, _, conf in results]
                 confidence = sum(confidences) / len(confidences) if confidences else 0.0
                 found_confident = False
@@ -301,8 +341,14 @@ def health():
 
 
 @app.post("/recognize")
-async def recognize(image: UploadFile = File(...)):
-    image_bytes = await image.read()
+def recognize(image: UploadFile = File(...)):
+    # Khong dung "async def" o day: than ham chay CPU nang (EasyOCR/OpenCV)
+    # dong bo, khong co await nao ben trong - neu khai bao async, no chay
+    # thang tren event loop chinh va chan dung MOI request khac (ke ca
+    # /health hay mot luot scan khac) cho toi khi xong, khien request den
+    # sau co ve "treo vinh vien" du server van song. Dung "def" thuong de
+    # FastAPI/Starlette tu dua vao threadpool rieng, khong chan event loop.
+    image_bytes = image.file.read()
     decoded = decode_image(image_bytes)
     candidates, raw_text = read_candidates(decoded)
 

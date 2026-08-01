@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrowserQRCodeReader } from "@zxing/browser";
+import { DecodeHintType } from "@zxing/library";
 import {
   AlertTriangle, Camera, CheckCircle2, CreditCard, ImageUp, LogIn, LogOut,
   QrCode, RefreshCw, Search, ScanLine, Video, VideoOff, X, XCircle,
@@ -22,28 +23,74 @@ import {
 const LOW_CONFIDENCE_PROCESS_STATUS = "MANUAL_REVIEW";
 const PACKAGE_LABELS = { DAILY: "Gói ngày", WEEKLY: "Gói tuần", MONTHLY: "Gói tháng" };
 
+// TRY_HARDER: chiu bo them CPU moi lan de doc duoc ca QR mo/nghieng/nho — bu lai
+// bang cach quet dong hon (xem QR_SCAN_OPTIONS ben duoi) thay vi quet nhieu lan/giay
+// nhung moi lan deu bo cuoc som.
+const QR_HINTS = new Map([[DecodeHintType.TRY_HARDER, true]]);
+// Mac dinh thu vien la 500ms/lan (2 lan/giay) — cam giac rat cham khi dua camera
+// vao ma QR. Giam xuong 120ms (~8 lan/giay) de bat ma ngay khi vua can net.
+const QR_SCAN_OPTIONS = { delayBetweenScanAttempts: 120, delayBetweenScanSuccess: 250 };
+
 function canonicalPlate(value) {
   return String(value ?? "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 }
 
+// Uu tien series dang "chu+so" (vd "H7", giong het PLATE_PATTERN/SERIES_PATTERN
+// ben ocr-service/main.py) truoc dang "chu don" — dung dinh dang xe may pho
+// bien nhat khi phai doan (xem ghi chu trong normalizePlateDisplay ben duoi).
+const PLATE_STRUCTURE_RE = /^(\d{2})((?:[A-Z]\d|[A-Z]{1,2}))(\d{4}|\d{5})$/;
+
+// Dung y het quy uoc format_prefix ben ocr-service/main.py: series 1 chu
+// (bien oto pho bien, vd "A") KHONG co gach ngang giua ma tinh va chu ("18A"),
+// chi series 2 ky tu (chu+so xe may hoac 2 chu dac biet) moi co gach ("18-H7").
+// QUAN TRONG: thieu quy tac nay se lam ham nay KHONG idempotent — chuan hoa
+// 1 gia tri DA DUNG lai ra gia tri khac (vd "18A-123.45" -> "18-A-123.45"),
+// va vi ham nay bi goi 2 lan lien tiep trong luong xac nhan OCR confidence
+// thap (handleLowConfidenceConfirm -> proceedWithResolvedPlate), lan chuan
+// hoa thu 2 doc nham chuoi sai do thanh sai hoan toan ("18-A1-2345").
+function platePrefix(province, series) {
+  return series.length > 1 ? `${province}-${series}` : `${province}${series}`;
+}
+
 function normalizePlateDisplay(value) {
+  const rawUpper = String(value ?? "").toUpperCase();
+
+  // Neu staff da tu go dau gach/cham dung ngay ranh gioi serial (vd
+  // "77H7-7060" hoac "51F-12345"), DUNG DUNG ranh gioi do — day la tin hieu
+  // dang tin cay nhat. Bien so VN co truong hop go lien KHONG THE phan biet
+  // chac chan bang regex (vd "77H77060" co the la series "H7" + serial 4 so
+  // kieu xe may, HOAC "51F12345" co the la series "F" (1 chu, kieu oto pho
+  // bien) + serial 5 so "12345" — ca 2 deu la dinh dang that, chi khac o
+  // loai xe) — nen buoc nay uu tien tuyet doi neu staff da tu tach ro.
+  const withSeparator = rawUpper.replace(/\s+/g, "")
+    .match(/^(\d{2})([A-Z]{1,2}\d?)[-.]((?:\d{3}[-.]\d{2})|\d{4,5})$/);
+  if (withSeparator) {
+    const [, province, series, serialRaw] = withSeparator;
+    const serial = serialRaw.replace(/[-.]/g, "");
+    const prefix = platePrefix(province, series);
+    return serial.length === 5 ? `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}` : `${prefix}-${serial}`;
+  }
+
   const canonical = canonicalPlate(value);
   if (!canonical) return "";
 
-  // Chi tu dong chen dau khi chac chan serial la 5 so (giong het logic backend
-  // LicensePlateUtil.normalizeDisplay/FIVE_DIGIT_SERIAL). Voi serial 4 so hoac it hon,
-  // khong the biet chac ranh gioi giua ma tinh/series va serial (vd "55SA2345" co the la
-  // "55-SA 2345" hoac dang khac) nen giu nguyen dinh dang nguoi dung da nhap, chi xoa
-  // khoang trang - tranh doan sai vi tri dau gach ngang nhu truoc day ("55SA-2345" sai).
-  const match = canonical.match(/^(.+?)(\d{5})$/);
-  if (match) {
-    const [, prefix, serial] = match;
-    return `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`;
+  // Go lien khong dau: doan theo cau truc tinh+series+serial (uu tien
+  // "chu+so" 4 so kieu xe may). Van co the sai voi bien oto dang "chu don +
+  // serial 5 so" (vd "51F12345" doan thanh "51-F1-2345" thay vi dung phai la
+  // "51-F-123.45") — neu gap truong hop nay, go them dau gach ngay sau chu de
+  // chac chan (nhanh "co dau" o tren).
+  const structured = canonical.match(PLATE_STRUCTURE_RE);
+  if (structured) {
+    const [, province, series, serial] = structured;
+    const prefix = platePrefix(province, series);
+    return serial.length === 5
+      ? `${prefix}-${serial.slice(0, 3)}.${serial.slice(3)}`
+      : `${prefix}-${serial}`;
   }
 
-  return String(value ?? "").toUpperCase().replace(/\s+/g, "");
+  return rawUpper.replace(/\s+/g, "");
 }
 
 export default function UnifiedScanPage() {
@@ -92,6 +139,7 @@ export default function UnifiedScanPage() {
   const qrReaderRef = useRef(null);
   const qrControlsRef = useRef(null);
   const [qrCameraOn, setQrCameraOn] = useState(false);
+  const [qrScanError, setQrScanError] = useState("");
 
   // Gate — buildingId cố định theo assignedBuilding, không cho đổi
   const buildingId = assignedId || "";
@@ -295,7 +343,12 @@ export default function UnifiedScanPage() {
     try {
       const fd = new FormData();
       fd.append("image", file, filename); fd.append("gateId", gateId); fd.append("triggerType", "ENTRY");
-      const res = await axiosClient.post("/ocr/scan-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      // timeout 30s: neu backend/OCR engine bi treo hoac qua tai, bao loi ro
+      // cho staff thay vi de spinner "Dang nhan dien..." dung im vinh vien.
+      const res = await axiosClient.post("/ocr/scan-image", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 30000,
+      });
       const d = unwrapApiData(res.data, {});
       const p = d.effectivePlate || d.detectedPlate || "";
       const c = Math.round((d.plateConfidenceScore || 0) * 100);
@@ -310,7 +363,14 @@ export default function UnifiedScanPage() {
         return;
       }
       await proceedWithResolvedPlate(p, c);
-    } catch (err) { setOcrError(err.response?.data?.message || "OCR thất bại."); }
+    } catch (err) {
+      const message = err.code === "ECONNABORTED"
+        ? "OCR xử lý quá lâu (quá 30s). Thử chụp lại ảnh rõ hơn hoặc nhập tay biển số."
+        : err.response?.data?.message || "OCR thất bại.";
+      setOcrError(message);
+      setManualPlate("");
+      setShowManualEntry(true);
+    }
     finally { setScanning(false); }
   }
 
@@ -461,23 +521,35 @@ export default function UnifiedScanPage() {
     setQrCameraOn(false);
   }
 
-  function closeQrModal() { stopQrCamera(); setShowQrModal(false); }
+  function closeQrModal() { stopQrCamera(); setShowQrModal(false); setQrScanError(""); }
 
   async function openQrModal() {
+    setQrScanError("");
     setShowQrModal(true);
     setTimeout(async () => {
       try {
-        if (!qrReaderRef.current) qrReaderRef.current = new BrowserQRCodeReader();
+        if (!qrReaderRef.current) qrReaderRef.current = new BrowserQRCodeReader(QR_HINTS, QR_SCAN_OPTIONS);
         setQrCameraOn(true);
         qrControlsRef.current = await qrReaderRef.current.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } },
+          {
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              // Lay net lien tuc — quan trong voi camera dien thoai khi dua sat
+              // ma QR, neu khong camera co the giu nguyen focus xa ban dau.
+              advanced: [{ focusMode: "continuous" }],
+            },
+          },
           qrVideoRef.current,
           (res) => {
-            const v = res?.getText();
+            const v = res?.getText?.() || res?.text || "";
             if (v) { setQrToken(v); closeQrModal(); }
           },
         );
-      } catch { /* camera error */ }
+      } catch (err) {
+        setQrCameraOn(false);
+        setQrScanError(err?.message || "Không mở được camera QR. Kiểm tra quyền camera hoặc dán token thủ công.");
+      }
     }, 100);
   }
 
@@ -736,8 +808,10 @@ export default function UnifiedScanPage() {
                             </p>
                           )}
                           {isPackageBooking && !isPendingPaymentBooking && (
-                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                              Đã thanh toán trọn gói — không thu thêm phí lúc vào/ra trong kỳ hạn.
+                            <p className={`mt-1 text-sm ${lookupData.bookingType === "DAILY" ? "text-amber-700 dark:text-amber-300" : "text-blue-700 dark:text-blue-300"}`}>
+                              {lookupData.bookingType === "DAILY"
+                                ? "Đã thanh toán trọn gói ngày — chỉ 1 lượt vào và 1 lượt ra, không cho vào lại sau khi đã ra bãi."
+                                : "Đã thanh toán trọn gói — không thu thêm phí lúc vào/ra trong kỳ hạn."}
                             </p>
                           )}
                         </div>
@@ -949,6 +1023,11 @@ export default function UnifiedScanPage() {
               </div>
             </div>
             <p className="mt-3 text-center text-xs text-muted-foreground">Đưa mã QR của driver vào khung. Tự động nhận diện.</p>
+            {qrScanError && (
+              <p className="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {qrScanError}
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -100,17 +100,27 @@ public class FloorServiceImpl implements FloorService {
         return floorRepo.save(floor);
     }
 
+    // Doi tu xoa cung (delete/deleteAllInBatch) sang vo hieu hoa mem — tang that
+    // co the co booking/session lich su tham chieu toi slot/zone ben trong.
     @Override
     @Transactional
     public void deactivate(Long id, Long scopeBuildingId) {
         Floor floor = floorRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy tầng ID: " + id));
-        enforceBuildingOwnership(floor.getBuilding() != null ? floor.getBuilding().getId() : null, scopeBuildingId, "xoá");
-        var zones = zoneRepo.findByFloorId(floor.getId());
-        zones.forEach(zone -> parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId())));
-        zoneRepo.deleteAllInBatch(zones);
-        floorRepo.delete(floor);
+        enforceBuildingOwnership(floor.getBuilding() != null ? floor.getBuilding().getId() : null, scopeBuildingId, "vô hiệu hoá");
+
+        zoneRepo.findByFloorId(floor.getId()).forEach(zone -> {
+            parkingSlotRepo.findByZoneId(zone.getId()).forEach(slot -> {
+                slot.setIsActive(false);
+                parkingSlotRepo.save(slot);
+            });
+            zone.setIsActive(false);
+            zoneRepo.save(zone);
+        });
+
+        floor.setIsActive(false);
+        floorRepo.save(floor);
     }
 
     private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean buildingScoped) {

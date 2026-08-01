@@ -113,15 +113,23 @@ public class ZoneServiceImpl implements ZoneService {
         return zoneRepo.save(zone);
     }
 
+    // Doi tu xoa cung sang vo hieu hoa mem — zone that co the co slot dang gan
+    // voi booking/session lich su.
     @Override
     @Transactional
     public void deactivate(Long id, Long scopeBuildingId) {
         Zone zone = zoneRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy zone ID: " + id));
-        enforceBuildingOwnership(zone, scopeBuildingId, "xoá");
-        parkingSlotRepo.deleteAllInBatch(parkingSlotRepo.findByZoneId(zone.getId()));
-        zoneRepo.delete(zone);
+        enforceBuildingOwnership(zone, scopeBuildingId, "vô hiệu hoá");
+
+        parkingSlotRepo.findByZoneId(zone.getId()).forEach(slot -> {
+            slot.setIsActive(false);
+            parkingSlotRepo.save(slot);
+        });
+
+        zone.setIsActive(false);
+        zoneRepo.save(zone);
     }
 
     private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean buildingScoped) {

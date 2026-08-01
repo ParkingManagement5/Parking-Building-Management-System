@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.io.FileSystemResource;
+import java.time.Duration;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -297,7 +298,16 @@ public class OcrServiceImpl implements OcrService {
 
         private OcrRecognitionResult callEngine(Path imagePath) {
             try {
-                RestTemplate restTemplate = restTemplateBuilder.build();
+                // Khong duoc de RestTemplate mac dinh (timeout vo han) - neu OCR
+                // engine bi treo that (deadlock/qua tai), thread backend se cho
+                // vinh vien theo, khien request cua staff dung im "Dang nhan
+                // dien..." ma khong bao gio bao loi. Connect nhanh (engine chay
+                // local), read cho toi 25s de du thoi gian cho anh chat luong kem
+                // roi vao nhanh fallback nang cua OCR service.
+                RestTemplate restTemplate = restTemplateBuilder
+                        .setConnectTimeout(Duration.ofSeconds(5))
+                        .setReadTimeout(Duration.ofSeconds(25))
+                        .build();
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 

@@ -60,6 +60,7 @@ public class StaffShiftServiceImpl implements StaffShiftService {
     public List<StaffShiftResponse> getAllStaffShifts() {
         return staffShiftRepository.findAll()
                 .stream()
+                .filter(this::isActive)
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -68,16 +69,18 @@ public class StaffShiftServiceImpl implements StaffShiftService {
     public List<StaffShiftResponse> getAllStaffShiftsByBuilding(Long buildingId) {
         return staffShiftRepository.findAll()
                 .stream()
+                .filter(this::isActive)
                 .filter(ss -> matchesBuilding(ss, buildingId))
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    
+
     @Override
 public List<StaffShiftResponse> getByUser(Long userId) {
     return staffShiftRepository.findByUserUserId((int)(long) userId)
             .stream()
+            .filter(this::isActive)
             .map(this::toResponse)
             .collect(Collectors.toList());
 }
@@ -86,6 +89,7 @@ public List<StaffShiftResponse> getByUser(Long userId) {
     public List<StaffShiftResponse> getByWorkingDate(LocalDate workingDate) {
         return staffShiftRepository.findByWorkingDate(workingDate)
                 .stream()
+                .filter(this::isActive)
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -94,9 +98,14 @@ public List<StaffShiftResponse> getByUser(Long userId) {
     public List<StaffShiftResponse> getByWorkingDateAndBuilding(LocalDate workingDate, Long buildingId) {
         return staffShiftRepository.findByWorkingDate(workingDate)
                 .stream()
+                .filter(this::isActive)
                 .filter(ss -> matchesBuilding(ss, buildingId))
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    private boolean isActive(StaffShift ss) {
+        return ss.getIsActive() == null || ss.getIsActive();
     }
 
     private boolean matchesBuilding(StaffShift ss, Long buildingId) {
@@ -121,11 +130,14 @@ public List<StaffShiftResponse> getByUser(Long userId) {
         return toResponse(staffShift);
     }
 
+    // Doi tu xoa cung sang vo hieu hoa mem — giu lai lich su check-in/check-out
+    // neu ca da dien ra, chi an khoi cac danh sach dang hoat dong.
     @Override
     public void deleteStaffShift(Long id) {
         StaffShift staffShift = staffShiftRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "StaffShift not found"));
-        staffShiftRepository.delete(staffShift);
+        staffShift.setIsActive(false);
+        staffShiftRepository.save(staffShift);
     }
 
     @Override

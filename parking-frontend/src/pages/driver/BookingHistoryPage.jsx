@@ -354,8 +354,12 @@ export default function BookingHistoryPage() {
                   {item.qrToken && (
                     <div className="ml-[52px] rounded-xl border border-border bg-background p-4">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div className="flex size-32 shrink-0 items-center justify-center rounded-xl bg-white p-2">
-                          <QRCodeSVG value={item.qrToken} size={112} level="M" includeMargin={false} />
+                        <div className="flex size-64 shrink-0 items-center justify-center rounded-xl bg-white p-2">
+                          {/* level="L" (thay vi "H"): token JWT rat dai, muc sua loi cao (H) bat
+                              buoc chia o qua nho de chua du du phong — kho quet qua webcam nham
+                              vao man hinh khac. Token nay la du lieu so, khong in giay/xuoc nen
+                              khong can du phong cao, "L" giup o to hon, de quet hon nhieu. */}
+                          <QRCodeSVG value={item.qrToken} size={240} level="L" includeMargin />
                         </div>
                         <div className="min-w-0 flex-1 space-y-2">
                           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

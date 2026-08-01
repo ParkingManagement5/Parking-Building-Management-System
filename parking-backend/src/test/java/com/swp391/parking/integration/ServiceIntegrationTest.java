@@ -1,7 +1,6 @@
 package com.swp391.parking.integration;
 
 import com.swp391.parking.dto.request.AssignStaffShiftRequest;
-import com.swp391.parking.dto.request.BuildingRequest;
 import com.swp391.parking.dto.request.CreatePricingPolicyRequest;
 import com.swp391.parking.dto.request.FloorRequest;
 import com.swp391.parking.dto.request.GateRequest;
@@ -90,12 +89,12 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
     @Test
     void buildingServiceShouldDeleteNestedDataAndGates() {
-        ParkingBuilding building = buildingService.create(BuildingRequest.builder()
-            .name("Tower A")
-            .address("123 Street")
-            .openTime(LocalTime.of(6, 0))
-            .closeTime(LocalTime.of(22, 0))
-            .build());
+        // Dung helper createBuilding (insert thang qua repo, khong qua
+        // BuildingServiceImpl.create) de tranh dung do voi tang 1/2 ma
+        // scaffoldStandardLayout tu dong sinh khi goi buildingService.create
+        // that (xem BuildingServiceImpl) — test nay chi kiem tra deactivate()
+        // xoa dung cascade, khong lien quan toi hanh vi tu sinh cau truc.
+        ParkingBuilding building = createBuilding("Tower A");
 
         Floor floor = createFloor(building, 1);
         VehicleType vehicleType = createVehicleType("Car-A", VehicleType.SlotSize.MEDIUM);
@@ -105,11 +104,14 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         buildingService.deactivate(building.getId(), null);
 
-        assertTrue(buildingRepository.findById(building.getId()).isEmpty());
-        assertTrue(floorRepository.findByBuildingId(building.getId()).isEmpty());
-        assertTrue(gateRepository.findByBuildingId(building.getId()).isEmpty());
-        assertTrue(zoneRepository.findByFloorId(floor.getId()).isEmpty());
-        assertTrue(parkingSlotRepository.findByZoneId(zone.getId()).isEmpty());
+        // Deactivate gio la vo hieu hoa mem (khong con xoa cung) — du lieu van
+        // con nguyen, chi isActive chuyen ve false, tranh vo booking/session
+        // lich su tham chieu toi cac ban ghi nay.
+        assertFalse(buildingRepository.findById(building.getId()).orElseThrow().getIsActive());
+        assertFalse(gateRepository.findByBuildingId(building.getId()).get(0).getIsActive());
+        assertFalse(floorRepository.findByBuildingId(building.getId()).get(0).getIsActive());
+        assertFalse(zoneRepository.findByFloorId(floor.getId()).get(0).getIsActive());
+        assertFalse(parkingSlotRepository.findByZoneId(zone.getId()).get(0).getIsActive());
     }
 
     @Test
@@ -139,9 +141,10 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         assertEquals("Floor 2 Updated", updated.getName());
         assertEquals(Floor.Status.MAINTENANCE, updated.getStatus());
-        assertTrue(floorRepository.findById(updated.getId()).isEmpty());
-        assertTrue(zoneRepository.findByFloorId(updated.getId()).isEmpty());
-        assertTrue(parkingSlotRepository.findByZoneId(zone.getId()).isEmpty());
+        // Vo hieu hoa mem — giu nguyen du lieu, chi isActive=false.
+        assertFalse(floorRepository.findById(updated.getId()).orElseThrow().getIsActive());
+        assertFalse(zoneRepository.findByFloorId(updated.getId()).get(0).getIsActive());
+        assertFalse(parkingSlotRepository.findByZoneId(zone.getId()).get(0).getIsActive());
     }
 
     @Test
@@ -211,13 +214,14 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
             .status(Zone.Status.MAINTENANCE)
             .build(), null);
 
-        createSlot(updated, "S-E1", ParkingSlot.Status.AVAILABLE);
+        ParkingSlot slot = createSlot(updated, "S-E1", ParkingSlot.Status.AVAILABLE);
         zoneService.deactivate(updated.getId(), null);
 
         assertEquals("E1 Updated", updated.getName());
         assertEquals(Zone.Status.MAINTENANCE, updated.getStatus());
-        assertTrue(zoneRepository.findById(updated.getId()).isEmpty());
-        assertTrue(parkingSlotRepository.findByZoneId(updated.getId()).isEmpty());
+        // Vo hieu hoa mem — giu nguyen du lieu, chi isActive=false.
+        assertFalse(zoneRepository.findById(updated.getId()).orElseThrow().getIsActive());
+        assertFalse(parkingSlotRepository.findById(slot.getId()).orElseThrow().getIsActive());
     }
 
     @Test
@@ -243,7 +247,8 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertThrows(AppException.class, () -> parkingSlotService.validateSelectable(created.getId()));
 
         parkingSlotService.delete(created.getId(), null);
-        assertTrue(parkingSlotRepository.findById(created.getId()).isEmpty());
+        // Vo hieu hoa mem — giu nguyen du lieu, chi isActive=false.
+        assertFalse(parkingSlotRepository.findById(created.getId()).orElseThrow().getIsActive());
     }
 
     @Test
@@ -350,7 +355,9 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertEquals("INACTIVE", updated.getStatus());
 
         shiftService.deleteShift(created.getShiftId());
-        assertTrue(shiftRepository.findById(created.getShiftId()).isEmpty());
+        // Vo hieu hoa mem (status=INACTIVE) — giu nguyen du lieu vi staff_shift
+        // co the da tham chieu shift_id nay.
+        assertEquals("INACTIVE", shiftRepository.findById(created.getShiftId()).orElseThrow().getStatus());
     }
 
     @Test
@@ -377,7 +384,11 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
         assertEquals(shiftTwo.getShiftId(), updated.getShiftId());
 
         staffShiftService.deleteStaffShift(created.getStaffShiftId());
-        assertTrue(staffShiftRepository.findById(created.getStaffShiftId()).isEmpty());
+        // Vo hieu hoa mem (isActive=false) — giu lai lich su check-in/check-out
+        // neu ca da dien ra, chi an khoi danh sach dang hoat dong (xem
+        // getByUser/getByWorkingDate da loc isActive o tren).
+        assertFalse(staffShiftRepository.findById(created.getStaffShiftId()).orElseThrow().getIsActive());
+        assertEquals(0, staffShiftService.getByUser(staff.getUserId().longValue()).size());
     }
 
     @Test

@@ -18,11 +18,15 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
 
 const TIME_TYPE_LABELS = { HOURLY: "Theo giờ", DAILY: "Theo ngày", WEEKLY: "Theo tuần", MONTHLY: "Theo tháng" };
 const DAY_TYPE_LABELS = { WEEKDAY: "Ngày thường", WEEKEND: "Cuối tuần", HOLIDAY: "Ngày lễ" };
 
 export default function PricingPolicyPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [policies, setPolicies] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -32,6 +36,7 @@ export default function PricingPolicyPage() {
   const [filterTimeType, setFilterTimeType] = useState("");
   const [filterDayType, setFilterDayType] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [formErrors, setFormErrors] = useState({});
   const [form, setForm] = useState({
     vehicleTypeId: "",
     buildingId: "",
@@ -59,12 +64,13 @@ export default function PricingPolicyPage() {
       setPolicies(unwrapApiData(policyRes.data, []));
     } catch (error) {
       console.error("Failed to load pricing data", error);
-      alert("Không tải được danh sách bảng giá");
+      toast.error("Không tải được danh sách bảng giá");
     }
   }
 
   const resetForm = () => {
     setEditingId(null);
+    setFormErrors({});
     setForm({
       vehicleTypeId: "",
       buildingId: "",
@@ -90,12 +96,16 @@ export default function PricingPolicyPage() {
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
     setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.vehicleTypeId || !form.pricePerHour) {
-      alert("Loại xe và giá là bắt buộc");
+    const errors = {};
+    if (!form.vehicleTypeId) errors.vehicleTypeId = "Loại xe là bắt buộc";
+    if (!form.pricePerHour) errors.pricePerHour = "Giá là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
 
@@ -124,15 +134,17 @@ export default function PricingPolicyPage() {
       }
       await loadInitialData();
       setPage(1);
+      toast.success(editingId ? "Đã cập nhật bảng giá" : "Đã tạo bảng giá mới");
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save pricing policy", error);
-      alert(error.response?.data?.message || "Lưu bảng giá thất bại");
+      toast.error(error.response?.data?.message || "Lưu bảng giá thất bại");
     }
   };
 
   const handleEdit = (item) => {
     setEditingId(item.policyId);
+    setFormErrors({});
     setForm({
       vehicleTypeId: item.vehicleTypeId,
       buildingId: item.buildingId ?? "",
@@ -147,18 +159,28 @@ export default function PricingPolicyPage() {
   };
 
   const handleDeactivate = async (id) => {
-    if (!window.confirm("Tắt bảng giá này? Các phiên đỗ xe cũ vẫn giữ nguyên giá lịch sử, chỉ dừng áp dụng cho phiên mới.")) return;
+    const ok = await confirm({
+      title: "Tắt bảng giá này?",
+      message: "Các phiên đỗ xe cũ vẫn giữ nguyên giá lịch sử, chỉ dừng áp dụng cho phiên mới.",
+      confirmLabel: "Tắt",
+      tone: "warning",
+    });
+    if (!ok) return;
     try {
       await pricingPolicyApi.delete(id);
+      toast.success("Đã tắt bảng giá");
       await loadInitialData();
     } catch (error) {
       console.error("Failed to deactivate pricing policy", error);
-      alert(error.response?.data?.message || "Tắt bảng giá thất bại");
+      toast.error(error.response?.data?.message || "Tắt bảng giá thất bại");
     }
   };
 
   const filteredPolicies = useMemo(() => {
     return policies.filter((p) => {
+      // Bo qua bang gia mac dinh toan he thong (khong co buildingId) - manager
+      // khong sua/tat duoc nen chi lam roi mat, chi hien bang gia rieng cua toa minh.
+      if (!p.buildingId) return false;
       if (filterVehicleType && String(p.vehicleTypeId) !== String(filterVehicleType)) return false;
       if (filterTimeType && p.timeType !== filterTimeType) return false;
       if (filterDayType && p.dayType !== filterDayType) return false;
@@ -257,11 +279,7 @@ export default function PricingPolicyPage() {
             {pagedPolicies.map((item) => (
               <ManagerRow key={item.policyId}>
                 <ManagerCell>{vehicleTypeMap[item.vehicleTypeId] || item.vehicleTypeId}</ManagerCell>
-                <ManagerCell>
-                  {item.buildingId ? (item.buildingName || item.buildingId) : (
-                    <ManagerStatusBadge tone="slate">Mặc định (Global)</ManagerStatusBadge>
-                  )}
-                </ManagerCell>
+                <ManagerCell>{item.buildingName || item.buildingId}</ManagerCell>
                 <ManagerCell><ManagerStatusBadge tone="blue">{TIME_TYPE_LABELS[item.timeType] || item.timeType}</ManagerStatusBadge></ManagerCell>
                 <ManagerCell>{DAY_TYPE_LABELS[item.dayType] || item.dayType}</ManagerCell>
                 <ManagerCell>{item.startHour ?? "-"} - {item.endHour ?? "-"}</ManagerCell>
@@ -270,16 +288,12 @@ export default function PricingPolicyPage() {
                   <ManagerStatusBadge tone={item.isActive ? "emerald" : "amber"}>{item.isActive ? "Đang bật" : "Đã tắt"}</ManagerStatusBadge>
                 </ManagerCell>
                 <ManagerCell>
-                  {!item.buildingId ? (
-                    <span className="text-xs text-muted-foreground whitespace-nowrap" title="Bảng giá mặc định cũ, không còn tạo mới được — tạo bảng giá riêng cho toà bạn để ghi đè giá này">Giá mặc định</span>
-                  ) : (
-                    <div className="flex gap-2">
-                      <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
-                      {item.isActive && (
-                        <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivate(item.policyId)}>Tắt</ManagerSecondaryButton>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    <ManagerSecondaryButton type="button" onClick={() => handleEdit(item)}>Sửa</ManagerSecondaryButton>
+                    {item.isActive && (
+                      <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDeactivate(item.policyId)}>Tắt</ManagerSecondaryButton>
+                    )}
+                  </div>
                 </ManagerCell>
               </ManagerRow>
             ))}
@@ -318,7 +332,7 @@ export default function PricingPolicyPage() {
               </button>
             </div>
             <ManagerForm onSubmit={handleSubmit}>
-              <ManagerField label="Loại xe">
+              <ManagerField label="Loại xe" error={formErrors.vehicleTypeId}>
                 <ManagerSelect name="vehicleTypeId" value={form.vehicleTypeId} onChange={handleChange}>
                   <option value="">Chọn loại xe</option>
                   {vehicleTypes.map((item) => (
@@ -351,7 +365,7 @@ export default function PricingPolicyPage() {
                   <ManagerInput type="number" name="endHour" value={form.endHour} onChange={handleChange} placeholder="22" />
                 </ManagerField>
               </div>
-              <ManagerField label="Giá theo giờ">
+              <ManagerField label="Giá theo giờ" error={formErrors.pricePerHour}>
                 <ManagerInput type="number" name="pricePerHour" value={form.pricePerHour} onChange={handleChange} placeholder="20000" />
               </ManagerField>
               <label className="flex items-center gap-2 rounded-2xl border border-border bg-muted px-3 py-3 text-sm text-foreground">

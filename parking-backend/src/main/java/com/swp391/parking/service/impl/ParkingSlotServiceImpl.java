@@ -183,14 +183,17 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
         }
     }
 
+    // Doi tu xoa cung sang vo hieu hoa mem — slot that co the co booking/
+    // session lich su tham chieu slot_id.
     @Override
     @Transactional
     public void delete(Long id, Long scopeBuildingId) {
         ParkingSlot slot = slotRepo.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
                         "Không tìm thấy slot ID: " + id));
-        enforceBuildingOwnership(slot.getZone(), scopeBuildingId, "xoá");
-        slotRepo.delete(slot);
+        enforceBuildingOwnership(slot.getZone(), scopeBuildingId, "vô hiệu hoá");
+        slot.setIsActive(false);
+        slotRepo.save(slot);
     }
 
     private void enforceStaffBuildingScope(Long buildingId, Long currentUserId, boolean buildingScoped) {

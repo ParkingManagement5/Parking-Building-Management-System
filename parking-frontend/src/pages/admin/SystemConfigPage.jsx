@@ -10,6 +10,7 @@ import {
   ManagerPanel,
   ManagerRow,
 } from "../../ui/components/manager/ManagerUi";
+import { useToast } from "../../ui/components/Toast";
 
 const GROUP_META = {
   OCR: { title: "Hệ thống OCR" },
@@ -73,6 +74,7 @@ function serializeToggleValue(value, originalValue) {
 }
 
 export default function SystemConfigPage() {
+  const toast = useToast();
   const [configs, setConfigs] = useState([]);
   const [page, setPage] = useState(1);
   const [draftValues, setDraftValues] = useState({});
@@ -94,7 +96,7 @@ export default function SystemConfigPage() {
       );
     } catch (error) {
       console.error("Failed to load system configs", error);
-      alert("Không tải được cấu hình hệ thống");
+      toast.error("Không tải được cấu hình hệ thống");
       setConfigs([]);
       setDraftValues({});
     }
@@ -160,7 +162,7 @@ export default function SystemConfigPage() {
   const handleSaveChanges = async () => {
     const userId = getUserId();
     if (!userId) {
-      alert("Vui lòng đăng nhập lại để quản lý cấu hình hệ thống");
+      toast.error("Vui lòng đăng nhập lại để quản lý cấu hình hệ thống");
       return;
     }
 
@@ -189,9 +191,10 @@ export default function SystemConfigPage() {
       );
 
       await loadConfigs();
+      toast.success("Đã lưu cấu hình hệ thống");
     } catch (error) {
       console.error("Failed to save system configs", error);
-      alert("Lưu cấu hình hệ thống thất bại");
+      toast.error("Lưu cấu hình hệ thống thất bại");
     } finally {
       setSaving(false);
     }

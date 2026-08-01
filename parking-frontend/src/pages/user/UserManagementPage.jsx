@@ -17,6 +17,8 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
 
 function toneForRole(role) {
   const value = String(role || "").replace(/^ROLE_/, "").toUpperCase();
@@ -40,6 +42,8 @@ function roleLabel(value) {
 const USER_STATUS_LABELS = { ACTIVE: "Đang hoạt động", LOCKED: "Đã khóa", INACTIVE: "Ngừng hoạt động" };
 
 export default function UserManagementPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [allUsers, setAllUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState("ALL");
@@ -48,8 +52,6 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState(null);
   const [roleDraft, setRoleDraft] = useState("");
   const [savingRole, setSavingRole] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [actionMessage, setActionMessage] = useState("");
   const [statusChangingId, setStatusChangingId] = useState(null);
   const [buildings, setBuildings] = useState([]);
   const [buildingModalUser, setBuildingModalUser] = useState(null);
@@ -151,8 +153,6 @@ export default function UserManagementPage() {
   const openRoleEditor = (user) => {
     setEditingUser(user);
     setRoleDraft(roleLabel(user.role));
-    setActionError("");
-    setActionMessage("");
   };
 
   const closeRoleEditor = () => {
@@ -173,17 +173,15 @@ export default function UserManagementPage() {
     }
 
     setSavingRole(true);
-    setActionError("");
-    setActionMessage("");
 
     try {
       await userApi.changeRole(editingUser.userId, roleDraft);
       await loadUsers();
-      setActionMessage(`Đã đổi vai trò của ${editingUser.username} thành ${roleDraft}.`);
+      toast.success(`Đã đổi vai trò của ${editingUser.username} thành ${roleDraft}.`);
       closeRoleEditor();
     } catch (err) {
       console.error("Failed to update user role", err);
-      setActionError(err.response?.data?.message || "Không thể cập nhật vai trò người dùng.");
+      toast.error(err.response?.data?.message || "Không thể cập nhật vai trò người dùng.");
       setSavingRole(false);
     }
   };
@@ -191,8 +189,6 @@ export default function UserManagementPage() {
   const openBuildingEditor = (user) => {
     setBuildingModalUser(user);
     setBuildingDraft(user.assignedBuildingId || "");
-    setActionError("");
-    setActionMessage("");
   };
 
   const closeBuildingEditor = () => {
@@ -204,12 +200,10 @@ export default function UserManagementPage() {
   const handleSaveBuilding = async () => {
     if (!buildingModalUser) return;
     setSavingBuilding(true);
-    setActionError("");
-    setActionMessage("");
     try {
       await userApi.assignBuilding(buildingModalUser.userId, buildingDraft || null);
       await loadUsers();
-      setActionMessage(
+      toast.success(
         buildingDraft
           ? `Đã gán ${buildingModalUser.username} vào toà nhà đã chọn.`
           : `Đã gỡ ${buildingModalUser.username} khỏi toà nhà.`
@@ -217,31 +211,33 @@ export default function UserManagementPage() {
       closeBuildingEditor();
     } catch (err) {
       console.error("Failed to assign building", err);
-      setActionError(err.response?.data?.message || "Không thể gán toà nhà cho người dùng.");
+      toast.error(err.response?.data?.message || "Không thể gán toà nhà cho người dùng.");
       setSavingBuilding(false);
     }
   };
 
   const handleToggleStatus = async (user) => {
     const nextStatus = user.status === "LOCKED" ? "ACTIVE" : "LOCKED";
-    const confirmText =
-      nextStatus === "LOCKED"
-        ? `Khóa tài khoản ${user.username}? Người này sẽ không thể đăng nhập.`
-        : `Mở khóa tài khoản ${user.username}?`;
-    if (!window.confirm(confirmText)) return;
+    const ok = await confirm({
+      title: nextStatus === "LOCKED" ? "Khóa tài khoản?" : "Mở khóa tài khoản?",
+      message: nextStatus === "LOCKED"
+        ? `Tài khoản ${user.username} sẽ không thể đăng nhập.`
+        : `Xác nhận mở khóa tài khoản ${user.username}.`,
+      confirmLabel: nextStatus === "LOCKED" ? "Khóa" : "Mở khóa",
+      tone: nextStatus === "LOCKED" ? "danger" : "default",
+    });
+    if (!ok) return;
 
     setStatusChangingId(user.userId);
-    setActionError("");
-    setActionMessage("");
     try {
       await userApi.changeStatus(user.userId, nextStatus);
       await loadUsers();
-      setActionMessage(
+      toast.success(
         nextStatus === "LOCKED" ? `Đã khóa tài khoản ${user.username}.` : `Đã mở khóa tài khoản ${user.username}.`
       );
     } catch (err) {
       console.error("Failed to update user status", err);
-      setActionError(err.response?.data?.message || "Không thể cập nhật trạng thái người dùng.");
+      toast.error(err.response?.data?.message || "Không thể cập nhật trạng thái người dùng.");
     } finally {
       setStatusChangingId(null);
     }
@@ -277,18 +273,6 @@ export default function UserManagementPage() {
             ))}
           </div>
         </div>
-
-        {actionMessage ? (
-          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-            {actionMessage}
-          </div>
-        ) : null}
-
-        {actionError ? (
-          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-            {actionError}
-          </div>
-        ) : null}
 
         {error ? (
           <ManagerEmptyState title="Không tải được người dùng" description={error} />

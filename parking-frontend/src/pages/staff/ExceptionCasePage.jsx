@@ -105,9 +105,13 @@ export default function ExceptionCasePage() {
   const [forceExitGateId, setForceExitGateId] = useState({});
 
   // ─── Báo cáo & Cho xe ra ──────────────────────────────────────────────
+  // Exit QR da bo hoan toan (xe ra chi con xac minh bang bien so) nen bo
+  // "LOST_QR" khoi danh sach tao MOI (van giu trong EXCEPTION_TYPE_LABELS/
+  // EXIT_TYPES/exceptionMeta o tren de hien thi dung cho cac case cu da tao
+  // tu truoc khi bo QR) - va doi lai chu "EXIT_VERIFICATION_FAILED" cho dung
+  // ly do that su gio la xac minh bien so, khong con la loi scan QR nua.
   const REPORT_TYPES = [
-    { value: "LOST_QR",                  label: "Mất QR — xe không scan được QR ra" },
-    { value: "EXIT_VERIFICATION_FAILED", label: "QR lỗi — scan thất bại hoặc QR hỏng" },
+    { value: "EXIT_VERIFICATION_FAILED", label: "Không xác minh được xe — biển số không khớp hoặc không đọc được" },
     { value: "SYSTEM_ERROR",             label: "Lỗi hệ thống — không xử lý được tự động" },
     { value: "OTHER",                    label: "Khác" },
   ];
@@ -115,7 +119,7 @@ export default function ExceptionCasePage() {
   const [rSession, setRSession]     = useState(null);
   const [rSearching, setRSearching] = useState(false);
   const [rSearchErr, setRSearchErr] = useState("");
-  const [rType, setRType]           = useState("LOST_QR");
+  const [rType, setRType]           = useState("EXIT_VERIFICATION_FAILED");
   const [rDesc, setRDesc]           = useState("");
   const [rGateId, setRGateId]       = useState("");
   const [rSubmitting, setRSubmitting] = useState(false);

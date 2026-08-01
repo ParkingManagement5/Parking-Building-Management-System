@@ -68,48 +68,6 @@ export const FLOOR_PLANS = {
   },
 
   /* ────────────────────────────────────────────────
-     pink pi – Tầng 1 (2 xe máy top + 2 ô tô bottom)
-  ──────────────────────────────────────────────── */
-  "pink pi|1": {
-    vbW: 900, vbH: 520,
-    bg: "#fdf0f5",
-    route: { entryX: 62, entryY: 38, laneY: 262 },
-    decorations: [
-      { type: "rect", x: 4, y: 4, w: 892, h: 512, rx: 10, fill: "#f0c8dc", stroke: "#d48aac", sw: 1.5 },
-      { type: "rect", x: 12, y: 12, w: 876, h: 496, rx: 8, fill: "#fef5f9", stroke: "#e8b0cc", sw: 0.8 },
-      // Road lane between xe máy and ô tô rows
-      { type: "lane", x: 12, y: 242, w: 876, h: 40, fill: "#e8b0cc" },
-      // Divider lane between left/right zones
-      { type: "lane", x: 444, y: 44, w: 12, h: 190, dir: "v", fill: "#e8b0cc", arrows: false },
-      { type: "lane", x: 444, y: 290, w: 12, h: 200, dir: "v", fill: "#e8b0cc", arrows: false },
-      // Entry gate (left top)
-      { type: "rect", x: 12, y: 12, w: 100, h: 26, rx: 4, fill: "#22c55e" },
-      { type: "text", x: 62, y: 25, text: "▶ CỔNG VÀO", fontSize: 8.5, fill: "#fff", anchor: "middle" },
-      // Exit gate (right top)
-      { type: "rect", x: 788, y: 12, w: 100, h: 26, rx: 4, fill: "#ef4444" },
-      { type: "text", x: 838, y: 25, text: "CỔNG RA ◀", fontSize: 8.5, fill: "#fff", anchor: "middle" },
-      // Both gate (bottom-center)
-      { type: "rect", x: 350, y: 486, w: 200, h: 26, rx: 4, fill: "#8b5cf6" },
-      { type: "text", x: 450, y: 499, text: "↕ CỔNG VÀO / RA", fontSize: 8.5, fill: "#fff", anchor: "middle" },
-      // Zone type labels
-      { type: "rect", x: 20, y: 44, w: 80, h: 18, rx: 3, fill: "#16a34a" },
-      { type: "text", x: 60, y: 53, text: "XE MÁY", fontSize: 7.5, fill: "#fff", anchor: "middle" },
-      { type: "rect", x: 462, y: 44, w: 80, h: 18, rx: 3, fill: "#16a34a" },
-      { type: "text", x: 502, y: 53, text: "XE MÁY", fontSize: 7.5, fill: "#fff", anchor: "middle" },
-      { type: "rect", x: 20, y: 290, w: 60, h: 18, rx: 3, fill: "#2563eb" },
-      { type: "text", x: 50, y: 299, text: "Ô TÔ", fontSize: 7.5, fill: "#fff", anchor: "middle" },
-      { type: "rect", x: 462, y: 290, w: 60, h: 18, rx: 3, fill: "#2563eb" },
-      { type: "text", x: 492, y: 299, text: "Ô TÔ", fontSize: 7.5, fill: "#fff", anchor: "middle" },
-    ],
-    zones: [
-      { match: "B2-XM-A", x: 20, y: 44, w: 416, h: 190 },
-      { match: "B2-XM-B", x: 464, y: 44, w: 416, h: 190 },
-      { match: "B2-OT-A", x: 20, y: 290, w: 416, h: 200 },
-      { match: "B2-OT-B", x: 464, y: 290, w: 416, h: 200 },
-    ],
-  },
-
-  /* ────────────────────────────────────────────────
      Bãi xe Bến Bạch Đằng – dải hẹp uốn theo bờ sông
      Sài Gòn, mặt tiền Tôn Đức Thắng. 1 hàng zone dọc
      theo chiều dài (đặc trưng lô đất ven sông).

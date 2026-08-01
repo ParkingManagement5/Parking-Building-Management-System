@@ -16,13 +16,18 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
 
 const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
 
 export default function VehicleTypePage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -41,12 +46,13 @@ export default function VehicleTypePage() {
       setVehicleTypes(unwrapApiData(res.data, []));
     } catch (error) {
       console.error("Failed to fetch vehicle types", error);
-      alert("Không tải được danh sách loại xe");
+      toast.error("Không tải được danh sách loại xe");
     }
   }
 
   const resetForm = () => {
     setEditingId(null);
+    setFormError("");
     setForm({
       name: "",
       description: "",
@@ -69,7 +75,7 @@ export default function VehicleTypePage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      alert("Tên loại xe là bắt buộc");
+      setFormError("Tên loại xe là bắt buộc");
       return;
     }
 
@@ -88,15 +94,17 @@ export default function VehicleTypePage() {
         await vehicleTypeApi.create(payload);
       }
       await fetchVehicleTypes();
+      toast.success(editingId ? "Đã cập nhật loại xe" : "Đã tạo loại xe mới");
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save vehicle type", error);
-      alert("Lưu loại xe thất bại");
+      toast.error("Lưu loại xe thất bại");
     }
   };
 
   const handleEdit = (item) => {
     setEditingId(item.vehicleTypeId || item.id);
+    setFormError("");
     setForm({
       name: item.name || "",
       description: item.description || "",
@@ -108,13 +116,15 @@ export default function VehicleTypePage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Xóa loại xe này?")) return;
+    const ok = await confirm({ title: "Xóa loại xe này?", confirmLabel: "Xóa", tone: "danger" });
+    if (!ok) return;
     try {
       await vehicleTypeApi.delete(id);
+      toast.success("Đã xóa loại xe");
       await fetchVehicleTypes();
     } catch (error) {
       console.error("Failed to delete vehicle type", error);
-      alert("Xóa loại xe thất bại");
+      toast.error("Xóa loại xe thất bại");
     }
   };
 
@@ -166,8 +176,8 @@ export default function VehicleTypePage() {
               </button>
             </div>
             <ManagerForm onSubmit={handleSubmit}>
-              <ManagerField label="Tên loại xe">
-                <ManagerInput value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ô tô" />
+              <ManagerField label="Tên loại xe" error={formError}>
+                <ManagerInput value={form.name} onChange={(event) => { setForm({ ...form, name: event.target.value }); setFormError(""); }} placeholder="Ô tô" />
               </ManagerField>
               <ManagerField label="Mô tả">
                 <ManagerInput value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Xe chở khách tiêu chuẩn" />

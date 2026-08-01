@@ -535,7 +535,7 @@ export default function DriverFindParkingPage() {
                 </div>
                 <aside>
                   {selSlot
-                    ? <DetailPanel slot={selSlot} st={selSt} session={sessionForPlanBuilding} zone={selSlotZone} floor={planFloor} />
+                    ? <DetailPanel slot={selSlot} st={selSt} session={sessionForPlanBuilding} zone={selSlotZone} floor={planFloor} building={planBuilding} />
                     : <div className="rounded-2xl border border-border bg-background p-5 text-center">
                         <MapPin className="mx-auto size-5 text-muted-foreground mb-2" />
                         <p className="text-[10px] text-muted-foreground">Bấm vào 1 vị trí để xem chi tiết</p>

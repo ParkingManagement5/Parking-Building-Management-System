@@ -162,6 +162,17 @@ html { scroll-behavior: smooth; }
 .ps-landing ul { list-style: none; }
 .ps-landing img { max-width: 100%; display: block; }
 
+/* RolePortalLayout (shell dung chung cho driver/staff/manager/admin) muon
+   dung lai background/reset (a/ul/img) cua .ps-landing nen van gan class
+   nay, nhung KHONG duoc ke thua font Outfit — toan bo dashboard phai dung
+   Inter dong bo voi phan con lai cua app (giong ly do auth-layout da tach
+   rieng o tren). RolePortalLayout gan them class "dash-shell" de override
+   rieng font o day, thay vi doi ca .ps-landing (se anh huong nguoc len
+   LandingPage/PublicLayout dang co tinh dung Outfit that). */
+.ps-landing.dash-shell {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
 .container {
   max-width: 1280px;
   margin: 0 auto;

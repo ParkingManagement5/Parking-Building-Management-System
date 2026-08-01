@@ -19,6 +19,8 @@ import {
   ManagerStatusBadge,
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
 
 const DAY_LABELS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
 
@@ -65,6 +67,8 @@ const ATTENDANCE_DOT = {
 };
 
 export default function StaffShiftPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const isManager = getRole() === "MANAGER";
   const assignedBuildingId = getAssignedBuildingId();
   const [staffUsers, setStaffUsers] = useState([]);
@@ -81,6 +85,8 @@ export default function StaffShiftPage() {
   const [staffPage, setStaffPage] = useState(1);
   const [filterStaffSearch, setFilterStaffSearch] = useState("");
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [formErrors, setFormErrors] = useState({});
+  const [createStaffErrors, setCreateStaffErrors] = useState({});
   const [form, setForm] = useState({
     userId: "",
     shiftId: "",
@@ -155,6 +161,7 @@ export default function StaffShiftPage() {
 
   const resetForm = () => {
     setEditingId(null);
+    setFormErrors({});
     setForm({ userId: "", shiftId: "", workingDate: "" });
   };
 
@@ -165,6 +172,7 @@ export default function StaffShiftPage() {
 
   const openCreateModalFor = (shiftId, workingDate) => {
     setEditingId(null);
+    setFormErrors({});
     setForm({ userId: "", shiftId: String(shiftId), workingDate });
     setShowModal(true);
   };
@@ -176,12 +184,17 @@ export default function StaffShiftPage() {
 
   const handleChange = (event) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }));
+    setFormErrors((prev) => ({ ...prev, [event.target.name]: undefined }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.userId || !form.shiftId || !form.workingDate) {
-      alert("Nhân viên, ca làm và ngày làm việc là bắt buộc");
+    const errors = {};
+    if (!form.userId) errors.userId = "Nhân viên là bắt buộc";
+    if (!form.shiftId) errors.shiftId = "Ca làm là bắt buộc";
+    if (!form.workingDate) errors.workingDate = "Ngày làm việc là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
 
@@ -198,15 +211,17 @@ export default function StaffShiftPage() {
         await staffShiftApi.create(payload);
       }
       await loadInitialData();
+      toast.success(editingId ? "Đã cập nhật ca làm" : "Đã gán ca làm");
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save staff shift", error);
-      alert("Lưu ca làm thất bại");
+      toast.error("Lưu ca làm thất bại");
     }
   };
 
   const handleEdit = (item) => {
     setEditingId(item.staffShiftId);
+    setFormErrors({});
     setForm({
       userId: String(item.userId),
       shiftId: String(item.shiftId),
@@ -215,45 +230,69 @@ export default function StaffShiftPage() {
     setShowModal(true);
   };
 
+  // Goi la handleDelete/Xoa nhung backend gio la vo hieu hoa mem (isActive=
+  // false) — giu lai lich su check-in/check-out neu ca da dien ra, chi an
+  // khoi danh sach dang hoat dong.
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa ca làm này?")) return;
+    const ok = await confirm({
+      title: "Bỏ phân ca này?",
+      message: "Lịch sử chấm công (nếu có) vẫn được giữ lại.",
+      confirmLabel: "Bỏ phân ca",
+      tone: "warning",
+    });
+    if (!ok) return;
     try {
       await staffShiftApi.delete(id);
+      toast.success("Đã bỏ phân ca");
       await loadInitialData();
     } catch (error) {
-      console.error("Failed to delete staff shift", error);
-      alert("Xóa ca làm thất bại");
+      console.error("Failed to deactivate staff shift", error);
+      toast.error("Bỏ phân ca thất bại");
     } finally {
       handleCloseModal();
     }
   };
 
   const handleUnassignBuilding = async (userId) => {
-    if (!window.confirm("Gỡ nhân viên này khỏi toà nhà? Nhân viên sẽ không thao tác được cho đến khi được gán lại.")) return;
+    const ok = await confirm({
+      title: "Gỡ nhân viên khỏi toà nhà?",
+      message: "Nhân viên sẽ không thao tác được cho đến khi được gán lại.",
+      confirmLabel: "Gỡ khỏi toà",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await axiosClient.put(`/users/${userId}/assign-building`);
+      toast.success("Đã gỡ nhân viên khỏi toà nhà");
       await loadInitialData();
     } catch (error) {
       console.error("Failed to unassign building", error);
-      alert(error.response?.data?.message || "Gỡ khỏi toà thất bại");
+      toast.error(error.response?.data?.message || "Gỡ khỏi toà thất bại");
     }
   };
 
   const handleCreateStaff = async (event) => {
     event.preventDefault();
     const { username, fullName, email, password } = createStaffForm;
-    if (!username.trim() || !fullName.trim() || !email.trim() || !password.trim()) {
-      alert("Username, họ tên, email và mật khẩu là bắt buộc");
+    const errors = {};
+    if (!username.trim()) errors.username = "Username là bắt buộc";
+    if (!fullName.trim()) errors.fullName = "Họ tên là bắt buộc";
+    if (!email.trim()) errors.email = "Email là bắt buộc";
+    if (!password.trim()) errors.password = "Mật khẩu là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setCreateStaffErrors(errors);
       return;
     }
     try {
       await axiosClient.post("/users/staff", createStaffForm);
       setShowCreateStaffModal(false);
       setCreateStaffForm({ username: "", fullName: "", email: "", phone: "", password: "" });
+      setCreateStaffErrors({});
+      toast.success("Đã tạo nhân viên mới");
       await loadInitialData();
     } catch (error) {
       console.error("Failed to create staff", error);
-      alert(error.response?.data?.message || "Tạo nhân viên thất bại");
+      toast.error(error.response?.data?.message || "Tạo nhân viên thất bại");
     }
   };
 
@@ -360,7 +399,7 @@ export default function StaffShiftPage() {
                 <ChevronRight size={14} />
               </button>
             </div>
-            <ManagerSecondaryButton type="button" onClick={() => setShowCreateStaffModal(true)} className="flex items-center gap-2">
+            <ManagerSecondaryButton type="button" onClick={() => { setCreateStaffErrors({}); setShowCreateStaffModal(true); }} className="flex items-center gap-2">
               <Plus size={14} /> Tạo nhân viên mới
             </ManagerSecondaryButton>
             <ManagerPrimaryButton type="button" onClick={openCreateModal} className="flex items-center gap-2">
@@ -469,8 +508,9 @@ export default function StaffShiftPage() {
                 await axiosClient.put(`/users/${buildingForm.userId}/assign-building?buildingId=${buildingForm.buildingId}`);
                 setShowBuildingModal(false);
                 await loadInitialData();
+                toast.success("Đã gán tòa nhà cho nhân viên");
               } catch (err) {
-                alert(err.response?.data?.message || "Gán tòa nhà thất bại");
+                toast.error(err.response?.data?.message || "Gán tòa nhà thất bại");
               }
             }}>
               <ManagerField label="Tòa nhà">
@@ -509,25 +549,25 @@ export default function StaffShiftPage() {
               </button>
             </div>
             <ManagerForm onSubmit={handleCreateStaff}>
-              <ManagerField label="Username">
+              <ManagerField label="Username" error={createStaffErrors.username}>
                 <ManagerInput value={createStaffForm.username}
-                  onChange={(e) => setCreateStaffForm((p) => ({ ...p, username: e.target.value }))} placeholder="staff_nguyenvana" />
+                  onChange={(e) => { setCreateStaffForm((p) => ({ ...p, username: e.target.value })); setCreateStaffErrors((p) => ({ ...p, username: undefined })); }} placeholder="staff_nguyenvana" />
               </ManagerField>
-              <ManagerField label="Họ tên">
+              <ManagerField label="Họ tên" error={createStaffErrors.fullName}>
                 <ManagerInput value={createStaffForm.fullName}
-                  onChange={(e) => setCreateStaffForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="Nguyễn Văn A" />
+                  onChange={(e) => { setCreateStaffForm((p) => ({ ...p, fullName: e.target.value })); setCreateStaffErrors((p) => ({ ...p, fullName: undefined })); }} placeholder="Nguyễn Văn A" />
               </ManagerField>
-              <ManagerField label="Email">
+              <ManagerField label="Email" error={createStaffErrors.email}>
                 <ManagerInput type="email" value={createStaffForm.email}
-                  onChange={(e) => setCreateStaffForm((p) => ({ ...p, email: e.target.value }))} placeholder="staff@parksmart.local" />
+                  onChange={(e) => { setCreateStaffForm((p) => ({ ...p, email: e.target.value })); setCreateStaffErrors((p) => ({ ...p, email: undefined })); }} placeholder="staff@parksmart.local" />
               </ManagerField>
               <ManagerField label="Số điện thoại (tuỳ chọn)">
                 <ManagerInput value={createStaffForm.phone}
                   onChange={(e) => setCreateStaffForm((p) => ({ ...p, phone: e.target.value }))} placeholder="09xxxxxxxx" />
               </ManagerField>
-              <ManagerField label="Mật khẩu">
+              <ManagerField label="Mật khẩu" error={createStaffErrors.password}>
                 <ManagerInput type="password" value={createStaffForm.password}
-                  onChange={(e) => setCreateStaffForm((p) => ({ ...p, password: e.target.value }))} placeholder="Tối thiểu 6 ký tự" />
+                  onChange={(e) => { setCreateStaffForm((p) => ({ ...p, password: e.target.value })); setCreateStaffErrors((p) => ({ ...p, password: undefined })); }} placeholder="Tối thiểu 6 ký tự" />
               </ManagerField>
               <div className="flex gap-3">
                 <ManagerPrimaryButton type="submit" className="flex-1">Tạo nhân viên</ManagerPrimaryButton>
@@ -554,7 +594,7 @@ export default function StaffShiftPage() {
               <ManagerEmptyState title="Không tải được dữ liệu từ backend" description={loadError} />
             ) : (
               <ManagerForm onSubmit={handleSubmit}>
-                <ManagerField label="Nhân viên">
+                <ManagerField label="Nhân viên" error={formErrors.userId}>
                   <ManagerSelect name="userId" value={form.userId} onChange={handleChange} disabled={assignableStaffUsers.length === 0}>
                     <option value="">Chọn nhân viên</option>
                     {assignableStaffUsers.map((item) => (
@@ -562,7 +602,7 @@ export default function StaffShiftPage() {
                     ))}
                   </ManagerSelect>
                 </ManagerField>
-                <ManagerField label="Ca làm">
+                <ManagerField label="Ca làm" error={formErrors.shiftId}>
                   <ManagerSelect name="shiftId" value={form.shiftId} onChange={handleChange} disabled={shifts.length === 0}>
                     <option value="">Chọn ca làm</option>
                     {shifts.map((item) => (
@@ -570,13 +610,13 @@ export default function StaffShiftPage() {
                     ))}
                   </ManagerSelect>
                 </ManagerField>
-                <ManagerField label="Ngày làm việc">
+                <ManagerField label="Ngày làm việc" error={formErrors.workingDate}>
                   <ManagerInput type="date" name="workingDate" value={form.workingDate} onChange={handleChange} />
                 </ManagerField>
                 <div className="flex gap-3">
                   <ManagerPrimaryButton type="submit" className="flex-1" disabled={!canAssign}>{editingId ? "Lưu thay đổi" : "Gán ca làm"}</ManagerPrimaryButton>
                   {editingId ? (
-                    <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(editingId)}>Xóa</ManagerSecondaryButton>
+                    <ManagerSecondaryButton type="button" className="border-amber-200 text-amber-600 hover:bg-amber-50" onClick={() => handleDelete(editingId)}>Bỏ phân ca</ManagerSecondaryButton>
                   ) : null}
                   <ManagerSecondaryButton type="button" className="flex-1" onClick={handleCloseModal}>Hủy</ManagerSecondaryButton>
                 </div>

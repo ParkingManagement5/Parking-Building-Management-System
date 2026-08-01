@@ -98,6 +98,11 @@ function SessionCard({ item, onReload, onError, navigate }) {
   const isSession = item.source === "session";
   const isPackage = Boolean(item.bookingType) && item.bookingType !== "HOURLY";
   const packageLabel = PACKAGE_LABELS[item.bookingType] || item.bookingType;
+  // Goi ngay CHI 1 luot vao + 1 luot ra (khong duoc reset lai CONFIRMED/QR
+  // dung lai nhu goi tuan/thang — xem isPassBooking o ParkingSessionServiceImpl,
+  // backend chi cho phep WEEKLY/MONTHLY duoc ra-vao thoai mai). Can tach rieng
+  // thong bao de driver khong hieu nham goi ngay cung duoc vao ra nhieu lan.
+  const isDailyPackage = item.bookingType === "DAILY";
   const badge = BADGE_MAP[displayMode] || BADGE_MAP.SYNCING;
 
   const tiles = isPackage
@@ -147,7 +152,7 @@ function SessionCard({ item, onReload, onError, navigate }) {
 
         {isPackage && (displayMode === "ENTRY_QR" || displayMode === "PARKED") && (
           <div className="mb-3 rounded-xl border border-emerald-300/40 bg-white/10 px-3 py-2 text-center text-xs text-white/85">
-            Đã thanh toán trọn gói · Vào/ra tự do trong kỳ hạn, không tính thêm phí
+            Đã thanh toán trọn gói
           </div>
         )}
 
@@ -180,16 +185,11 @@ function SessionCard({ item, onReload, onError, navigate }) {
         </div>
       </div>
 
-      {/* Action area */}
+      {/* Action area — bo qua voi PARKED: trang thai/huong dan da hien du o
+          badge + bang chi tiet phia tren, khong con gi de thao tac them nen
+          khong can khung rieng (tranh dư thừa, nhat la khi co nhieu phien). */}
+      {displayMode !== "PARKED" && (
       <div className="rounded-2xl border border-border bg-card p-5 flex flex-col items-center">
-        <button
-          type="button"
-          onClick={() => navigate("/driver/parking-map")}
-          className="mb-5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
-        >
-          Mở bản đồ bãi xe
-        </button>
-
         {displayMode === "WAITING_PAYMENT" ? (
           <WaitingPaymentAction />
         ) : displayMode === "WAITING_PAYMENT_PENDING_SESSION" ? (
@@ -203,22 +203,21 @@ function SessionCard({ item, onReload, onError, navigate }) {
               <RefreshCw size={14} /> Tải lại trạng thái
             </button>
           </>
-        ) : displayMode === "PARKED" ? (
-          <>
-            <p className="text-sm font-semibold text-foreground">Xe đang đỗ trong bãi</p>
-            <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
-              Khi ra cổng, nhân viên sẽ quét biển số xe bạn để xác nhận — không cần xuất trình QR.
-            </p>
-          </>
         ) : displayMode === "ENTRY_QR" ? (
           <>
             <p className="text-sm font-semibold text-foreground mb-3">Mã QR vào bãi</p>
             <div className="rounded-2xl bg-white p-4 shadow-sm">
-              <QRCodeSVG value={item.qrToken} size={200} level="H" includeMargin />
+              {/* level="L": token JWT dai, "H" (30% du phong) buoc o QR qua nho, kho quet
+                  qua webcam. Du lieu so khong xuoc/mo nen khong can du phong cao. */}
+              <QRCodeSVG value={item.qrToken} size={224} level="L" includeMargin />
             </div>
             <p className="mt-3 font-mono text-xs text-muted-foreground">{shortToken(item.qrToken)}</p>
             <p className="max-w-sm text-center text-xs text-muted-foreground mt-2">Đưa QR cho staff ở cổng vào. Sau khi quét, phiên chuyển sang ACTIVE.</p>
-            {isPackage && (
+            {isDailyPackage ? (
+              <p className="max-w-sm text-center text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Đã thanh toán trọn gói ngày — vé chỉ dùng cho <b>1 lượt vào và 1 lượt ra</b> trong ngày, không dùng lại được sau khi đã ra bãi.
+              </p>
+            ) : isPackage && (
               <p className="max-w-sm text-center text-xs text-muted-foreground mt-1">
                 Đã thanh toán trọn gói {packageLabel.toLowerCase()} — dùng lại đúng QR này cho mỗi lần vào bãi trong kỳ hạn.
               </p>
@@ -270,6 +269,7 @@ function SessionCard({ item, onReload, onError, navigate }) {
           </>
         ) : null}
       </div>
+      )}
     </div>
   );
 }
@@ -355,11 +355,20 @@ export default function CurrentSessionPage() {
         </div>
       )}
 
-      {items.length > 1 && (
-        <p className="text-sm text-muted-foreground">
-          Bạn đang có {items.length} xe/booking active:
-        </p>
-      )}
+      <div className="flex items-center justify-between gap-3">
+        {items.length > 1 ? (
+          <p className="text-sm text-muted-foreground">
+            Bạn đang có {items.length} xe/booking active:
+          </p>
+        ) : <span />}
+        <button
+          type="button"
+          onClick={() => navigate("/driver/parking-map")}
+          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 shrink-0"
+        >
+          Mở bản đồ bãi xe
+        </button>
+      </div>
 
       {items.map((item) => (
         <SessionCard

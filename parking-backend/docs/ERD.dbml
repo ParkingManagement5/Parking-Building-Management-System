@@ -1,23 +1,17 @@
 // ============================================================================
 // parking_db — MySQL 8.0 — ERD đầy đủ, dbdiagram.io-ready
-// Nguồn: parking-backend/docs/parking_db_schema.sql (mysqldump 2026-07-22 14:54)
+// Nguồn: parking-backend/docs/parking_db_schema.sql (mysqldump trực tiếp từ
+//         localhost:3306/parking_db, kiểm tra lại 2026-07-22)
 //         đối chiếu trực tiếp với toàn bộ entity JPA trong
 //         parking-backend/src/main/java/com/swp391/parking/entity/*.java
 // Thay thế bản ERD.dbml cũ (18/6) đã lỗi thời — bản đó thiếu is_active,
 // slot_size, assigned_building_id, building_id (pricing_policy/request/
 // exception_case), booking_type, effective_from, latitude/longitude...
 //
-// *** LƯU Ý QUAN TRỌNG — 1 chỗ lệch giữa code và DB thật ***
-// Bảng `staff_shift` bên dưới có 3 cột (attendance_status, check_in_time,
-// check_out_time) được StaffShift.java / StaffShiftServiceImpl /
-// StaffShiftAttendanceScheduler dùng thật, nhưng CHƯA tồn tại trong DB thật
-// (dev/prod chạy ddl-auto: none, không có migration nào thêm 3 cột này —
-// chỉ test dùng ddl-auto: create-drop nên Hibernate tự tạo, che mất lỗi).
-// => Chạy tính năng điểm danh ca làm trên DB thật sẽ lỗi
-//    "Unknown column 'attendance_status'". Cần ALTER TABLE (script ở cuối
-//    file) TRƯỚC khi các cột này thực sự tồn tại — hiện tại chúng được vẽ
-//    trong ERD này vì đã là một phần thiết kế/code chính thức, nhưng đánh
-//    dấu rõ bằng comment "PENDING MIGRATION" để không bị hiểu nhầm là đã có.
+// Đã xác minh lại bằng DESCRIBE trực tiếp trên DB thật: bảng staff_shift
+// đã có sẵn check_in_time, check_out_time, attendance_status — không còn
+// thiếu migration nào. (Bản dump trước đó dùng để soát lỗi bị lỗi thời so
+// với DB thật nên từng báo nhầm là "chưa có".)
 // ============================================================================
 
 // ── AUTH & USERS ────────────────────────────────────────────────
@@ -345,26 +339,9 @@ Table staff_shift {
   staff_user_id int [ref: > users.user_id, not null]
   shift_id int [ref: > shift.shift_id, not null]
   working_date date [not null]
-
-  // *** PENDING MIGRATION — 3 cột dưới đây CHƯA có trong DB thật ***
-  // Được StaffShift.java / StaffShiftServiceImpl / StaffShiftAttendanceScheduler
-  // dùng thật (auto-mark ABSENT khi bỏ ca), nhưng dev/prod DB chưa có migration
-  // thêm cột này (ddl-auto: none). Chạy ALTER TABLE ở cuối file trước khi coi
-  // 3 cột này là "đã tồn tại" trên DB thật.
-  check_in_time datetime // [PENDING MIGRATION]
-  check_out_time datetime // [PENDING MIGRATION]
+  check_in_time datetime
+  check_out_time datetime
   attendance_status varchar(20) [not null, default: 'NOT_STARTED']
-  // [PENDING MIGRATION] NOT_STARTED, ON_TIME, LATE, ABSENT, COMPLETED
+  // NOT_STARTED, ON_TIME, LATE, ABSENT, COMPLETED — StaffShiftAttendanceScheduler
+  // tự động đánh ABSENT nếu Staff không check-in trước khi hết ca
 }
-
-// ============================================================================
-// Script migration còn thiếu (chạy trên DB thật trước khi export lại dump):
-//
-// ALTER TABLE staff_shift
-//   ADD COLUMN check_in_time datetime NULL,
-//   ADD COLUMN check_out_time datetime NULL,
-//   ADD COLUMN attendance_status varchar(20) NOT NULL DEFAULT 'NOT_STARTED';
-//
-// Sau khi chạy xong, xóa 2 dòng comment "PENDING MIGRATION" ở bảng staff_shift
-// phía trên — lúc đó ERD này phản ánh đúng 100% DB thật, không cần sửa gì thêm.
-// ============================================================================

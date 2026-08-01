@@ -4,12 +4,17 @@ import axiosClient from "../../api/axiosClient";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
 import { unwrapApiData } from "../../utils/api";
 import { getStatusClasses } from "./driverPortalUtils";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
+import { Banner } from "../../ui/components/Banner";
 
 function getVehicleTypeId(item) {
   return item?.vehicleTypeId ?? item?.id ?? "";
 }
 
 export default function MyVehiclesPage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [vehicles, setVehicles] = useState([]);
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -122,6 +127,7 @@ export default function MyVehiclesPage() {
       setVehicles(unwrapApiData(res.data, []));
       setShowModal(false);
       resetForm();
+      toast.success(editingId ? "Đã cập nhật xe" : "Đã thêm xe mới");
     } catch (error) {
       console.error("Failed to save vehicle", error);
       setFormError(error.response?.data?.message || "Lưu xe thất bại.");
@@ -129,17 +135,22 @@ export default function MyVehiclesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Vô hiệu hóa xe này? Xe sẽ bị ẩn khỏi các booking mới nhưng lịch sử vẫn được giữ lại.")) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Vô hiệu hóa xe này?",
+      message: "Xe sẽ bị ẩn khỏi các booking mới nhưng lịch sử vẫn được giữ lại.",
+      confirmLabel: "Vô hiệu hóa",
+      tone: "warning",
+    });
+    if (!ok) return;
 
     try {
       await axiosClient.delete(`/vehicles/${id}`);
       const res = await axiosClient.get("/vehicles/my");
       setVehicles(unwrapApiData(res.data, []));
+      toast.success("Đã vô hiệu hóa xe");
     } catch (error) {
       console.error("Failed to delete vehicle", error);
-      alert(
+      toast.error(
         error.response?.data?.message ||
         error.response?.data?.error ||
         error.message ||
@@ -226,20 +237,6 @@ export default function MyVehiclesPage() {
             </div>
           );
         })}
-        {Array.from({ length: Math.max(0, PAGE_SIZE - paged.length) }, (_, index) => (
-          <div key={`filler-${index}`} aria-hidden="true" className="invisible min-h-[200px] rounded-2xl border border-border bg-card p-5">
-            &nbsp;
-          </div>
-        ))}
-
-        {/* Add new card */}
-        <button
-          onClick={openCreate}
-          className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-5 text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
-        >
-          <Plus size={24} />
-          <span className="text-sm font-medium">Thêm xe mới</span>
-        </button>
       </div>
 
       {totalPages > 1 && (
@@ -286,11 +283,7 @@ export default function MyVehiclesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {formError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                  {formError}
-                </div>
-              )}
+              {formError && <Banner tone="error">{formError}</Banner>}
 
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-foreground">Biển số xe *</label>

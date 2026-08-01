@@ -76,7 +76,6 @@ const CONFIG = {
         label: "Cơ sở hạ tầng",
         items: [
           { id: "parking-structure", label: "Cấu trúc bãi xe" },
-          { id: "floor-plan-editor", label: "Sơ đồ mặt bằng (thử nghiệm)" },
         ],
       },
       {
@@ -244,7 +243,7 @@ export default function RolePortalLayout({ portal }) {
   const accentColor = ROLE_COLORS[portal] || "var(--accent)";
 
   return (
-    <div className={`ps-landing ${themeClass}`} style={{ minHeight: "100dvh", background: "var(--bg)" }}>
+    <div className={`ps-landing dash-shell ${themeClass}`} style={{ minHeight: "100dvh", background: "var(--bg)" }}>
       <nav className="dash-nav" ref={navRef}>
         <div className="dash-nav-inner">
           <a

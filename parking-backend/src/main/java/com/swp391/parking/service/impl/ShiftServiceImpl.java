@@ -58,11 +58,14 @@ public class ShiftServiceImpl implements ShiftService {
         return toResponse(shift);
     }
 
+    // Doi tu xoa cung sang vo hieu hoa mem (status=INACTIVE) — staff_shift tham
+    // chieu shift_id, xoa cung se vo du lieu phan ca da gan cho nhan vien.
     @Override
     public void deleteShift(Long id) {
         Shift shift = shiftRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Shift not found"));
-        shiftRepository.delete(shift);
+        shift.setStatus("INACTIVE");
+        shiftRepository.save(shift);
     }
 
    private ShiftResponse toResponse(Shift shift) {

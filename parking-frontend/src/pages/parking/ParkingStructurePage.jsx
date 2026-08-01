@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronRight, Edit2, Plus,
-  Search, Trash2, X,
+  Ban, ChevronRight, Edit2, Plus,
+  Search, X,
 } from "lucide-react";
 import { buildingApi } from "../../api/manager/buildingApi";
 import { floorApi } from "../../api/manager/floorApi";
@@ -16,6 +16,8 @@ import {
 } from "../../ui/components/manager/ManagerUi";
 import { unwrapApiData } from "../../utils/api";
 import { getAssignedBuildingId, getRole } from "../../utils/auth";
+import { useToast } from "../../ui/components/Toast";
+import { useConfirm } from "../../ui/components/ConfirmDialog";
 
 function getBuildingId(item) { return item?.buildingId ?? item?.id; }
 function getFloorId(item) { return item?.floorId ?? item?.id; }
@@ -56,6 +58,8 @@ const SLOT_SIZE_LABELS = { SMALL: "Nhỏ", MEDIUM: "Vừa", LARGE: "Lớn" };
 const SLOT_PAGE_SIZE = 10;
 
 export default function ParkingStructurePage() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const isManager = getRole() === "MANAGER";
   const assignedBuildingId = getAssignedBuildingId();
   const [buildings, setBuildings] = useState([]);
@@ -113,7 +117,7 @@ export default function ParkingStructurePage() {
       setGates(unwrapApiData(gateRes.data, []));
     } catch (error) {
       console.error("Failed to load parking structure data", error);
-      alert("Không tải được dữ liệu cấu trúc bãi xe");
+      toast.error("Không tải được dữ liệu cấu trúc bãi xe");
     }
   }
 
@@ -248,6 +252,7 @@ export default function ParkingStructurePage() {
   function openBuildingModal(item = null) {
     setBuildingModal({
       editingId: item?.id ?? null,
+      errors: {},
       form: {
         name: item?.name || "",
         address: item?.address || "",
@@ -265,8 +270,11 @@ export default function ParkingStructurePage() {
   async function submitBuildingModal(event) {
     event.preventDefault();
     const { editingId, form } = buildingModal;
-    if (!form.name.trim() || !form.address.trim()) {
-      alert("Tên tòa nhà và địa chỉ là bắt buộc");
+    const errors = {};
+    if (!form.name.trim()) errors.name = "Tên tòa nhà là bắt buộc";
+    if (!form.address.trim()) errors.address = "Địa chỉ là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setBuildingModal((m) => ({ ...m, errors }));
       return;
     }
     const payload = {
@@ -284,22 +292,33 @@ export default function ParkingStructurePage() {
       if (editingId) await buildingApi.update(editingId, payload);
       else await buildingApi.create(payload);
       setBuildingModal(null);
+      toast.success(editingId ? "Đã cập nhật tòa nhà" : "Đã tạo tòa nhà mới");
       await loadAll();
     } catch (error) {
       console.error("Failed to save building", error);
-      alert(error.response?.data?.message || "Lưu tòa nhà thất bại");
+      toast.error(error.response?.data?.message || "Lưu tòa nhà thất bại");
     }
   }
 
-  async function deleteBuilding(id) {
-    if (!window.confirm("Xóa tòa nhà này?")) return;
+  // Goi la "Xoa" nhung backend gio la vo hieu hoa mem (khong con xoa cung du
+  // lieu nua) — giu nguyen ten API/route cu (buildingApi.delete goi endpoint
+  // /deactivate that su), chi doi lai chu hien thi cho dung ban chat.
+  async function deactivateBuilding(id) {
+    const ok = await confirm({
+      title: "Vô hiệu hoá tòa nhà?",
+      message: "Toàn bộ tầng/zone/slot/cổng bên trong cũng sẽ bị vô hiệu hoá theo, nhưng dữ liệu lịch sử vẫn được giữ lại.",
+      confirmLabel: "Vô hiệu hoá",
+      tone: "warning",
+    });
+    if (!ok) return;
     try {
       await buildingApi.delete(id);
       if (String(selectedBuildingId) === String(id)) backToBuildings();
+      toast.success("Đã vô hiệu hoá tòa nhà");
       await loadAll();
     } catch (error) {
-      console.error("Failed to delete building", error);
-      alert(error.response?.data?.message || "Xóa tòa nhà thất bại");
+      console.error("Failed to deactivate building", error);
+      toast.error(error.response?.data?.message || "Vô hiệu hoá tòa nhà thất bại");
     }
   }
 
@@ -307,6 +326,7 @@ export default function ParkingStructurePage() {
   function openFloorModal(item = null) {
     setFloorModal({
       editingId: item?.id ?? null,
+      errors: {},
       form: {
         floorNumber: item?.floorNumber ?? "",
         floorName: item?.name || "",
@@ -318,8 +338,11 @@ export default function ParkingStructurePage() {
   async function submitFloorModal(event) {
     event.preventDefault();
     const { editingId, form } = floorModal;
-    if (!form.floorNumber || !form.floorName.trim()) {
-      alert("Số tầng và tên tầng là bắt buộc");
+    const errors = {};
+    if (!form.floorNumber) errors.floorNumber = "Số tầng là bắt buộc";
+    if (!form.floorName.trim()) errors.floorName = "Tên tầng là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setFloorModal((m) => ({ ...m, errors }));
       return;
     }
     const payload = {
@@ -329,25 +352,13 @@ export default function ParkingStructurePage() {
       capacity: form.capacity ? Number(form.capacity) : 0,
     };
     try {
-      if (editingId) await floorApi.update(editingId, payload);
-      else await floorApi.create(payload);
+      await floorApi.update(editingId, payload);
       setFloorModal(null);
+      toast.success("Đã cập nhật tầng");
       await loadAll();
     } catch (error) {
       console.error("Failed to save floor", error);
-      alert(error.response?.data?.message || "Lưu tầng thất bại");
-    }
-  }
-
-  async function deleteFloor(id) {
-    if (!window.confirm("Xóa tầng này?")) return;
-    try {
-      await floorApi.delete(id);
-      if (String(resolvedFloorId) === String(id)) setSelectedFloorId("");
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to delete floor", error);
-      alert(error.response?.data?.message || "Xóa tầng thất bại");
+      toast.error(error.response?.data?.message || "Lưu tầng thất bại");
     }
   }
 
@@ -355,6 +366,7 @@ export default function ParkingStructurePage() {
   function openGateModal(item = null) {
     setGateModal({
       editingId: item?.id ?? null,
+      errors: {},
       form: {
         gateCode: item?.gateCode || "",
         gateType: item?.gateType || "ENTRY",
@@ -366,7 +378,7 @@ export default function ParkingStructurePage() {
     event.preventDefault();
     const { editingId, form } = gateModal;
     if (!form.gateCode.trim()) {
-      alert("Mã cổng là bắt buộc");
+      setGateModal((m) => ({ ...m, errors: { gateCode: "Mã cổng là bắt buộc" } }));
       return;
     }
     const payload = {
@@ -375,24 +387,13 @@ export default function ParkingStructurePage() {
       gateType: form.gateType,
     };
     try {
-      if (editingId) await gateApi.update(editingId, payload);
-      else await gateApi.create(payload);
+      await gateApi.update(editingId, payload);
       setGateModal(null);
+      toast.success("Đã cập nhật cổng");
       await loadAll();
     } catch (error) {
       console.error("Failed to save gate", error);
-      alert(error.response?.data?.message || "Lưu cổng thất bại");
-    }
-  }
-
-  async function deleteGate(id) {
-    if (!window.confirm("Xóa cổng này?")) return;
-    try {
-      await gateApi.delete(id);
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to delete gate", error);
-      alert(error.response?.data?.message || "Xóa cổng thất bại");
+      toast.error(error.response?.data?.message || "Lưu cổng thất bại");
     }
   }
 
@@ -400,6 +401,7 @@ export default function ParkingStructurePage() {
   function openZoneModal(item = null) {
     setZoneModal({
       editingId: item?.id ?? null,
+      errors: {},
       form: {
         vehicleTypeId: item?.vehicleType?.vehicleTypeId ?? item?.vehicleType?.id ?? "",
         zoneName: item?.name || "",
@@ -411,8 +413,11 @@ export default function ParkingStructurePage() {
   async function submitZoneModal(event) {
     event.preventDefault();
     const { editingId, form } = zoneModal;
-    if (!form.vehicleTypeId || !form.zoneName.trim()) {
-      alert("Loại xe và tên zone là bắt buộc");
+    const errors = {};
+    if (!form.vehicleTypeId) errors.vehicleTypeId = "Loại xe là bắt buộc";
+    if (!form.zoneName.trim()) errors.zoneName = "Tên zone là bắt buộc";
+    if (Object.keys(errors).length > 0) {
+      setZoneModal((m) => ({ ...m, errors }));
       return;
     }
     const payload = {
@@ -422,25 +427,13 @@ export default function ParkingStructurePage() {
       description: form.description || null,
     };
     try {
-      if (editingId) await zoneApi.update(editingId, payload);
-      else await zoneApi.create(payload);
+      await zoneApi.update(editingId, payload);
       setZoneModal(null);
+      toast.success("Đã cập nhật zone");
       await loadAll();
     } catch (error) {
       console.error("Failed to save zone", error);
-      alert(error.response?.data?.message || "Lưu zone thất bại");
-    }
-  }
-
-  async function deleteZone(id) {
-    if (!window.confirm("Xóa zone này?")) return;
-    try {
-      await zoneApi.delete(id);
-      if (String(selectedZoneId) === String(id)) setSelectedZoneId("");
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to delete zone", error);
-      alert(error.response?.data?.message || "Xóa zone thất bại");
+      toast.error(error.response?.data?.message || "Lưu zone thất bại");
     }
   }
 
@@ -448,6 +441,7 @@ export default function ParkingStructurePage() {
   function openSlotModal(item = null) {
     setSlotModal({
       editingId: item?.id ?? null,
+      errors: {},
       form: {
         slotCode: item?.slotCode || "",
         status: item?.status || "AVAILABLE",
@@ -459,12 +453,12 @@ export default function ParkingStructurePage() {
     event.preventDefault();
     const { editingId, form } = slotModal;
     if (!form.slotCode.trim()) {
-      alert("Mã slot là bắt buộc");
+      setSlotModal((m) => ({ ...m, errors: { slotCode: "Mã slot là bắt buộc" } }));
       return;
     }
     const slotSize = selectedZone?.vehicleType?.slotSize;
     if (!slotSize) {
-      alert("Không xác định được kích cỡ slot từ zone đang chọn");
+      toast.error("Không xác định được kích cỡ slot từ zone đang chọn");
       return;
     }
     const payload = {
@@ -474,24 +468,13 @@ export default function ParkingStructurePage() {
       status: form.status,
     };
     try {
-      if (editingId) await parkingSlotApi.update(editingId, payload);
-      else await parkingSlotApi.create(payload);
+      await parkingSlotApi.update(editingId, payload);
       setSlotModal(null);
+      toast.success("Đã cập nhật slot");
       await loadAll();
     } catch (error) {
       console.error("Failed to save slot", error);
-      alert(error.response?.data?.message || "Lưu slot thất bại");
-    }
-  }
-
-  async function deleteSlot(id) {
-    if (!window.confirm("Xóa slot này?")) return;
-    try {
-      await parkingSlotApi.delete(id);
-      await loadAll();
-    } catch (error) {
-      console.error("Failed to delete slot", error);
-      alert(error.response?.data?.message || "Xóa slot thất bại");
+      toast.error(error.response?.data?.message || "Lưu slot thất bại");
     }
   }
 
@@ -584,10 +567,10 @@ export default function ParkingStructurePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteBuilding(item.id)}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-rose-200 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50"
+                    onClick={() => deactivateBuilding(item.id)}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-200 py-2 text-sm text-amber-600 transition-colors hover:bg-amber-50"
                   >
-                    <Trash2 size={13} /> Xóa
+                    <Ban size={13} /> Vô hiệu hoá
                   </button>
                 </div>
               </div>
@@ -610,12 +593,9 @@ export default function ParkingStructurePage() {
           <div className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Tầng</h3>
-              <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openFloorModal()}>
-                <Plus size={12} /> Thêm tầng
-              </ManagerSecondaryButton>
             </div>
             {buildingFloors.length === 0 ? (
-              <ManagerEmptyState title="Chưa có tầng" description="Thêm tầng đầu tiên cho tòa nhà này." />
+              <ManagerEmptyState title="Chưa có tầng" description="Cấu trúc tầng được cấu hình sẵn theo hệ thống — liên hệ đội kỹ thuật nếu chưa thấy tầng nào." />
             ) : (
               <div className="flex flex-wrap gap-2">
                 {buildingFloors.map((floor) => {
@@ -637,14 +617,9 @@ export default function ParkingStructurePage() {
                         {floor.label} — {floor.name}
                       </button>
                       {isActive && (
-                        <>
-                          <button type="button" onClick={() => openFloorModal(floor)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                            <Edit2 size={12} />
-                          </button>
-                          <button type="button" onClick={() => deleteFloor(floor.id)} className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50">
-                            <Trash2 size={12} />
-                          </button>
-                        </>
+                        <button type="button" onClick={() => openFloorModal(floor)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                          <Edit2 size={12} />
+                        </button>
                       )}
                     </div>
                   );
@@ -657,12 +632,9 @@ export default function ParkingStructurePage() {
           <div className="border-t border-border p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Cổng ra vào</h3>
-              <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openGateModal()}>
-                <Plus size={12} /> Thêm cổng
-              </ManagerSecondaryButton>
             </div>
             {buildingGates.length === 0 ? (
-              <ManagerEmptyState title="Chưa có cổng" description="Thêm cổng vào/ra cho tòa nhà này." />
+              <ManagerEmptyState title="Chưa có cổng" description="Cổng ra vào được cấu hình sẵn theo hệ thống — liên hệ đội kỹ thuật nếu chưa thấy cổng nào." />
             ) : (
               <ManagerDataTable columns={["Cổng", "Loại", "Trạng thái", "Thao tác"]}>
                 {buildingGates.map((gate) => (
@@ -679,10 +651,7 @@ export default function ParkingStructurePage() {
                       </span>
                     </ManagerCell>
                     <ManagerCell>
-                      <div className="flex gap-2">
-                        <ManagerSecondaryButton type="button" onClick={() => openGateModal(gate)}>Sửa</ManagerSecondaryButton>
-                        <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => deleteGate(gate.id)}>Xóa</ManagerSecondaryButton>
-                      </div>
+                      <ManagerSecondaryButton type="button" onClick={() => openGateModal(gate)}>Sửa</ManagerSecondaryButton>
                     </ManagerCell>
                   </ManagerRow>
                 ))}
@@ -695,12 +664,9 @@ export default function ParkingStructurePage() {
             <div className="border-t border-border p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Zone — {selectedFloor?.label} {selectedFloor?.name}</h3>
-                <ManagerSecondaryButton type="button" className="flex items-center gap-1.5 !py-1.5 !px-3 !text-xs" onClick={() => openZoneModal()}>
-                  <Plus size={12} /> Thêm zone
-                </ManagerSecondaryButton>
               </div>
               {floorZones.length === 0 ? (
-                <ManagerEmptyState title="Chưa có zone" description="Thêm zone để bắt đầu khai báo slot cho tầng này." />
+                <ManagerEmptyState title="Chưa có zone" description="Zone được cấu hình sẵn theo hệ thống — liên hệ đội kỹ thuật nếu chưa thấy zone nào." />
               ) : (
                 <ManagerDataTable columns={["Zone", "Loại xe", "Mô tả", "Trạng thái", "Thao tác"]}>
                   {floorZones.map((zone) => {
@@ -716,10 +682,7 @@ export default function ParkingStructurePage() {
                           </span>
                         </ManagerCell>
                         <ManagerCell>
-                          <div className="flex gap-2">
-                            <ManagerSecondaryButton type="button" onClick={(e) => { e.stopPropagation(); openZoneModal(zone); }}>Sửa</ManagerSecondaryButton>
-                            <ManagerSecondaryButton type="button" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); deleteZone(zone.id); }}>Xóa</ManagerSecondaryButton>
-                          </div>
+                          <ManagerSecondaryButton type="button" onClick={(e) => { e.stopPropagation(); openZoneModal(zone); }}>Sửa</ManagerSecondaryButton>
                         </ManagerCell>
                       </ManagerRow>
                     );
@@ -737,9 +700,6 @@ export default function ParkingStructurePage() {
                   <h3 className="text-sm font-semibold text-foreground">Slot — {selectedZone.name}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{selectedZone.vehicleType?.name} · slot size {selectedZone.vehicleType?.slotSize}</p>
                 </div>
-                <ManagerPrimaryButton type="button" className="flex items-center gap-1.5" onClick={() => openSlotModal()}>
-                  <Plus size={14} /> Thêm slot
-                </ManagerPrimaryButton>
               </div>
 
               <div className="mb-4">
@@ -797,7 +757,7 @@ export default function ParkingStructurePage() {
 
               <div className="space-y-2" ref={slotListRef}>
                 {pagedZoneSlots.length === 0 ? (
-                  <ManagerEmptyState title="Không có slot" description="Thêm slot đầu tiên cho zone này." />
+                  <ManagerEmptyState title="Không có slot" description="Slot được cấu hình sẵn theo hệ thống — liên hệ đội kỹ thuật nếu chưa thấy slot nào." />
                 ) : (
                   pagedZoneSlots.map((slot) => (
                     <div key={slot.id} className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3">
@@ -820,9 +780,6 @@ export default function ParkingStructurePage() {
                       </span>
                       <button type="button" onClick={() => openSlotModal(slot)} className="rounded-xl border border-border p-2 text-muted-foreground transition-colors hover:bg-muted">
                         <Edit2 size={14} />
-                      </button>
-                      <button type="button" onClick={() => deleteSlot(slot.id)} className="rounded-xl border border-rose-200 p-2 text-rose-600 transition-colors hover:bg-rose-50">
-                        <Trash2 size={14} />
                       </button>
                     </div>
                   ))
@@ -864,14 +821,14 @@ export default function ParkingStructurePage() {
               </button>
             </div>
             <form onSubmit={submitBuildingModal} className="space-y-4">
-              <ManagerField label="Tên tòa nhà">
+              <ManagerField label="Tên tòa nhà" error={buildingModal.errors?.name}>
                 <ManagerInput required value={buildingModal.form.name}
-                  onChange={(e) => setBuildingModal((m) => ({ ...m, form: { ...m.form, name: e.target.value } }))}
+                  onChange={(e) => setBuildingModal((m) => ({ ...m, form: { ...m.form, name: e.target.value }, errors: { ...m.errors, name: undefined } }))}
                   placeholder="Bãi xe Quận 1" />
               </ManagerField>
-              <ManagerField label="Địa chỉ">
+              <ManagerField label="Địa chỉ" error={buildingModal.errors?.address}>
                 <ManagerInput required value={buildingModal.form.address}
-                  onChange={(e) => setBuildingModal((m) => ({ ...m, form: { ...m.form, address: e.target.value } }))}
+                  onChange={(e) => setBuildingModal((m) => ({ ...m, form: { ...m.form, address: e.target.value }, errors: { ...m.errors, address: undefined } }))}
                   placeholder="123 Đường ABC, Quận 1, TP.HCM" />
               </ManagerField>
               <div className="grid gap-4 md:grid-cols-2">
@@ -927,7 +884,7 @@ export default function ParkingStructurePage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{floorModal.editingId ? "Cập nhật tầng" : "Thêm tầng"}</h3>
+                <h3 className="text-lg font-semibold text-foreground">Cập nhật tầng</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Thuộc tòa nhà: {selectedBuilding?.name}</p>
               </div>
               <button type="button" onClick={() => setFloorModal(null)} className="rounded-full p-2 text-muted-foreground hover:bg-muted">
@@ -936,21 +893,21 @@ export default function ParkingStructurePage() {
             </div>
             <ManagerForm onSubmit={submitFloorModal}>
               <div className="grid gap-4 md:grid-cols-2">
-                <ManagerField label="Số tầng">
+                <ManagerField label="Số tầng" error={floorModal.errors?.floorNumber}>
                   <ManagerInput type="number" value={floorModal.form.floorNumber}
-                    onChange={(e) => setFloorModal((m) => ({ ...m, form: { ...m.form, floorNumber: e.target.value } }))} placeholder="1" />
+                    onChange={(e) => setFloorModal((m) => ({ ...m, form: { ...m.form, floorNumber: e.target.value }, errors: { ...m.errors, floorNumber: undefined } }))} placeholder="1" />
                 </ManagerField>
                 <ManagerField label="Sức chứa">
                   <ManagerInput type="number" value={floorModal.form.capacity}
                     onChange={(e) => setFloorModal((m) => ({ ...m, form: { ...m.form, capacity: e.target.value } }))} placeholder="50" />
                 </ManagerField>
               </div>
-              <ManagerField label="Tên tầng">
+              <ManagerField label="Tên tầng" error={floorModal.errors?.floorName}>
                 <ManagerInput value={floorModal.form.floorName}
-                  onChange={(e) => setFloorModal((m) => ({ ...m, form: { ...m.form, floorName: e.target.value } }))} placeholder="Tầng trệt" />
+                  onChange={(e) => setFloorModal((m) => ({ ...m, form: { ...m.form, floorName: e.target.value }, errors: { ...m.errors, floorName: undefined } }))} placeholder="Tầng trệt" />
               </ManagerField>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{floorModal.editingId ? "Lưu thay đổi" : "Tạo tầng"}</ManagerPrimaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">Lưu thay đổi</ManagerPrimaryButton>
                 <ManagerSecondaryButton type="button" className="flex-1" onClick={() => setFloorModal(null)}>Hủy</ManagerSecondaryButton>
               </div>
             </ManagerForm>
@@ -964,7 +921,7 @@ export default function ParkingStructurePage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{gateModal.editingId ? "Cập nhật cổng" : "Thêm cổng"}</h3>
+                <h3 className="text-lg font-semibold text-foreground">Cập nhật cổng</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Thuộc tòa nhà: {selectedBuilding?.name}</p>
               </div>
               <button type="button" onClick={() => setGateModal(null)} className="rounded-full p-2 text-muted-foreground hover:bg-muted">
@@ -972,9 +929,9 @@ export default function ParkingStructurePage() {
               </button>
             </div>
             <ManagerForm onSubmit={submitGateModal}>
-              <ManagerField label="Mã cổng">
+              <ManagerField label="Mã cổng" error={gateModal.errors?.gateCode}>
                 <ManagerInput value={gateModal.form.gateCode}
-                  onChange={(e) => setGateModal((m) => ({ ...m, form: { ...m.form, gateCode: e.target.value } }))} placeholder="GATE-IN-01" />
+                  onChange={(e) => setGateModal((m) => ({ ...m, form: { ...m.form, gateCode: e.target.value }, errors: { ...m.errors, gateCode: undefined } }))} placeholder="GATE-IN-01" />
               </ManagerField>
               <ManagerField label="Loại cổng">
                 <ManagerSelect value={gateModal.form.gateType}
@@ -985,7 +942,7 @@ export default function ParkingStructurePage() {
                 </ManagerSelect>
               </ManagerField>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{gateModal.editingId ? "Lưu thay đổi" : "Tạo cổng"}</ManagerPrimaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">Lưu thay đổi</ManagerPrimaryButton>
                 <ManagerSecondaryButton type="button" className="flex-1" onClick={() => setGateModal(null)}>Hủy</ManagerSecondaryButton>
               </div>
             </ManagerForm>
@@ -999,7 +956,7 @@ export default function ParkingStructurePage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{zoneModal.editingId ? "Cập nhật zone" : "Thêm zone"}</h3>
+                <h3 className="text-lg font-semibold text-foreground">Cập nhật zone</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Thuộc tầng: {selectedFloor?.label} — {selectedFloor?.name}</p>
               </div>
               <button type="button" onClick={() => setZoneModal(null)} className="rounded-full p-2 text-muted-foreground hover:bg-muted">
@@ -1007,25 +964,25 @@ export default function ParkingStructurePage() {
               </button>
             </div>
             <ManagerForm onSubmit={submitZoneModal}>
-              <ManagerField label="Loại xe">
+              <ManagerField label="Loại xe" error={zoneModal.errors?.vehicleTypeId}>
                 <ManagerSelect value={zoneModal.form.vehicleTypeId}
-                  onChange={(e) => setZoneModal((m) => ({ ...m, form: { ...m.form, vehicleTypeId: e.target.value } }))}>
+                  onChange={(e) => setZoneModal((m) => ({ ...m, form: { ...m.form, vehicleTypeId: e.target.value }, errors: { ...m.errors, vehicleTypeId: undefined } }))}>
                   <option value="">Chọn loại xe</option>
                   {vehicleTypes.map((item) => (
                     <option key={item.vehicleTypeId ?? item.id} value={item.vehicleTypeId ?? item.id}>{item.name}</option>
                   ))}
                 </ManagerSelect>
               </ManagerField>
-              <ManagerField label="Tên zone">
+              <ManagerField label="Tên zone" error={zoneModal.errors?.zoneName}>
                 <ManagerInput value={zoneModal.form.zoneName}
-                  onChange={(e) => setZoneModal((m) => ({ ...m, form: { ...m.form, zoneName: e.target.value } }))} placeholder="Zone A" />
+                  onChange={(e) => setZoneModal((m) => ({ ...m, form: { ...m.form, zoneName: e.target.value }, errors: { ...m.errors, zoneName: undefined } }))} placeholder="Zone A" />
               </ManagerField>
               <ManagerField label="Mô tả">
                 <ManagerInput value={zoneModal.form.description}
                   onChange={(e) => setZoneModal((m) => ({ ...m, form: { ...m.form, description: e.target.value } }))} placeholder="Dành cho ô tô con" />
               </ManagerField>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{zoneModal.editingId ? "Lưu thay đổi" : "Tạo zone"}</ManagerPrimaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">Lưu thay đổi</ManagerPrimaryButton>
                 <ManagerSecondaryButton type="button" className="flex-1" onClick={() => setZoneModal(null)}>Hủy</ManagerSecondaryButton>
               </div>
             </ManagerForm>
@@ -1039,7 +996,7 @@ export default function ParkingStructurePage() {
           <div className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{slotModal.editingId ? "Cập nhật slot" : "Thêm slot"}</h3>
+                <h3 className="text-lg font-semibold text-foreground">Cập nhật slot</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Thuộc zone: {selectedZone?.name}</p>
               </div>
               <button type="button" onClick={() => setSlotModal(null)} className="rounded-full p-2 text-muted-foreground hover:bg-muted">
@@ -1048,9 +1005,9 @@ export default function ParkingStructurePage() {
             </div>
             <ManagerForm onSubmit={submitSlotModal}>
               <div className="grid gap-4 md:grid-cols-2">
-                <ManagerField label="Mã slot">
+                <ManagerField label="Mã slot" error={slotModal.errors?.slotCode}>
                   <ManagerInput value={slotModal.form.slotCode}
-                    onChange={(e) => setSlotModal((m) => ({ ...m, form: { ...m.form, slotCode: e.target.value } }))} placeholder="A01" />
+                    onChange={(e) => setSlotModal((m) => ({ ...m, form: { ...m.form, slotCode: e.target.value }, errors: { ...m.errors, slotCode: undefined } }))} placeholder="A01" />
                 </ManagerField>
                 <ManagerField label="Trạng thái">
                   <ManagerSelect value={slotModal.form.status}
@@ -1066,7 +1023,7 @@ export default function ParkingStructurePage() {
                 <ManagerInput value={selectedZone?.vehicleType?.slotSize || ""} readOnly placeholder="Auto từ zone" />
               </ManagerField>
               <div className="flex gap-3">
-                <ManagerPrimaryButton type="submit" className="flex-1">{slotModal.editingId ? "Lưu thay đổi" : "Tạo slot"}</ManagerPrimaryButton>
+                <ManagerPrimaryButton type="submit" className="flex-1">Lưu thay đổi</ManagerPrimaryButton>
                 <ManagerSecondaryButton type="button" className="flex-1" onClick={() => setSlotModal(null)}>Hủy</ManagerSecondaryButton>
               </div>
             </ManagerForm>

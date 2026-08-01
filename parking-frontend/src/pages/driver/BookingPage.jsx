@@ -185,6 +185,8 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const preselectBuildingName = location.state?.buildingName || "";
+  const preselectZoneName = location.state?.zoneName || "";
+  const preselectSlotCode = location.state?.slotCode || "";
 
   const [step, setStep] = useState(0);
   const [vehicles, setVehicles] = useState([]);
@@ -286,15 +288,37 @@ export default function BookingPage() {
 
   const buildingOptions = useMemo(() => Array.from(new Map(slotGrid.map((s) => [s.building, s.building])).values()), [slotGrid]);
 
-  // Tu chon toa nha khi vao tu nut "Dat cho" o trang Tim bai do xe (truyen
-  // buildingName qua router state) — chi ap dung sau khi da chon xe (buildingOptions
-  // chi co du lieu luc do) va nguoi dung chua tu chon toa nha khac.
+  // Tu chon san toa nha (va neu co, ca tang/khu vuc/slot) khi vao tu nut "Dat
+  // cho"/"Dat cho nay" o trang Tim bai do xe (truyen qua router state) — chi
+  // ap dung sau khi da chon xe (slotGrid chi co du lieu luc do) va nguoi dung
+  // chua tu chon gi khac. Neu slot cu the da bi dat mat luc nay (VD nguoi khac
+  // vua dat truoc), tu dong roi ve chon san toa nha thoi, khong loi.
   useEffect(() => {
     if (!preselectBuildingName || selection.building || !selection.vehicleId) return;
-    if (buildingOptions.includes(preselectBuildingName)) {
+    if (!buildingOptions.includes(preselectBuildingName)) return;
+
+    const exactSlot = preselectSlotCode
+      ? slotGrid.find((s) =>
+          s.building === preselectBuildingName &&
+          (!preselectZoneName || s.zone === preselectZoneName) &&
+          s.slotCode === preselectSlotCode &&
+          s.status === "available")
+      : null;
+
+    if (exactSlot) {
+      setSelection((p) => ({
+        ...p,
+        building: exactSlot.building,
+        floor: exactSlot.floor,
+        zone: exactSlot.zone,
+        slotCode: exactSlot.slotCode,
+        slotId: exactSlot.slotId,
+      }));
+      setOpenPanel(null);
+    } else {
       setSelection((p) => ({ ...p, building: preselectBuildingName }));
     }
-  }, [preselectBuildingName, buildingOptions, selection.vehicleId, selection.building]);
+  }, [preselectBuildingName, preselectZoneName, preselectSlotCode, buildingOptions, slotGrid, selection.vehicleId, selection.building]);
   const floorOptions = useMemo(() => {
     const byName = new Map();
     for (const s of slotGrid) {

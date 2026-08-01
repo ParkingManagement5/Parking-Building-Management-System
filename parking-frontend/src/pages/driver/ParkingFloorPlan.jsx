@@ -40,7 +40,12 @@ function Slot({ slot, ses, x, y, w, h, onClick }) {
 // chi biet toa do ca khu vuc.
 const ZONE_COLS = 3;
 const ZONE_PAD_X = 6, ZONE_PAD_TOP = 8, ZONE_PAD_BOT = 8;
-const ZONE_COL_GAP = 12, ZONE_AISLE_GAP = 22;
+const ZONE_COL_GAP = 18, ZONE_AISLE_GAP = 30;
+// Khe ho toi thieu giua 2 zone canh nhau tren moi ban ve (kiem tra thu cong
+// tung building trong buildingFloorPlans.js) la 10px (Tan Son Nhat B-C) — dung
+// offset nho hon mot nua de line canh-ngoai luon nam giua khe, khong bao gio
+// cham vao zone ben canh.
+const ZONE_EDGE_GAP = 5;
 // Ty le cao:rong ~2:1 giong dung o do trong ban ve mau da duyet (khong con
 // keo dan cho vua het khu vuc — luon giu dung ty le, du con du khong gian.
 const SLOT_ASPECT = 2;
@@ -81,6 +86,27 @@ function slotRectAt(pz, grid, index) {
     y: pz.y + ZONE_PAD_TOP + grid.offsetY + ri * grid.rowStep,
     w: grid.slotW, h: grid.slotH, ri, ci,
   };
+}
+
+// Doan dau tien cua route (tu cong vao toi lan xe chinh) o mot so building
+// (vd Le Van Tam, Tan Son Nhat) co entryX nam thang hang voi mot zone giua
+// cong va lan xe — neu cu ke thang mot duong doc se cat xuyen qua khoi zone
+// do. Ham nay do truoc: neu phat hien zone chan ngang, re sang khe ho gan
+// nhat (trai/phai zone do) truoc khi tiep tuc di het doan con lai, thay vi
+// gia dinh doan cong->lan luon rong.
+function computeEntryPrefix(route, planZones) {
+  const { entryX, entryY, laneY } = route;
+  const yMin = Math.min(entryY, laneY), yMax = Math.max(entryY, laneY);
+  const blocker = (planZones || []).find(
+    (z) => entryX > z.x && entryX < z.x + z.w && yMax > z.y && yMin < z.y + z.h
+  );
+  if (!blocker) return `M${entryX} ${entryY} L${entryX} ${laneY}`;
+
+  const movingUp = laneY < entryY;
+  const nearMarginY = movingUp ? blocker.y + blocker.h + ZONE_EDGE_GAP : blocker.y - ZONE_EDGE_GAP;
+  const leftX = blocker.x - ZONE_EDGE_GAP, rightX = blocker.x + blocker.w + ZONE_EDGE_GAP;
+  const detourX = Math.abs(entryX - leftX) <= Math.abs(entryX - rightX) ? leftX : rightX;
+  return `M${entryX} ${entryY} L${entryX} ${nearMarginY} L${detourX} ${nearMarginY} L${detourX} ${laneY}`;
 }
 
 // Chi ve o do that (khong con khung/nhan "zone" — zone chi la don vi du lieu
@@ -160,8 +186,6 @@ export function ParkingMap({ sections, session, activeZone, zoom, onSlotClick, f
   const azIdx = sections.findIndex((s) => String($zi(s)) === String($zi(activeZone)));
   const azRow = azIdx >= 0 ? Math.floor(azIdx / COLS) : -1;
   const azCol = azIdx >= 0 ? azIdx % COLS : -1;
-  const azCx = azIdx >= 0 ? startX + azCol * (zw + GAP) + zw / 2 : 0;
-  const azCy = azIdx >= 0 ? startY + azRow * (zh + ROAD + GAP) + zh / 2 : 0;
 
   return (
     <div className="rounded-2xl border border-border bg-slate-100 dark:bg-slate-800/50 overflow-hidden">
@@ -195,12 +219,37 @@ export function ParkingMap({ sections, session, activeZone, zoom, onSlotClick, f
           </g>;
         })()}
 
-        {azIdx >= 0 && isBottom && <>
-          <defs><marker id="ra" markerWidth={6} markerHeight={6} refX={5} refY={3} orient="auto">
-            <path d="M0,0.5 L5,3 L0,5.5" fill="none" stroke="#3b82f6" strokeWidth={1} /></marker></defs>
-          <path d={`M${PAD + 34} ${PAD + 20} L${PAD + 34} ${startY - 5} L${azCx} ${startY - 5} L${azCx} ${azCy - zh / 2}`}
-            fill="none" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="5 3" opacity={0.5} markerEnd="url(#ra)" />
-        </>}
+        {azIdx >= 0 && isBottom && (() => {
+          // Tro dung toa do o cu the (khong chi tam zone) va tranh cat qua
+          // zone o cac hang truoc do: neu zone dich khong o hang dau, di
+          // xuong theo khe ho GIUA COT (luon rong xuyen suot moi hang) roi
+          // moi re ngang vao dung cot/dung o, thay vi ke mot duong thang
+          // dung xuyen qua cac khoi zone hang tren.
+          const targetZone = sections[azIdx];
+          const zoneSlots = srt(targetZone?.slots || []);
+          const slotIdx = Math.max(0, zoneSlots.findIndex((s) => $m(s, session)));
+          const zonePos = { x: startX + azCol * (zw + GAP), y: startY + azRow * (zh + ROAD + GAP) };
+          const grid = computeZoneGrid(zw, zh, zoneSlots.length);
+          const slotRect = slotRectAt(zonePos, grid, slotIdx);
+          const slotCenterX = slotRect.x + slotRect.w / 2;
+
+          let d;
+          if (azRow === 0) {
+            d = `M${PAD + 34} ${PAD + 20} L${PAD + 34} ${startY - 5} L${slotCenterX} ${startY - 5} L${slotCenterX} ${slotRect.y}`;
+          } else {
+            const corridorOnRight = azCol < COLS - 1;
+            const corridorX = corridorOnRight ? zonePos.x + zw + GAP / 2 : zonePos.x - GAP / 2;
+            d = `M${PAD + 34} ${PAD + 20} L${PAD + 34} ${startY - 5} L${corridorX} ${startY - 5} L${corridorX} ${zonePos.y} L${slotCenterX} ${zonePos.y} L${slotCenterX} ${slotRect.y}`;
+          }
+
+          return (
+            <>
+              <defs><marker id="ra" markerWidth={6} markerHeight={6} refX={5} refY={3} orient="auto">
+                <path d="M0,0.5 L5,3 L0,5.5" fill="none" stroke="#3b82f6" strokeWidth={1} /></marker></defs>
+              <path d={d} fill="none" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="5 3" opacity={0.5} markerEnd="url(#ra)" />
+            </>
+          );
+        })()}
 
         {Array.from({ length: rows }).map((_, row) => {
           const ry = startY + row * (zh + ROAD + GAP);
@@ -315,16 +364,35 @@ export function StaticFloorPlanMap({ plan, sections, session, activeZone, zoom, 
           const isOuterRow = slotRect.ri === outerRowIndex;
           // Dung dung tai vien ngoai o (khong chay de len chu/vien ben trong).
           const nearEdgeY = enterFromTop ? slotRect.y : slotRect.y + slotRect.h;
+          const entryPrefix = computeEntryPrefix(route, planZones);
           let d;
           if (isOuterRow) {
-            d = `M${route.entryX} ${route.entryY} L${route.entryX} ${route.laneY} L${slotCenterX} ${route.laneY} L${slotCenterX} ${nearEdgeY}`;
+            d = `${entryPrefix} L${slotCenterX} ${route.laneY} L${slotCenterX} ${nearEdgeY}`;
           } else {
             const colGapWidth = grid.colStep - grid.slotW;
-            const corridorOnRight = slotRect.ci < ZONE_COLS - 1;
-            const corridorX = corridorOnRight
-              ? slotRect.x + slotRect.w + colGapWidth / 2
-              : slotRect.x - colGapWidth / 2;
-            d = `M${route.entryX} ${route.entryY} L${route.entryX} ${route.laneY} L${corridorX} ${route.laneY} L${corridorX} ${nearEdgeY} L${slotCenterX} ${nearEdgeY}`;
+            const lastCi = (slotRect.ri === grid.nRows - 1 ? grid.colsInLastRow : ZONE_COLS) - 1;
+            let corridorX;
+            if (slotRect.ci === 0) {
+              // Cot ngoai cung ben trai: di vong qua khe HO NGOAI CUNG cua ca
+              // zone (giua zone nay va zone/tuong ben trai) thay vi cat qua
+              // khe noi bo giua cot 1-2 (se de bi hieu nham la cat qua o ben
+              // canh tren man hinh nho).
+              corridorX = activeBox.x - ZONE_EDGE_GAP;
+            } else if (slotRect.ci === lastCi) {
+              // Cot ngoai cung ben phai: tuong tu, di vong qua khe ngoai cung
+              // ben phai cua ca zone.
+              corridorX = activeBox.x + activeBox.w + ZONE_EDGE_GAP;
+            } else {
+              // Cot giua: di sau vao khe noi bo (giua cot giua va cot ben canh).
+              corridorX = slotRect.x + slotRect.w + colGapWidth / 2;
+            }
+            // Re ngang o GIUA khe aisle (giua hang ngoai va hang trong) thay
+            // vi sat mep o hang ngoai — giong xe tien vao giua lan trong roi
+            // moi re dau vao dung cho, ro rang hon nhat la voi cot giua.
+            const aisleMidY = enterFromTop
+              ? slotRect.y - grid.aisleGap / 2
+              : slotRect.y + slotRect.h + grid.aisleGap / 2;
+            d = `${entryPrefix} L${corridorX} ${route.laneY} L${corridorX} ${aisleMidY} L${slotCenterX} ${aisleMidY} L${slotCenterX} ${nearEdgeY}`;
           }
           return (
             <g>
@@ -351,9 +419,18 @@ export function StaticFloorPlanMap({ plan, sections, session, activeZone, zoom, 
   );
 }
 
-export function DetailPanel({ slot, st, session, zone, floor }) {
+export function DetailPanel({ slot, st, session, zone, floor, building }) {
   const navigate = useNavigate();
   const c = PAL[st] || PAL.available, code = $c(slot), mine = st === "mine";
+  // Truyen dung slot dang xem sang BookingPage de tu dien san toa/tang/khu
+  // vuc/slot cho driver, thay vi bat ho chon lai tu dau (BookingPage.jsx doc
+  // cac field nay qua location.state va tu chon neu khop dung 1 slot con trong).
+  const bookingState = {
+    buildingName: building?.name || "",
+    floorName: $fn(floor),
+    zoneName: $zn(zone),
+    slotCode: code,
+  };
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-border bg-card p-4 overflow-hidden">
@@ -373,7 +450,7 @@ export function DetailPanel({ slot, st, session, zone, floor }) {
             </div>
           ))}
         </div>
-        {st === "available" && <button type="button" onClick={() => navigate("/driver/booking")}
+        {st === "available" && <button type="button" onClick={() => navigate("/driver/booking", { state: bookingState })}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]">
           Đặt chỗ này<ChevronRight size={14} /></button>}
         {mine && <div className="mt-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 p-3 text-center">
