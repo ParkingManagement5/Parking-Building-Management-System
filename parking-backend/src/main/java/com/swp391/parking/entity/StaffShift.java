@@ -39,9 +39,7 @@ public class StaffShift {
     @Column(name = "attendance_status", nullable = false, length = 20)
     private AttendanceStatus attendanceStatus = AttendanceStatus.NOT_STARTED;
 
-    // Vo hieu hoa mem thay vi xoa cung — giu lai lich su check-in/check-out
-    // neu Manager go nham/huy phan ca. Cot moi, can migration ALTER TABLE
-    // (xem parking_db_schema.sql) vi du an dung ddl-auto: none.
+    // Vo hieu hoa mem — giu lai lich su check-in/check-out neu Manager go/huy phan ca.
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;

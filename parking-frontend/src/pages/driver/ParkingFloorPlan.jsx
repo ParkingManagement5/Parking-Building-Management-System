@@ -8,8 +8,7 @@ import { PAL, $c, $zi, $zn, $fn, $vt, $s, $m, srt } from "./parkingFloorPlanUtil
 // co booking, chi xem layout + trang thai mau). Component tu nhan biet co
 // session hay khong qua tham so `session` — session=null se khong to sang gi.
 
-// Mau chu/vien mo (slate) dung chung cho Legend va vach loi vao — kieu web
-// dich vu than thien, khong con giong ban ve CAD/ky thuat nua.
+// Mau chu/vien mo (slate) dung chung cho Legend va vach loi vao.
 const INK_SOFT = "#64748b";
 
 // Mot o do: khung bo goc mem, mau nen theo trang thai (con trong/da dat/dang
@@ -46,8 +45,8 @@ const ZONE_COL_GAP = 18, ZONE_AISLE_GAP = 30;
 // offset nho hon mot nua de line canh-ngoai luon nam giua khe, khong bao gio
 // cham vao zone ben canh.
 const ZONE_EDGE_GAP = 5;
-// Ty le cao:rong ~2:1 giong dung o do trong ban ve mau da duyet (khong con
-// keo dan cho vua het khu vuc — luon giu dung ty le, du con du khong gian.
+// Ty le cao:rong ~2:1 — luon giu dung ty le nay, khong keo dan slot cho vua
+// het khu vuc du con du khong gian.
 const SLOT_ASPECT = 2;
 
 function computeZoneGrid(zw, zh, n) {
@@ -109,10 +108,9 @@ function computeEntryPrefix(route, planZones) {
   return `M${entryX} ${entryY} L${entryX} ${nearMarginY} L${detourX} ${nearMarginY} L${detourX} ${laneY}`;
 }
 
-// Chi ve o do that (khong con khung/nhan "zone" — zone chi la don vi du lieu
-// noi bo, khong phai vat the that trong bai xe nen bo het the/nhan de giong
-// ban ve ky thuat that, bot roi mat). isActive chi con dung de highlight nhe
-// khu chua slot cua driver khi da co booking.
+// Chi ve o do that, khong ve khung/nhan "zone" — zone chi la don vi du lieu
+// noi bo, khong phai vat the that trong bai xe. isActive dung de highlight
+// nhe khu chua slot cua driver khi da co booking.
 function ZoneCell({ zone, ses, x, y, zw, zh, onSlotClick, isActive }) {
   const slots = srt(zone.slots || []);
   const grid = computeZoneGrid(zw, zh, slots.length);
@@ -143,8 +141,7 @@ function ZoneCell({ zone, ses, x, y, zw, zh, onSlotClick, isActive }) {
   );
 }
 
-// ── Chú giải nhỏ gọn, thân thiện kiểu web dịch vụ (không còn khung viền
-// kép/la bàn/thước tỉ lệ/khung tên như bản vẽ kỹ thuật trước đây). ──
+// ── Chú giải nhỏ gọn, kiểu web dịch vụ. ──
 
 function Legend({ x, y }) {
   const rows = [

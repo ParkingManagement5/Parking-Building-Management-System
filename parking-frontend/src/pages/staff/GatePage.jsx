@@ -6,7 +6,7 @@ import { zoneApi } from "../../api/manager/zoneApi";
 import { parkingSlotApi } from "../../api/manager/parkingSlotApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
-import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
+import { formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { getAssignedBuildingId, getAssignedBuildingName } from "../../utils/auth";
 import { ParkingMap, StaticFloorPlanMap, ZoomCtrl } from "../driver/ParkingFloorPlan";
 import { getFloorPlan } from "../../config/buildingFloorPlans";
@@ -243,7 +243,7 @@ export default function MapPage() {
                         <p className="text-[11px] text-muted-foreground">#{s.sessionId} • {s.slotCode} • {formatStaffDateTime(s.entryTime)}</p>
                       </div>
                     </div>
-                    <p className="text-xs font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(s.entryTime))}</p>
+                    <p className="text-xs font-semibold text-foreground">{formatStaffCurrency(s.calculatedFee)}</p>
                   </div>
                 ))}
               </div>
@@ -308,7 +308,7 @@ export default function MapPage() {
                   ["Thời gian đỗ", formatDuration(selectedSlot.session.entryTime, selectedSlot.session.exitTime || new Date().toISOString())],
                   selectedSlot.session.exitTime
                     ? ["Trạng thái", "Chờ thanh toán"]
-                    : ["Phí tạm tính", formatStaffCurrency(computeSessionFee(selectedSlot.session.entryTime))],
+                    : ["Phí tạm tính", formatStaffCurrency(selectedSlot.session.calculatedFee)],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-muted-foreground">{k}</span>

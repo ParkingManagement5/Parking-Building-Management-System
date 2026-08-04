@@ -88,8 +88,8 @@ public class GateServiceImpl implements GateService {
         return gateRepo.save(gate);
     }
 
-    // Doi tu xoa cung sang vo hieu hoa mem — gate_log (lich su xe qua cong)
-    // tham chieu gate_id, xoa cung se vo lien ket lich su.
+    // Vo hieu hoa mem — gate_log (lich su xe qua cong) tham chieu gate_id,
+    // xoa cung se vo lien ket lich su.
     @Override
     @Transactional
     public void deactivate(Long id) {

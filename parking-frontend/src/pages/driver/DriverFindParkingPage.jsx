@@ -241,7 +241,7 @@ export default function DriverFindParkingPage() {
     navigate("/driver/booking", { state: { buildingName: building.name } });
   }
 
-  // ─── Leaflet map setup (giong pattern da dung o trang tim bai cu) ───────
+  // ─── Leaflet map setup ───────
   useEffect(() => {
     if (typeof window === "undefined" || view !== "map") return;
 

@@ -268,8 +268,7 @@ class ControllerIntegrationTest extends AbstractIntegrationTestSupport {
     @Test
     @WithMockUser(username = "manager-pricing", roles = "MANAGER")
     void pricingPolicyControllerShouldCreateAndActivatePolicy() throws Exception {
-        // Admin khong con dat/sua gia duoc nua - moi Manager toan quyen tu cau
-        // hinh gia rieng cho toa nha minh quan ly.
+        // Manager toan quyen tu cau hinh gia rieng cho toa nha minh quan ly.
         User manager = createUser("manager-pricing", Role.RoleName.MANAGER);
         ParkingBuilding building = createBuilding("Pricing Controller Tower");
         assignBuilding(manager, building);

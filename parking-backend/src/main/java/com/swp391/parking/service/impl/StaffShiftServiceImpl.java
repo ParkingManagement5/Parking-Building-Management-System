@@ -130,8 +130,8 @@ public List<StaffShiftResponse> getByUser(Long userId) {
         return toResponse(staffShift);
     }
 
-    // Doi tu xoa cung sang vo hieu hoa mem — giu lai lich su check-in/check-out
-    // neu ca da dien ra, chi an khoi cac danh sach dang hoat dong.
+    // Vo hieu hoa mem — giu lai lich su check-in/check-out neu ca da dien ra,
+    // chi an khoi cac danh sach dang hoat dong.
     @Override
     public void deleteStaffShift(Long id) {
         StaffShift staffShift = staffShiftRepository.findById(id)

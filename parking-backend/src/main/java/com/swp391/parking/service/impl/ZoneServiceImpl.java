@@ -113,8 +113,8 @@ public class ZoneServiceImpl implements ZoneService {
         return zoneRepo.save(zone);
     }
 
-    // Doi tu xoa cung sang vo hieu hoa mem — zone that co the co slot dang gan
-    // voi booking/session lich su.
+    // Vo hieu hoa mem — zone that co the co slot dang gan voi booking/session
+    // lich su.
     @Override
     @Transactional
     public void deactivate(Long id, Long scopeBuildingId) {

@@ -5,7 +5,7 @@ import lombok.*;
 
 /**
  * Xe của Driver đăng ký trong hệ thống.
- * user_id trỏ về bảng users của module Auth (Quang) — không dùng @ManyToOne để tránh coupling.
+ * user_id trỏ về bảng users — không dùng @ManyToOne để tránh coupling.
  */
 @Entity
 @Table(name = "vehicle")

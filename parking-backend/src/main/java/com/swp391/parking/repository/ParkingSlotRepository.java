@@ -127,8 +127,8 @@ List<ParkingSlot> findAvailableBySlotSize(@Param("slotSize") String slotSize);
         """, nativeQuery = true)
     List<Object[]> getBuildingOccupancy();
 
-    // Toan bo slot he thong, JOIN FETCH mot lan de tranh N+1 (truoc day frontend
-    // phai goi rieng tung zone, hang tram request cho trang cong khai/landing).
+    // Toan bo slot he thong, JOIN FETCH mot lan de tranh N+1 — dung cho trang
+    // cong khai/landing can hien tat ca slot ma khong goi rieng tung zone.
     @Query("""
         SELECT ps FROM ParkingSlot ps
         JOIN FETCH ps.zone z

@@ -204,15 +204,12 @@ export default function LoginPage() {
       // nhap Google account nao), Google KHONG goi lai callback ben duoi nua -
       // nut bam vao im lang, khong co gi xay ra, khong bao loi (dung nhu canh
       // bao "may stop functioning when FedCM becomes mandatory" cua GSI_LOGGER).
-      // Dat timeout fallback: neu callback khong chay trong 1 khoang du dai, tu
-      // bao loi thay vi de nguoi dung cho vo ich khong biet chuyen gi dang xay ra.
-      //
-      // 3s ban dau qua ngan: UI chon tai khoan/"Dang xac minh..." cua Chrome co
-      // the mat hon 3s de hien/xac minh xong (dac biet lan dau trong phien), khien
-      // fallback bao loi "khong phan hoi" trong luc flow van dang chay binh thuong
-      // va se thanh cong ngay sau do - gay hoang mang gia. Tang len 10s de giam
-      // false-positive; neu login van thanh cong sau khi loi da hien, callback
-      // credential ben initialize() se tu clear loi nay (xem setError("") o duoi).
+      // Dat timeout fallback 10s: neu callback khong chay trong khoang nay, tu
+      // bao loi thay vi de nguoi dung cho vo ich khong biet chuyen gi dang xay
+      // ra. 10s du dai vi UI chon tai khoan/"Dang xac minh..." cua Chrome co
+      // the mat vai giay de hien/xac minh xong (dac biet lan dau trong phien).
+      // Neu login van thanh cong sau khi loi da hien, callback credential ben
+      // initialize() se tu clear loi nay (xem setError("") o duoi).
       let callbackFired = false;
       const fallbackTimer = setTimeout(() => {
         if (callbackFired) return;

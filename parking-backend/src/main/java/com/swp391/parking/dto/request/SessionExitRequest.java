@@ -15,7 +15,6 @@ public class SessionExitRequest {
     // Staff override: bypass QR requirement khi xe không scan được QR (mất QR, lỗi hệ thống)
     private Boolean staffForceExit;
 
-    // Bien so da xac minh qua OCR/nhap tay o cong ra - thay the cho Exit QR
-    // (da bo hoan toan khoi luong exit chinh, xem UnifiedQrScanPage.jsx)
+    // Bien so da xac minh qua OCR/nhap tay o cong ra.
     private String licensePlate;
 }

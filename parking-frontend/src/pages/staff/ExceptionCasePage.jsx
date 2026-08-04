@@ -4,7 +4,7 @@ import axiosClient from "../../api/axiosClient";
 import { exceptionApi } from "../../api/staff/exceptionApi";
 import { gateApi } from "../../api/manager/gateApi";
 import { sessionApi } from "../../api/staff/sessionApi";
-import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
+import { formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { unwrapApiData } from "../../utils/api";
 import { getAssignedBuildingId } from "../../utils/auth";
 import {
@@ -105,11 +105,9 @@ export default function ExceptionCasePage() {
   const [forceExitGateId, setForceExitGateId] = useState({});
 
   // ─── Báo cáo & Cho xe ra ──────────────────────────────────────────────
-  // Exit QR da bo hoan toan (xe ra chi con xac minh bang bien so) nen bo
-  // "LOST_QR" khoi danh sach tao MOI (van giu trong EXCEPTION_TYPE_LABELS/
-  // EXIT_TYPES/exceptionMeta o tren de hien thi dung cho cac case cu da tao
-  // tu truoc khi bo QR) - va doi lai chu "EXIT_VERIFICATION_FAILED" cho dung
-  // ly do that su gio la xac minh bien so, khong con la loi scan QR nua.
+  // Xe ra chi xac minh bang bien so (khong dung QR), nen "LOST_QR" khong
+  // xuat hien trong danh sach tao MOI — van giu trong EXCEPTION_TYPE_LABELS/
+  // EXIT_TYPES/exceptionMeta de hien thi dung cho cac case cu da ton tai.
   const REPORT_TYPES = [
     { value: "EXIT_VERIFICATION_FAILED", label: "Không xác minh được xe — biển số không khớp hoặc không đọc được" },
     { value: "SYSTEM_ERROR",             label: "Lỗi hệ thống — không xử lý được tự động" },
@@ -161,7 +159,7 @@ export default function ExceptionCasePage() {
     try {
       const staffId = Number(localStorage.getItem("userId")) || 0;
       // 1. Force exit — bypass QR
-      await sessionApi.exit(rSession.sessionId, {
+      const exitRes = await sessionApi.exit(rSession.sessionId, {
         gateId: Number(rGateId),
         staffUserId: staffId,
         qrVerified: false,
@@ -174,7 +172,12 @@ export default function ExceptionCasePage() {
         exceptionType: rType,
         description: `[Staff báo cáo thủ công] ${rDesc || REPORT_TYPES.find((t) => t.value === rType)?.label || rType}`,
       });
-      const fee = computeSessionFee(rSession.entryTime);
+      // Dung calculatedFee tra ve tu API exit (FeeCalculatorUtil da tinh dung
+      // theo building/loai xe/khung gio), khong tu tinh lai o FE — computeSessionFee
+      // voi gia mac dinh 20k/h se sai voi xe co gia rieng, gay lech so voi so
+      // tien thuc te se thu (vd hien o StaffDashboard/PaymentProcessingPage).
+      const exitData = unwrapApiData(exitRes.data, {});
+      const fee = Number(exitData.calculatedFee ?? 0);
       setRResult({ licensePlate: rSession.licensePlate, sessionId: rSession.sessionId, fee });
       setRPlate(""); setRSession(null); setRDesc(""); setRGateId("");
       await loadCases();
@@ -345,7 +348,7 @@ export default function ExceptionCasePage() {
                 )}
                 <span className="text-muted-foreground font-semibold">Phí ước tính</span>
                 <span className="font-bold text-rose-600 dark:text-rose-400">
-                  {formatStaffCurrency(computeSessionFee(rSession.entryTime))}
+                  {formatStaffCurrency(rSession.calculatedFee)}
                 </span>
               </div>
             )}

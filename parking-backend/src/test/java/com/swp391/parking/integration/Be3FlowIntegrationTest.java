@@ -202,8 +202,7 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         Gate entryGate = createGate(building, "ENTRY-WI", Gate.GateType.ENTRY);
         Gate exitGate = createGate(building, "EXIT-WI", Gate.GateType.EXIT);
 
-        // Toa nha phai co bang gia rieng (Manager tu set) truoc khi cho walk-in vao -
-        // khong con fallback ve gia global nua.
+        // Toa nha phai co bang gia rieng (Manager tu set) truoc khi cho walk-in vao.
         pricingPolicyRepository.save(PricingPolicy.builder()
                 .vehicleType(vehicleType)
                 .building(building)
@@ -245,8 +244,8 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
         assertThat(activeSession.getVehicle().getLicensePlate()).isEqualTo("59A-123.45");
 
         // Vao-ra gan nhu tuc thi (0 phut) => phi tinh duoc = 0d, nam trong grace
-        // period => "/exit" tu dong hoan tat luon session (tinh nang co san,
-        // khong phai loi), khong con buoc WAITING_PAYMENT rieng nua.
+        // period => "/exit" tu dong hoan tat luon session, khong can qua buoc
+        // WAITING_PAYMENT rieng.
         mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -511,9 +510,9 @@ class Be3FlowIntegrationTest extends AbstractIntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].sessionId").value(activeSession.getId()));
 
-        // Exit da bo QR hoan toan - staff xac minh bang bien so OCR/nhap tay (xem
-        // processExit's plateVerified). Bien khong khop -> tu choi; bien khop
-        // (kieu goc/co dau cham deu duoc canonical hoa) -> cho ra thanh cong.
+        // Exit xac minh bang bien so OCR/nhap tay (xem processExit's plateVerified).
+        // Bien khong khop -> tu choi; bien khop (kieu goc/co dau cham deu duoc
+        // canonical hoa) -> cho ra thanh cong.
         mockMvc.perform(post("/api/v1/sessions/{id}/exit", activeSession.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""

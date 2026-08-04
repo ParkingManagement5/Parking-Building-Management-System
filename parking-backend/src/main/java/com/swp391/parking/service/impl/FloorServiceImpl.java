@@ -100,8 +100,8 @@ public class FloorServiceImpl implements FloorService {
         return floorRepo.save(floor);
     }
 
-    // Doi tu xoa cung (delete/deleteAllInBatch) sang vo hieu hoa mem — tang that
-    // co the co booking/session lich su tham chieu toi slot/zone ben trong.
+    // Vo hieu hoa mem — tang that co the co booking/session lich su tham
+    // chieu toi slot/zone ben trong.
     @Override
     @Transactional
     public void deactivate(Long id, Long scopeBuildingId) {

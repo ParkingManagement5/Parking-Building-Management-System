@@ -37,11 +37,8 @@ public interface PricingPolicyRepository extends JpaRepository<PricingPolicy, Lo
 
     /**
      * Danh sach policy (TAT CA phien ban) ap dung cho 1 toa nha + loai xe.
-     *
-     * KHONG con fallback ve gia global (building_id IS NULL) nua: moi Manager toan
-     * quyen tu cau hinh gia rieng cho toa minh, Admin khong con dat/sua gia chung
-     * duoc nua. Neu buildingId=null (hiem gap trong thuc te, chi con lai cho du
-     * lieu lich su/global cu), tra ve dung policy global nhu truoc.
+     * Moi Manager toan quyen tu cau hinh gia rieng cho toa minh; buildingId=null
+     * chi con dung cho du lieu lich su/global cu, tra ve dung policy global.
      */
     default List<PricingPolicy> resolveForBuilding(Long vehicleTypeId, Long buildingId) {
         if (buildingId == null) {

@@ -188,9 +188,8 @@ public class PaymentServiceImpl implements PaymentService {
         LocalDateTime bookingEndTime = booking != null ? booking.getBookingEndTime() : null;
         BigDecimal combinedFee = feeCalculatorUtil.calculateSessionFee(
                 session.getEntryTime(), session.getExitTime(), activePolicies, serverRate, bookingType, bookingEndTime);
-        // Tach rieng phan phu troi (qua han goi) khoi phi goc, thay vi gop het
-        // vao baseFee - de driver/staff thay ro trong bill vi sao phai tra
-        // hon gia goi da tra truoc, khong phai 1 con so mo ho.
+        // Tach rieng phan phu troi (qua han goi) khoi phi goc de driver/staff
+        // thay ro trong bill vi sao phai tra hon gia goi da tra truoc.
         BigDecimal serverOvertimeFee = feeCalculatorUtil.calculateOvertimeFee(
                 bookingType, session.getExitTime(), bookingEndTime, activePolicies, serverRate);
         BigDecimal serverDeposit = BigDecimal.ZERO;

@@ -179,12 +179,11 @@ public class BuildingServiceImpl implements BuildingService {
         return buildingRepo.save(building);
     }
 
-    // Truoc day ham nay ten la "deactivate" nhung lam XOA CUNG that (delete/
-    // deleteAllInBatch) toan bo cong/slot/zone/tang/building — rat nguy hiem vi
-    // building that luon co booking/session/payment lich su tham chieu toi cac
-    // slot/zone nay, xoa cung se vo du lieu hoac loi rang buoc khoa ngoai. Gio
-    // doi thanh vo hieu hoa mem (isActive=false) toan bo cay, giu nguyen du
-    // lieu — cac API list (findByIsActiveTrue...) da tu loai chung ra roi.
+    // Vo hieu hoa mem (isActive=false) toan bo cay cong/slot/zone/tang/building,
+    // giu nguyen du lieu — building that luon co booking/session/payment lich
+    // su tham chieu toi cac slot/zone nay, xoa cung se vo du lieu hoac loi rang
+    // buoc khoa ngoai. Cac API list (findByIsActiveTrue...) tu loai bo phan da
+    // vo hieu hoa.
     @Override
     @Transactional
     public void deactivate(Long id, Long scopeBuildingId) {

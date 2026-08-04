@@ -1,8 +1,8 @@
 spring:
   datasource:
     # serverTimezone phai khop voi time_zone that cua MySQL server (SYSTEM = gio he
-    # dieu hanh, +07:00) - truoc day de UTC khien driver tuong server o UTC, tu tru
-    # 7 tieng khi ghi LocalDateTime xuong DB (xem hibernate.jdbc.time_zone ben duoi).
+    # dieu hanh, +07:00), neu khong driver se ghi sai lech LocalDateTime xuong DB
+    # (xem hibernate.jdbc.time_zone ben duoi).
     url: jdbc:mysql://localhost:3306/parking_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: root
     password: "12345"

@@ -288,7 +288,11 @@ public class EmailService {
     }
 
     private String buildQrImageUrl(String qrData) {
-        return "https://api.qrserver.com/v1/create-qr-code/?size=280x280&data="
+        // ecc=L (muc sua loi thap nhat) giu QR du thua de camera dien thoai
+        // quet on dinh, vi qrData la JWT dai (~200-400 ky tu) va muc mac dinh
+        // cua api.qrserver.com se day module day dac hon can thiet o kich
+        // thuoc 280x280.
+        return "https://api.qrserver.com/v1/create-qr-code/?size=280x280&ecc=L&data="
                 + URLEncoder.encode(qrData, StandardCharsets.UTF_8);
     }
 

@@ -151,10 +151,9 @@ export default function PublicSlotListPage() {
     return bList;
   };
 
-  // Tai TOAN BO slot he thong trong 1 lan goi (thay vi truoc day phai goi rieng
-  // tung building -> floor -> zone, hang tram request rieng le, cham va de mat
-  // du lieu do timeout). Loc theo building/vehicle/tu khoa deu xu ly o client
-  // (xem "filtered" ben duoi), khong can goi lai server khi doi bo loc.
+  // Tai TOAN BO slot he thong trong 1 lan goi. Loc theo building/vehicle/tu
+  // khoa deu xu ly o client (xem "filtered" ben duoi), khong can goi lai
+  // server khi doi bo loc.
   const loadData = async ({ silent = false, force = false } = {}) => {
     if (requestInFlightRef.current) return;
 

@@ -20,16 +20,14 @@ public class Booking extends BaseEntity {
     @Column(name = "booking_id")
     private Long id;
 
-    // FK → users (module Quang) — dùng Long để khớp PK
+    // FK → users — dùng Long để khớp PK
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    // FK → vehicle (module Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
-    // FK → parking_slot (module Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "slot_id", nullable = false)
     private ParkingSlot slot;
@@ -52,7 +50,7 @@ public class Booking extends BaseEntity {
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;
 
-    // QR fields — thay thế Ticket trong V2
+    // QR fields — dùng để check-in tại cổng vào
     @Column(name = "qr_token", unique = true, length = 500)
     private String qrToken;
 

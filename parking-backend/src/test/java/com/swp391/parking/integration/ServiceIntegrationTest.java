@@ -104,9 +104,9 @@ class ServiceIntegrationTest extends AbstractIntegrationTestSupport {
 
         buildingService.deactivate(building.getId(), null);
 
-        // Deactivate gio la vo hieu hoa mem (khong con xoa cung) — du lieu van
-        // con nguyen, chi isActive chuyen ve false, tranh vo booking/session
-        // lich su tham chieu toi cac ban ghi nay.
+        // Deactivate la vo hieu hoa mem — du lieu van con nguyen, chi isActive
+        // chuyen ve false, tranh vo booking/session lich su tham chieu toi cac
+        // ban ghi nay.
         assertFalse(buildingRepository.findById(building.getId()).orElseThrow().getIsActive());
         assertFalse(gateRepository.findByBuildingId(building.getId()).get(0).getIsActive());
         assertFalse(floorRepository.findByBuildingId(building.getId()).get(0).getIsActive());

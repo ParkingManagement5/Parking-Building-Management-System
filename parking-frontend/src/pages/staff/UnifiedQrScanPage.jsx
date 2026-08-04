@@ -13,7 +13,7 @@ import { exceptionApi } from "../../api/staff/exceptionApi";
 import { ocrApi } from "../../api/staff/ocrApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { unwrapApiData } from "../../utils/api";
-import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
+import { formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { getAssignedBuildingId, getAssignedBuildingName } from "../../utils/auth";
 import {
   StaffInput, StaffPageSection, StaffPrimaryButton, StaffSecondaryButton,

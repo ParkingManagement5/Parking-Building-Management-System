@@ -320,10 +320,10 @@ public abstract class AbstractIntegrationTestSupport {
 
     /**
      * Gia rieng cho 1 building, phu toan bo 24h, timeType="HOURLY" - khop dung
-     * cau hinh Manager tu set cho toa nha minh trong thuc te (khong con fallback
-     * ve gia global nua). Dung ham nay thay vi createPricingPolicy() khi test can
-     * tao booking/walk-in qua BookingService/ParkingSessionService that su (co
-     * validate "toa nha da co gia chua").
+     * cau hinh Manager tu set cho toa nha minh trong thuc te. Dung ham nay thay
+     * vi createPricingPolicy() khi test can tao booking/walk-in qua
+     * BookingService/ParkingSessionService that su (co validate "toa nha da co
+     * gia chua").
      */
     protected PricingPolicy createBuildingPricingPolicy(VehicleType vehicleType, ParkingBuilding building, boolean isActive) {
         PricingPolicy policy = PricingPolicy.builder()

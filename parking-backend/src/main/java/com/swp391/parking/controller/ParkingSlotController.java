@@ -48,9 +48,8 @@ public class ParkingSlotController {
             slotService.getAvailableByVehicleType(vehicleTypeId)));
     }
 
-    // Cong khai, khong can auth - 1 query gop toan bo slot he thong, thay the cho
-    // viec frontend truoc day phai goi rieng tung zone (hang tram request, cham
-    // va de mat du lieu do timeout khi so luong toa nha lon).
+    // Cong khai, khong can auth - 1 query gop toan bo slot he thong, tranh
+    // frontend phai goi rieng tung zone khi so luong toa nha lon.
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<List<ParkingSlot>>> getPublicOverview() {
         return ResponseEntity.ok(ApiResponse.success(slotService.getPublicOverview()));

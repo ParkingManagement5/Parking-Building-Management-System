@@ -183,8 +183,8 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
         }
     }
 
-    // Doi tu xoa cung sang vo hieu hoa mem — slot that co the co booking/
-    // session lich su tham chieu slot_id.
+    // Vo hieu hoa mem — slot that co the co booking/session lich su tham
+    // chieu slot_id.
     @Override
     @Transactional
     public void delete(Long id, Long scopeBuildingId) {

@@ -58,9 +58,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         Gate gate = gateRepository.findById(request.getGateId())
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy gate"));
 
-        // Staff chi duoc xu ly vao/ra o dung toa nha duoc phan cong - truoc day
-        // KHONG co check nay, khien staff toa B co the vo tinh (hoac co y) cho
-        // xe vao/ra o toa A ma khong bi chan, lam sai lech slot/session cua toa do.
+        // Staff chi duoc xu ly vao/ra o dung toa nha duoc phan cong, tranh
+        // sai lech du lieu slot/session giua cac toa.
         enforceStaffBuildingScope(request.getStaffUserId(),
                 gate.getBuilding() != null ? gate.getBuilding().getId() : null);
 
@@ -230,42 +229,6 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
                 .build());
     }
 
-//    private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
-//                                              ParkingSession.EntryMode mode) {
-//        if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
-//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe");
-//        }
-//        if (request.getSlotId() == null) {
-//            throw new AppException(HttpStatus.BAD_REQUEST, "Thiếu slotId cho walk-in");
-//        }
-//
-//        Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
-//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND,
-//
-//        ParkingSlot slot = parkingSlotRepository.findById(request.getSlotId())
-//                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy slot"));
-//
-//        if (slot.getStatus() != ParkingSlot.Status.AVAILABLE) {
-//            throw new AppException(HttpStatus.CONFLICT,
-//                    "Slot " + slot.getSlotCode() + " không còn trống");
-//        }
-//
-//        slot.setStatus(ParkingSlot.Status.OCCUPIED);
-//        parkingSlotRepository.save(slot);
-//
-//        ParkingSession session = ParkingSession.builder()
-//                .slot(slot)
-//                .userId(vehicle.getUserId())
-//                .vehicle(vehicle)
-//                .entryGate(gate)
-//                .entryTime(LocalDateTime.now())
-//                .entryMode(mode)
-//                .status(ParkingSession.SessionStatus.ACTIVE)
-//                .build();
-//
-//        return sessionRepository.save(session);
-//    }
-
     private ParkingSession processWalkInEntry(SessionEntryRequest request, Gate gate,
                                               ParkingSession.EntryMode mode) {
         if (request.getLicensePlate() == null || request.getLicensePlate().isBlank()) {
@@ -303,10 +266,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
         ParkingSlot slot;
         if (mode == ParkingSession.EntryMode.WALK_IN_AUTO) {
             // Tự động tìm slot theo slotSize của loại xe [BR-02]
-            // Phai gioi han theo dung building cua gate — truoc day truyen null
-            // khien slot co the duoc gan tu MOT TOA NHA KHAC, lam session bi
-            // "bien mat" khoi danh sach cua staff (staff bi gioi han xem theo
-            // dung building duoc phan cong) du session/slot van luu dung.
+            // Phai gioi han theo dung building cua gate, tranh gan slot tu
+            // toa nha khac (staff chi duoc xem session theo dung building
+            // duoc phan cong).
             Long entryBuildingId = gate.getBuilding() != null ? gate.getBuilding().getId() : null;
             slot = slotAssignmentService.assignBestSlot(entryBuildingId,
                     vehicle.getVehicleType().getSlotSize());
@@ -318,9 +280,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
             slot = slotAssignmentService.assignSpecificSlot(request.getSlotId());
         }
 
-        // Toa nha phai duoc chinh Manager cua toa do tu cau hinh gia HOURLY rieng
-        // truoc thi moi cho xe walk-in vao - khong con fallback ve gia global cua
-        // Admin nua (Admin khong con quyen dat/sua gia).
+        // Xe walk-in chi duoc vao khi Manager cua toa da tu cau hinh gia HOURLY
+        // rieng — khong co fallback ve gia global.
         Long walkInBuildingId = slot.getZone() != null && slot.getZone().getFloor() != null
                 && slot.getZone().getFloor().getBuilding() != null
                 ? slot.getZone().getFloor().getBuilding().getId() : null;
@@ -351,9 +312,8 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
     public SessionResponse processExit(Long sessionId, SessionExitRequest request) {
         ParkingSession session = getSessionEntity(sessionId);
 
-        // Staff chi duoc cho xe ra dung toa nha duoc phan cong. Truoc day thieu
-        // check nay khien staff toa B quet bien/QR van dong duoc session cua
-        // toa A (bug nghiem trong: sai lech du lieu slot/booking giua cac toa).
+        // Staff chi duoc cho xe ra dung toa nha duoc phan cong, tranh sai lech
+        // du lieu slot/booking giua cac toa.
         enforceStaffBuildingScope(request.getStaffUserId(), buildingIdOf(session));
 
         if (session.getStatus() != ParkingSession.SessionStatus.ACTIVE) {
@@ -461,10 +421,9 @@ public class ParkingSessionServiceImpl implements ParkingSessionService {
 
         log.info("Session #{} exit recorded, WAITING_PAYMENT", sessionId);
 
-        // Tao san parking fee PENDING de staff co the thu CASH hoac sinh QR VNPay ngay -
-        // tao TRUOC khi gui thong bao de lay dung so tien da tinh (gom ca phu troi
-        // qua han goi neu co), thay vi bao chung chung "cho thanh toan" khong ro
-        // ly do can tra hon gia goi da tra truoc.
+        // Tao san parking fee PENDING truoc khi gui thong bao, de thong bao hien
+        // dung so tien da tinh (gom ca phu troi qua han goi neu co) thay vi chi
+        // bao chung chung "cho thanh toan".
         PaymentResponse feeResult = paymentService.createParkingFee(
                 session.getId().intValue(),
                 booking != null && booking.getId() != null ? booking.getId().intValue() : null,

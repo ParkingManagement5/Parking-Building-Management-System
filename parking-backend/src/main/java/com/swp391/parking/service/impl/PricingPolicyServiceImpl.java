@@ -187,9 +187,8 @@ public class PricingPolicyServiceImpl implements PricingPolicyService {
 
     /**
      * Manager: luon ep ve toa nha minh quan ly.
-     * Admin: CHI tao duoc gia global (building=null) — gia rieng cua 1 toa la viec
-     * cua Manager quan ly toa do, Admin khong con tao/sua thay nua (tranh trung
-     * chuc nang, giong cach da tach voi viec gan Staff vao toa).
+     * Admin: CHI tao duoc gia global (building=null) — gia rieng cua 1 toa la
+     * trach nhiem cua Manager quan ly toa do.
      */
     private ParkingBuilding resolveBuildingForWrite(Long requestedBuildingId, Long scopeBuildingId) {
         if (scopeBuildingId != null) {

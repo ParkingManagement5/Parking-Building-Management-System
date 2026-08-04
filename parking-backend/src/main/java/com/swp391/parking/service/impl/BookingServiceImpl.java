@@ -139,9 +139,8 @@ public class BookingServiceImpl implements BookingService {
         String bookingType = request.getBookingType() != null && !request.getBookingType().isBlank()
                 ? request.getBookingType().toUpperCase() : "HOURLY";
 
-        // Toa nha phai duoc chinh Manager cua toa do tu cau hinh gia rieng cho loai
-        // xe + loai dat cho nay truoc thi moi cho dat - khong con fallback ve gia
-        // global cua Admin nua (Admin khong con quyen dat/sua gia).
+        // Booking chi duoc tao khi Manager cua toa da tu cau hinh gia rieng cho
+        // loai xe + hinh thuc dat cho nay — khong co fallback ve gia global.
         if (!pricingPolicyRepository.existsByVehicleType_IdAndBuilding_IdAndTimeTypeAndIsActiveTrue(
                 vehicle.getVehicleType().getId(), buildingIdOf(slot), bookingType)) {
             throw new AppException(HttpStatus.BAD_REQUEST,
@@ -185,7 +184,7 @@ public class BookingServiceImpl implements BookingService {
             deposit = calculateDeposit(vehicle.getVehicleType().getName(), minutesUntilStart);
         } else {
             // Flat-rate booking theo goi (DAILY/WEEKLY/MONTHLY): prepay toan bo phi
-            // truoc khi nhan QR, khong duoc mien coc rieng cho DAILY nua
+            // truoc khi nhan QR, ap dung dong nhat cho ca 3 loai goi.
             deposit = calculatePrepayFlatRate(vehicle, bookingType, startTime, endTime, buildingIdOf(slot));
         }
 
@@ -389,6 +388,14 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
 
         log.info("Booking #{} QR regenerated, new expiry={}", bookingId, qrExpiry);
+
+        // Gui lai email voi QR moi — token cu bi verifyQrToken tu choi ngay khi
+        // setQrToken() o tren chay, nen email cu se khong dung duoc neu khong
+        // gui email moi o day.
+        Booking regeneratedBooking = booking;
+        userRepository.findById(regeneratedBooking.getUserId().intValue())
+                .ifPresent(user -> emailService.sendBookingQrEmail(user, regeneratedBooking));
+
         return toResponse(booking);
     }
 

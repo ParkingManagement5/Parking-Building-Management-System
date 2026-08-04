@@ -26,7 +26,6 @@ public class OcrScan extends BaseEntity {
     @JoinColumn(name = "session_id")
     private ParkingSession session;
 
-    // FK → gate (Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gate_id")
     private Gate gate;

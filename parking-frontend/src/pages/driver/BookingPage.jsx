@@ -333,7 +333,7 @@ export default function BookingPage() {
 
   // Backend tra ve pricingPolicies cua TAT CA toa nha cho driver (khong scope
   // theo building nhu Manager) - phai tu loc theo dung toa dang chon o day,
-  // neu khong bang gia se bi tran/lan giua cac toa (bug goc bao cao).
+  // neu khong bang gia se bi tran/lan giua cac toa.
   const buildingPricingPolicies = useMemo(
     () => (selectedSlot?.buildingId ? pricingPolicies.filter((p) => String(p.buildingId) === String(selectedSlot.buildingId)) : []),
     [pricingPolicies, selectedSlot],
@@ -402,13 +402,13 @@ export default function BookingPage() {
     setDurationUnits(1);
   }
 
-  // Input type="datetime-local" chi chan gio truoc "min" o cac trinh duyet
-  // ho tro dung, nhung UI lich/spinner cua Chrome (nhu trong screenshot loi)
-  // van cho bam chon gio truoc "min" ma khong bao loi - neu chap nhan thang
-  // gia tri do, bookingStart co the roi vao qua khu/qua gan hien tai, khien
-  // uoc tinh coc tinh minutesUntilStart am/nho hon 10p va hien nham "Mien phi"
-  // (trong khi thuc te backend se tu choi booking nay). Chan tai day bang cach
-  // ep ve toi thieu "now + 10 phut" thay vi nhan thang gia tri tu input.
+  // Input type="datetime-local" chi chan gio truoc "min" o cac trinh duyet ho
+  // tro dung, nhung UI lich/spinner cua Chrome van cho bam chon gio truoc
+  // "min" ma khong bao loi - neu chap nhan thang gia tri do, bookingStart co
+  // the roi vao qua khu/qua gan hien tai, khien uoc tinh coc tinh
+  // minutesUntilStart am/nho hon 10p va hien nham "Mien phi" (trong khi thuc
+  // te backend se tu choi booking nay). Chan tai day bang cach ep ve toi
+  // thieu "now + 10 phut" thay vi nhan thang gia tri tu input.
   function handleBookingStartChange(value) {
     if (!value) return;
     const picked = new Date(value);
@@ -418,6 +418,10 @@ export default function BookingPage() {
 
   async function handleConfirm() {
     if (!selection.vehicleId || !selectedSlot || isSelectedVehicleLocked) return;
+    if (isPackageMode && estimatedCost == null) {
+      setSubmitError("Tòa nhà chưa cấu hình giá cho gói này. Vui lòng chọn hình thức khác.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -940,12 +944,23 @@ export default function BookingPage() {
                       latestEffectivePolicy(policies, bookingStart, () => true) ||
                       policies[0];
                     const selected = bookingType === opt.value;
+                    // Toa nha chua cau hinh gia cho goi nay - khong cho chon, tranh
+                    // truong hop chon/xac nhan duoc goi ma backend chac chan se tu
+                    // choi luc bam "Xac nhan dat cho" (khong cau hinh gia = khong dat).
+                    const disabled = !policy;
                     return (
-                      <button key={opt.value} type="button" onClick={() => handleModeChange(opt.value)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${selected ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"}`}>
-                        <p className={`font-semibold text-sm mb-0.5 ${selected ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
-                        {policy && (
+                      <button key={opt.value} type="button" disabled={disabled}
+                        onClick={() => !disabled && handleModeChange(opt.value)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          disabled
+                            ? "border-border bg-muted/30 opacity-50 cursor-not-allowed"
+                            : selected ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"
+                        }`}>
+                        <p className={`font-semibold text-sm mb-0.5 ${selected && !disabled ? "text-primary" : "text-foreground"}`}>{opt.label}</p>
+                        {policy ? (
                           <p className="text-[11px] text-muted-foreground">{Number(policy.pricePerHour).toLocaleString("vi-VN")}đ/{opt.unitLabel}</p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground italic">Chưa có giá — liên hệ quản lý bãi</p>
                         )}
                         <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{opt.desc}</p>
                       </button>
@@ -1107,6 +1122,9 @@ export default function BookingPage() {
             </div>
           </div>
 
+          {isPackageMode && estimatedCost == null && (
+            <AlertBox>Tòa nhà chưa cấu hình giá cho gói này. Vui lòng chọn hình thức khác hoặc liên hệ quản lý bãi.</AlertBox>
+          )}
           <AlertBox>{submitError}</AlertBox>
 
           <div className="flex gap-3">
@@ -1114,7 +1132,7 @@ export default function BookingPage() {
               Quay lại
             </button>
             <button onClick={handleConfirm}
-              disabled={!selection.vehicleId || !selection.slotCode || submitting || isSelectedVehicleLocked}
+              disabled={!selection.vehicleId || !selection.slotCode || submitting || isSelectedVehicleLocked || (isPackageMode && estimatedCost == null)}
               className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors">
               {submitting ? "Đang tạo..." : "Xác nhận đặt chỗ"}
             </button>

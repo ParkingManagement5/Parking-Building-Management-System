@@ -28,8 +28,8 @@ public class PricingPolicyController {
     private final PricingPolicyService pricingPolicyService;
     private final UserRepository userRepository;
 
-    // Admin khong con dat/sua/xem bang gia nua - moi Manager toan quyen tu cau
-    // hinh gia rieng cho dung toa nha minh quan ly, tranh 2 noi cung sua 1 gia.
+    // Chi Manager duoc dat/sua bang gia, gioi han dung toa nha minh quan ly —
+    // tranh 2 role cung sua 1 gia.
 
     @PostMapping
     @Operation(summary = "Create pricing policy")

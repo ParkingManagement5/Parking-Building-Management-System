@@ -18,7 +18,6 @@ public class GateLog extends BaseEntity {
     @Column(name = "gate_log_id")
     private Long id;
 
-    // FK → gate (Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gate_id", nullable = false)
     private Gate gate;

@@ -23,16 +23,14 @@ public class ParkingSession extends BaseEntity {
     @JoinColumn(name = "booking_id")
     private Booking booking;
 
-    // FK → parking_slot (Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "slot_id", nullable = false)
     private ParkingSlot slot;
 
-    // FK → users (Quang) — dùng Long
+    // FK → users — dùng Long để khớp PK
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    // FK → vehicle (Du)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;

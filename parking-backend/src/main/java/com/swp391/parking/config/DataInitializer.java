@@ -56,11 +56,8 @@ public class DataInitializer implements CommandLineRunner {
     // go dau truc tiep) vi platform dang compile bang Cp1252 chu khong phai UTF-8
     // (pom.xml chua khai bao sourceEncoding) - escape la ASCII thuan nen doc
     // dung bat ke encoding nao, tranh bi mojibake nhu vai cho khac trong repo.
-    // Chi con 4 building chinh thuc dung cho demo (da bo 9 building phu -
-    // Pi Pink/Tao Dan/Landmark 81/Phu My Hung/Cong Hoa/Go Vap/Aeon Tan Phu/
-    // Binh Tan Hub/Sala Thu Thiem - de tranh bi tu dong tai tao moi lan app
-    // khoi dong, dung dung 4 toa nha that su duoc dung: FPT HCM, Ben Bach
-    // Dang, Le Van Tam, Tan Son Nhat).
+    // Danh sach seed demo co dinh 4 toa nha thuc te dang su dung: FPT HCM,
+    // Ben Bach Dang, Le Van Tam, Tan Son Nhat.
     private static final List<BuildingSeed> HCMC_BUILDINGS = List.of(
             new BuildingSeed("B\u00e3i xe FPT HCM", "L\u00f4 E2a-7, \u0110\u01b0\u1eddng D1, Long Th\u1ea1nh M\u1ef9, Th\u1ee7 \u0110\u1ee9c, TP.HCM", "0900000010", "parking@fpt.edu.vn", "B\u00e3i \u0111\u1ed7 xe demo 2 t\u1ea7ng \u00f4 t\u00f4 t\u1ea1i khu FPT HCM", 10.8413, 106.8098, "FPTHCM"),
             new BuildingSeed("B\u00e3i xe B\u1ebfn B\u1ea1ch \u0110\u1eb1ng", "T\u00f4n \u0110\u1ee9c Th\u1eafng, B\u1ebfn Ngh\u00e9, Qu\u1eadn 1, TP.HCM", "0900000012", "bachdang@parking.vn", "B\u00e3i \u0111\u1ed7 xe \u00f4 t\u00f4 g\u1ea7n ph\u1ed1 \u0111i b\u1ed9 Nguy\u1ec5n Hu\u1ec7", 10.7729, 106.7053, "BACHDANG"),

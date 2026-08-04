@@ -27,7 +27,7 @@ function asArray(payload) {
 
 function todayDateString() {
   // Dung thanh phan ngay-thang-nam theo local time — toISOString() quy ve
-  // UTC se lui 1 ngay voi mui gio +7 (xem fix tuong tu o StaffShiftPage).
+  // UTC se lui 1 ngay voi mui gio +7 (cung luu y ap dung o StaffShiftPage).
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");

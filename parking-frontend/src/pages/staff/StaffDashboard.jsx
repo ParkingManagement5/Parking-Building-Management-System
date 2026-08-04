@@ -9,9 +9,8 @@ import { exceptionApi } from "../../api/staff/exceptionApi";
 import { sessionApi } from "../../api/staff/sessionApi";
 import { getUserId } from "../../utils/auth";
 import { unwrapApiData } from "../../utils/api";
-import { pricingPolicyApi } from "../../api/manager/pricingPolicyApi";
 import { vehicleTypeApi } from "../../api/manager/vehicleTypeApi";
-import { computeSessionFee, formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
+import { formatStaffCurrency, formatStaffDateTime } from "./staffPortalState";
 import { StaffEmptyState, StaffPageSection, StaffStatBar, StaffStatusBadge } from "./StaffUi";
 
 function formatElapsed(entryTime) {
@@ -58,7 +57,6 @@ export default function StaffDashboard() {
   const [openRequests, setOpenRequests] = useState([]);
   const [ocrReviews, setOcrReviews] = useState([]);
   const [openExceptions, setOpenExceptions] = useState([]);
-  const [pricingPolicies, setPricingPolicies] = useState([]);
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [attendanceBusy, setAttendanceBusy] = useState(false);
   const [attendanceError, setAttendanceError] = useState("");
@@ -78,7 +76,6 @@ export default function StaffDashboard() {
           requestRes,
           ocrRes,
           exceptionRes,
-          pricingRes,
           vehicleTypeRes,
         ] = await Promise.allSettled([
           userId ? staffShiftApi.getByUser(userId) : Promise.resolve({ data: [] }),
@@ -88,7 +85,6 @@ export default function StaffDashboard() {
           requestApi.getByStatus("OPEN"),
           ocrApi.getPendingReviews(),
           exceptionApi.getByStatus("OPEN"),
-          pricingPolicyApi.getAll(),
           vehicleTypeApi.getAll(),
         ]);
 
@@ -102,7 +98,6 @@ export default function StaffDashboard() {
         setOpenRequests(settledData(requestRes, failures, [], "yêu cầu"));
         setOcrReviews(settledData(ocrRes, failures, [], "kiểm tra OCR"));
         setOpenExceptions(settledData(exceptionRes, failures, [], "sự cố"));
-        setPricingPolicies(settledData(pricingRes, failures, [], "bảng giá"));
         setVehicleTypes(settledData(vehicleTypeRes, failures, [], "loại xe"));
         if (failures.length > 0) {
           setError(`Một số phần không tải được: ${failures.join(", ")}. Dữ liệu hiển thị có thể chưa đầy đủ.`);
@@ -126,16 +121,13 @@ export default function StaffDashboard() {
     };
   }, [userId]);
 
-  function resolveHourlyRate(session) {
-    const policy = pricingPolicies.find(
-      (p) => p.isActive && p.vehicleTypeId === session?.vehicleTypeId
-    );
-    return Number(policy?.pricePerHour ?? 20000);
-  }
-
+  // Dung thang calculatedFee tu backend (SessionResponse) thay vi tu tinh lai
+  // o FE — FeeCalculatorUtil ben backend resolve gia theo dung building/loai
+  // xe/khung gio, tu tinh lai o day (gia mac dinh 20k/h khong phan biet loai
+  // xe) se ra so khac voi phi thuc te se thu, gay lech giua cac man hinh.
   const pendingAmount = useMemo(
-    () => waitingPayments.reduce((sum, item) => sum + computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)), 0),
-    [waitingPayments, pricingPolicies]
+    () => waitingPayments.reduce((sum, item) => sum + Number(item.calculatedFee || 0), 0),
+    [waitingPayments]
   );
 
   const upcomingShifts = useMemo(() => {
@@ -192,7 +184,7 @@ export default function StaffDashboard() {
     const paymentActivities = waitingPayments.slice(0, 3).map((item) => ({
       id: `payment-${item.sessionId}`,
       plate: item.licensePlate,
-      action: `Chờ thanh toán ${formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}`,
+      action: `Chờ thanh toán ${formatStaffCurrency(item.calculatedFee)}`,
       type: "payment",
       time: item.exitTime || item.entryTime,
     }));
@@ -207,7 +199,7 @@ export default function StaffDashboard() {
     return [...sessionActivities, ...paymentActivities, ...ocrActivities]
       .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
       .slice(0, 6);
-  }, [activeSessions, waitingPayments, ocrReviews, pricingPolicies]);
+  }, [activeSessions, waitingPayments, ocrReviews]);
 
   return (
     <div className="space-y-5">
@@ -301,7 +293,7 @@ export default function StaffDashboard() {
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Vào lúc {formatStaffDateTime(item.entryTime)}</span>
-                    <span className="font-semibold text-foreground">{formatStaffCurrency(computeSessionFee(item.entryTime, new Date(), resolveHourlyRate(item)))}</span>
+                    <span className="font-semibold text-foreground">{formatStaffCurrency(item.calculatedFee)}</span>
                   </div>
                 </div>
               ))}
@@ -347,8 +339,7 @@ export default function StaffDashboard() {
           ) : (
             <div className="space-y-3">
               {waitingPayments.slice(0, 5).map((item) => {
-                const rate = resolveHourlyRate(item);
-                const fee = computeSessionFee(item.entryTime, new Date(), rate);
+                const fee = item.calculatedFee;
                 return (
                   <button
                     key={item.sessionId}
@@ -360,7 +351,7 @@ export default function StaffDashboard() {
                       <div>
                         <p className="text-sm font-semibold text-foreground">{item.licensePlate}</p>
                         <p className="text-xs text-muted-foreground">
-                          Slot {item.slotCode} • {formatStaffCurrency(rate)}/h • {item.vehicleTypeName || "—"}
+                          Slot {item.slotCode} • {formatStaffCurrency(item.hourlyRate)}/h • {item.vehicleTypeName || "—"}
                         </p>
                       </div>
                       <StaffStatusBadge tone="amber">chờ thu</StaffStatusBadge>

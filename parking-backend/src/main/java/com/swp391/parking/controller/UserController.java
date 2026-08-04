@@ -49,8 +49,7 @@ public class UserController {
         boolean isManager = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_MANAGER"));
         if (isManager) {
-            // MANAGER chỉ thấy nhân viên thuộc toà nhà mình quản lý (không thấy
-            // toàn bộ nhân viên hệ thống như trước).
+            // MANAGER chỉ thấy nhân viên thuộc toà nhà mình quản lý.
             var manager = userRepository.findByUsername(authentication.getName())
                     .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Không tìm thấy user hiện tại"));
             Long managerBuildingId = manager.getAssignedBuilding() != null ? manager.getAssignedBuilding().getId() : null;

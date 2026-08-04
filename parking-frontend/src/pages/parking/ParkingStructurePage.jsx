@@ -69,7 +69,7 @@ export default function ParkingStructurePage() {
   const [vehicleTypes, setVehicleTypes] = useState([]);
   const [gates, setGates] = useState([]);
 
-  // Drill-down selection — day la phan thay the cho 4 route rieng biet truoc day
+  // Drill-down selection cho dieu huong Toa nha → Tang → Zone → Slot.
   const [selectedBuildingId, setSelectedBuildingId] = useState("");
   const [selectedFloorId, setSelectedFloorId] = useState("");
   const [selectedZoneId, setSelectedZoneId] = useState("");
@@ -78,8 +78,8 @@ export default function ParkingStructurePage() {
   const [filterSlotStatus, setFilterSlotStatus] = useState("all");
   const slotListRef = useRef(null);
 
-  // Modals: 1 bo state rieng cho tung cap, nhung field cha luon duoc dien san
-  // theo ngu canh dang xem thay vi de trong nhu 4 trang cu.
+  // Modals: 1 bo state rieng cho tung cap, field cha luon duoc dien san theo
+  // dung ngu canh dang xem.
   const [buildingModal, setBuildingModal] = useState(null); // { editingId, form } | null
   const [floorModal, setFloorModal] = useState(null);
   const [zoneModal, setZoneModal] = useState(null);
@@ -300,9 +300,8 @@ export default function ParkingStructurePage() {
     }
   }
 
-  // Goi la "Xoa" nhung backend gio la vo hieu hoa mem (khong con xoa cung du
-  // lieu nua) — giu nguyen ten API/route cu (buildingApi.delete goi endpoint
-  // /deactivate that su), chi doi lai chu hien thi cho dung ban chat.
+  // Hien thi la "Vo hieu hoa" nhung ham/API van ten "delete" — buildingApi.delete
+  // thuc chat goi endpoint /deactivate (vo hieu hoa mem, khong xoa du lieu).
   async function deactivateBuilding(id) {
     const ok = await confirm({
       title: "Vô hiệu hoá tòa nhà?",
